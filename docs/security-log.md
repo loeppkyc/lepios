@@ -76,6 +76,12 @@ When importing any of the 5 n8n workflow JSON files into a running n8n instance,
 2. When rotating a credential, replace with a variable reference in the same operation. Do not do a two-step (replace-with-new, then-replace-with-placeholder) that creates an intermediate commit with a live credential.
 3. The `{{VARIABLE}}` placeholder convention already used in these files (`{{N8N_WEBHOOK_TOKEN}}`) should be applied consistently to all credentials at the time the workflow files are first created.
 
+### Before sharing this repo
+
+**Before granting any user access to `loeppkyc/Loeppky`, the `loeppky_trigger_bot` token must be rotated via BotFather to invalidate the token still present in commit `fd8860c`'s history.**
+
+Risk accepted 2026-04-17 on the basis that the repo is private with no collaborators. This safeguard must be executed before visibility changes.
+
 ---
 
 ## INC-002 — Full Git History Secrets Scan (Streamlit OS repo)

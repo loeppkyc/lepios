@@ -52,7 +52,13 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ---
 
-## 5 — Kill Criterion (ARCHITECTURE.md §11)
+## 5 — Security Safeguards
+
+**Before granting any user access to `loeppkyc/Loeppky`, the `loeppky_trigger_bot` token must be rotated via BotFather to invalidate the token still present in commit `fd8860c`'s history.** (INC-001 — risk accepted 2026-04-17 while repo is private, no collaborators.)
+
+---
+
+## 6 — Kill Criterion (ARCHITECTURE.md §11)
 
 2 weeks from Phase 3 start: if LepiOS is not measurably helping Colin make or save money (Amazon Telegram alerts firing on real deals, Expenses tile tracking real spend, Betting/Trading tiles logging real activity), stop and simplify. Elegance is not a substitute for utility.
 
