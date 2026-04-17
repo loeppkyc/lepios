@@ -48,9 +48,15 @@ if (DRY_RUN_RESPONSE !== undefined) {
 } else {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    console.warn('[review] ANTHROPIC_API_KEY not set — skipping AI review (Layer 2)')
-    console.warn('[review] Set ANTHROPIC_API_KEY to enable the Reviewer Agent.')
-    process.exit(0)
+    console.error('')
+    console.error('[review] ✗ BLOCKED — ANTHROPIC_API_KEY not set in environment.')
+    console.error('[review]   The Reviewer Agent cannot run without it.')
+    console.error('[review]   Fix: add to your shell profile and reload:')
+    console.error('[review]     export ANTHROPIC_API_KEY=sk-ant-...')
+    console.error('[review]   Bypass (logs reason): ./scripts/commit-skip.sh "reason"')
+    console.error('[review]   Raw bypass (no log):  git commit --no-verify')
+    console.error('')
+    process.exit(1)
   }
 
   const client = new Anthropic({ apiKey })
