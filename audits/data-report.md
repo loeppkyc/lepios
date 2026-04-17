@@ -742,6 +742,8 @@ Required redesign: These belong in the `subscriptions` table with `person_handle
 
 Required redesign: Audit which tab name is canonical. The constant `RULES_SHEET = "🏪 Vendor Rules"` in auto_reconcile.py may be a bug (🏪 vs 🏷️). Resolve before porting — otherwise vendor classification breaks silently.
 
+**SD-4 RESOLVED AS BUG, NOT SCHEMA DEBT.** Audit completed 2026-04-17. Only one Vendor Rules tab has ever existed (`🏷️`, 82 rows). The `🏪` reference in `auto_reconcile.py:67` is a typo that caused silent data loss on every auto-learn attempt — `learn_vendor_rule()` wrote to a ghost tab that was never read back. The Streamlit OS bug will NOT be fixed (code is being retired). Migration implication: Port the 82 rules from `🏷️ Vendor Rules` to Supabase `vendor_rules` table as the source of truth. When LepiOS implements auto-learning, ensure the read path and write path reference the SAME schema and the SAME column set. Add an acceptance test: `learn_vendor_rule` writes a row → subsequent `load_vendor_rules` returns that row. [grounded: `streamlit_app/docs/vendor-rules-audit.md`]
+
 ### SD-5: Statement Lines uses string "Account Key" not a foreign key
 
 The `account` field in statement_lines is a free-text string ('td_chequing', 'amex', 'costco_mc'). There is no `accounts` reference table. [grounded: `utils/data_layer.py:383`]
