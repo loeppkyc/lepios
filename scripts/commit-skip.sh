@@ -38,4 +38,5 @@ printf "| %s | %s | %s | %s |\n" \
 echo "[commit-skip] Logged bypass to ${LOG_FILE}"
 echo "[commit-skip] Committing with --no-verify..."
 
+shift  # drop reason from args so it isn't forwarded to git commit
 SKIP_AI_REVIEW=1 git commit --no-verify "$@"
