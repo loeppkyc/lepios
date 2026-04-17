@@ -1,7 +1,8 @@
 # Secrets Diagnostic Notes — alerts_bot
 
 **Audit date:** 2026-04-17
-**Scope:** Read-only. No changes made to secrets.toml or .env files.
+**Resolution date:** 2026-04-17
+**Scope:** Diagnostic + one local edit (secrets.toml is gitignored).
 
 ---
 
@@ -55,21 +56,37 @@ Cannot confirm without checking @BotFather.
 
 ---
 
-## Resolution Steps (for Colin via BotFather)
+## Resolution
 
-1. Open Telegram → search `@BotFather` → `/mybots`
-2. Locate `loeppky_alerts_bot` in the list → tap **API Token** → copy it
-3. Note the bot_id (the numeric prefix before the colon)
-4. Verify it is **not** `8532992708` (daily bot) or `8660843715` (trigger bot)
-5. In `secrets.toml`, replace `[alerts_bot] token` with the correct token
-6. Add `chat_id = "8741603768"` to `[alerts_bot]` (same chat as `[telegram]`, unless alerts should go to a separate group)
-7. Also check if `8502932021` (BBV bot) is the alerts bot or a separate BBV bot
-8. After fixing the token: decide whether `send_alert()` should be updated to read from `[alerts_bot]` instead of `[telegram]`, or whether to leave `[telegram]` as the active path and create a dedicated `send_health_alert()` function for circuit-breaker and cron failures
+**`[alerts_bot]` removed from secrets.toml on 2026-04-17.**
+
+The section (2 lines: header + token) was deleted locally. secrets.toml is gitignored — this is a local-only change with no commit required.
+
+**Why removed rather than fixed:** No Python code reads `[alerts_bot]`. No `chat_id` was set. The token was a copy of `[builder_bot]`'s token — a trap that could mislead a future session into thinking alerts routing was wired when it wasn't.
+
+**`loeppky_alerts_bot` exists in BotFather** but was never wired to any code. No live impact from removal.
+
+---
+
+## If Alerts Bot Routing Is Needed in Future
+
+When Sprint 6 Telegram webhook work happens in LepiOS (or any session that needs dedicated health-check routing):
+
+1. Open Telegram → `@BotFather` → `/mybots` → find `loeppky_alerts_bot` → copy API Token
+2. Get bot_id (prefix before `:`) — verify it is **not** `8532992708` (daily) or `8660843715` (trigger)
+3. Re-add to secrets.toml cleanly:
+
+   ```toml
+   [alerts_bot]
+   token   = "<real loeppky_alerts_bot token>"
+   chat_id = "8741603768"
+   ```
+
+4. Wire a dedicated `send_health_alert()` function in `utils/alerts.py` that reads `[alerts_bot]`
+5. Route circuit-breaker and cron-failure alerts to that function; leave `send_alert()` on `[telegram]` for general use
 
 ---
 
 ## Current Live Behavior
 
-All `send_alert()` calls (including circuit breakers, auto-reconcile, price monitors, staple alerts) send via `loeppky_daily_bot` (8532992708) to chat_id `8741603768`. There is no separate routing to `loeppky_alerts_bot` yet. The `[alerts_bot]` section exists in secrets.toml but is wired to the wrong bot and consumed by no code.
-
-**No action is blocking.** Alerts are reaching Colin via `loeppky_daily_bot`. The fix is to (a) correct the token in `[alerts_bot]` and (b) optionally wire health-check-specific alerts to the alerts bot separately.
+All `send_alert()` calls (circuit breakers, auto-reconcile, price monitors, staple alerts) send via `loeppky_daily_bot` (bot_id `8532992708`) to chat_id `8741603768`. This is correct and unaffected by the removal of `[alerts_bot]`.
