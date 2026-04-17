@@ -1,75 +1,58 @@
 # Sprint 2 Port Plan — Betting Tile
 
-**Date:** 2026-04-17 | **Status:** AWAITING COLIN'S ANSWERS — do not start coding
-**Scope:** read-only tile + Kelly lib + acceptance tests. No auth, no live odds, no entry form.
+**Date:** 2026-04-17 | **Decisions locked:** 2026-04-18
+**Scope:** 2-step bet entry (log intent → settle result) + Kelly lib + EdgeSignal + Settle action. No auth, no live odds.
 
 ---
 
 ## DECISION QUESTIONS — Answer before any code lands
 
 **(a) Live odds integration — v1 or v1.1?**
-The Streamlit app fetches today's NHL/NBA/etc. games from The Odds API and shows
-per-game Kelly recommendations. Should LepiOS do the same in Sprint 2?
-
-- **No (stats-only, recommended):** Tile shows historical P&L, win rate, Kelly from
-  completed `bets` rows. Zero API cost. Ships fast.
-- **Yes (live odds):** Adds a server-side The Odds API call on every page load.
-  ~1–10 credits per sport. Requires `ODDS_API_KEY` in Vercel env. Natural Sprint 3.
-
-_Recommendation: defer to v1.1. Stats tile ships in Sprint 2, live card in Sprint 3._
+**DECISION: No.** Stats-only tile in v1. The Odds API research stays in this doc for v1.1 reference.
+Stats tile shows historical P&L, win rate, Kelly from completed `bets` rows. Zero API cost.
 
 ---
 
 **(b) Closing-odds capture mechanism — auto / manual / defer?**
-The `bets` table has a `closing_odds integer` column. Closing line is the benchmark
-for "did you beat the market?" — the sharpest signal of long-run edge.
-
-- **Auto from API:** at result-entry time, fetch closing line from Odds API historical
-  endpoint. Requires paid plan (free tier has limited historical access). Complex.
-- **Manual:** Colin types the closing odds when settling a bet. Simple, always correct.
-- **Defer to v1.1:** leave `closing_odds` NULL for now. Column is ready. No Sprint 2 scope.
-
-_Recommendation: defer. The column exists — capture it in v1.1 without blocking the tile._
+**DECISION: Defer.** `closing_odds` stays NULL in v1. Column is ready; revisit when The Odds API
+is wired in v1.1 (pairs naturally with live odds decision).
 
 ---
 
 **(c) Bet entry timing — log before placing / log after / both?**
-When does a bet get recorded?
+**DECISION: Before placing (overriding recommendation).** Log intent + reasoning at decision time.
+Two-step workflow:
 
-- **Before placing:** log intent (odds, stake, Kelly rec) → update result later.
-  Captures pre-result Kelly discipline. More fields required at entry time.
-- **After placing:** log once the bet is confirmed placed. Simpler form, more common.
-- **Both:** "draft" state → "placed" state. Overkill for v1.
+**Step 1 — Log intent** (at bet decision time):
+Fields: `bet_date`, `sport`, `league`, `home_team`, `away_team`, `bet_on`, `bet_type`,
+`odds`, `stake`, `bankroll_before`, `book`, `ai_notes` (reasoning), `kelly_pct` (computed)
+Sets: `result = 'Pending'`, `_source = 'lepios'`
 
-The current Streamlit flow logs before placing (you fill in odds + stake, result
-comes later). The Supabase schema supports either with `result = 'Pending'`.
+**Step 2 — Settle** (after game resolves):
+Fields: `result` (Win/Loss/Push), `pnl`, `bankroll_after`, `closing_odds` (optional, v1.1)
+Action: "Settle Bet" button on any pending row in the tile
 
-_Recommendation: after placing (status = 'Pending', result filled later). Matches Streamlit._
+No schema change needed — `result = 'Pending'` is already a valid enum value in the table.
 
 ---
 
 **(d) Multi-book support — v1 or v1.1?**
-The `bets` table has a `book text` column (SportsInteraction, BetMGM, etc.).
-Should Sprint 2 surface per-book stats (win rate, CLV by book)?
-
-- **v1:** show book as a field on bet rows. No per-book aggregation.
-- **v1.1:** add per-book breakdown in the tile detail view.
-
-_Recommendation: v1 — store the book, display it, no aggregation yet._
+**DECISION: v1 stores and displays `book` column. No per-book aggregation.** v1.1 can add
+breakdown views (win rate by book, CLV by book) once enough data accumulates.
 
 ---
 
 **(e) Tilt detection scope — v1 or v1.1?**
-The Streamlit page has a System Proof Panel that flags "LOSING EDGE" vs
-"PROFITABLE SYSTEM" based on win rate vs break-even. Should LepiOS show
-a tilt/edge signal in the tile?
+**DECISION: v1 ships with PROFITABLE / BREAK-EVEN / LOSING signal.**
+Signal uses a **30-bet rolling ROI window** (not all-time, not win-rate vs implied).
 
-- **v1:** show the edge signal (PROFITABLE / BREAK-EVEN / LOSING) as a
-  StatusLight + one-line label in the tile header. Pure math, no AI.
-- **v1.1:** add streak-based tilt detection ("5L streak → suggest pause"),
-  integrating with a future notification system.
+Thresholds (tunable — stored in `lib/betting-signals.ts`, not inline):
+- **PROFITABLE:** rolling ROI > +3%
+- **BREAK-EVEN:** rolling ROI -3% to +3%
+- **LOSING:** rolling ROI < -3%
 
-_Recommendation: v1 basic edge signal (it's 4 lines of math). Tilt alert is v1.1._
+Rendered as a StatusLight + label in the tile header.
+Thresholds in a constants file so they can be tightened without touching the component.
 
 ---
 
@@ -124,10 +107,52 @@ _Verify Python values with: `_kelly_fraction(p, o)` before implementing TS._
 
 ---
 
+## Betting Signals — `lib/betting-signals.ts`
+
+Constants file for tilt/edge signal thresholds. Never inline these in the component.
+
+```typescript
+// lib/betting-signals.ts
+
+/** Rolling window size for ROI signal calculation */
+export const SIGNAL_WINDOW = 30
+
+/** ROI thresholds (as decimals). Tune here, nowhere else. */
+export const ROI_PROFITABLE_THRESHOLD = 0.03   // > +3%
+export const ROI_LOSING_THRESHOLD     = -0.03  // < -3%
+
+export type EdgeSignal = 'PROFITABLE' | 'BREAK-EVEN' | 'LOSING'
+
+/**
+ * Compute the edge signal from the last N completed bets.
+ * Uses rolling ROI window — not all-time, not win-rate vs implied.
+ *
+ * @param bets  Completed bets (Win/Loss only), most-recent first
+ */
+export function rollingRoiSignal(
+  bets: Array<{ pnl: number | null; stake: number | null }>,
+  window = SIGNAL_WINDOW
+): EdgeSignal {
+  const slice = bets.slice(0, window).filter(b => b.stake && b.stake > 0)
+  if (slice.length === 0) return 'BREAK-EVEN'
+
+  const totalPnl   = slice.reduce((s, b) => s + (b.pnl ?? 0), 0)
+  const totalStake = slice.reduce((s, b) => s + (b.stake ?? 0), 0)
+  const roi        = totalStake > 0 ? totalPnl / totalStake : 0
+
+  if (roi > ROI_PROFITABLE_THRESHOLD) return 'PROFITABLE'
+  if (roi < ROI_LOSING_THRESHOLD)     return 'LOSING'
+  return 'BREAK-EVEN'
+}
+```
+
+---
+
 ## Supabase Bets Table (already exists — no migration needed)
 
-```
-id              uuid        PK
+```sql
+-- columns only — table already migrated
+-- id              uuid        PK
 bet_date        date        NOT NULL
 sport / league / home_team / away_team / bet_on / bet_type   text
 odds            integer     American (-150, +120)
@@ -248,43 +273,53 @@ export async function POST(request: Request) {
 
 ## Betting Tile Component Tree
 
-```
+```text
 app/(cockpit)/money/page.tsx                    [server component — already exists]
-  │  + fetch bets stats: direct Supabase query (same pattern as deals)
-  │  + wire PillBar label="Betting" value={bets_pnl_abs} max={1000}
+  │  + fetch bets: direct Supabase query (pending + last 30 completed)
+  │  + wire PillBar label="Betting" value={rolling30_roi_pct} max={20}
   │
-  └─ BettingTile (inline server block)           [new, ~80 lines inline per Sprint 1 pattern]
-       │  props: stats { completed, wins, losses, win_rate, total_pnl }
+  └─ BettingTile (inline server block)           [new, ~120 lines inline]
+       │  props: { pending, completed30, stats }
        │
        ├─ Tile header row
        │    ├─ <span className="label-caps">Betting</span>
-       │    ├─ EdgeSignal                         [inline: PROFITABLE/BREAK-EVEN/LOSING]
-       │    │    uses: win_rate vs implied break-even at avg odds
-       │    │    color: var(--color-positive) | var(--color-warning) | var(--color-critical)
-       │    └─ P&L readout: +$XX CAD monospace
+       │    ├─ EdgeSignal                         [PROFITABLE/BREAK-EVEN/LOSING]
+       │    │    source: lib/betting-signals.ts   rollingRoiSignal(last30)
+       │    │    color: var(--color-positive|warning|critical)
+       │    └─ Rolling 30-bet ROI readout: +X.X% monospace
        │
-       ├─ Empty state (completed === 0)
-       │    "No completed bets — import from Streamlit to populate"
+       ├─ Empty state (no bets)
+       │    "No bets yet — log your first bet to start tracking"
        │
-       └─ Stats row (completed > 0)
+       ├─ Pending bets section  (result = 'Pending', if any)
+       │    ├─ Section label: "PENDING (N)"  [label-caps]
+       │    └─ PendingBetRow × N
+       │         ├─ date · sport · bet_on · odds · stake · book
+       │         ├─ Kelly % at entry  [var(--font-mono)]
+       │         └─ [Settle]  button → PATCH /api/bets/:id
+       │              opens inline settle form:
+       │                result enum (Win/Loss/Push) + pnl + bankroll_after
+       │                submit → revalidatePath('/money')
+       │
+       └─ Completed stats section  (last 30 settled bets)
             ├─ W–L record  [var(--font-mono), var(--text-pillar-value)]
             ├─ Win rate %  [color-coded: ≥55% positive, <45% critical]
-            ├─ Season P&L  [+ green / - red]
-            └─ Pending badge  [count of result='Pending']
+            ├─ Season P&L  [+ green / - red, all-time]
+            └─ Rolling 30 ROI  [drives EdgeSignal color]
 
-Design tokens in use (all defined in globals.css):
-  var(--color-surface)          tile background
-  var(--color-border)           tile border + row dividers
-  var(--color-positive)         #4CAF50 — win / profit
-  var(--color-warning)          #c89b37 — break-even
-  var(--color-critical)         #cc1a1a — loss / losing edge
+Design tokens (all defined in globals.css):
+  var(--color-surface)                  tile background
+  var(--color-border)                   tile border + row dividers
+  var(--color-positive)   #4CAF50       win / profit / PROFITABLE
+  var(--color-warning)    #c89b37       break-even
+  var(--color-critical)   #cc1a1a       loss / LOSING
   var(--color-text-primary/secondary/muted/disabled)
-  var(--font-mono)              numeric readouts
-  var(--font-ui)                labels + caps
-  var(--text-pillar-value)      large stat numbers
-  var(--text-small / nano)      secondary labels
-  var(--radius-md / sm)         border radii
-  var(--color-pillar-money)     money pillar accent
+  var(--font-mono)                      numeric readouts
+  var(--font-ui)                        labels + caps
+  var(--text-pillar-value)              large stat numbers
+  var(--text-small / nano)              secondary labels
+  var(--radius-md / sm)                 border radii
+  var(--color-pillar-money)             money pillar accent
 ```
 
 **Sprint 4 extract:** once this pattern is duplicated 3+ times, extract to
