@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Layer 1 — deterministic checks (zero tokens, fast)
+npx lint-staged
+
+# Layer 2 — AI diff review (Sonnet, ~3-5s)
+# Skip if SKIP_AI_REVIEW=1 (e.g. in CI or explicit bypass)
+if [ "${SKIP_AI_REVIEW}" != "1" ]; then
+  node scripts/ai-review.mjs
+fi
