@@ -8,7 +8,9 @@
  * until orders/transactions are populated in Sprint 2.
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+
+export const dynamic = 'force-dynamic'
 
 // ── Sprint 4: extract to components/cockpit/ArcGauge.tsx ─────────────────────
 function arcPath(pct: number, cx: number, cy: number, r: number) {
@@ -124,7 +126,7 @@ function StatusLight({ status, label }: { status: 'ok' | 'warn' | 'error' | 'inf
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function MoneyPage() {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data: deals, error } = await supabase
     .from('deals')
