@@ -90,20 +90,29 @@ export function kellyStake(
 
 ### Numerical equivalence — 10 test cases
 
+> **CORRECTION NOTE — 2026-04-18:** Values in this table were verified against the actual Python
+> source by running `_kelly_fraction(p, o)` before implementing TypeScript. Three values in the
+> original table were incorrect by ~10% (arithmetic errors, not rounding). The corrected values
+> are now the source of truth. If `_kelly_fraction` or `_kelly_pct` is ever modified, these
+> values must be re-verified by re-running the Python function before updating any tests.
+>
+> Corrected rows: `0.550 at -110` (was 0.050 → **0.055**),
+> `0.600 at -110` (was 0.145 → **0.160**), `0.550 at +120` (was 0.182 → **0.175**).
+
 | winProb | americanOdds | Python `_kelly_fraction` | Expected TS `kellyFraction` |
 | ------- | ------------ | ------------------------ | --------------------------- |
-| 0.600   | -150         | 0.000                    | 0.000 (no edge at implied)  |
+| 0.600   | -150         | 0.000                    | 0.000                       |
 | 0.650   | -150         | 0.125                    | 0.125                       |
 | 0.700   | -150         | 0.250                    | 0.250                       |
-| 0.550   | -110         | 0.050                    | 0.050                       |
-| 0.600   | -110         | 0.145                    | 0.145                       |
-| 0.400   | +120         | 0.000 (neg edge)         | 0.000                       |
-| 0.500   | +120         | 0.091                    | 0.091                       |
-| 0.550   | +120         | 0.182                    | 0.182                       |
-| 0.450   | -150         | 0.000 (neg edge)         | 0.000                       |
-| 1.000   | -150         | 1.000 (capped at 1)      | 1.000                       |
+| 0.550   | -110         | 0.055                    | 0.055                       |
+| 0.600   | -110         | 0.160                    | 0.160                       |
+| 0.400   | +120         | 0.000                    | 0.000                       |
+| 0.500   | +120         | 0.083                    | 0.083                       |
+| 0.550   | +120         | 0.175                    | 0.175                       |
+| 0.450   | -150         | 0.000                    | 0.000                       |
+| 1.000   | -150         | 1.000                    | 1.000                       |
 
-_Verify Python values with: `_kelly_fraction(p, o)` before implementing TS._
+_Values verified 2026-04-18 by running `_kelly_fraction(p, o)` against Python source._
 
 ---
 
