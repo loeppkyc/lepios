@@ -601,11 +601,12 @@ The Supabase `bets` table schema was designed from scratch and is richer
 
 ---
 
-## Sprint 2 Execution Order (pending Decision answers)
+## Sprint 2 Execution Order
 
-1. `npm install -D vitest` — add test runner
-2. `lib/kelly.ts` — pure math, no deps
-3. `tests/kelly.test.ts` — run green before any other code
+1. ✅ `npm install -D vitest` — vitest 4.1.4, `vitest.config.ts` with `@/` alias
+2. ✅ `lib/kelly.ts` — 102 lines, strict TS, 5 exports. Source: `3_Sports_Betting.py:361,1136`
+3. ✅ `tests/kelly.test.ts` — 38/38 passing. Includes 10 numerical cases + edge cases.
+   Note: 3 port-plan table values were wrong; corrected before tests written (see `docs/hallucination-log.md`)
 4. `app/api/bets/route.ts` GET — mirrors deals route
 5. `tests/bets-api.test.ts` — mock Supabase, verify stats aggregation
 6. Wire `money/page.tsx` — Supabase bets query + BettingTile block + EdgeSignal
