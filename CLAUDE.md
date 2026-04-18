@@ -58,7 +58,13 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ---
 
-## 6 — Kill Criterion (ARCHITECTURE.md §11)
+## 6 — Data Integrity Rules
+
+**Historical Streamlit bets data is NOT trusted for LepiOS signals pending an odds-integrity audit (BACKLOG-1).** Do not import bets from Streamlit SQLite/Sheets into the Supabase `bets` table without explicit approval from Colin and a verified audit. See `audits/migration-notes.md` BACKLOG-1 for scope and methodology requirements.
+
+---
+
+## 7 — Kill Criterion (ARCHITECTURE.md §11)
 
 2 weeks from Phase 3 start: if LepiOS is not measurably helping Colin make or save money (Amazon Telegram alerts firing on real deals, Expenses tile tracking real spend, Betting/Trading tiles logging real activity), stop and simplify. Elegance is not a substitute for utility.
 

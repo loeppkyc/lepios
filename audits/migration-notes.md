@@ -56,6 +56,44 @@ Update `deal_scan.py` to write `status='rejected'` when brand/ROI/rank filter el
 
 ---
 
+## BACKLOG-1 — Historical Sports Bets Odds Integrity Audit
+
+**Sprint:** Pre-import prerequisite — NOT v1, no action without Colin's explicit approval
+**Source:** Colin identified during Sprint 2 Chunk 3 planning (2026-04-18)
+
+**Context:**
+Colin identified a bug in the Streamlit OS where odds were entered as the same value on every
+game for some period. This means historical `implied_prob` and `kelly_pct` calculations stored
+in the Streamlit bets history are unreliable for those rows. Importing this data into LepiOS
+without auditing would corrupt the `rollingRoiSignal` and any future calibration analysis.
+
+**Prerequisite for:** importing ANY Streamlit bet history into the LepiOS `bets` table.
+
+**Scope of audit:**
+
+1. **Identify affected time window:** Query the Streamlit bets source (Google Sheets `🎰 Bets` tab)
+   and find rows where odds are suspiciously uniform (e.g., same value for multiple consecutive
+   games across different sports/matchups). Flag the start and end date of the affected window.
+
+2. **Classify bets:**
+   - `usable` — odds appear correct and independently verifiable
+   - `fixable` — correct odds can be reconstructed from Play Alberta history or memory
+   - `unsalvageable` — odds cannot be verified; row must be excluded from migration
+
+3. **Document methodology:** Before any migration runs, produce a written audit doc in
+   `docs/historical-bets-audit.md` showing the classification methodology, counts per category,
+   and the proposed fix for `fixable` rows.
+
+4. **Approval gate:** Colin reviews the audit doc and explicitly approves the migration plan.
+
+**Migration:** Only `usable` + verified-`fixable` rows are eligible for import.
+The import script must set `_source = 'streamlit-import'` (not `'lepios'`) so imported rows
+are distinguishable from natively-logged bets.
+
+**Not v1. No action without Colin's explicit approval.**
+
+---
+
 ## MN-3 — Multi-User RLS Gate (Sprint 5 Hard Prerequisite)
 
 **Sprint:** Sprint 5 (auth + multi-user) — HARD GATE, see ARCHITECTURE.md §7.3
