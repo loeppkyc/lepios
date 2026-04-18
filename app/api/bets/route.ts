@@ -46,17 +46,18 @@ export async function GET(request: Request) {
   })
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid query parameters', issues: parsed.error.issues }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid query parameters', issues: parsed.error.issues },
+      { status: 400 }
+    )
   }
 
   const { from, to, result, limit } = parsed.data
 
   // Build filter chain first — order/limit must come last (PostgREST requirement)
   // TODO Sprint 5: derive person_handle from user session mapping
-  let query = supabase
-    .from('bets')
-    .select(BET_SELECT_COLS)
-    .eq('person_handle', 'colin')
+  // SPRINT5-GATE: replace with profiles table lookup before adding any second auth user (see ARCHITECTURE.md §7.3, MN-3)
+  let query = supabase.from('bets').select(BET_SELECT_COLS).eq('person_handle', 'colin')
 
   if (from) query = query.gte('bet_date', from)
   if (to) query = query.lte('bet_date', to)
@@ -86,7 +87,10 @@ export async function POST(request: Request) {
 
   const parsed = BetInsertSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Validation failed', issues: parsed.error.issues },
+      { status: 400 }
+    )
   }
 
   const betData = parsed.data
@@ -101,7 +105,8 @@ export async function POST(request: Request) {
       ...betData,
       implied_prob: impliedProb,
       kelly_pct: kellyPctValue,
-      person_handle: 'colin', // TODO Sprint 5: derive from session user mapping
+      // SPRINT5-GATE: replace with profiles table lookup before adding any second auth user (see ARCHITECTURE.md §7.3, MN-3)
+      person_handle: 'colin',
       _source: 'lepios',
     })
     .select()

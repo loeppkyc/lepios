@@ -53,3 +53,75 @@ ALTER TABLE deals ADD CONSTRAINT deals_status_check
 Update `deal_scan.py` to write `status='rejected'` when brand/ROI/rank filter eliminates a deal (currently deals that fail filters are simply not saved). Update Telegram buy/skip handler to write `status='passed'` on Skip.
 
 **Not a v1 change.** Do not implement until the Telegram buy/skip workflow is wired.
+
+---
+
+## MN-3 — Multi-User RLS Gate (Sprint 5 Hard Prerequisite)
+
+**Sprint:** Sprint 5 (auth + multi-user) — HARD GATE, see ARCHITECTURE.md §7.3
+**Source:** RLS verification checks run 2026-04-18, session before Chunk 3
+
+The current RLS policy on `bets` (and all other person-scoped tables) is:
+
+```sql
+-- Current — permissive: allows any authenticated user to read/write all rows
+CREATE POLICY bets_authenticated ON bets
+  FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+```
+
+This is safe today (auth.users = 0), but will break multi-user isolation the moment a second user is created. Before any second user is added:
+
+**Step 1 — Create profiles table:**
+
+```sql
+CREATE TABLE profiles (
+  user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  person_handle text NOT NULL UNIQUE
+);
+
+-- Seed for Colin's account once created
+-- INSERT INTO profiles (user_id, person_handle) VALUES ('<colin_auth_uid>', 'colin');
+```
+
+**Step 2 — Update RLS on all person-scoped tables** (`bets`, `trades`, `transactions`, `products`, `deals`, `net_worth_snapshots`, `agent_events`):
+
+```sql
+-- Drop permissive policy
+DROP POLICY bets_authenticated ON bets;
+
+-- SELECT: own rows only
+CREATE POLICY bets_select ON bets FOR SELECT
+  USING (
+    person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())
+  );
+
+-- INSERT: own rows only
+CREATE POLICY bets_insert ON bets FOR INSERT
+  WITH CHECK (
+    person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())
+  );
+
+-- UPDATE: own rows only
+CREATE POLICY bets_update ON bets FOR UPDATE
+  USING (
+    person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())
+  );
+```
+
+Repeat for all person-scoped tables.
+
+**Step 3 — Remove hardcoded person_handle from routes:**
+All routes tagged with `// SPRINT5-GATE` must be updated to derive `person_handle` via:
+
+```typescript
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('person_handle')
+  .eq('user_id', user.id)
+  .single()
+const personHandle = profile?.person_handle
+```
+
+**Verification:** Log in as a second auth user. Attempt SELECT and INSERT on rows owned by 'colin'. Both must return 0 rows / RLS violation.

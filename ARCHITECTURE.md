@@ -22,12 +22,12 @@ This document is the single source of truth for LepiOS. Every agent — human or
 
 Life is organized into four top-level pillars. Every metric in the system rolls up to one of them. Every pillar rolls up into a single master metric: the **Quality of Life Index**.
 
-| Pillar | Core question | Example inputs |
-|---|---|---|
-| **Money** | Am I making money? Is wealth compounding? | Amazon P&L, sports betting ROI, trading P&L, expenses (business vs personal, Colin vs Megan), cash position, net worth trajectory |
-| **Health** | Am I / we healthy? | Oura (readiness, HRV, sleep), weight, strength, energy, medical flags — for Colin, Megan, and Cora |
-| **Growing** | Am I advancing? Is quality of life trending up? | Composite score benchmarked against age cohort; rolls up progress from other pillars plus skills, learning, project shipping |
-| **Happy** | Am I / we happy? | Daily self-rating, mood signals, Cora's mental state, Megan's wellbeing, time spent on what matters |
+| Pillar      | Core question                                   | Example inputs                                                                                                                    |
+| ----------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Money**   | Am I making money? Is wealth compounding?       | Amazon P&L, sports betting ROI, trading P&L, expenses (business vs personal, Colin vs Megan), cash position, net worth trajectory |
+| **Health**  | Am I / we healthy?                              | Oura (readiness, HRV, sleep), weight, strength, energy, medical flags — for Colin, Megan, and Cora                                |
+| **Growing** | Am I advancing? Is quality of life trending up? | Composite score benchmarked against age cohort; rolls up progress from other pillars plus skills, learning, project shipping      |
+| **Happy**   | Am I / we happy?                                | Daily self-rating, mood signals, Cora's mental state, Megan's wellbeing, time spent on what matters                               |
 
 Each pillar has specialist sub-agent(s) whose job is to (1) define what "good" looks like in that domain, (2) score current state, (3) recommend the next action, (4) explain itself in plain language. **Agents never make Colin's decisions — they sharpen them.**
 
@@ -40,6 +40,7 @@ LepiOS is a **situation room with a standing council of specialists** continuous
 ### 3.1 Permanent Council Roster (v1)
 
 **System-level agents (always on):**
+
 - **Digital Twin** — synthesizes across all agents; speaks as Colin's proxy; produces the `Next Move` recommendation; owns the deliberation feed.
 - **Safety & Security Agent** — Tier 0 monitor. Reads every proposed write, migration, git operation, secret-adjacent action. Vetoes or escalates. Always on. Preempts everything.
 - **Reality-Check Agent** — grounds every other agent's output. Tags claims as **grounded** (evidence-backed) or **generated** (prose). Generated content cannot be promoted to canonical without Colin's explicit approval. Runs cheap, Ollama-eligible.
@@ -47,12 +48,14 @@ LepiOS is a **situation room with a standing council of specialists** continuous
 - **Context Budget Manager** — sibling to Token Budget Manager (see §8.5). Tokens are money; context depth is accuracy. Both get managed.
 
 **Life-domain agents (Money pillar, v1 priority):**
+
 - **Trading Agent** — decision support. Pre-market prep, setup summarization from sources Colin trusts, risk budget, P&L logging. **Does not generate trade signals for Colin to execute blindly.**
 - **Betting Agent** — decision support and honest logging. Bankroll rules, Kelly sizing math on Colin's picks (integrates existing Kelly Sizer component), tilt detection, ROI tracking. **Picks come from Colin.**
 - **Amazon Agent** — web scouting for online arbitrage deals, monitoring High Demand tier 1 authors and Collectibles tiers, Telegram alerts when deals hit. Orchestrates the scan/list/ship workflow Colin already uses. **Hands-on sourcing through pallets stays Colin's.**
 - **Expenses Agent** — classifies business vs personal, Colin vs Megan; flags anomalies.
 
 **Life-domain agents (v2+, stubs in v1):**
+
 - **Doctor Agent** — health composite for Colin, Megan, Cora; flags trajectory changes.
 - **Fitness/Trainer Agent** — Oura + workout + strength.
 - **Nutrition Agent** — food inventory, groceries, eating patterns.
@@ -61,6 +64,7 @@ LepiOS is a **situation room with a standing council of specialists** continuous
 - **Friend / Stranger Agent** — outside perspective; devil's advocate.
 
 **Design Council (ships v1 looking like a cockpit, not a generic SaaS app):**
+
 - **Art Director Agent** — aesthetic vision; references Bloomberg Terminal, Apollo mission control, high-end trading platforms, sci-fi HUDs, Teenage Engineering. Actively prevents generic-Claude-coder look.
 - **Motion Agent** — animation, transitions, micro-interactions.
 - **Data-viz Agent** — chooses the truthful, beautiful visualization per metric.
@@ -98,9 +102,11 @@ LepiOS is a **situation room with a standing council of specialists** continuous
 4. **Situation Room Ticker.** Slim strip showing latest council deliberation headline.
 
 ### 4.2 Reusable Primitives
+
 `<Gauge>`, `<PillBar>`, `<StatusLight>`, `<CockpitRow>`, `<NextMoveButton>`, `<SituationTicker>`. Every section uses these. No freelancing.
 
 ### 4.3 Design Council Deliverable (Phase 2 gate)
+
 Mood boards, typography/color tokens, motion principles, coded mockups of each primitive, and a 10-minute **taste session** with Colin to lock direction before any cockpit code is written.
 
 ---
@@ -134,6 +140,7 @@ Mood boards, typography/color tokens, motion principles, coded mockups of each p
 v1 ships when LepiOS can drive a profitable earning day. Target: 4–6 weeks of parallel council work, **contingent on the 2-week kill criterion** (§11).
 
 ### 7.1 Must ship in v1
+
 - Cockpit home with primitives, master gauge, Next Move button, Situation Room ticker.
 - **Money pillar operational:**
   - **Trading tile** — prep and logging. Daily briefing from Trading Agent. P&L logging. No blind signals.
@@ -145,10 +152,14 @@ v1 ships when LepiOS can drive a profitable earning day. Target: 4–6 weeks of 
 - Overnight autonomy limited to research and deal-scouting, not code-writing.
 
 ### 7.2 Stubbed but visible in v1
+
 Health / Growing / Happy pillars grayed out with "coming in v2."
 
 ### 7.3 Out of scope for v1
+
 Doctor/Fitness/Nutrition/Coach/Teacher agents, full Situation Room deliberation feed, Megan login, WhatsApp, Tesla API, cross-border relocation features, autonomous overnight code-writing.
+
+- **Multi-user auth — HARD GATE on Sprint 5 prerequisite.** Before any second user is added to auth.users, the following must ship and be verified: (a) a `profiles(user_id uuid PRIMARY KEY, person_handle text NOT NULL)` table with FK to auth.users, (b) updated RLS policies on all person-scoped tables (`bets`, `trades`, `transactions`, `products`, `deals`, `net_worth_snapshots`, `agent_events`) replacing the permissive `auth.uid() IS NOT NULL` check with `person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())` on both USING and WITH CHECK, (c) removal of hardcoded `person_handle = 'colin'` from `app/api/bets/route.ts` and any other route that acquires this constraint during v1. Verification: attempt cross-user SELECT and INSERT as a second auth user and confirm both are blocked. See `audits/migration-notes.md` MN-3 for SQL migration sketch.
 
 ---
 
@@ -173,7 +184,7 @@ Doctor/Fitness/Nutrition/Coach/Teacher agents, full Situation Room deliberation 
 For every proposed unit of work, the agent asks and documents:
 
 1. **Does this already exist?** Grep the repo, list the files, check Supabase schema, check existing components, check past Claude Code sessions. Report findings.
-2. **If it exists, what's the state?** *Working / Partial / Broken / Stale.*
+2. **If it exists, what's the state?** _Working / Partial / Broken / Stale._
 3. **What's the right action?** Pick one:
    - **Leave alone** (works, meets v1 bar) — document and move on.
    - **Beef up** (exists but under-built) — extend in place, don't rewrite.
@@ -185,7 +196,7 @@ This rule applies to components, database tables, RLS policies, agents, scripts,
 
 ### 8.5 Accuracy-Zone Pipeline — Hallucination Management
 
-Context degradation under scope is the #1 quality risk. Model accuracy falls *exponentially* as context depth and task scope increase. The "good zone" is early in a fresh context on a tight-scope task. We must stay in that zone.
+Context degradation under scope is the #1 quality risk. Model accuracy falls _exponentially_ as context depth and task scope increase. The "good zone" is early in a fresh context on a tight-scope task. We must stay in that zone.
 
 **Tight-scope execution rule.** Every agent task has a token budget and a scope budget. A build task is "implement `<Gauge>` primitive to pass these three tests" — not "build the cockpit." A research task is "audit Supabase `expenses` table schema" — not "audit everything." If a task can't be stated in one sentence with a clear acceptance criterion, it's too big. Break it.
 
@@ -195,9 +206,9 @@ Context degradation under scope is the #1 quality risk. Model accuracy falls *ex
 
 **Star topology, not long chains.** A coordinator holds the plan and dispatches short, independent tasks to workers. Each worker returns a small verified artifact and its context is discarded. The plan is the artifact, not the coordinator's memory. If the coordinator's context fills, coordinator swap.
 
-**Calibrated confidence.** Every output includes confidence level and grounding statement. "Megan's BP trending up 4% over 3 weeks (grounded: Oura BP field, 21 readings)" is fine. Unsourced prose is flagged and not surfaced. Agents are taught to say *I don't know*.
+**Calibrated confidence.** Every output includes confidence level and grounding statement. "Megan's BP trending up 4% over 3 weeks (grounded: Oura BP field, 21 readings)" is fine. Unsourced prose is flagged and not surfaced. Agents are taught to say _I don't know_.
 
-**Hot-zone mapping.** Empirically measure where accuracy drops for each task type on each model. Log failures with context depth, task type, model. The accuracy zone is *tuned with data from our own runs*, not assumed.
+**Hot-zone mapping.** Empirically measure where accuracy drops for each task type on each model. Log failures with context depth, task type, model. The accuracy zone is _tuned with data from our own runs_, not assumed.
 
 **Hallucination log.** Every caught hallucination goes in `docs/hallucination-log.md` with context depth, task, model, and corrective action. This feeds the CLAUDE.md #4 failures-and-successes bucket.
 
@@ -220,8 +231,9 @@ Context degradation under scope is the #1 quality risk. Model accuracy falls *ex
 ## 10. CLAUDE.md Alignment
 
 CLAUDE.md (global + project) must capture:
+
 1. Knowledge compression (`/init`).
-2. Preferences/conventions — e.g., *write acceptance tests first*, *check before build*, *tight-scope tasks*, *never freelance the look*, *Ollama for clerical*.
+2. Preferences/conventions — e.g., _write acceptance tests first_, _check before build_, _tight-scope tasks_, _never freelance the look_, _Ollama for clerical_.
 3. Capabilities declaration — tools, MCPs, skills, sub-agents, when to use them.
 4. Failures & successes log — fed continuously from the hallucination log and build retrospectives.
 
@@ -236,8 +248,8 @@ ARCHITECTURE.md is the north star. CLAUDE.md is the working playbook.
 - **Phase 3 — Delegated Parallel Build:** v1 scope built in parallel worktrees with tight-scope tasks, handoffs, acceptance tests, Reality-Check gates.
 - **Phase 4 — Integration & Polish:** merge, Puppeteer end-to-end, ship v1.
 
-**Kill criterion — 2 weeks from Phase 3 start.** If LepiOS is not measurably helping Colin make or save money by that point (Amazon deal-scouting firing real Telegram alerts Colin acts on, Expenses tile accurately tracking his actual spend, Betting/Trading tiles logging his activity honestly), we stop, re-evaluate, and possibly simplify the architecture. No sunk-cost. *Does this make money this week?* is the test. Elegance is not a substitute for utility.
+**Kill criterion — 2 weeks from Phase 3 start.** If LepiOS is not measurably helping Colin make or save money by that point (Amazon deal-scouting firing real Telegram alerts Colin acts on, Expenses tile accurately tracking his actual spend, Betting/Trading tiles logging his activity honestly), we stop, re-evaluate, and possibly simplify the architecture. No sunk-cost. _Does this make money this week?_ is the test. Elegance is not a substitute for utility.
 
 ---
 
-*Last updated: April 17, 2026. Supersedes all prior informal specs. Changes require explicit Colin ratification.*
+_Last updated: April 17, 2026. Supersedes all prior informal specs. Changes require explicit Colin ratification._
