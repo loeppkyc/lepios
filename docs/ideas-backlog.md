@@ -1,0 +1,68 @@
+# LepiOS — Ideas Backlog
+
+Long-horizon ideas that are NOT v1 scope. Each entry documents context, phases, and hard rules.
+No work begins on any item without explicit Colin approval post-v1 kill-criterion.
+
+---
+
+## BACKLOG-2 — Sports Prediction Modeling Pipeline (Multi-Phase)
+
+**Status:** NOT STARTED. Not v1. No action without Colin's explicit approval post-v1 kill-criterion.
+**Raised:** 2026-04-18
+
+**Context:**
+Colin raised the idea of backtesting historical game data to build win-probability models that
+could feed into the Betting tile's Kelly calculator. This is legitimate long-term work — but it is
+explicitly a post-v1 initiative. The v1 betting tile uses Colin's own win-probability estimates,
+which is intentional (calibration-first; build models only once you have baseline data to beat).
+
+---
+
+### Phase 1 — Historical Game Database Only
+
+- NBA, NFL, MLB, NHL — 5-10 seasons of historical game data
+- Sources: publicly available APIs (Retrosheet, basketball-reference, etc.) — no odds data
+- Goal: queryable archive as decision support context for the Betting Agent
+- Output: `game_history` table in Supabase with standardized schema
+- No modeling. No odds. No Kelly. Just data.
+- **Gate:** explicit Colin approval before Phase 1 starts
+
+---
+
+### Phase 2 — Baseline Per-Sport Win-Probability Models
+
+- Train on 70% of Phase 1 data, test on 30% out-of-sample
+- Goal: calibration, NOT beating books
+- Acceptance criterion: Brier score ≤ 0.25 per sport (better than coin-flip calibration)
+- Output: model files + calibration curves per sport
+- **Gate:** Phase 1 complete + Colin approval
+
+---
+
+### Phase 3 — Historical Odds Integration + ROI Measurement
+
+- Requires paid-tier historical odds data (The Odds API or similar)
+- Retrain with closing odds as calibration benchmark
+- Measure ROI against realistic vig on 3-year out-of-sample holdout
+- **HARD RULE:** If ROI is not demonstrably positive after vig on the out-of-sample period,
+  the model is NOT deployed. No exceptions. No "it was close."
+- Output: ROI curve, calibration plots, confidence intervals
+- **Gate:** Phase 2 complete + positive ROI confirmed + Colin approval
+
+---
+
+### Phase 4 — Live Integration
+
+- Positive-EV flagging with Kelly sizing in the Betting tile
+- Model outputs feed `implied_prob` override if confidence threshold met
+- **Gate:** Phase 3 positive ROI confirmed + Colin approval
+
+---
+
+### Hard Rules (apply to all phases)
+
+1. No phase ships without prior phase validation — no skipping
+2. Backtest claims never trigger real-money bets — model is decision support only
+3. Colin's own win-probability estimates always remain primary input; model is a secondary signal
+4. No Phase 1 start without explicit Colin approval after v1 kill-criterion is met
+5. Every model output is tagged **generated** by the Reality-Check Agent until Phase 3 ROI is confirmed
