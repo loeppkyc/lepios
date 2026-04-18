@@ -36,14 +36,15 @@ describe('Betting Tile — /money', () => {
   })
 
   afterAll(async () => {
-    await browser.close()
+    // browser.close() can hang on Windows — race with a 5s timeout
+    await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 5000))])
   })
 
   // ── Test 1: Page loads without errors ──────────────────────────────────────
 
   it('page loads at /money without JS errors', async () => {
     const jsErrors: string[] = []
-    page.on('pageerror', (err) => jsErrors.push(err.message))
+    page.on('pageerror', (err) => jsErrors.push((err as Error).message))
 
     const res = await page.goto(MONEY_URL, { waitUntil: 'networkidle0' })
     expect(res?.status()).toBeLessThan(500)

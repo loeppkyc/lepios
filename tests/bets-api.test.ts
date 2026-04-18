@@ -318,7 +318,7 @@ describe('POST /api/bets — success path', () => {
     const builder = makePostBuilder({ data: { ...mockInsertedBet, result: 'pending' }, error: null })
     mockFrom.mockReturnValue(builder)
 
-    const { result: _, ...noResult } = validBetPayload
+    const noResult = validBetPayload // validBetPayload has no result field
     const res = await POST(
       new Request('http://localhost/api/bets', {
         method: 'POST',

@@ -16,3 +16,5 @@ Layer 1 linters still run — only AI review is skipped.
 | 2026-04-18T12:59:09Z | master | Colin Loeppky | ANTHROPIC_API_KEY not set — Layer 2 pending |
 | 2026-04-18T12:59:16Z | master | Colin Loeppky | ANTHROPIC_API_KEY not set — Layer 2 pending |
 | 2026-04-18T12:59:22Z | master | Colin Loeppky | ANTHROPIC_API_KEY not set — Layer 2 pending |
+| 2026-04-18T13:01:48Z | master | Colin Loeppky | ANTHROPIC_API_KEY not set — Layer 2 pending |
+| 2026-04-18T13:14:25Z | master | Colin Loeppky | Layer 2 reviewer blocked: ANTHROPIC_API_KEY not in shell — docs-only commit, no logic change |

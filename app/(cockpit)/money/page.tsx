@@ -9,6 +9,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { BettingTileClient } from './_components/BettingTileClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,6 +129,28 @@ function StatusLight({ status, label }: { status: 'ok' | 'warn' | 'error' | 'inf
 export default async function MoneyPage() {
   const supabase = createServiceClient()
 
+  // ── Bets query ────────────────────────────────────────────────────────────
+  // SPRINT5-GATE: person_handle filter is hardcoded; see ARCHITECTURE.md §7.3
+  const { data: bets } = await supabase
+    .from('bets')
+    .select(
+      'id, bet_date, sport, league, bet_on, bet_type, odds, stake, result, pnl, bankroll_before, kelly_pct, book',
+    )
+    .eq('person_handle', 'colin')
+    .order('bet_date', { ascending: false })
+    .limit(80)
+
+  const allBets = bets ?? []
+  const pending = allBets.filter((b) => b.result === 'pending')
+  const completed30 = allBets
+    .filter((b) => ['win', 'loss', 'push'].includes(b.result))
+    .slice(0, 30)
+  const settledCount = allBets.filter((b) => ['win', 'loss', 'push'].includes(b.result)).length
+  const wins = allBets.filter((b) => b.result === 'win').length
+  const losses = allBets.filter((b) => b.result === 'loss').length
+  const totalPnl = allBets.reduce((s, b) => s + (b.pnl ?? 0), 0)
+  const rolling30Pnl = completed30.reduce((s, b) => s + (b.pnl ?? 0), 0)
+
   const { data: deals, error } = await supabase
     .from('deals')
     .select('id, asin, title, product_type, source, sell_price_cad, roi_pct, sales_rank, status, found_date')
@@ -193,7 +216,7 @@ export default async function MoneyPage() {
               color="var(--color-pillar-money)" />
             <PillBar label="Trading" value={0} max={2000} unit=" CAD"
               color="var(--color-pillar-money)" height={6} />
-            <PillBar label="Betting" value={0} max={1000} unit=" CAD"
+            <PillBar label="Betting" value={Math.round(rolling30Pnl)} max={1000} unit=" CAD"
               color="var(--color-pillar-money)" height={6} />
             <PillBar label="Expenses" value={0} max={3000} unit=" CAD"
               color="var(--color-critical)" height={6} />
@@ -213,6 +236,24 @@ export default async function MoneyPage() {
           </div>
 
         </div>
+      </div>
+
+      {/* ── Betting Tile ─────────────────────────────────────────────── */}
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--color-border)',
+        overflow: 'hidden',
+        marginBottom: 16,
+      }}>
+        <BettingTileClient
+          pending={pending}
+          completed30={completed30}
+          settledCount={settledCount}
+          totalPnl={totalPnl}
+          wins={wins}
+          losses={losses}
+        />
       </div>
 
       {/* ── Amazon Tile — Deals ───────────────────────────────────────── */}
