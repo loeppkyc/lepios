@@ -56,6 +56,7 @@ export function LogBetForm({ onSuccess }: LogBetFormProps) {
       bankroll_before: fd.get('bankroll_before') ? Number(fd.get('bankroll_before')) : undefined,
       book: fd.get('book') as string || undefined,
       ai_notes: fd.get('ai_notes') as string || undefined,
+      win_prob_pct: winProbPct ? parseFloat(winProbPct) : undefined,
     }
 
     try {

@@ -16,6 +16,7 @@ const BET_SELECT_COLS = [
   'closing_odds',
   'implied_prob',
   'kelly_pct',
+  'win_prob_pct',
   'bankroll_before',
   'stake',
   'result',

@@ -52,6 +52,7 @@ export const BetInsertSchema = z.object({
   bankroll_after: z.number().positive().optional(),
   book: z.string().optional(),
   ai_notes: z.string().optional(),
+  win_prob_pct: z.number().min(0).max(100).optional(),
 })
 
 export type BetInsert = z.infer<typeof BetInsertSchema>

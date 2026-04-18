@@ -13,25 +13,24 @@ const RESULT_OPTIONS = [
 interface SettleBetFormProps {
   betId: string
   stake: number | null
+  odds: number | null
   onSuccess: () => void
   onCancel: () => void
+  onNotLoggedIn: (betId: string) => void
 }
 
-export function SettleBetForm({ betId, stake, onSuccess, onCancel }: SettleBetFormProps) {
+export function SettleBetForm({ betId, stake, odds, onSuccess, onCancel, onNotLoggedIn }: SettleBetFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState('')
   const [pnl, setPnl] = useState('')
 
-  function autoCalcPnl(res: string, odds: string) {
-    // Simple auto-calc for moneyline: user can override
+  function autoCalcPnl(res: string) {
     if (res === 'push') { setPnl('0'); return }
     if (!stake || !odds) return
-    const o = parseInt(odds, 10)
-    if (isNaN(o)) return
     if (res === 'win') {
-      const profit = o < 0 ? stake * (100 / Math.abs(o)) : stake * (o / 100)
+      const profit = odds < 0 ? stake * (100 / Math.abs(odds)) : stake * (odds / 100)
       setPnl(profit.toFixed(2))
     } else if (res === 'loss') {
       setPnl((-stake).toFixed(2))
@@ -59,7 +58,7 @@ export function SettleBetForm({ betId, stake, onSuccess, onCancel }: SettleBetFo
       })
 
       if (res.status === 401) {
-        setSubmitError('Not logged in — Sprint 5 will wire auth.')
+        onNotLoggedIn(betId)
         return
       }
 
@@ -113,9 +112,7 @@ export function SettleBetForm({ betId, stake, onSuccess, onCancel }: SettleBetFo
           value={result}
           onChange={(e) => {
             setResult(e.target.value)
-            const oddsInput = (e.currentTarget.closest('form') as HTMLFormElement)
-              ?.querySelector<HTMLInputElement>('[name="closing_odds"]')
-            autoCalcPnl(e.target.value, oddsInput?.value ?? '')
+            autoCalcPnl(e.target.value)
           }}
         />
         <CockpitInput
@@ -128,6 +125,7 @@ export function SettleBetForm({ betId, stake, onSuccess, onCancel }: SettleBetFo
           error={errors.pnl}
           value={pnl}
           onChange={(e) => setPnl(e.target.value)}
+          hint="Auto-calculated for moneyline bets. Override for spreads/parlays."
         />
         <CockpitInput
           label="Bankroll after ($)"

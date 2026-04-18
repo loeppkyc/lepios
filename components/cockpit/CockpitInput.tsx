@@ -5,9 +5,10 @@ import type { InputHTMLAttributes } from 'react'
 interface CockpitInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
   error?: string
+  hint?: string
 }
 
-export function CockpitInput({ label, error, id, ...props }: CockpitInputProps) {
+export function CockpitInput({ label, error, hint, id, ...props }: CockpitInputProps) {
   const inputId = id ?? `ci-${label.toLowerCase().replace(/\s+/g, '-')}`
 
   return (
@@ -21,9 +22,28 @@ export function CockpitInput({ label, error, id, ...props }: CockpitInputProps) 
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: error ? 'var(--color-critical)' : 'var(--color-text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
         }}
       >
         {label}
+        {hint && (
+          <span
+            title={hint}
+            style={{
+              cursor: 'help',
+              color: 'var(--color-text-disabled)',
+              fontWeight: 400,
+              textTransform: 'none',
+              letterSpacing: 0,
+              fontSize: '0.8em',
+              userSelect: 'none',
+            }}
+          >
+            ⓘ
+          </span>
+        )}
       </label>
       <input
         id={inputId}
