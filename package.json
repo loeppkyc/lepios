@@ -13,6 +13,7 @@
     "type:check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "prepare": "husky"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "puppeteer": "^24.0.0"
   }
 }
