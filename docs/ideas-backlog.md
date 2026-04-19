@@ -5,6 +5,53 @@ No work begins on any item without explicit Colin approval post-v1 kill-criterio
 
 ---
 
+## BACKLOG-6 — Buyback Pricing Integration
+
+**Status:** NOT STARTED. Deferred from Sprint 3 Chunk D.
+**Raised:** 2026-04-19
+
+**Context:**
+No active buyback outlet currently in use. Single-price env var model is too simplistic —
+would pollute scan data with a fixed number that doesn't reflect vendor/category/condition
+variability. Buyback decisions are more useful at hit-list / batch-review time than at scan
+time.
+
+**Natural home:** Sub-feature of the hit list (Chunk E) or a later multi-vendor sprint when
+a real buyback relationship exists.
+
+**Acceptance doc preserved at:** `docs/sprint-3/chunk-d-acceptance.md`
+
+**When built:**
+- Multi-vendor support (BookScouter, Ziffit, WeBuyBooks — condition/category-aware pricing)
+- Surface at hit-list review time, not at scan time
+- No env var fixed-price hack — real per-ASIN vendor quotes or a maintained price table
+
+**Hard rules:**
+- No work begins without active buyback relationship and Colin approval.
+
+---
+
+## BACKLOG-5 — React #418 Hydration Mystery on /scan
+
+**Status:** NOT STARTED. Not blocking any sprint work.
+**Raised:** 2026-04-19
+
+**Context:**
+React error #418 (hydration mismatch) fires on hard refresh of `/scan` even after wrapping
+`ScannerClient` in `next/dynamic` with `ssr: false`. The scanner is fully client-rendered; the error
+does not block any features. Suspected cause: browser extension DOM injection between server render
+and React hydration (evidenced by `safeParseJson 'undefined' is not valid JSON / NodeList(0)` in the
+same console session). Confirmed extension-sourced if error disappears in a clean incognito session.
+
+**When investigated:**
+- Test in incognito with all extensions disabled first. If #418 is gone → close the issue.
+- If #418 persists in clean session → deeper investigation needed (root layout, Supabase SSR init).
+
+**Hard rules:**
+- Does not block Chunk D or any sprint work. Cosmetic until proven otherwise.
+
+---
+
 ## BACKLOG-4 — Keepa Price/BSR History Chart
 
 **Status:** NOT STARTED. Deferred from Sprint 3 Chunk B.
