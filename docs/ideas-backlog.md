@@ -5,6 +5,29 @@ No work begins on any item without explicit Colin approval post-v1 kill-criterio
 
 ---
 
+## BACKLOG-7 — Logout Button + Account Indicator in Cockpit Nav
+
+**Status:** NOT STARTED. Scheduled between E.3 and E.4.
+**Raised:** 2026-04-19
+
+**Context:**
+No logout or account indicator exists in the cockpit nav. Session is invisible — user cannot
+confirm they're signed in, cannot sign out, cannot switch accounts. Found during E.1 smoke test.
+~30 min task. Must land before the first real sourcing run so Colin can recover from any auth
+stuck-state in the field without manually clearing cookies.
+
+**Build:**
+- Add user email (truncated) + "Sign out" button to cockpit nav (right-aligned)
+- Sign out calls `supabase.auth.signOut()` → redirect `/login`
+- Nav is a server component; user info requires a client component island or passing email as prop
+- Simplest correct approach: make `CockpitNav` a `'use client'` component that reads session via
+  `createClient()` (browser client) on mount
+
+**Hard rules:**
+- No emergency auth bypass. If signOut fails, log the error and surface it — don't silently eat it.
+
+---
+
 ## BACKLOG-6 — Buyback Pricing Integration
 
 **Status:** NOT STARTED. Deferred from Sprint 3 Chunk D.

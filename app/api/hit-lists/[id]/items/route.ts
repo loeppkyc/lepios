@@ -2,6 +2,35 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { AddItemsSchema } from '@/lib/hit-lists/schemas'
 
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+
+  const { data: list } = await supabase
+    .from('hit_lists')
+    .select('id')
+    .eq('id', id)
+    .eq('person_handle', 'colin')
+    .single()
+
+  if (!list) return NextResponse.json({ error: 'List not found' }, { status: 404 })
+
+  const { data, error } = await supabase
+    .from('hit_list_items')
+    .select('id, isbn, status, added_at')
+    .eq('hit_list_id', id)
+    .order('added_at', { ascending: true })
+
+  if (error) return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
+
+  return NextResponse.json(data ?? [])
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
   const {
