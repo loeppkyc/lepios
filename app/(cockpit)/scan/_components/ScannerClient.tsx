@@ -24,6 +24,7 @@ interface EbayData {
 }
 
 interface ScanResult {
+  scanResultId: string | null
   isbn: string
   asin: string
   title: string
@@ -39,6 +40,11 @@ interface ScanResult {
   decision: 'buy' | 'skip'
   keepa: KeepaData | null
   ebay: EbayData | null
+}
+
+interface HitListOption {
+  id: string
+  name: string
 }
 
 const cell = {
@@ -102,6 +108,14 @@ export function ScannerClient() {
   const [sparkLoading, setSparkLoading] = useState(false)
   const [sparkPoints, setSparkPoints] = useState<BsrPoint[] | null>(null)
 
+  // Save-to-list state
+  const [saveState, setSaveState] = useState<'idle' | 'open' | 'saving' | 'saved' | 'new-list'>('idle')
+  const [lists, setLists] = useState<HitListOption[]>([])
+  const [listsLoaded, setListsLoaded] = useState(false)
+  const [savedToName, setSavedToName] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [newListName, setNewListName] = useState('')
+
   async function handleScan(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -118,10 +132,14 @@ export function ScannerClient() {
       if (!res.ok) setError(data.error ?? 'Scan failed')
       else {
         setResult(data as ScanResult)
-        // Reset sparkline state on each new scan
+        // Reset sparkline + save state on each new scan
         setSparkOpen(false)
         setSparkLoading(false)
         setSparkPoints(null)
+        setSaveState('idle')
+        setSavedToName(null)
+        setSaveError(null)
+        setNewListName('')
       }
     } catch {
       setError('Network error — check connection')
@@ -151,6 +169,73 @@ export function ScannerClient() {
       // Error state: BSR text stays, no sparkline shown
     } finally {
       setSparkLoading(false)
+    }
+  }
+
+  async function handleOpenSave() {
+    setSaveState('open')
+    setSaveError(null)
+    if (!listsLoaded) {
+      try {
+        const res = await fetch('/api/hit-lists')
+        if (res.ok) {
+          const data = await res.json()
+          setLists(data as HitListOption[])
+          setListsLoaded(true)
+        }
+      } catch {
+        setSaveError('Failed to load lists')
+      }
+    }
+  }
+
+  async function handleSaveToList(listId: string, listName: string) {
+    if (!result) return
+    setSaveState('saving')
+    setSaveError(null)
+    try {
+      const res = await fetch(`/api/hit-lists/${listId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isbns: [result.isbn] }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setSaveError(d.error ?? 'Save failed')
+        setSaveState('open')
+      } else {
+        setSavedToName(listName)
+        setSaveState('saved')
+      }
+    } catch {
+      setSaveError('Network error')
+      setSaveState('open')
+    }
+  }
+
+  async function handleCreateAndSave() {
+    if (!result || !newListName.trim()) return
+    setSaveState('saving')
+    setSaveError(null)
+    try {
+      const createRes = await fetch('/api/hit-lists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newListName.trim() }),
+      })
+      if (!createRes.ok) {
+        const d = await createRes.json()
+        setSaveError(d.error ?? 'Failed to create list')
+        setSaveState('new-list')
+        return
+      }
+      const newList = await createRes.json()
+      // Invalidate cached lists so next open re-fetches
+      setListsLoaded(false)
+      await handleSaveToList(newList.id, newListName.trim())
+    } catch {
+      setSaveError('Network error')
+      setSaveState('new-list')
     }
   }
 
@@ -459,6 +544,164 @@ export function ScannerClient() {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Save-to-list panel — shown below result card after successful scan */}
+      {result && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {saveState === 'idle' && (
+            <button
+              onClick={handleOpenSave}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                fontWeight: 600,
+                padding: '8px 16px',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text-muted)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                alignSelf: 'flex-start',
+              }}
+            >
+              Save to list
+            </button>
+          )}
+
+          {(saveState === 'open' || saveState === 'saving') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <select
+                disabled={saveState === 'saving'}
+                defaultValue=""
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === '__new__') {
+                    setSaveState('new-list')
+                  } else if (val) {
+                    const list = lists.find((l) => l.id === val)
+                    if (list) handleSaveToList(list.id, list.name)
+                  }
+                }}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 10px',
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="" disabled>
+                  {saveState === 'saving' ? 'Saving…' : '— pick a list —'}
+                </option>
+                {lists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+                <option value="__new__">— New list… —</option>
+              </select>
+              <button
+                onClick={() => setSaveState('idle')}
+                disabled={saveState === 'saving'}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 12px',
+                  background: 'none',
+                  color: 'var(--color-text-disabled)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {saveState === 'new-list' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                autoFocus
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateAndSave()}
+                placeholder="New list name"
+                maxLength={80}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 10px',
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  width: 200,
+                }}
+              />
+              <button
+                onClick={handleCreateAndSave}
+                disabled={!newListName.trim()}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  fontWeight: 600,
+                  padding: '7px 14px',
+                  background: newListName.trim() ? 'var(--color-accent-gold)' : 'var(--color-surface-2)',
+                  color: newListName.trim() ? 'var(--color-base)' : 'var(--color-text-disabled)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: newListName.trim() ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Create &amp; save
+              </button>
+              <button
+                onClick={() => setSaveState('open')}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 12px',
+                  background: 'none',
+                  color: 'var(--color-text-disabled)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                Back
+              </button>
+            </div>
+          )}
+
+          {saveState === 'saved' && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-positive)',
+              }}
+            >
+              Saved to &ldquo;{savedToName}&rdquo;
+            </div>
+          )}
+
+          {saveError && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-critical)',
+              }}
+            >
+              {saveError}
+            </div>
+          )}
         </div>
       )}
     </div>
