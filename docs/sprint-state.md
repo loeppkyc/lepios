@@ -1,11 +1,12 @@
 active_sprint: 4
 active_chunk: null
-status: "draft"
+status: "in-acceptance-doc"
 last_handoff_path: null
 awaiting: "coordinator"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-19T10:00:00-06:00"
+last_updated_at: "2026-04-19T13:00:00-06:00"
+plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
 
@@ -20,7 +21,7 @@ kill_criterion: "Every visible number on LepiOS Business Review matches its sour
 
 # Progress
 
-chunks_planned: []
+chunks_planned: ["A", "B", "C", "D", "E"]
 chunks_complete: []
 chunks_escalated: []
 chunks_rolled_back: []
