@@ -7,7 +7,7 @@ No work begins on any item without explicit Colin approval post-v1 kill-criterio
 
 ## BACKLOG-7 — Logout Button + Account Indicator in Cockpit Nav
 
-**Status:** NOT STARTED. Scheduled between E.3 and E.4.
+**Status:** SHIPPED 2026-04-19. CockpitNav extracted to client component; email + Sign out in nav right rail.
 **Raised:** 2026-04-19
 
 **Context:**
