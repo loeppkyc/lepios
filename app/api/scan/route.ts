@@ -14,6 +14,7 @@ import { estimateEbayProfit } from '@/lib/ebay/fees'
 const ScanBody = z.object({
   isbn: z.string().min(1),
   cost_paid: z.number().positive().max(999.99),
+  hit_list_item_id: z.string().uuid().optional(),
 })
 
 export async function POST(request: Request) {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { isbn: rawIsbn, cost_paid: costPaid } = parsed.data
+  const { isbn: rawIsbn, cost_paid: costPaid, hit_list_item_id: hitListItemId } = parsed.data
   const isbn = normalizeIsbn(rawIsbn)
 
   if (!isIsbn(isbn)) {
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
   const ebayProfit = ebayListings ? estimateEbayProfit(ebayListings.medianCad, costPaid) : null
 
   // Write scan result
-  const { error: dbError } = await supabase.from('scan_results').insert({
+  const { data: scanRow, error: dbError } = await supabase.from('scan_results').insert({
     // SPRINT5-GATE: replace with profiles FK + RLS policy (ARCHITECTURE.md §7.3, MN-3)
     person_handle: 'colin',
     isbn,
@@ -136,7 +137,17 @@ export async function POST(request: Request) {
     ebay_listing_median_cad: ebayListings?.medianCad ?? null,
     ebay_listing_count: ebayListings?.count ?? null,
     ebay_profit_cad: ebayProfit,
-  })
+  }).select('id').single()
+
+  // Link scan result back to hit list item if this was a batch scan
+  if (!dbError && hitListItemId && scanRow?.id) {
+    await supabase.from('hit_list_items').update({
+      status: 'scanned',
+      scan_result_id: scanRow.id,
+      scanned_at: new Date().toISOString(),
+      cost_paid_cad: costPaid,
+    }).eq('id', hitListItemId)
+  }
 
   // Write agent event — non-critical, don't fail the scan if this errors
   await supabase.from('agent_events').insert({
@@ -166,6 +177,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json(
     {
+      scanResultId: scanRow?.id ?? null,
       isbn,
       asin,
       title: catalog.title,
