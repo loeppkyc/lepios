@@ -49,11 +49,7 @@ export async function POST(request: Request) {
   const startMs = Date.now()
 
   // Step 1: ISBN → ASIN (sequential — required for all subsequent calls)
-  let findAsinError: string | null = null
-  const asin = await findAsin(isbn).catch((e: unknown) => {
-    findAsinError = String(e)
-    return null
-  })
+  const asin = await findAsin(isbn)
 
   if (!asin) {
     await supabase.from('agent_events').insert({
@@ -62,12 +58,12 @@ export async function POST(request: Request) {
       actor: 'user',
       status: 'error',
       input_summary: `ISBN: ${isbn}, cost: $${costPaid}`,
-      error_message: findAsinError ?? `No ASIN found for ISBN ${isbn}`,
+      error_message: `No ASIN found for ISBN ${isbn}`,
       duration_ms: Date.now() - startMs,
       meta: { isbn },
     })
     return NextResponse.json(
-      { error: `No Amazon CA listing found for ISBN ${isbn}`, debug: findAsinError },
+      { error: `No Amazon CA listing found for ISBN ${isbn}` },
       { status: 404 }
     )
   }
