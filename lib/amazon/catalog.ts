@@ -27,6 +27,7 @@ export async function findAsin(isbn: string): Promise<string | null> {
     [s, 'ISBN'],
   ]
 
+  let lastError: unknown
   for (const [id, idType] of attempts) {
     try {
       const data = await spFetch<SearchResponse>('/catalog/2022-04-01/items', {
@@ -39,10 +40,11 @@ export async function findAsin(isbn: string): Promise<string | null> {
       })
       const asin = data.items?.[0]?.asin
       if (asin) return asin
-    } catch {
-      // try next identifier type
+    } catch (e) {
+      lastError = e
     }
   }
+  if (lastError) console.error('[findAsin] all attempts failed, last error:', lastError)
   return null
 }
 
