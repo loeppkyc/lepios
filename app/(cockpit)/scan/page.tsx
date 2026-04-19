@@ -1,6 +1,27 @@
+import dynamicImport from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { ScannerClient } from './_components/ScannerClient'
+
+const ScannerClient = dynamicImport(
+  () => import('./_components/ScannerClient').then((m) => ({ default: m.ScannerClient })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          maxWidth: 520,
+          margin: '0 auto',
+          padding: '24px 16px',
+          fontFamily: 'var(--font-ui)',
+          fontSize: 'var(--text-small)',
+          color: 'var(--color-text-muted)',
+        }}
+      >
+        Loading scanner…
+      </div>
+    ),
+  }
+)
 
 export const dynamic = 'force-dynamic'
 
