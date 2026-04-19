@@ -137,24 +137,39 @@ Mood boards, typography/color tokens, motion principles, coded mockups of each p
 
 ## 7. v1 Scope — The Amazon Earning Loop
 
-v1 is the first unified slice of LepiOS that replaces the Streamlit prototype for real earning activity. Ship Amazon first because Amazon is the only thing currently making money. Everything else waits its turn.
+v1 is the first unified slice of LepiOS that replaces the Loeppky Streamlit prototype for real earning activity. Ship Amazon first because Amazon is the only thing currently making money. Everything else waits its turn.
 
-The Streamlit app (Loeppky Business OS, ~60 modules) is a brain-dump prototype, not a production system. Nothing is being actively used to run the business yet. LepiOS is the rebuild — not a migration. Streamlit is reference material; Next.js + Supabase is the destination.
+The Streamlit app (Loeppky Business OS, ~60 modules) is a brain-dump prototype, not a production system. Multiple sections carry hardcoded approximations, silently-swallowed errors, and dead code paths. Nothing is being actively used to run the business yet. LepiOS is the rebuild — not a migration. Streamlit is reference material; Next.js + Supabase is the destination.
 
 ### 7.1 Sprint queue (locked)
 
-- **Sprint 3 — PageProfit Core.** Barcode scan → multi-marketplace profit (Amazon CA/US, eBay, Buyback) → hit list. SP-API catalog/buy-box/fees, Keepa BSR, eBay sold comps. Writes to Supabase + structured events to local knowledge store (Ollama collection layer).
-- **Sprint 4 — Shipment Manager Core.** Hit list → FBA inbound plan → FNSKU labels → mark shipped. SP-API create-listing + create-shipment-plan.
-- **Sprint 5 — Amazon Orders + Payouts.** SP-API order sync, Payout Register reconciliation. Closes the money loop. **KILL-CRITERION GATE:** after Sprint 5, Colin must have a complete Amazon money loop running in LepiOS. If not, stop and re-evaluate.
-- **Sprint 6 — Amazon reporting.** Sales Charts + Category P&L + Business History. Read-only views on Sprints 3–5 data.
-- **Sprint 7 — Bookkeeping Core.** Bookkeeping Hub landing + Receipts ingest (Claude Vision) + Paper Trail reconciliation + Monthly Close sign-off. Dual-write with Monthly Expenses. Ledger foundation.
-- **Sprint 8 — Household Finance.** Monthly Expenses + Personal Expenses + Cash Forecast + Subscriptions + Net Worth. Reads Sprint 7 ledger.
-- **Sprint 9 — Sourcing stack.** Retail HQ (absorbs Arbitrage Scanner + Retail Monitor) + Keepa Intel + Cashback HQ (absorbs Deal Tracker) + Lego Vault (absorbs Retirement tracker).
-- **Sprint 10 — Marketplace expansion.** eBay Listings + Marketplace Hub + Repricer.
-- **Sprint 11 — Tax layer.** Tax Centre rebuild — decompose 6,922-line colin_tax.py into discrete modules. MileIQ.
-- **Sprint 12+ — Life, Pet Health** (before pets arrive, ~10 days), Family, Calendar, Goals, Health, Cora's Future.
+**Sprint 3 — PageProfit Core.** [SHIPPED 2026-04-19]
 
-### 7.2 Shipped / deferred / dumped
+**Sprint 4 — Business Review Trust Layer (Tier 1).** Wire the honest, non-sheet-backed sections of Business Review into LepiOS: Today Live, Yesterday, What You're Owed, Statement Coverage, Recent Days (honest zeros, no back-fills). Kill-criterion: every visible number on the Sprint 4 BR matches its source system (Seller Central, Dropbox statement folder) to the penny, with zero approximations carried forward from Streamlit.
+
+**Sprint 5 — Amazon Orders + Payouts.** SP-API order sync, Payout Register reconciliation. Fills the per-order fee/payout data that removes the Streamlit 65% approximation. Closes the live-money loop. KILL-CRITERION GATE: after Sprint 5, Colin must have actual order-level fees and payouts flowing. If not, stop and re-evaluate.
+
+**Sprint 6 — Business Review Tier 2.** Refine the partially-working BR sections now that trust layer + order data are live: Life P&L with honest error surfacing, Financial Snapshot driven by real bookkeeping writes, Inventory Potential Profit with real referral fee logic (no more 65%).
+
+**Sprint 7 — Bookkeeping Core.** Bookkeeping Hub + Receipts ingest (Claude Vision) + Paper Trail reconciliation + Monthly Close sign-off. Ledger foundation that feeds BR Tier 2 and beyond.
+
+**Sprint 8 — Business Review Tier 3 + Shipment Manager Core.** Rebuild the broken BR sections (Monthly Expenses, Health, view toggles) with accumulated judgment from Sprints 4–7. Ship the FBA inbound/label workflow once the trust layer is verified.
+
+**Sprint 9 — Amazon reporting.** Sales Charts + Category P&L + Business History. Read-only views on Sprints 3–5 data.
+
+**Sprint 10+** — Marketplace expansion, Tax layer, Household, Life/Pets/Health/Family/Calendar/Goals per original queue.
+
+### 7.2 Sequencing rationale
+
+**Trust before tools.** Colin's stated pattern: "once my numbers, bookkeeping, and statements all come in first page accurately is when I trust actually listing and shipping stuff." Shipment Manager sat at Sprint 4 in the prior plan. Moving it to Sprint 8 reflects that building shipping tools before the trust layer is ready produces dead features.
+
+**Honest first, then refine, then rebuild.** BR is tier-sorted by verifiability against source systems. Sprint 4 ships only the already-honest sections. Sprints 5–7 fill the data gaps that make partially-working sections trustworthy. Sprint 8 rebuilds the structurally broken sections with accumulated judgment.
+
+### 7.3 Multi-user HARD GATE
+
+Multi-user HARD GATE from previous §7.3 still applies before any second user touches auth.users. See migration-notes MN-3. Before any second user is added to auth.users, the following must ship and be verified: (a) a `profiles(user_id uuid PRIMARY KEY, person_handle text NOT NULL)` table with FK to auth.users, (b) updated RLS policies on all person-scoped tables (`bets`, `trades`, `transactions`, `products`, `deals`, `net_worth_snapshots`, `agent_events`) replacing the permissive `auth.uid() IS NOT NULL` check with `person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())` on both USING and WITH CHECK, (c) removal of hardcoded `person_handle = 'colin'` from `app/api/bets/route.ts` and any other route that acquires this constraint during v1. Verification: attempt cross-user SELECT and INSERT as a second auth user and confirm both are blocked. See `audits/migration-notes.md` MN-3 for SQL migration sketch.
+
+### 7.4 Shipped / deferred / dumped
 
 - **Shipped and holding:** Sprint 2 Betting tile (stays deployed at lepios-one.vercel.app, not active priority).
 - **Deferred to v3+:** Trading Journal, Life Compass, 3D Printer HQ.
@@ -162,19 +177,16 @@ The Streamlit app (Loeppky Business OS, ~60 modules) is a brain-dump prototype, 
 - **Consolidated:** Arbitrage Scanner → Retail HQ; Retail Monitor → Retail HQ; Deal Tracker → Cashback HQ; Retirement Tracker → Lego Vault; Oura Health → Health; Coupon Lady → Grocery Tracker; Tax Return → Tax Centre.
 - **Confirmed dead in Streamlit (delete, don't port):** Book Scout, Scoutly, Expense Dashboard, Retail Scout, Product Intel, Shipments redirect. ~2,800 lines.
 
-### 7.3 Rules that carry through the whole queue
+### 7.5 Rules that carry through the queue
 
 - Every module writes structured events to the local knowledge store (Ollama collection layer). GPU arrives later; until then collection-only.
-- Every sprint uses Check-Before-Build (§8.4) against the Streamlit reference before writing new code.
-- Every sprint stays in the Accuracy Zone (§8.5) — tight scope, context window hygiene, Reality-Check grounding.
-- Tier 0 Safety (Safety & Security Agent, Reality-Check Agent) preempts all sprint work.
-- **Multi-user HARD GATE** from previous §7.3 still applies before any second user touches auth.users. See migration-notes MN-3. Before any second user is added to auth.users, the following must ship and be verified: (a) a `profiles(user_id uuid PRIMARY KEY, person_handle text NOT NULL)` table with FK to auth.users, (b) updated RLS policies on all person-scoped tables (`bets`, `trades`, `transactions`, `products`, `deals`, `net_worth_snapshots`, `agent_events`) replacing the permissive `auth.uid() IS NOT NULL` check with `person_handle = (SELECT person_handle FROM profiles WHERE user_id = auth.uid())` on both USING and WITH CHECK, (c) removal of hardcoded `person_handle = 'colin'` from `app/api/bets/route.ts` and any other route that acquires this constraint during v1. Verification: attempt cross-user SELECT and INSERT as a second auth user and confirm both are blocked. See `audits/migration-notes.md` MN-3 for SQL migration sketch.
-- Kill criterion from §11 holds: does this sprint make or save money this week? If no, stop.
+- Tier 0 Safety (Safety & Security Agent, Reality-Check Agent) preempts all sprint work. _Note: Reality-Check Agent is currently performed by Colin in person; agent implementation targets Sprint 5+._
+- Kill criterion from §11 holds at sprint granularity: does this sprint make or save money this week? If no, stop.
 
-### 7.4 What v1 is NOT
+### 7.6 What v1 is NOT
 
 - v1 is not the full Council of Agents speaking to Colin. Agents run silently under sprints as needed (Safety, Reality-Check, Amazon, Expenses). The Situation Room, Digital Twin deliberation feed, and Design Council full rollout are v2+.
-- v1 is not the cockpit aesthetic with master Quality of Life gauge, pillar gauges, and status lights as the primary home. A functional home page exists (ported from Streamlit Business_Review) but the full cockpit design is v2.
+- v1 is not the cockpit aesthetic with master Quality of Life gauge, pillar gauges, and status lights as the primary home. Business Review serves as functional home through the tier progression (Sprint 4 Tier 1 → Sprint 6 Tier 2 → Sprint 8 Tier 3); the full cockpit design is v2.
 - v1 is not multi-user, Megan login, Tesla API, WhatsApp, or cross-border relocation features.
 
 ---
