@@ -20,3 +20,4 @@ Layer 1 linters still run — only AI review is skipped.
 | 2026-04-18T13:14:25Z | master | Colin Loeppky | Layer 2 reviewer blocked: ANTHROPIC_API_KEY not in shell — docs-only commit, no logic change              |
 | 2026-04-18T23:15:40Z | master | Colin Loeppky | audit-only markdown file, no code change, reviewer hook requires ANTHROPIC_API_KEY not available in shell |
 | 2026-04-19T01:04:57Z | master | Colin Loeppky | ANTHROPIC_API_KEY not in shell — Chunk A reviewed by Claude Code session, 9/9 acceptance + 80/80 unit tests passing |
+| 2026-04-19T02:59:36Z | master | Colin Loeppky | Sprint 3 B/C/C.5 — 114 tests passing, full review completed in Claude Code session |

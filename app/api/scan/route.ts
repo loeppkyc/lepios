@@ -7,6 +7,9 @@ import { getUsedBuyBox } from '@/lib/amazon/pricing'
 import { getFbaFees } from '@/lib/amazon/fees'
 import { normalizeIsbn, isIsbn } from '@/lib/amazon/isbn'
 import { calcProfit, calcRoi, getDecision } from '@/lib/profit/calculator'
+import { getKeepaProduct } from '@/lib/keepa/product'
+import { getEbayListings } from '@/lib/ebay/listings'
+import { estimateEbayProfit } from '@/lib/ebay/fees'
 
 const ScanBody = z.object({
   isbn: z.string().min(1),
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     )
   }
 
-  // Step 2: catalog data + buy box in parallel (independent of each other)
+  // Step 2: catalog + buy box in parallel (independent of each other)
   const [catalog, buyBoxPrice] = await Promise.all([getCatalogData(asin), getUsedBuyBox(asin)])
 
   if (!buyBoxPrice) {
@@ -88,12 +91,28 @@ export async function POST(request: Request) {
     )
   }
 
-  // Step 3: FBA fees — depends on buy box price, so sequential after step 2
-  const fbaFees = await getFbaFees(asin, buyBoxPrice)
+  // Step 3: FBA fees + Keepa + eBay in parallel (none depend on each other)
+  const [fbaFees, keepaProduct, ebayResult] = await Promise.all([
+    getFbaFees(asin, buyBoxPrice),
+    getKeepaProduct(asin),
+    getEbayListings(isbn, catalog.title || undefined),
+  ])
 
   const profit = calcProfit(buyBoxPrice, fbaFees, costPaid)
   const roi = calcRoi(profit, costPaid)
+
+  // eBay median is active listing prices (asking prices), not sold comps.
+  // Not used as a buy/skip gate until we have real sell-through data to validate the signal.
   const decision = getDecision(profit, roi)
+
+  // Resolve BSR + source: SP-API is preferred; Keepa fills the gap
+  const bsr = catalog.bsr > 0 ? catalog.bsr : (keepaProduct?.bsr ?? null)
+  const bsrSource: 'sp-api' | 'keepa' | null =
+    catalog.bsr > 0 ? 'sp-api' : keepaProduct?.bsr ? 'keepa' : null
+
+  // eBay comp fields
+  const ebayListings = ebayResult.listings
+  const ebayProfit = ebayListings ? estimateEbayProfit(ebayListings.medianCad, costPaid) : null
 
   // Write scan result
   const { error: dbError } = await supabase.from('scan_results').insert({
@@ -109,6 +128,14 @@ export async function POST(request: Request) {
     roi_pct: roi,
     decision,
     marketplace: 'amazon_ca',
+    bsr,
+    bsr_source: bsrSource,
+    rank_drops_30: keepaProduct?.rankDrops30 ?? null,
+    monthly_sold: keepaProduct?.monthlySold ?? null,
+    avg_rank_90d: keepaProduct?.avgRank90d ?? null,
+    ebay_listing_median_cad: ebayListings?.medianCad ?? null,
+    ebay_listing_count: ebayListings?.count ?? null,
+    ebay_profit_cad: ebayProfit,
   })
 
   // Write agent event — non-critical, don't fail the scan if this errors
@@ -127,6 +154,9 @@ export async function POST(request: Request) {
       fba_fees_cad: fbaFees,
       profit_cad: profit,
       roi_pct: roi,
+      keepa_tokens_left: keepaProduct?.tokensLeft ?? null,
+      ebay_listing_count: ebayListings?.count ?? null,
+      ...(ebayResult.fallbackReason ? { ebay_fallback_reason: ebayResult.fallbackReason } : {}),
     },
   })
 
@@ -140,8 +170,9 @@ export async function POST(request: Request) {
       asin,
       title: catalog.title,
       imageUrl: catalog.imageUrl,
-      bsr: catalog.bsr,
+      bsr,
       bsrCategory: catalog.bsrCategory,
+      bsrSource,
       buyBoxPrice,
       fbaFees,
       costPaid,
@@ -149,6 +180,25 @@ export async function POST(request: Request) {
       roi,
       decision,
       marketplace: 'amazon_ca',
+      keepa: keepaProduct
+        ? {
+            bsr: keepaProduct.bsr,
+            avgRank90d: keepaProduct.avgRank90d,
+            rankDrops30: keepaProduct.rankDrops30,
+            monthlySold: keepaProduct.monthlySold,
+            velocityBadge: keepaProduct.velocityBadge,
+          }
+        : null,
+      ebay: ebayListings
+        ? {
+            medianCad: ebayListings.medianCad,
+            lowCad: ebayListings.lowCad,
+            highCad: ebayListings.highCad,
+            count: ebayListings.count,
+            profit: ebayProfit,
+            fallbackUsed: ebayListings.fallbackUsed,
+          }
+        : null,
     },
     { status: 201 }
   )

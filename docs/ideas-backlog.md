@@ -5,6 +5,32 @@ No work begins on any item without explicit Colin approval post-v1 kill-criterio
 
 ---
 
+## BACKLOG-4 — Keepa Price/BSR History Chart
+
+**Status:** NOT STARTED. Deferred from Sprint 3 Chunk B.
+**Raised:** 2026-04-18
+
+**Context:**
+Chunk B uses Keepa `stats=90` only (~1 token/scan). Full BSR/price history requires `history=1`
+(~6 tokens/scan) — violates F7 token budget if added to the scan path. The scan page is a
+decision surface, not an exploration surface. Charts belong on a per-book detail page.
+
+**Natural home:** Chunk F (batch/history/analytics) or a per-book detail page after Chunk E
+(hit list) lands.
+
+**When built:**
+
+- Call Keepa `/product?history=1` on demand (tap-to-expand), NOT on every scan.
+- Cache response for 24h (keyed by ASIN) to avoid re-spending tokens on repeat views.
+- Render BSR history and 90-day price history as sparklines.
+
+**Hard rules:**
+
+- Never add `history=1` to the per-scan Keepa call. On-demand only.
+- No work begins without explicit Colin approval.
+
+---
+
 ## BACKLOG-2 — Sports Prediction Modeling Pipeline (Multi-Phase)
 
 **Status:** NOT STARTED. Not v1. No action without Colin's explicit approval post-v1 kill-criterion.

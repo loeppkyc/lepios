@@ -2,20 +2,43 @@
 
 import { useState } from 'react'
 import { CockpitInput } from '@/components/cockpit/CockpitInput'
+import { BsrSparkline } from '@/components/cockpit/BsrSparkline'
+import type { VelocityBadge } from '@/lib/keepa/product'
+import type { BsrPoint } from '@/lib/keepa/history'
+
+interface KeepaData {
+  bsr: number | null
+  avgRank90d: number | null
+  rankDrops30: number | null
+  monthlySold: number | null
+  velocityBadge: VelocityBadge
+}
+
+interface EbayData {
+  medianCad: number
+  lowCad: number
+  highCad: number
+  count: number
+  profit: number | null
+  fallbackUsed: boolean
+}
 
 interface ScanResult {
   isbn: string
   asin: string
   title: string
   imageUrl: string
-  bsr: number
+  bsr: number | null
   bsrCategory: string
+  bsrSource: 'sp-api' | 'keepa' | null
   buyBoxPrice: number
   fbaFees: number
   costPaid: number
   profit: number
   roi: number
   decision: 'buy' | 'skip'
+  keepa: KeepaData | null
+  ebay: EbayData | null
 }
 
 const cell = {
@@ -41,12 +64,43 @@ const cellValue = {
   fontVariantNumeric: 'tabular-nums' as const,
 }
 
+const VELOCITY_STYLES: Record<VelocityBadge, { bg: string; color: string }> = {
+  Hot: { bg: 'var(--color-positive)', color: 'var(--color-base)' },
+  Warm: { bg: 'var(--color-accent-gold)', color: 'var(--color-base)' },
+  Slow: { bg: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
+  Unknown: { bg: 'var(--color-overlay)', color: 'var(--color-text-disabled)' },
+}
+
+function VelocityPill({ badge }: { badge: VelocityBadge }) {
+  const { bg, color } = VELOCITY_STYLES[badge]
+  return (
+    <span
+      style={{
+        fontFamily: 'var(--font-ui)',
+        fontSize: 'var(--text-nano)',
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        padding: '2px 8px',
+        borderRadius: 'var(--radius-sm)',
+        background: bg,
+        color,
+      }}
+    >
+      {badge.toUpperCase()}
+    </span>
+  )
+}
+
 export function ScannerClient() {
   const [isbn, setIsbn] = useState('')
   const [costPaid, setCostPaid] = useState('0.25')
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const [sparkOpen, setSparkOpen] = useState(false)
+  const [sparkLoading, setSparkLoading] = useState(false)
+  const [sparkPoints, setSparkPoints] = useState<BsrPoint[] | null>(null)
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault()
@@ -62,11 +116,41 @@ export function ScannerClient() {
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? 'Scan failed')
-      else setResult(data as ScanResult)
+      else {
+        setResult(data as ScanResult)
+        // Reset sparkline state on each new scan
+        setSparkOpen(false)
+        setSparkLoading(false)
+        setSparkPoints(null)
+      }
     } catch {
       setError('Network error — check connection')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleBsrTap(asin: string) {
+    if (sparkOpen) {
+      setSparkOpen(false)
+      return
+    }
+    if (sparkPoints !== null) {
+      setSparkOpen(true)
+      return
+    }
+    setSparkLoading(true)
+    try {
+      const res = await fetch(`/api/bsr-history?asin=${encodeURIComponent(asin)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSparkPoints((data.points as BsrPoint[]) ?? [])
+        setSparkOpen(true)
+      }
+    } catch {
+      // Error state: BSR text stays, no sparkline shown
+    } finally {
+      setSparkLoading(false)
     }
   }
 
@@ -81,6 +165,8 @@ export function ScannerClient() {
       ? 'var(--color-positive)'
       : 'var(--color-critical)'
     : 'var(--color-text-primary)'
+
+  const velocityBadge: VelocityBadge = result?.keepa?.velocityBadge ?? 'Unknown'
 
   return (
     <div
@@ -113,7 +199,7 @@ export function ScannerClient() {
             margin: '4px 0 0',
           }}
         >
-          Amazon CA · Chunk A
+          Amazon CA · Chunk B
         </p>
       </div>
 
@@ -215,10 +301,26 @@ export function ScannerClient() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: 'var(--text-small)',
                   color: 'var(--color-text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
                 }}
               >
-                {result.asin}
-                {result.bsr > 0 && <span> · BSR {result.bsr.toLocaleString()}</span>}
+                <span>{result.asin}</span>
+                {result.bsr && result.bsr > 0 && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleBsrTap(result.asin)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleBsrTap(result.asin)}
+                    style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                  >
+                    · BSR {result.bsr.toLocaleString()}
+                    {sparkLoading && ' …'}
+                  </span>
+                )}
+                <VelocityPill badge={velocityBadge} />
               </div>
             </div>
             <span
@@ -237,6 +339,13 @@ export function ScannerClient() {
               {isBuy ? 'BUY' : 'SKIP'}
             </span>
           </div>
+
+          {/* BSR sparkline — on-demand, tap-to-load */}
+          {sparkOpen && sparkPoints && sparkPoints.length > 0 && (
+            <div style={{ paddingLeft: 64 }}>
+              <BsrSparkline points={sparkPoints} />
+            </div>
+          )}
 
           {/* Price breakdown — 3 cells */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -282,6 +391,73 @@ export function ScannerClient() {
                 {result.roi.toFixed(1)}%
               </div>
             </div>
+          </div>
+
+          {/* Keepa velocity detail row */}
+          {result.keepa && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-muted)',
+                display: 'flex',
+                gap: 16,
+                flexWrap: 'wrap',
+              }}
+            >
+              {result.keepa.rankDrops30 !== null && (
+                <span>Rank drops 30d: {result.keepa.rankDrops30}</span>
+              )}
+              {result.keepa.monthlySold !== null && result.keepa.monthlySold >= 0 && (
+                <span>Est. sold/mo: {result.keepa.monthlySold}</span>
+              )}
+              {result.keepa.avgRank90d !== null && (
+                <span>Avg BSR 90d: {result.keepa.avgRank90d.toLocaleString()}</span>
+              )}
+            </div>
+          )}
+
+          {/* eBay active listing comps row */}
+          <div style={cell}>
+            <div style={cellLabel}>eBay CA (active listings)</div>
+            {result.ebay ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ ...cellValue, color: 'var(--color-text-primary)' }}>
+                  {result.ebay.count} listed · median ${result.ebay.medianCad.toFixed(2)}
+                </span>
+                {result.ebay.profit !== null && (
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 'var(--text-small)',
+                      color:
+                        result.ebay.profit >= 3
+                          ? 'var(--color-positive)'
+                          : 'var(--color-text-muted)',
+                    }}
+                  >
+                    est. profit ${result.ebay.profit.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                No eBay data
+              </span>
+            )}
           </div>
         </div>
       )}
