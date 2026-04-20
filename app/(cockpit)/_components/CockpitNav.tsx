@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 const NAV_LINKS = [
   { href: '/scan', label: 'Scan' },
   { href: '/hit-lists', label: 'Lists' },
+  { href: '/autonomous', label: 'Autonomous' },
 ]
 
 export function CockpitNav() {
