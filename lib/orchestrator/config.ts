@@ -18,6 +18,16 @@ export const KNOWN_EVENT_DOMAINS = [
 export const STUCK_PROCESSING_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 export const SLOW_EVENT_THRESHOLD_MS = 30_000
 
+export const CURRENT_CAPACITY_TIER = 'tier_1_laptop_ollama'
+export const WEIGHTS_V1 = {
+  completeness: 0.4,
+  signal_quality: 0.3,
+  efficiency: 0.2,
+  hygiene: 0.1,
+} as const
+export const BASELINE_MIN_RUNS = 7
+export const SCORER_VERSION = 'rule_based_v1'
+
 const MT_TZ = 'America/Denver'
 
 /**
