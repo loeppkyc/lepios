@@ -16,6 +16,18 @@ const { mockSiteHealth, mockScanIntegrity, mockEventLog } = vi.hoisted(() => ({
   mockEventLog: vi.fn(),
 }))
 
+// ── Mock scoring ──────────────────────────────────────────────────────────────
+
+const { mockFetchHistory, mockScoreNightTick } = vi.hoisted(() => ({
+  mockFetchHistory: vi.fn(),
+  mockScoreNightTick: vi.fn(),
+}))
+
+vi.mock('@/lib/orchestrator/scoring', () => ({
+  fetchHistoricalContext: mockFetchHistory,
+  scoreNightTick: mockScoreNightTick,
+}))
+
 vi.mock('@/lib/orchestrator/checks/site-health', () => ({ checkSiteHealth: mockSiteHealth }))
 vi.mock('@/lib/orchestrator/checks/scan-integrity', () => ({
   checkScanIntegrity: mockScanIntegrity,
@@ -56,11 +68,26 @@ function makeInsertBuilder() {
   return { insert }
 }
 
+const MOCK_QUALITY_SCORE = {
+  aggregate: 75.0,
+  capacity_tier: 'tier_1_laptop_ollama',
+  dimensions: { completeness: 100, signal_quality: 50, efficiency: 50, hygiene: 100 },
+  weights_version: 'v1',
+  scored_at: '2026-04-20T17:00:00.000Z',
+  scored_by: 'rule_based_v1',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockSiteHealth.mockResolvedValue(passCheck('site_health'))
   mockScanIntegrity.mockResolvedValue(passCheck('scan_integrity'))
   mockEventLog.mockResolvedValue(passCheck('event_log_consistency'))
+  mockFetchHistory.mockResolvedValue({
+    task_type: 'night_tick',
+    capacity_tier: 'tier_1_laptop_ollama',
+    prior_durations_ms: [],
+  })
+  mockScoreNightTick.mockReturnValue(MOCK_QUALITY_SCORE)
 })
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -208,5 +235,46 @@ describe('runNightTick — never throws', () => {
     mockFrom.mockReturnValue(b)
     await runNightTick()
     expect(b.insert).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('runNightTick — quality scoring', () => {
+  it('row has task_type=night_tick', async () => {
+    const b = makeInsertBuilder()
+    mockFrom.mockReturnValue(b)
+    await runNightTick()
+    expect(b.insert.mock.calls[0][0].task_type).toBe('night_tick')
+  })
+
+  it('row has quality_score with expected shape', async () => {
+    const b = makeInsertBuilder()
+    mockFrom.mockReturnValue(b)
+    await runNightTick()
+    const qs = b.insert.mock.calls[0][0].quality_score
+    expect(qs.aggregate).toBe(75.0)
+    expect(qs.capacity_tier).toBe('tier_1_laptop_ollama')
+    expect(qs.scored_by).toBe('rule_based_v1')
+    expect(qs.dimensions).toBeDefined()
+  })
+
+  it('fetchHistoricalContext called with task_type=night_tick and current tier', async () => {
+    mockFrom.mockReturnValue(makeInsertBuilder())
+    await runNightTick()
+    expect(mockFetchHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'night_tick',
+      'tier_1_laptop_ollama'
+    )
+  })
+
+  it('scoring failure → row still writes with fallback scored_by', async () => {
+    mockFetchHistory.mockRejectedValue(new Error('history fetch failed'))
+    const b = makeInsertBuilder()
+    mockFrom.mockReturnValue(b)
+    await runNightTick()
+    expect(b.insert).toHaveBeenCalledTimes(1)
+    const qs = b.insert.mock.calls[0][0].quality_score
+    expect(qs.scored_by).toBe('rule_based_v1_fallback')
+    expect(qs.aggregate).toBeNull()
   })
 })

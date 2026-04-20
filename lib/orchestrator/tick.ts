@@ -3,7 +3,9 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { checkSiteHealth } from './checks/site-health'
 import { checkScanIntegrity } from './checks/scan-integrity'
 import { checkEventLogConsistency } from './checks/event-log-consistency'
-import type { CheckResult, TickResult, TickStatus } from './types'
+import { fetchHistoricalContext, scoreNightTick } from './scoring'
+import { CURRENT_CAPACITY_TIER } from './config'
+import type { CheckResult, TickResult, TickStatus, QualityScore } from './types'
 
 const CHECK_TIMEOUT_MS = 15_000
 
@@ -71,6 +73,23 @@ export async function runNightTick(): Promise<TickResult> {
     status: tickStatus,
   }
 
+  // Score the tick — never throws to caller; fallback signals scoring failure in dashboard
+  let qualityScore: QualityScore | Record<string, unknown>
+  try {
+    const scoringClient = createServiceClient()
+    const history = await fetchHistoricalContext(scoringClient, 'night_tick', CURRENT_CAPACITY_TIER)
+    qualityScore = scoreNightTick(result, history)
+  } catch {
+    qualityScore = {
+      aggregate: null,
+      capacity_tier: CURRENT_CAPACITY_TIER,
+      dimensions: null,
+      weights_version: 'v1',
+      scored_at: new Date().toISOString(),
+      scored_by: 'rule_based_v1_fallback',
+    }
+  }
+
   // Write exactly one agent_events row — never throws to caller
   try {
     const supabase = createServiceClient()
@@ -82,6 +101,8 @@ export async function runNightTick(): Promise<TickResult> {
       output_summary: JSON.stringify(result),
       duration_ms,
       tags: ['night_tick', 'step6', 'read_only'],
+      task_type: 'night_tick',
+      quality_score: qualityScore,
       meta: {
         tick_id,
         run_id,
