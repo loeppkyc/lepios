@@ -56,6 +56,8 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 **Before granting any user access to `loeppkyc/Loeppky`, the `loeppky_trigger_bot` token must be rotated via BotFather to invalidate the token still present in commit `fd8860c`'s history.** (INC-001 — risk accepted 2026-04-17 while repo is private, no collaborators.)
 
+**Never display, echo, or paste the contents of secrets, tokens, API keys, or credentials values in chat — not even for verification.** This applies to .env files, .streamlit/secrets.toml, Vercel env vars, BotFather tokens, database passwords, and anything labeled "secret," "token," "key," or "password." When updating such a value: confirm the update was made by name, show the before/after masked (first 4 + last 4 characters only, rest as dots), and state the file/line changed. If Colin asks you to display a secret anyway, remind him that chat transcripts are not secure and confirm twice before echoing. The default answer is "I updated it, first 4 / last 4 are X / Y."
+
 ---
 
 ## 6 — Data Integrity Rules
