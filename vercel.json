@@ -1,0 +1,21 @@
+{
+  "_dst_note": "Night tick runs at 08:00 UTC (~02:00 MDT / ~01:00 MST). Morning digest at 12:00 UTC (~06:00 MDT / ~05:00 MST). Vercel cron schedules are UTC-fixed and do NOT shift with DST transitions. The ~1h drift between MDT and MST is acceptable for overnight read-only work.",
+  "crons": [
+    {
+      "path": "/api/knowledge/nightly",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/metrics/digest",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/night-tick",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/morning-digest",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}
