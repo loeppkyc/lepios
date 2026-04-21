@@ -493,6 +493,106 @@ describe('POST /api/telegram/webhook — message edit on tap', () => {
   })
 })
 
+// ── Message edit await — twin of 451d1cc ─────────────────────────────────────
+
+describe('POST /api/telegram/webhook — message edit await', () => {
+  it('logs telegram_edit_fail to agent_events when editMessageText fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if ((url as string).includes('editMessageText'))
+          return Promise.reject(new Error('network timeout'))
+        return Promise.resolve({ ok: true })
+      })
+    )
+
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
+
+    const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
+    await POST(req)
+
+    const editFailCall = agentInsert.mock.calls.find(
+      (args: unknown[][]) => (args[0] as { task_type: string }).task_type === 'telegram_edit_fail'
+    )
+    expect(editFailCall).toBeDefined()
+    const row = editFailCall![0] as Record<string, unknown>
+    expect(row.status).toBe('error')
+    expect(row.task_type).toBe('telegram_edit_fail')
+  })
+
+  it('error row meta contains message_id, action, and error string', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if ((url as string).includes('editMessageText'))
+          return Promise.reject(new Error('rate limited'))
+        return Promise.resolve({ ok: true })
+      })
+    )
+
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
+
+    const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
+    await POST(req)
+
+    const editFailCall = agentInsert.mock.calls.find(
+      (args: unknown[][]) => (args[0] as { task_type: string }).task_type === 'telegram_edit_fail'
+    )
+    const row = editFailCall![0] as { meta: Record<string, unknown> }
+    expect(row.meta.message_id).toBe(42)
+    expect(row.meta.action).toBe('up')
+    expect(String(row.meta.error)).toContain('rate limited')
+  })
+
+  it('returns ok:true even when editMessageText fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if ((url as string).includes('editMessageText'))
+          return Promise.reject(new Error('timeout'))
+        return Promise.resolve({ ok: true })
+      })
+    )
+
+    const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
+    const res = await POST(req)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.ok).toBe(true)
+  })
+
+  it('feedback row is written before edit — edit failure does not block vote', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if ((url as string).includes('editMessageText'))
+          return Promise.reject(new Error('timeout'))
+        return Promise.resolve({ ok: true })
+      })
+    )
+
+    const fbBuilder = makeDefaultBuilder(null)
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'task_feedback') return fbBuilder
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
+    await POST(req)
+
+    expect(fbBuilder._insert).toHaveBeenCalledOnce()
+  })
+})
+
 // ── Malformed JSON body ───────────────────────────────────────────────────────
 
 describe('POST /api/telegram/webhook — malformed body', () => {

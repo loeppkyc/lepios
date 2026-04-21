@@ -116,7 +116,7 @@ async function editMessageWithAck(
     hour12: false,
   })
 
-  await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -125,7 +125,11 @@ async function editMessageWithAck(
       text: `${originalText}\n${emoji} recorded at ${timestamp} MT`,
       reply_markup: { inline_keyboard: [] },
     }),
-  }).catch(() => {})
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -171,16 +175,40 @@ export async function POST(request: Request): Promise<NextResponse> {
     })
   }
 
-  // Dismiss spinner before the edit — edit is fire-and-forget
+  // Dismiss spinner before the edit — answerCallbackQuery must fire first
   await answerCallbackQuery(callbackQuery.id)
 
   if (parsed) {
-    void editMessageWithAck(
-      callbackQuery.message.chat.id,
-      callbackQuery.message.message_id,
-      callbackQuery.message.text ?? '',
-      parsed.action
-    ).catch(() => {})
+    try {
+      await editMessageWithAck(
+        callbackQuery.message.chat.id,
+        callbackQuery.message.message_id,
+        callbackQuery.message.text ?? '',
+        parsed.action
+      )
+    } catch (err) {
+      // Don't throw — callback is already acked, feedback row is written.
+      try {
+        const db = createServiceClient()
+        await db.from('agent_events').insert({
+          domain: 'orchestrator',
+          action: 'telegram_edit',
+          actor: 'telegram_webhook',
+          status: 'error',
+          task_type: 'telegram_edit_fail',
+          output_summary: `Failed to edit message ${callbackQuery.message.message_id} after ${parsed.action}`,
+          meta: {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            action: parsed.action,
+            error: String(err),
+          },
+          tags: ['telegram', 'webhook', 'component2'],
+        })
+      } catch {
+        // logEvent itself failed — swallow, we already acked.
+      }
+    }
   }
 
   return NextResponse.json({ ok: true })
