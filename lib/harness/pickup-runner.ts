@@ -1,6 +1,8 @@
+import crypto from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { claimTask, peekTask, reclaimStale, failTask } from '@/lib/harness/task-pickup'
 import { postMessage } from '@/lib/orchestrator/telegram'
+import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 
 export type PickupResult = {
@@ -25,16 +27,20 @@ export function buildTelegramMessage(task: TaskRow, dryRun = false): string {
   ].join('\n')
 }
 
+// Returns the pre-generated event UUID so the caller can embed it in the Telegram button
+// callback_data before sending. Returns null if the insert fails (swallowed).
 async function logEvent(
   runId: string,
   status: 'success' | 'warning' | 'error',
   taskId: string | null,
   detail: string,
   durationMs: number
-): Promise<void> {
+): Promise<string | null> {
+  const id = crypto.randomUUID()
   try {
     const db = createServiceClient()
     await db.from('agent_events').insert({
+      id,
       domain: 'orchestrator',
       action: 'task_pickup',
       actor: 'task_pickup_cron',
@@ -45,8 +51,9 @@ async function logEvent(
       meta: { run_id: runId, claimed_task_id: taskId },
       tags: ['task_pickup', 'harness', 'step5'],
     })
+    return id
   } catch {
-    // Swallow — result is still returned to caller
+    return null
   }
 }
 
@@ -108,12 +115,12 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     return { ok: true, claimed: null, reason: 'validation-failed', run_id: runId, duration_ms }
   }
 
-  // Step 4: Telegram notification — task_queue row IS the handoff; no file needed
-  void postMessage(buildTelegramMessage(task)).catch(() => {})
-
-  // Step 5: agent_events row
+  // Step 4: agent_events row — inserted first so its UUID can go in the button callback_data
   const duration_ms = Date.now() - start
-  await logEvent(runId, 'success', task.id, `claimed: ${task.task}`, duration_ms)
+  const eventId = await logEvent(runId, 'success', task.id, `claimed: ${task.task}`, duration_ms)
+
+  // Step 5: Telegram notification — sendMessageWithButtons attaches 👍/👎 when flag is set
+  void sendMessageWithButtons(eventId ?? crypto.randomUUID(), buildTelegramMessage(task)).catch(() => {})
 
   return {
     ok: true,

@@ -426,3 +426,49 @@ describe('runPickup — validation failure', () => {
     expect(result.reason).toBe('validation-failed')
   })
 })
+
+// ── agent_events insert precedes Telegram (component #2 prerequisite) ─────────
+
+describe('runPickup — agent_events insert precedes Telegram send', () => {
+  it('agent_events insert completes before Telegram fires on happy path', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const callOrder: string[] = []
+
+    const insertFn = vi.fn().mockImplementation(async () => {
+      callOrder.push('agent_events_insert')
+      return { data: null, error: null }
+    })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: insertFn }
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+    mockPostMessage.mockImplementation(async () => {
+      callOrder.push('telegram_send')
+    })
+
+    await runPickup('run-abc')
+    await Promise.resolve()
+
+    const insertIdx = callOrder.indexOf('agent_events_insert')
+    const telegramIdx = callOrder.indexOf('telegram_send')
+    expect(insertIdx).toBeGreaterThanOrEqual(0)
+    expect(telegramIdx).toBeGreaterThanOrEqual(0)
+    expect(insertIdx).toBeLessThan(telegramIdx)
+  })
+
+  it('agent_events row carries an explicit id UUID (for button callback_data embedding)', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: insertFn }
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    await runPickup('run-abc')
+
+    const row = insertFn.mock.calls[0]?.[0]
+    expect(row).toHaveProperty('id')
+    expect(typeof row.id).toBe('string')
+    expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  })
+})
