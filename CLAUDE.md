@@ -56,6 +56,8 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 **Before granting any user access to `loeppkyc/Loeppky`, the `loeppky_trigger_bot` token must be rotated via BotFather to invalidate the token still present in commit `fd8860c`'s history.** (INC-001 — risk accepted 2026-04-17 while repo is private, no collaborators.)
 
+**INC-002 (2026-04-21): GitHub secret scanning detected two leaked Telegram bot tokens in `docs/security-log.md:114` and `audits/integrations-report.md:342`, both from Streamlit-era work. Both tokens revoked via BotFather the same day — no live security risk remains. Files were NOT scrubbed from the repo or history; alerts remain open in the GitHub Security tab. Defer cleanup until the repo direction is settled (delete + restart vs. scrub files + close alerts). If deciding to keep this repo long-term, do Option B: delete the two files in a commit, then mark the scanning alerts as revoked.**
+
 **Never display, echo, or paste the contents of secrets, tokens, API keys, or credentials values in chat — not even for verification.** This applies to .env files, .streamlit/secrets.toml, Vercel env vars, BotFather tokens, database passwords, and anything labeled "secret," "token," "key," or "password." When updating such a value: confirm the update was made by name, show the before/after masked (first 4 + last 4 characters only, rest as dots), and state the file/line changed. If Colin asks you to display a secret anyway, remind him that chat transcripts are not secure and confirm twice before echoing. The default answer is "I updated it, first 4 / last 4 are X / Y."
 
 ---
