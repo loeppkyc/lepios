@@ -50,3 +50,13 @@ export interface HistoricalContext {
   capacity_tier: CapacityTier
   prior_durations_ms: number[]
 }
+
+export interface DigestResult {
+  status: DigestStatus
+  composed_at: string
+  sent_at: string | null
+  found_tick: boolean
+  character_count: number
+  telegram_latency_ms: number | null
+  source_flag_count: number
+}

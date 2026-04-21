@@ -2,13 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const { mockFrom, mockPostMessage } = vi.hoisted(() => ({
+const { mockFrom, mockPostMessage, mockFetchHistory, mockScoreMorningDigest } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
+  mockFetchHistory: vi.fn(),
+  mockScoreMorningDigest: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
+}))
+
+vi.mock('@/lib/orchestrator/scoring', () => ({
+  fetchHistoricalContext: mockFetchHistory,
+  scoreMorningDigest: mockScoreMorningDigest,
 }))
 
 vi.mock('@/lib/orchestrator/telegram', () => {
@@ -79,9 +86,24 @@ function makeInsertBuilder() {
   return { insert }
 }
 
+const MOCK_QUALITY_SCORE = {
+  aggregate: 75.0,
+  capacity_tier: 'tier_1_laptop_ollama',
+  dimensions: { completeness: 100, signal_quality: 50, efficiency: 50, hygiene: 100 },
+  weights_version: 'v1',
+  scored_at: '2026-04-21T08:00:00.000Z',
+  scored_by: 'rule_based_v1',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockPostMessage.mockResolvedValue(undefined)
+  mockFetchHistory.mockResolvedValue({
+    task_type: 'morning_digest',
+    capacity_tier: 'tier_1_laptop_ollama',
+    prior_durations_ms: [],
+  })
+  mockScoreMorningDigest.mockReturnValue(MOCK_QUALITY_SCORE)
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
@@ -365,5 +387,67 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
 
     await sendMorningDigest()
     expect(ib.insert.mock.calls[0][0].meta.mapped_from).toBe('spec_v1')
+  })
+})
+
+describe('sendMorningDigest — quality scoring', () => {
+  it('row has task_type=morning_digest', async () => {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+
+    await sendMorningDigest()
+    expect(ib.insert.mock.calls[0][0].task_type).toBe('morning_digest')
+  })
+
+  it('row has quality_score with expected shape', async () => {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+
+    await sendMorningDigest()
+    const qs = ib.insert.mock.calls[0][0].quality_score
+    expect(qs.aggregate).toBe(75.0)
+    expect(qs.capacity_tier).toBe('tier_1_laptop_ollama')
+    expect(qs.scored_by).toBe('rule_based_v1')
+    expect(qs.dimensions).toBeDefined()
+  })
+
+  it('fetchHistoricalContext called with task_type=morning_digest and current tier', async () => {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+
+    await sendMorningDigest()
+    expect(mockFetchHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'morning_digest',
+      'tier_1_laptop_ollama'
+    )
+  })
+
+  it('scoring failure → row still writes with fallback scored_by', async () => {
+    mockFetchHistory.mockRejectedValue(new Error('history fetch failed'))
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+
+    await sendMorningDigest()
+    expect(ib.insert).toHaveBeenCalledTimes(1)
+    const qs = ib.insert.mock.calls[0][0].quality_score
+    expect(qs.scored_by).toBe('rule_based_v1_fallback')
+    expect(qs.aggregate).toBeNull()
   })
 })

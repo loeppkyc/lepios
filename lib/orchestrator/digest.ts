@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { postMessage, MissingTelegramConfigError } from './telegram'
-import type { DigestStatus, TickResult } from './types'
+import { fetchHistoricalContext, scoreMorningDigest } from './scoring'
+import { CURRENT_CAPACITY_TIER } from './config'
+import type { DigestResult, DigestStatus, QualityScore, TickResult } from './types'
 
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
@@ -46,18 +48,42 @@ function toColumnStatus(digestStatus: DigestStatus): 'success' | 'warning' | 'er
   return 'error' // 'telegram_failed'
 }
 
-async function writeDigestEvent(digestStatus: DigestStatus): Promise<void> {
+async function writeDigestEvent(result: DigestResult): Promise<void> {
+  // Score — never throws to caller; fallback signals scoring failure in dashboard
+  let qualityScore: QualityScore | Record<string, unknown>
+  try {
+    const scoringClient = createServiceClient()
+    const history = await fetchHistoricalContext(
+      scoringClient,
+      'morning_digest',
+      CURRENT_CAPACITY_TIER
+    )
+    qualityScore = scoreMorningDigest(result, history)
+  } catch {
+    qualityScore = {
+      aggregate: null,
+      capacity_tier: CURRENT_CAPACITY_TIER,
+      dimensions: null,
+      weights_version: 'v1',
+      scored_at: new Date().toISOString(),
+      scored_by: 'rule_based_v1_fallback',
+    }
+  }
+
   try {
     const supabase = createServiceClient()
     await supabase.from('agent_events').insert({
       domain: 'orchestrator',
       action: 'morning_digest',
       actor: 'night_watchman',
-      status: toColumnStatus(digestStatus),
-      output_summary: `Morning digest status: ${digestStatus}`,
+      status: toColumnStatus(result.status),
+      output_summary: `Morning digest status: ${result.status}`,
+      duration_ms: result.telegram_latency_ms ?? undefined,
       tags: ['morning_digest', 'step6'],
+      task_type: 'morning_digest',
+      quality_score: qualityScore,
       meta: {
-        digest_status: digestStatus,
+        digest_status: result.status,
         mapped_from: 'spec_v1',
       },
     })
@@ -69,6 +95,7 @@ async function writeDigestEvent(digestStatus: DigestStatus): Promise<void> {
 export async function sendMorningDigest(): Promise<DigestStatus> {
   const supabase = createServiceClient()
   const cutoff = new Date(Date.now() - 12 * 3_600_000).toISOString()
+  const composed_at = new Date().toISOString()
 
   const { data } = await supabase
     .from('agent_events')
@@ -79,9 +106,11 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
     .limit(1)
     .single()
 
-  // Determine what to send
   let messageToSend: string
   let digestStatus: DigestStatus
+  let foundTick = false
+  let characterCount = 0
+  let sourceFlagCount = 0
 
   if (!data?.output_summary) {
     messageToSend = '⚠️ No night tick found for last night'
@@ -91,21 +120,39 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
       const tick = JSON.parse(data.output_summary) as TickResult
       messageToSend = composeMorningDigest(tick)
       digestStatus = 'sent'
+      foundTick = true
+      characterCount = messageToSend.length
+      sourceFlagCount = tick.checks.reduce((s, c) => s + c.flags.length, 0)
     } catch {
       messageToSend = '⚠️ No night tick found for last night'
       digestStatus = 'no_tick_found'
     }
   }
 
-  // Attempt send — override status on Telegram failure
+  // Attempt send — measure Telegram latency, override status on failure
+  let telegramLatencyMs: number | null = null
+  let sentAt: string | null = null
   try {
+    const sendStart = Date.now()
     await postMessage(messageToSend)
+    telegramLatencyMs = Date.now() - sendStart
+    sentAt = new Date().toISOString()
   } catch (err) {
     if (err instanceof MissingTelegramConfigError || err instanceof Error) {
       digestStatus = 'telegram_failed'
     }
   }
 
-  await writeDigestEvent(digestStatus)
+  const digestResult: DigestResult = {
+    status: digestStatus,
+    composed_at,
+    sent_at: sentAt,
+    found_tick: foundTick,
+    character_count: characterCount,
+    telegram_latency_ms: telegramLatencyMs,
+    source_flag_count: sourceFlagCount,
+  }
+
+  await writeDigestEvent(digestResult)
   return digestStatus
 }

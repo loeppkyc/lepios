@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { scoreNightTick } from '@/lib/orchestrator/scoring'
-import type { TickResult, HistoricalContext } from '@/lib/orchestrator/types'
+import { scoreNightTick, scoreMorningDigest } from '@/lib/orchestrator/scoring'
+import type { TickResult, DigestResult, HistoricalContext } from '@/lib/orchestrator/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,5 +163,108 @@ describe('scoreNightTick — metadata', () => {
 
   it('weights_version is v1', () => {
     expect(scoreNightTick(makeTickResult(), makeHistory([])).weights_version).toBe('v1')
+  })
+})
+
+// ── scoreMorningDigest ────────────────────────────────────────────────────────
+
+function makeDigestResult(overrides: Partial<DigestResult> = {}): DigestResult {
+  return {
+    status: 'sent',
+    composed_at: '2026-04-21T08:00:00.000Z',
+    sent_at: '2026-04-21T08:00:01.500Z',
+    found_tick: true,
+    character_count: 200,
+    telegram_latency_ms: 1500,
+    source_flag_count: 0,
+    ...overrides,
+  }
+}
+
+function makeDigestHistory(durations: number[]): HistoricalContext {
+  return { task_type: 'morning_digest', capacity_tier: 'tier_1_laptop_ollama', prior_durations_ms: durations }
+}
+
+describe('scoreMorningDigest — completeness', () => {
+  it('status=sent → 100', () => {
+    expect(scoreMorningDigest(makeDigestResult({ status: 'sent' }), makeDigestHistory([])).dimensions.completeness).toBe(100)
+  })
+
+  it('status=no_tick_found → 50', () => {
+    expect(scoreMorningDigest(makeDigestResult({ status: 'no_tick_found' }), makeDigestHistory([])).dimensions.completeness).toBe(50)
+  })
+
+  it('status=telegram_failed → 0', () => {
+    expect(scoreMorningDigest(makeDigestResult({ status: 'telegram_failed' }), makeDigestHistory([])).dimensions.completeness).toBe(0)
+  })
+})
+
+describe('scoreMorningDigest — signal_quality', () => {
+  it('zero source flags → 50', () => {
+    expect(scoreMorningDigest(makeDigestResult({ source_flag_count: 0 }), makeDigestHistory([])).dimensions.signal_quality).toBe(50)
+  })
+
+  it('one or more source flags → 70', () => {
+    expect(scoreMorningDigest(makeDigestResult({ source_flag_count: 3 }), makeDigestHistory([])).dimensions.signal_quality).toBe(70)
+  })
+})
+
+describe('scoreMorningDigest — efficiency', () => {
+  it('null telegram_latency_ms → 50 (fallback)', () => {
+    expect(scoreMorningDigest(makeDigestResult({ telegram_latency_ms: null }), makeDigestHistory(TEN_DURATIONS)).dimensions.efficiency).toBe(50)
+  })
+
+  it('below baseline threshold (< 7 runs) → 50', () => {
+    expect(scoreMorningDigest(makeDigestResult({ telegram_latency_ms: 100 }), makeDigestHistory([200, 300])).dimensions.efficiency).toBe(50)
+  })
+
+  it('latency at p20 of baseline → 100', () => {
+    // p20 of TEN_DURATIONS = 280 (same as night_tick efficiency test)
+    expect(scoreMorningDigest(makeDigestResult({ telegram_latency_ms: 280 }), makeDigestHistory(TEN_DURATIONS)).dimensions.efficiency).toBe(100)
+  })
+})
+
+describe('scoreMorningDigest — hygiene', () => {
+  it('all required fields present → 100', () => {
+    expect(scoreMorningDigest(makeDigestResult(), makeDigestHistory([])).dimensions.hygiene).toBe(100)
+  })
+
+  it('missing composed_at → 80', () => {
+    expect(scoreMorningDigest(makeDigestResult({ composed_at: '' }), makeDigestHistory([])).dimensions.hygiene).toBe(80)
+  })
+
+  it('missing status → 80', () => {
+    expect(scoreMorningDigest(makeDigestResult({ status: undefined as unknown as DigestResult['status'] }), makeDigestHistory([])).dimensions.hygiene).toBe(80)
+  })
+})
+
+describe('scoreMorningDigest — aggregate', () => {
+  it('sent, zero flags, no baseline → 75.0', () => {
+    // completeness=100×0.4 + signal=50×0.3 + efficiency=50×0.2 + hygiene=100×0.1 = 75.0
+    expect(scoreMorningDigest(makeDigestResult({ telegram_latency_ms: null }), makeDigestHistory([])).aggregate).toBe(75.0)
+  })
+
+  it('telegram_failed → 0 completeness drives aggregate down', () => {
+    // completeness=0×0.4 + signal=50×0.3 + efficiency=50×0.2 + hygiene=100×0.1 = 35.0
+    const result = scoreMorningDigest(makeDigestResult({ status: 'telegram_failed', telegram_latency_ms: null }), makeDigestHistory([]))
+    expect(result.aggregate).toBe(35.0)
+  })
+})
+
+describe('scoreMorningDigest — metadata', () => {
+  it('scored_at is ISO 8601 timestamp', () => {
+    expect(scoreMorningDigest(makeDigestResult(), makeDigestHistory([])).scored_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+  })
+
+  it('scored_by is rule_based_v1', () => {
+    expect(scoreMorningDigest(makeDigestResult(), makeDigestHistory([])).scored_by).toBe('rule_based_v1')
+  })
+
+  it('capacity_tier is tier_1_laptop_ollama', () => {
+    expect(scoreMorningDigest(makeDigestResult(), makeDigestHistory([])).capacity_tier).toBe('tier_1_laptop_ollama')
+  })
+
+  it('weights_version is v1', () => {
+    expect(scoreMorningDigest(makeDigestResult(), makeDigestHistory([])).weights_version).toBe('v1')
   })
 })

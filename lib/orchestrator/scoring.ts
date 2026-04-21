@@ -7,6 +7,7 @@ import {
 } from './config'
 import type {
   TickResult,
+  DigestResult,
   QualityScore,
   QualityDimensions,
   HistoricalContext,
@@ -46,7 +47,7 @@ function lerp(x0: number, y0: number, x1: number, y1: number, x: number): number
   return y0 + ((x - x0) / (x1 - x0)) * (y1 - y0)
 }
 
-function scoreEfficiency(tick: TickResult, history: HistoricalContext): number {
+function scoreEfficiencyMs(durationMs: number, history: HistoricalContext): number {
   if (history.prior_durations_ms.length < BASELINE_MIN_RUNS) return 50
 
   const sorted = [...history.prior_durations_ms].sort((a, b) => a - b)
@@ -56,7 +57,7 @@ function scoreEfficiency(tick: TickResult, history: HistoricalContext): number {
   const twoXMedian = 2 * p50
   const fiveXMedian = 5 * p50
 
-  const v = tick.duration_ms
+  const v = durationMs
   let score: number
 
   if (v <= p20) {
@@ -74,6 +75,10 @@ function scoreEfficiency(tick: TickResult, history: HistoricalContext): number {
   }
 
   return Math.min(100, Math.max(0, score))
+}
+
+function scoreEfficiency(tick: TickResult, history: HistoricalContext): number {
+  return scoreEfficiencyMs(tick.duration_ms, history)
 }
 
 function scoreHygiene(tick: TickResult): number {
@@ -145,4 +150,57 @@ export async function fetchHistoricalContext(
     .filter((d): d is number => d !== null)
 
   return { task_type, capacity_tier, prior_durations_ms }
+}
+
+// ── Morning digest scorer ─────────────────────────────────────────────────────
+
+function scoreDigestCompleteness(result: DigestResult): number {
+  if (result.status === 'sent') return 100
+  if (result.status === 'no_tick_found') return 50
+  return 0 // 'telegram_failed'
+}
+
+function scoreDigestSignalQuality(result: DigestResult): number {
+  return result.source_flag_count === 0 ? 50 : 70
+}
+
+function scoreDigestEfficiency(result: DigestResult, history: HistoricalContext): number {
+  if (result.telegram_latency_ms === null) return 50
+  return scoreEfficiencyMs(result.telegram_latency_ms, history)
+}
+
+function scoreDigestHygiene(result: DigestResult): number {
+  const required: (keyof DigestResult)[] = ['status', 'composed_at']
+  let score = 100
+  for (const field of required) {
+    const v = result[field]
+    if (v === undefined || v === null || v === '') score -= 20
+  }
+  return Math.max(0, score)
+}
+
+export function scoreMorningDigest(result: DigestResult, history: HistoricalContext): QualityScore {
+  const dimensions: QualityDimensions = {
+    completeness: scoreDigestCompleteness(result),
+    signal_quality: scoreDigestSignalQuality(result),
+    efficiency: scoreDigestEfficiency(result, history),
+    hygiene: scoreDigestHygiene(result),
+  }
+
+  const raw =
+    dimensions.completeness * WEIGHTS_V1.completeness +
+    dimensions.signal_quality * WEIGHTS_V1.signal_quality +
+    dimensions.efficiency * WEIGHTS_V1.efficiency +
+    dimensions.hygiene * WEIGHTS_V1.hygiene
+
+  const aggregate = Math.round(raw * 10) / 10
+
+  return {
+    aggregate,
+    capacity_tier: CURRENT_CAPACITY_TIER,
+    dimensions,
+    weights_version: 'v1',
+    scored_at: new Date().toISOString(),
+    scored_by: SCORER_VERSION,
+  }
 }
