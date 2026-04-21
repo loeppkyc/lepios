@@ -43,7 +43,7 @@ but is explicitly out of scope for v0.
 
 ### In scope (v0)
 
-- `harness_tasks` Supabase table — schema, migration, RLS
+- `task_queue` Supabase table — schema, migration, RLS
 - `GET /api/cron/task-pickup` route — claim, validate, write handoff, notify
 - `docs/harness-tasks/active-task.md` — structured handoff file coordinator reads cold
 - Telegram notification to Colin when a task is claimed: task description, handoff path,
@@ -104,89 +104,83 @@ issue sync), once the queue itself is proven. v0 builds the foundation.
 
 ### 4.1 Migration
 
-New table: `harness_tasks`. One migration file at
-`supabase/migrations/NNNN_add_harness_tasks.sql`.
+New table: `task_queue`. Migration file at
+`supabase/migrations/0015_add_task_queue.sql`.
 
 ```sql
-BEGIN;
+CREATE TABLE public.task_queue (
+  id          UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
 
-CREATE TABLE public.harness_tasks (
-  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  task        TEXT      NOT NULL,
+  description TEXT,                                       -- optional long-form context
 
-  -- What to do
-  task          TEXT        NOT NULL,
-  description   TEXT,                           -- optional long-form context
+  -- 1 = highest priority, 10 = lowest; ties broken by created_at ASC
+  priority    SMALLINT  NOT NULL DEFAULT 5,
 
-  -- Scheduling
-  priority      INTEGER     NOT NULL DEFAULT 50
-                            CHECK (priority BETWEEN 0 AND 100),
-                            -- 0 = highest, 100 = lowest; ties broken by created_at ASC
+  -- queued    → waiting to be claimed by pickup cron
+  -- claimed   → pickup cron claimed it; handoff written; coordinator not yet started
+  -- running   → coordinator actively executing with heartbeat
+  -- completed → coordinator finished successfully
+  -- failed    → unrecoverable error or exhausted retries
+  -- cancelled → manually cancelled, or max_retries hit on stale reclaim
+  status      TEXT      NOT NULL DEFAULT 'queued'
+              CHECK (status IN ('queued','claimed','running','completed','failed','cancelled')),
 
-  -- Lifecycle
-  status        TEXT        NOT NULL DEFAULT 'queued'
-                            CHECK (status IN (
-                              'queued',    -- waiting to be claimed
-                              'claimed',   -- claimed by a pickup run, handoff written
-                              'running',   -- coordinator/builder actively working (v1)
-                              'done',      -- completed successfully
-                              'failed',    -- exhausted retries or unrecoverable error
-                              'cancelled'  -- manually cancelled or max_retries hit
-                            )),
+  source      TEXT      NOT NULL DEFAULT 'manual'
+              CHECK (source IN ('manual','handoff-file','colin-telegram','cron')),
 
-  -- Claim tracking
+  metadata    JSONB     NOT NULL DEFAULT '{}'::jsonb,
+  result      JSONB,
+
+  retry_count SMALLINT  NOT NULL DEFAULT 0,
+  max_retries SMALLINT  NOT NULL DEFAULT 2,
+
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   claimed_at        TIMESTAMPTZ,
-  claimed_by        TEXT,                       -- pickup run_id; prevents double-claim
+  claimed_by        TEXT,
+  last_heartbeat_at TIMESTAMPTZ,
   completed_at      TIMESTAMPTZ,
-  last_heartbeat_at TIMESTAMPTZ,               -- updated every 5 min while coordinator runs; stale detection uses this, not claimed_at
-
-  -- Retry
-  retry_count   INTEGER     NOT NULL DEFAULT 0,
-  max_retries   INTEGER     NOT NULL DEFAULT 2, -- matches global retry limit in CLAUDE.md
-
-  -- Provenance
-  source        TEXT        NOT NULL DEFAULT 'manual'
-                            CHECK (source IN (
-                              'manual',   -- Colin inserted directly
-                              'cron',     -- inserted by another Vercel cron
-                              'api',      -- inserted via a route call
-                              'colin'     -- alias for manual, explicit attribution
-                            )),
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-  -- Result and error
-  result        JSONB,                          -- structured output from coordinator handoff
-  error         TEXT,                           -- error message if failed or cancelled
-
-  -- Flexible per-task context
-  metadata      JSONB                           -- sprint_id, chunk_id, source_ref, etc.
+  error_message     TEXT
 );
 
 -- Pickup query: highest-priority queued task first
-CREATE INDEX ON public.harness_tasks (status, priority ASC, created_at ASC);
+CREATE INDEX task_queue_pickup_idx
+  ON public.task_queue (status, priority ASC, created_at ASC);
 
--- Stale claim detection: find claimed tasks older than threshold
-CREATE INDEX ON public.harness_tasks (status, claimed_at)
-  WHERE status = 'claimed';
+-- Stale-claim reclaim: claimed/running tasks with stale heartbeat
+CREATE INDEX task_queue_stale_idx
+  ON public.task_queue (status, last_heartbeat_at)
+  WHERE status IN ('claimed', 'running');
 
-COMMIT;
+-- Observability: tasks by source, newest first
+CREATE INDEX task_queue_source_idx
+  ON public.task_queue (source, created_at DESC);
+
+ALTER TABLE public.task_queue ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "task_queue_authenticated" ON public.task_queue
+  FOR ALL TO authenticated
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Rollback: DROP TABLE IF EXISTS public.task_queue;
 ```
 
 ### 4.2 RLS
 
-The `harness_tasks` table is internal harness infrastructure. It is written and read by
-the service client (bypasses RLS). No user-facing RLS policy is required for v0. If a
-dashboard UI is added later, add a policy then.
+RLS is enabled. The service role bypasses RLS automatically — no explicit policy is needed
+for the pickup cron or coordinator. Authenticated users get full access (single-user app).
+SPRINT5-GATE: tighten to `profiles.id` when multi-user ships.
 
 ### 4.3 Adding tasks (v0 write path)
 
 Colin inserts tasks directly via Supabase Studio or a one-liner:
 
 ```sql
-INSERT INTO harness_tasks (task, priority, source, metadata)
+INSERT INTO task_queue (task, priority, source, metadata)
 VALUES (
   'Sprint 4 Chunk A — SP-API integration + Today Live / Yesterday',
-  10,
-  'colin',
+  1,
+  'manual',
   '{"sprint": 4, "chunk": "A", "plan_path": "docs/sprint-4/plan.md"}'
 );
 ```
@@ -227,7 +221,7 @@ Three-hour gap before and after. No scheduling conflicts.
 
 ### What a pickup run does (in order)
 
-1. **Stale claim recovery** — reset any `claimed` tasks where
+1. **Stale claim recovery** — reset any `claimed` or `running` tasks where
    `COALESCE(last_heartbeat_at, claimed_at) < NOW() - INTERVAL '10 minutes'` back to
    `queued`, increment `retry_count`. If `retry_count >= max_retries` after reset, move to
    `cancelled` and send Telegram alert. Using `last_heartbeat_at` (not `claimed_at`) means
@@ -253,13 +247,13 @@ Three-hour gap before and after. No scheduling conflicts.
 The claim is a single UPDATE with a condition:
 
 ```sql
-UPDATE harness_tasks
+UPDATE task_queue
 SET
   status     = 'claimed',
   claimed_at = NOW(),
   claimed_by = $run_id      -- UUID generated at pickup run start
 WHERE id = (
-  SELECT id FROM harness_tasks
+  SELECT id FROM task_queue
   WHERE status = 'queued'
   ORDER BY priority ASC, created_at ASC
   LIMIT 1
@@ -289,16 +283,17 @@ and manual invocations are one-shot by operator intent.
 ### Status lifecycle
 
 ```text
-queued → claimed → done        (happy path)
-       → claimed → cancelled   (max_retries hit on stale reset)
-       → failed                (validation failure at claim time)
-queued → cancelled             (manual cancellation via SQL)
+queued → claimed → running → (completed | failed)   (happy path)
+       → claimed → cancelled                          (max_retries hit on stale reset)
+       → failed                                       (validation failure at claim time)
+queued → cancelled                                    (manual cancellation via SQL)
+failed → queued                                       (if retry_count < max_retries)
 ```
 
-There is no `running` transition in v0 — coordinator does not write back to the table
-during execution. `running` is reserved for v1 when remote invocation is active and the
-coordinator can heartbeat its progress. For now, `claimed` covers both "handoff written,
-waiting for coordinator" and "coordinator is actively working."
+`running` distinguishes a task that has been claimed but not yet started (coordinator
+hasn't invoked yet) from one that is actively executing with a live heartbeat. In v0,
+coordinator transitions status to `running` and begins writing `last_heartbeat_at` every
+5 minutes. Stale detection covers both states: `status IN ('claimed','running')`.
 
 ### Stale claim recovery
 
@@ -306,11 +301,11 @@ A task stays `claimed` indefinitely if coordinator is never invoked (Colin saw t
 but didn't act). The recovery logic runs at the start of each pickup run:
 
 ```text
-FOR EACH task WHERE status = 'claimed'
+FOR EACH task WHERE status IN ('claimed', 'running')
   AND COALESCE(last_heartbeat_at, claimed_at) < NOW() - INTERVAL '10 minutes':
   retry_count += 1
   IF retry_count >= max_retries:
-    status = 'cancelled', error = 'stale claim: max retries exhausted'
+    status = 'cancelled', error_message = 'stale claim: max retries exhausted'
     → Telegram alert: "Task [id] cancelled after [N] stale claims"
   ELSE:
     status = 'queued'   -- re-queue for next pickup
@@ -326,7 +321,7 @@ task (Colin closed the session, coordinator died) stops heartbeating and trips t
 window. With `max_retries: 2`, a task gets three total pickup attempts before cancellation.
 
 **Heartbeat write path (v0):** In v0, the heartbeat is a manual convention — the coordinator
-agent is expected to `UPDATE harness_tasks SET last_heartbeat_at = NOW() WHERE id = $task_id`
+agent is expected to `UPDATE task_queue SET last_heartbeat_at = NOW() WHERE id = $task_id`
 via the Supabase service client every 5 minutes during a long run. This is documented in
 `coordinator.md` (to be updated as part of the build step). In v1, the remote invocation
 wrapper handles heartbeating automatically.
@@ -362,7 +357,7 @@ JSON if present. Either fails.
 - Task moved to `status: 'failed'`, `error` field populated with validation message
 - `active-task.md` is NOT written — no partial handoff for coordinator
 - Telegram alert: "Harness pickup: task [id] failed validation — [error]. Inspect
-  harness_tasks."
+  task_queue."
 - Route returns HTTP 200 (the pickup cron itself ran fine; the task was bad)
 
 ### 7.4 Handoff file write failure (filesystem / git issues)
@@ -392,7 +387,7 @@ succeeded. Colin can discover the active task by querying Supabase or reading
 
 **Behavior:** Stale claim recovery (§6) enforces `max_retries: 2` (default). After the
 third stale claim, the task is cancelled and Colin is notified. The task content is
-preserved in the `harness_tasks` row for post-mortem. The queue unblocks and proceeds
+preserved in the `task_queue` row for post-mortem. The queue unblocks and proceeds
 to the next task.
 
 **Prevention:** `max_retries` is per-row and can be overridden at insert time for tasks
@@ -411,7 +406,7 @@ the queue automatically.
 **If urgency requires earlier unblocking:** Colin runs:
 
 ```sql
-UPDATE harness_tasks SET status = 'cancelled' WHERE id = '[poison-task-id]';
+UPDATE task_queue SET status = 'cancelled' WHERE id = '[poison-task-id]';
 ```
 
 This is a documented escape hatch, not an automated behavior.
@@ -485,10 +480,10 @@ Colin copies the last line into Claude Code. That is the only thing he needs to 
 
 ### v0 limitation — what coordinator does NOT do automatically
 
-In v0, coordinator does not write back to `harness_tasks` when a chunk completes. The task
+In v0, coordinator does not write back to `task_queue` when a chunk completes. The task
 stays `claimed` until:
 
-- Colin manually sets `status = 'done'` after confirming the sprint grounding checkpoint,
+- Colin manually sets `status = 'completed'` after confirming the sprint grounding checkpoint,
   OR
 - The next pickup run's stale recovery re-queues it (if Colin forgets)
 
@@ -519,31 +514,33 @@ available. Neither is in scope for v0.
 
 Machine-checkable. Tests written and passing before any v0 code merges.
 
-### AC-1: harness_tasks table exists with correct schema
+### AC-1: task_queue table exists with correct schema
 
 ```sql
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
-WHERE table_name = 'harness_tasks'
+WHERE table_name = 'task_queue'
 ORDER BY ordinal_position;
 ```
 
 Expected columns: `id` (uuid, not null), `task` (text, not null), `description` (text,
-nullable), `priority` (integer, not null, default 50), `status` (text, not null, default
-'queued'), `claimed_at` (timestamptz, nullable), `claimed_by` (text, nullable),
-`completed_at` (timestamptz, nullable), `last_heartbeat_at` (timestamptz, nullable),
-`retry_count` (integer, not null, default 0), `max_retries` (integer, not null, default 2),
-`source` (text, not null, default 'manual'), `created_at` (timestamptz, not null),
-`result` (jsonb, nullable), `error` (text, nullable), `metadata` (jsonb, nullable).
+nullable), `priority` (smallint, not null, default 5), `status` (text, not null, default
+'queued'), `source` (text, not null, default 'manual'), `metadata` (jsonb, not null,
+default '{}'), `result` (jsonb, nullable), `retry_count` (smallint, not null, default 0),
+`max_retries` (smallint, not null, default 2), `created_at` (timestamptz, not null),
+`claimed_at` (timestamptz, nullable), `claimed_by` (text, nullable),
+`last_heartbeat_at` (timestamptz, nullable), `completed_at` (timestamptz, nullable),
+`error_message` (text, nullable).
 
 ### AC-2: Task insert succeeds and defaults are correct
 
 ```sql
-INSERT INTO harness_tasks (task) VALUES ('test task') RETURNING *;
+INSERT INTO task_queue (task) VALUES ('test task') RETURNING *;
 ```
 
-Expected: `status = 'queued'`, `priority = 50`, `retry_count = 0`, `source = 'manual'`,
-`claimed_at IS NULL`, `claimed_by IS NULL`.
+Expected: `status = 'queued'`, `priority = 5`, `retry_count = 0`, `max_retries = 2`,
+`source = 'manual'`, `metadata = '{}'`, `claimed_at IS NULL`, `claimed_by IS NULL`,
+`last_heartbeat_at IS NULL`.
 
 ### AC-3: Pickup route claims highest-priority queued task atomically
 
@@ -553,20 +550,20 @@ Setup: insert two tasks — priority 10 and priority 80.
 GET /api/cron/task-pickup  (authorized)
 → HTTP 200
 → body.claimed.id = ID of the priority-10 task
-→ that row in harness_tasks: status = 'claimed', claimed_at IS NOT NULL,
+→ that row in task_queue: status = 'claimed', claimed_at IS NOT NULL,
     claimed_by = body.run_id
 → the priority-80 task: status = 'queued' (untouched)
 ```
 
 ### AC-4: Empty queue returns clean no-op
 
-Setup: no `queued` tasks in `harness_tasks`.
+Setup: no `queued` tasks in `task_queue`.
 
 ```text
 GET /api/cron/task-pickup  (authorized)
 → HTTP 200
 → body = { ok: true, claimed: null, reason: "queue-empty" }
-→ no harness_tasks rows mutated
+→ no task_queue rows mutated
 → no Telegram notification sent
 ```
 
@@ -597,7 +594,7 @@ Setup: task with `status = 'claimed'`, `claimed_at = NOW() - INTERVAL '11 minute
 
 ```text
 GET /api/cron/task-pickup  (authorized)
-→ task status = 'cancelled', error contains 'stale claim: max retries exhausted'
+→ task status = 'cancelled', error_message contains 'stale claim: max retries exhausted'
 → Telegram alert sent (verify via mock or log)
 → task does NOT re-enter queued state
 ```
@@ -609,7 +606,7 @@ With TASK_PICKUP_DRY_RUN=1:
 GET /api/cron/task-pickup  (authorized, queue has one task)
 → HTTP 200
 → body.dry_run = true
-→ no harness_tasks rows mutated (task remains status = 'queued')
+→ no task_queue rows mutated (task remains status = 'queued')
 → docs/harness-tasks/active-task.md NOT written
 → Telegram message (if sent) includes "[DRY RUN]" prefix
 ```
@@ -621,7 +618,7 @@ With TASK_PICKUP_ENABLED unset or empty:
 GET /api/cron/task-pickup  (authorized)
 → HTTP 200
 → body = { ok: false, reason: "task-pickup-disabled", duration_ms: 0 }
-→ no harness_tasks mutations
+→ no task_queue mutations
 → no Telegram notification
 → no agent_events row written
 ```
@@ -631,7 +628,7 @@ GET /api/cron/task-pickup  (authorized)
 ```text
 GET /api/cron/task-pickup  (no Authorization header, CRON_SECRET set)
 → HTTP 401
-→ no harness_tasks mutations
+→ no task_queue mutations
 → no active-task.md written
 ```
 
@@ -672,7 +669,7 @@ Read vercel.json. Assert crons array contains:
 -- Verify column exists
 SELECT column_name, data_type, is_nullable
 FROM information_schema.columns
-WHERE table_name = 'harness_tasks' AND column_name = 'last_heartbeat_at';
+WHERE table_name = 'task_queue' AND column_name = 'last_heartbeat_at';
 -- Expected: row returned, data_type = 'timestamp with time zone', is_nullable = 'YES'
 ```
 
@@ -713,7 +710,7 @@ logic before enabling live operation.
 
 ### Rollout order
 
-1. **Migration** — apply `NNNN_add_harness_tasks.sql` to production Supabase.
+1. **Migration** — apply `0015_add_task_queue.sql` to production Supabase.
    Verify table exists via Studio.
 
 2. **Code merged, both flags off** — merge PR with `TASK_PICKUP_ENABLED` unset.
@@ -739,7 +736,7 @@ logic before enabling live operation.
 
 1. Set `TASK_PICKUP_ENABLED=` in Vercel env (fastest, no redeploy)
 2. Remove from `vercel.json` (removes cron schedule, requires deploy)
-3. `UPDATE harness_tasks SET status = 'cancelled' WHERE status = 'queued'` (drains queue
+3. `UPDATE task_queue SET status = 'cancelled' WHERE status = 'queued'` (drains queue
    without disabling pickup)
 
 ---
@@ -751,7 +748,7 @@ Sprint 4 is paused awaiting this component per `docs/sprint-state.md`
 
 ### Required (all must be true simultaneously)
 
-1. **Migration applied and verified** — `harness_tasks` table exists in production Supabase
+1. **Migration applied and verified** — `task_queue` table exists in production Supabase
    with correct schema (AC-1 passes against production).
 
 2. **Three consecutive days of pickup crons completing cleanly** — `agent_events` rows
