@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { spApiConfigured } from '@/lib/amazon/client'
+import { logEvent, logError } from '@/lib/knowledge/client'
 import { findAsin, getCatalogData } from '@/lib/amazon/catalog'
 import { getUsedBuyBox } from '@/lib/amazon/pricing'
 import { getFbaFees } from '@/lib/amazon/fees'
@@ -56,14 +57,11 @@ export async function POST(request: Request) {
   const asin = await findAsin(isbn)
 
   if (!asin) {
-    await supabase.from('agent_events').insert({
-      domain: 'pageprofit',
-      action: 'scan',
+    await logError('pageprofit', 'scan', new Error(`No ASIN found for ISBN ${isbn}`), {
       actor: 'user',
-      status: 'error',
-      input_summary: `ISBN: ${isbn}, cost: $${costPaid}`,
-      error_message: `No ASIN found for ISBN ${isbn}`,
-      duration_ms: Date.now() - startMs,
+      entity: isbn,
+      inputSummary: `ISBN: ${isbn}, cost: $${costPaid}`,
+      durationMs: Date.now() - startMs,
       meta: { isbn },
     })
     return NextResponse.json(
@@ -76,14 +74,11 @@ export async function POST(request: Request) {
   const [catalog, buyBoxPrice] = await Promise.all([getCatalogData(asin), getUsedBuyBox(asin)])
 
   if (!buyBoxPrice) {
-    await supabase.from('agent_events').insert({
-      domain: 'pageprofit',
-      action: 'scan',
+    await logError('pageprofit', 'scan', new Error(`No used buy box price for ASIN ${asin}`), {
       actor: 'user',
-      status: 'error',
-      input_summary: `ISBN: ${isbn}, cost: $${costPaid}`,
-      error_message: `No used buy box price for ASIN ${asin}`,
-      duration_ms: Date.now() - startMs,
+      entity: asin,
+      inputSummary: `ISBN: ${isbn}, cost: $${costPaid}`,
+      durationMs: Date.now() - startMs,
       meta: { isbn, asin },
     })
     return NextResponse.json(
@@ -150,14 +145,13 @@ export async function POST(request: Request) {
   }
 
   // Write agent event — non-critical, don't fail the scan if this errors
-  await supabase.from('agent_events').insert({
-    domain: 'pageprofit',
-    action: 'scan',
+  void logEvent('pageprofit', 'scan', {
     actor: 'user',
     status: dbError ? 'warning' : 'success',
-    input_summary: `ISBN: ${isbn}, cost: $${costPaid}`,
-    output_summary: `ASIN: ${asin}, profit: $${profit.toFixed(2)}, decision: ${decision}`,
-    duration_ms: Date.now() - startMs,
+    entity: isbn,
+    inputSummary: `ISBN: ${isbn}, cost: $${costPaid}`,
+    outputSummary: `ASIN: ${asin}, profit: $${profit.toFixed(2)}, decision: ${decision}`,
+    durationMs: Date.now() - startMs,
     meta: {
       isbn,
       asin,

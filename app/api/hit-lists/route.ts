@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { CreateListSchema } from '@/lib/hit-lists/schemas'
+import { logEvent, logError } from '@/lib/knowledge/client'
 
 export async function GET() {
   const supabase = await createClient()
@@ -59,7 +60,17 @@ export async function POST(request: Request) {
     .select('id, name, created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: 'Failed to create list' }, { status: 500 })
+  if (error) {
+    void logError('pageprofit', 'hit-list.create', new Error(error.message), { actor: 'user' })
+    return NextResponse.json({ error: 'Failed to create list' }, { status: 500 })
+  }
+
+  void logEvent('pageprofit', 'hit-list.create', {
+    actor: 'user',
+    status: 'success',
+    entity: data.id,
+    outputSummary: `Created hit list: ${parsed.data.name}`,
+  })
 
   return NextResponse.json(data, { status: 201 })
 }

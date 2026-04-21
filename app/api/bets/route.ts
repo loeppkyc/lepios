@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { americanToImpliedProb, kellyPct } from '@/lib/kelly'
 import { BetInsertSchema, BetQuerySchema } from '@/lib/schemas/bet'
 import { NextResponse } from 'next/server'
+import { logEvent, logError } from '@/lib/knowledge/client'
 
 const BET_SELECT_COLS = [
   'id',
@@ -113,7 +114,21 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    void logError('betting', 'bet.create', new Error(error.message), {
+      actor: 'user',
+      meta: { sport: betData.sport, league: betData.league, odds: betData.odds },
+    })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  void logEvent('betting', 'bet.create', {
+    actor: 'user',
+    status: 'success',
+    entity: data.id,
+    outputSummary: `${betData.sport} ${betData.bet_on} @ ${betData.odds}, kelly: ${kellyPctValue.toFixed(1)}%`,
+    meta: { sport: betData.sport, league: betData.league, odds: betData.odds, kelly_pct: kellyPctValue },
+  })
 
   return NextResponse.json({ bet: data }, { status: 201 })
 }

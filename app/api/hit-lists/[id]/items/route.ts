@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { AddItemsSchema } from '@/lib/hit-lists/schemas'
+import { logEvent, logError } from '@/lib/knowledge/client'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
@@ -83,10 +84,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .upsert(rows, { onConflict: 'hit_list_id,isbn', ignoreDuplicates: true })
     .select('id')
 
-  if (error) return NextResponse.json({ error: 'Failed to add ISBNs' }, { status: 500 })
+  if (error) {
+    void logError('pageprofit', 'hit-list.add-items', new Error(error.message), {
+      actor: 'user',
+      entity: id,
+      meta: { isbn_count: isbns.length },
+    })
+    return NextResponse.json({ error: 'Failed to add ISBNs' }, { status: 500 })
+  }
 
   const added = inserted?.length ?? 0
   const skipped = isbns.length - added
+
+  void logEvent('pageprofit', 'hit-list.add-items', {
+    actor: 'user',
+    status: 'success',
+    entity: id,
+    outputSummary: `Added ${added} ISBNs, skipped ${skipped} duplicates`,
+    meta: { added, skipped, list_id: id },
+  })
 
   return NextResponse.json({ added, skipped })
 }
