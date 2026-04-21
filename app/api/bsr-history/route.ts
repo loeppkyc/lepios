@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getBsrHistory } from '@/lib/keepa/history'
+import { logEvent, logError } from '@/lib/knowledge/client'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -13,17 +14,27 @@ export async function GET(request: Request) {
   const asin = searchParams.get('asin')?.trim()
   if (!asin) return NextResponse.json({ error: 'asin is required' }, { status: 400 })
 
-  const result = await getBsrHistory(asin)
+  let result: Awaited<ReturnType<typeof getBsrHistory>>
+  try {
+    result = await getBsrHistory(asin)
+  } catch (err) {
+    await logError('pageprofit', 'bsr_sparkline', err instanceof Error ? err : new Error(String(err)), {
+      actor: 'user',
+      entity: asin,
+      inputSummary: `ASIN: ${asin}`,
+      meta: { asin },
+    })
+    return NextResponse.json({ error: 'Failed to fetch BSR history' }, { status: 500 })
+  }
 
-  // Log tokensLeft to agent_events on cache-miss calls so audit trail is maintained
+  // Log tokensLeft on cache-miss calls so audit trail is maintained
   if (!result.fromCache && result.tokensLeft !== null) {
-    await supabase.from('agent_events').insert({
-      domain: 'pageprofit',
-      action: 'bsr_sparkline',
+    void logEvent('pageprofit', 'bsr_sparkline', {
       actor: 'user',
       status: 'success',
-      input_summary: `ASIN: ${asin}`,
-      output_summary: `${result.points.length} BSR points fetched`,
+      entity: asin,
+      inputSummary: `ASIN: ${asin}`,
+      outputSummary: `${result.points.length} BSR points fetched`,
       meta: { asin, keepa_tokens_left: result.tokensLeft },
     })
   }

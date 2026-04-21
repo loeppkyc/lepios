@@ -14,6 +14,7 @@ ALTER TABLE public.agent_events
 -- Index task_type for per-task-type trend queries and dashboard filtering
 CREATE INDEX ON public.agent_events (task_type);
 
+-- Reserved for §11.1 Telegram thumbs (see docs/feedback-loop-scoring.md)
 -- Human feedback table: thumbs + retrospective signal-quality corrections
 CREATE TABLE public.task_feedback (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
