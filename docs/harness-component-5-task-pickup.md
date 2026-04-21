@@ -26,7 +26,7 @@ Component #5 breaks that dependency. It introduces:
 
 **What this unlocks:** Colin queues "Sprint 4 Chunk A" once. The next pickup run claims it,
 writes the handoff, sends the Telegram. Colin sees "Coordinator ready — Sprint 4 Chunk A" and
-invokes coordinator with one word: *go*. The cognitive work of synthesizing what to do next
+invokes coordinator with one word: _go_. The cognitive work of synthesizing what to do next
 is removed. That is the value unlock even in v0, before full remote agent invocation exists.
 
 **The v1 horizon:** pickup claims a task and directly invokes the coordinator via the Claude
@@ -77,15 +77,15 @@ but is explicitly out of scope for v0.
 
 Three options evaluated:
 
-| Criterion | Supabase table | GitHub issues | Telegram inbox |
-| --- | --- | --- | --- |
-| Uses existing infrastructure | Yes — service client already wired | No — new GitHub API auth | Partial — bot exists but alert-only |
-| Queryable by Vercel cron | Yes — standard SQL | No — webhook or polling required | No — polling required |
-| Supports structured metadata | Yes — JSONB column | Limited — labels + body text | No |
-| Inspectable / debuggable | Yes — SQL query | Medium | Low |
-| Separation of concerns | Clean — queue is queue | Muddy — issues serve dual purpose | Very muddy |
-| Write path from other agents | Yes — INSERT via service client | Requires GitHub token | Requires bot send |
-| Colin's existing workflow | Not native (new habit) | Semi-native | Native |
+| Criterion                    | Supabase table                     | GitHub issues                     | Telegram inbox                      |
+| ---------------------------- | ---------------------------------- | --------------------------------- | ----------------------------------- |
+| Uses existing infrastructure | Yes — service client already wired | No — new GitHub API auth          | Partial — bot exists but alert-only |
+| Queryable by Vercel cron     | Yes — standard SQL                 | No — webhook or polling required  | No — polling required               |
+| Supports structured metadata | Yes — JSONB column                 | Limited — labels + body text      | No                                  |
+| Inspectable / debuggable     | Yes — SQL query                    | Medium                            | Low                                 |
+| Separation of concerns       | Clean — queue is queue             | Muddy — issues serve dual purpose | Very muddy                          |
+| Write path from other agents | Yes — INSERT via service client    | Requires GitHub token             | Requires bot send                   |
+| Colin's existing workflow    | Not native (new habit)             | Semi-native                       | Native                              |
 
 **Chosen: Supabase table.**
 
@@ -208,14 +208,14 @@ faster cadence (§6 covers idempotency).
 
 ### Coexistence with existing crons
 
-| UTC | MT (MDT) | Route | What |
-| --- | --- | --- | --- |
-| 06:00 | 00:00 | `/api/knowledge/nightly` | Knowledge rollup |
-| 08:00 | 02:00 | `/api/cron/night-tick` | Night watchman |
-| 12:00 | 06:00 | `/api/cron/morning-digest` | Telegram digest |
-| 13:00 | 07:00 | `/api/metrics/digest` | Metrics rollup |
-| **16:00** | **10:00** | **`/api/cron/task-pickup`** | **← new** |
-| 18:00 | 12:00 | `/api/cron/daytime-tick` | Step 6.5 (deferred) |
+| UTC       | MT (MDT)  | Route                       | What                |
+| --------- | --------- | --------------------------- | ------------------- |
+| 06:00     | 00:00     | `/api/knowledge/nightly`    | Knowledge rollup    |
+| 08:00     | 02:00     | `/api/cron/night-tick`      | Night watchman      |
+| 12:00     | 06:00     | `/api/cron/morning-digest`  | Telegram digest     |
+| 13:00     | 07:00     | `/api/metrics/digest`       | Metrics rollup      |
+| **16:00** | **10:00** | **`/api/cron/task-pickup`** | **← new**           |
+| 18:00     | 12:00     | `/api/cron/daytime-tick`    | Step 6.5 (deferred) |
 
 Three-hour gap before and after. No scheduling conflicts.
 
@@ -229,14 +229,13 @@ Three-hour gap before and after. No scheduling conflicts.
    heartbeating.
 2. **Claim the top task** — atomic UPDATE of the highest-priority `queued` task. If 0 rows
    updated (race or empty queue), return `{claimed: null, reason: "queue-empty"}` cleanly.
-3. **Validate the task** — confirm `task` field is non-empty, `metadata` is parseable if
-   present. On failure: mark `failed`, send Telegram, stop.
-4. **Write the handoff file** — write `docs/harness-tasks/active-task.md` with the task
-   details in coordinator-readable format (see §6).
-5. **Send Telegram notification** — alert Colin that a task has been claimed and the handoff
-   is written. Include the one-word invocation: "Reply 'go' to start coordinator."
-6. **Write `agent_events` row** — `task_type: 'task_pickup'`, result includes claimed task
-   id and handoff path.
+3. **Validate the task** — confirm `task` field is non-empty. On failure: mark `failed`,
+   send Telegram, stop.
+4. **Send Telegram notification** — alert Colin that a task has been claimed. Message
+   includes a short task ID, the first 80 chars of the task text, and the invocation
+   instruction (see §8).
+5. **Write `agent_events` row** — `task_type: 'task_pickup'`, meta includes `run_id` and
+   `claimed_task_id`.
 
 ---
 
@@ -268,7 +267,7 @@ and finds zero rows — returns `{claimed: null, reason: "queue-empty"}` without
 
 `claimed_by` stores the pickup `run_id`. If two runs somehow claim different tasks
 simultaneously (both find different rows), each run owns its task exclusively. Coordinator
-reads `claimed_by` from the handoff to confirm it's processing the right run.
+reads `claimed_by` from the `task_queue` row to confirm it's processing the right run.
 
 ### Idempotency
 
@@ -425,58 +424,30 @@ is unaffected — tasks accumulate in `queued` state until the cron resumes.
 
 ## 8. Integration with coordinator/builder
 
-### v0: handoff-file integration
+### v0: Telegram notification + Supabase read on execution
 
-When a task is claimed, the pickup run writes
-`docs/harness-tasks/active-task.md` in coordinator-readable format:
+No handoff file is written. The `task_queue` row IS the handoff — the cron runs on
+Vercel (read-only filesystem); Claude Code runs on Colin's laptop. A file can never
+bridge them. The database already bridges them cleanly.
 
-```markdown
-# Harness Task — Active
-
-**Claimed at:** 2026-04-21T16:00:05Z
-**Claimed by:** {run_id}
-**Task ID:** {uuid}
-**Source:** colin
-**Priority:** 10
-
-## Task
-
-Sprint 4 Chunk A — SP-API integration + Today Live / Yesterday
-
-## Description
-
-(from description column if populated)
-
-## Metadata
-
-sprint: 4
-chunk: A
-plan_path: docs/sprint-4/plan.md
-
-## Coordinator instruction
-
-Read docs/sprint-4/plan.md and docs/sprint-state.md.
-Proceed with Phase 2 (acceptance doc) for Chunk A.
-Follow coordinator.md escalation rules.
-Cache-match is disabled for Sprint 4 — escalate all acceptance docs to Colin.
-
-## Invocation
-
-Use coordinator sub-agent. Active task at docs/harness-tasks/active-task.md.
-```
-
-The Telegram notification to Colin reads:
+When a task is claimed, the pickup cron sends a Telegram notification:
 
 ```text
-[LepiOS Harness] Task claimed — Sprint 4 Chunk A
+✅ Task claimed: <8-char-id>
+<first 80 chars of task text>...
 
-Priority: 10 | Source: colin
-Handoff: docs/harness-tasks/active-task.md
-
-Start coordinator: Use coordinator sub-agent. Active task at docs/harness-tasks/active-task.md.
+To run: paste `Run task <full-uuid>` into Claude Code
 ```
 
-Colin copies the last line into Claude Code. That is the only thing he needs to type.
+Colin pastes `Run task <uuid>` into Claude Code. The coordinator reads the full task
+row directly from Supabase:
+
+```sql
+SELECT * FROM task_queue WHERE id = '<uuid>';
+```
+
+`task`, `description`, `metadata`, and `claimed_by` are all in that row. No local
+file path, no bridge problem.
 
 ### v0 limitation — what coordinator does NOT do automatically
 
@@ -488,22 +459,14 @@ stays `claimed` until:
 - The next pickup run's stale recovery re-queues it (if Colin forgets)
 
 This is acceptable for v0. The queue's value is task selection automation, not lifecycle
-tracking. Full lifecycle tracking (coordinator writes `done` on chunk completion, next chunk
-auto-queues) is v1 behavior.
+tracking. Full lifecycle tracking (coordinator writes `completed` on chunk completion,
+next chunk auto-queues) is v1 behavior.
 
 ### v1: remote invocation (out of scope, documented for continuity)
 
-In v1, the pickup route calls the Claude Code remote trigger API after writing the handoff:
-
-```text
-POST https://api.anthropic.com/v1/... (Claude Code remote trigger endpoint)
-Authorization: Bearer {CLAUDE_CODE_API_KEY}
-Body: { agent: "coordinator", context_file: "docs/harness-tasks/active-task.md" }
-```
-
-Coordinator runs autonomously. Escalations and grounding checkpoints are surfaced via
-Telegram (coordinator.md already defines Telegram as the escalation notification path).
-Colin only types when coordinator explicitly asks.
+In v1, the pickup route calls the Claude Code remote trigger API after claiming the task,
+passing the task ID as context. Coordinator fetches the task row from Supabase and runs
+autonomously. Escalations and grounding checkpoints are surfaced via Telegram.
 
 This requires `CLAUDE_CODE_API_KEY` in Vercel env and the remote trigger API being
 available. Neither is in scope for v0.
@@ -553,6 +516,9 @@ GET /api/cron/task-pickup  (authorized)
 → that row in task_queue: status = 'claimed', claimed_at IS NOT NULL,
     claimed_by = body.run_id
 → the priority-80 task: status = 'queued' (untouched)
+→ Telegram sent: includes first-8-chars of task id, first 80 chars of task text,
+    and "Run task <full-uuid>" invocation instruction
+→ no file written to filesystem
 ```
 
 ### AC-4: Empty queue returns clean no-op
@@ -607,8 +573,8 @@ GET /api/cron/task-pickup  (authorized, queue has one task)
 → HTTP 200
 → body.dry_run = true
 → no task_queue rows mutated (task remains status = 'queued')
-→ docs/harness-tasks/active-task.md NOT written
 → Telegram message (if sent) includes "[DRY RUN]" prefix
+→ no file written to filesystem
 ```
 
 ### AC-8: Feature flag gates entirely
