@@ -66,3 +66,28 @@ If this code path is revived, the `legacy_untyped` rows should be re-backfilled
 with an appropriate task_type (likely `metrics_digest`) and a new mapping rule
 added to the scoring config. Do not leave `legacy_untyped` as a permanent type
 in production trend views — it will pollute scoring baselines.
+
+---
+
+## Retype: legacy_untyped → metrics_digest — 2026-04-21
+
+The 1 `legacy_untyped` row was retyped to `metrics_digest` now that
+`/api/metrics/digest` is committed in the repo and the route is real.
+
+```sql
+UPDATE agent_events
+SET task_type = 'metrics_digest'
+WHERE task_type = 'legacy_untyped'
+  AND action = 'metrics.digest';
+```
+
+**Affected rows:** 1
+
+**Verification:**
+
+| task_type | count |
+| --- | --- |
+| `metrics_digest` | 1 |
+| `legacy_untyped` | 0 (gone) |
+
+`legacy_untyped` no longer exists in the table. All rows now have a meaningful `task_type`.
