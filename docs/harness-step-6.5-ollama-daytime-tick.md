@@ -1,6 +1,7 @@
 # Autonomous Harness — Step 6.5: Ollama Daytime Tick
 
-**Status:** Design — pending Colin review  
+**Status:** Design — approved  
+**Build status:** DEFERRED 2026-04-21 — component #5 (task pickup) reprioritized as coordinator unblock. This design doc remains the spec; build resumes after #5 stabilizes.  
 **Author:** Colin + Claude, 2026-04-21  
 **Scope:** Daytime orchestration tick powered by local Ollama; OLLAMA_TUNNEL_URL production wiring  
 **Gated on:** Step 6 running clean (in progress — night_tick + morning_digest live as of 2026-04-20)

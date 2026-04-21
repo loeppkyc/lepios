@@ -5,12 +5,12 @@
 active_sprint: 4
 active_chunk: null
 status: "paused-pending-harness"
-paused_reason: "autonomous harness Steps 1-6 prioritized to accelerate Sprint 4 execution; resume after Step 6.5 Ollama daytime tick"
+paused_reason: "coordinator/builder pattern (harness #3) blocked by absence of non-human task pickup source; component #5 (task pickup) reprioritized as next build to activate coordinator's latent value; resume after #5 stabilizes. Step 6.5 design at docs/harness-step-6.5-ollama-daytime-tick.md remains valid — deferred one slot."
 last_handoff_path: null
-awaiting: "harness-step-6.5"
+awaiting: "harness-task-pickup"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-21T00:00:00-06:00"
+last_updated_at: "2026-04-21T12:00:00-06:00"
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
@@ -31,6 +31,14 @@ chunks_complete: []
 chunks_escalated: []
 chunks_rolled_back: []
 
-# Resume trigger: Step 6.5 (Ollama daytime tick) deployed and
-# running clean for 3+ days. At that point the harness can
-# assist with Sprint 4 chunk execution.
+# Resume trigger: harness components #5 (task pickup) and #2
+# (Telegram thumbs) deployed and running clean for 3+ days.
+# At that point the harness starts assisting LepiOS development
+# — the whole personal OS system, being rebuilt on Next.js from
+# the Loeppky Streamlit prototype shell and designed to grow
+# from there. Sprint 4 Business Review Trust Layer is one slice
+# of LepiOS, not the destination. Harness components #4 (deploy
+# gate), #6 (attribution), and Step 6.5 (Ollama daytime tick)
+# are deferred until a real LepiOS need surfaces them. Do not
+# build more harness for its own sake. LepiOS shipping bigger
+# and better is the success metric.
