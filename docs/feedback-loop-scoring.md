@@ -269,3 +269,50 @@ LLM-based are calibrated.
 - Telegram digest has working thumbs buttons
 - Tier 1 baseline data begins accumulating from day 1
 - No regressions to Step 6 tick behavior
+
+## 11. Deferred work
+
+The following are intentionally deferred from v1 and should be
+revisited on the triggers listed.
+
+### 11.1 §9 Step 7 — Telegram thumbs buttons
+
+Inline 👍/👎 buttons on the morning digest that write to
+task_feedback. Provides the ground truth that calibrates the
+rule-based scorer's placeholder signal_quality rule (§4.2).
+
+**Triggers to revisit:**
+
+- Signal Quality's 50/70 placeholder is visibly distorting aggregates
+- Step 6.5 (LLM-based scoring) is about to ship and needs ground
+  truth to compare against
+- Enough scored runs exist (2+ weeks) that calibration would have
+  statistical meaning
+
+**Estimated scope:** 2-3 hours. Involves a new public webhook
+endpoint, Telegram API registration, callback_data encoding of
+agent_event_id, message editing after tap, and the task_feedback
+write path.
+
+### 11.2 Dashboard dimension drill-down
+
+The QualityTrends cards currently show latest/avg/sparkline + a
+2x2 dimension grid. A drill-down view per task_type (click a card
+→ detailed per-dimension history over time) was designed but not
+built. Revisit when enough tier-1 runs exist that dimensional
+patterns become interesting to look at.
+
+### 11.3 LLM-based scoring (§7.2)
+
+Tied to Step 6.5 (Ollama wiring). Second-opinion scorer that
+reviews TickResult output and produces its own QualityScore
+stored alongside rule-based. Blocked on OLLAMA_TUNNEL_URL
+being set in Vercel env and Step 6 running clean for a week
+(per yesterday's trust-building rule).
+
+### 11.4 Attribution
+
+When a regression is detected (score drops significantly), identify
+which commit caused it. Dumb v1 = "show commits since the last
+known-good score above threshold." Revisit when a real regression
+happens and attribution would actually be useful.
