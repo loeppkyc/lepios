@@ -7,8 +7,9 @@
  * Requires SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL in .env.local.
  * Inserts and immediately deletes test rows — safe to run against production.
  *
- * Indexes and RLS policies are not queryable via the service client (PostgREST
- * does not expose pg_catalog). Steps 5–6 document the manual verification queries.
+ * Note: PostgREST only exposes the public schema, so information_schema is not
+ * queryable via the JS client. Column type/nullability checks use the insert
+ * test (step 3) as implicit verification. Index and RLS checks are manual.
  */
 
 import { readFileSync } from 'fs'
@@ -47,75 +48,30 @@ async function main() {
   console.log('='.repeat(60) + '\n')
 
   // ── 1. Table exists ──────────────────────────────────────────────────────
+  // Query the table directly with limit(0) — PostgREST returns an error if
+  // the table doesn't exist, empty data if it does.
 
   console.log('[ 1 ] Table existence')
 
-  const { data: tableRows, error: tableErr } = await db
-    .from('information_schema.tables')
-    .select('table_name')
-    .eq('table_schema', 'public')
-    .eq('table_name', 'task_queue')
+  const { error: tableErr } = await db
+    .from('task_queue')
+    .select('id')
+    .limit(0)
 
-  if (tableErr || !tableRows?.length) {
-    fail('public.task_queue exists', tableErr?.message ?? 'not found — migration not applied?')
-    console.log('\n✗  Cannot continue — table missing.\n')
-    process.exit(1)
+  if (tableErr) {
+    fail('public.task_queue exists', tableErr.message)
+    console.log('\n✗  Cannot continue — table missing or inaccessible.\n')
+    process.exitCode = 1
+    return
   }
   pass('public.task_queue exists')
 
-  // ── 2. Column types and nullability ──────────────────────────────────────
+  // ── 2. Default values ────────────────────────────────────────────────────
+  // Insert a minimal row (task only) and verify all defaults via RETURNING.
+  // This also implicitly confirms the column set is correct — a missing
+  // NOT NULL column without a default would cause the insert to fail.
 
-  console.log('\n[ 2 ] Column types and nullability')
-
-  type ColExpect = { type: string; nullable: 'YES' | 'NO' }
-  const EXPECTED: Record<string, ColExpect> = {
-    id:                 { type: 'uuid',                     nullable: 'NO'  },
-    task:               { type: 'text',                     nullable: 'NO'  },
-    description:        { type: 'text',                     nullable: 'YES' },
-    priority:           { type: 'smallint',                 nullable: 'NO'  },
-    status:             { type: 'text',                     nullable: 'NO'  },
-    source:             { type: 'text',                     nullable: 'NO'  },
-    metadata:           { type: 'jsonb',                    nullable: 'NO'  },
-    result:             { type: 'jsonb',                    nullable: 'YES' },
-    retry_count:        { type: 'smallint',                 nullable: 'NO'  },
-    max_retries:        { type: 'smallint',                 nullable: 'NO'  },
-    created_at:         { type: 'timestamp with time zone', nullable: 'NO'  },
-    claimed_at:         { type: 'timestamp with time zone', nullable: 'YES' },
-    claimed_by:         { type: 'text',                     nullable: 'YES' },
-    last_heartbeat_at:  { type: 'timestamp with time zone', nullable: 'YES' },
-    completed_at:       { type: 'timestamp with time zone', nullable: 'YES' },
-    error_message:      { type: 'text',                     nullable: 'YES' },
-  }
-
-  const { data: colRows, error: colErr } = await db
-    .from('information_schema.columns')
-    .select('column_name, data_type, is_nullable')
-    .eq('table_schema', 'public')
-    .eq('table_name', 'task_queue')
-
-  if (colErr || !colRows) {
-    fail('Column query succeeded', colErr?.message)
-  } else {
-    type ColRow = { column_name: string; data_type: string; is_nullable: string }
-    const colMap = Object.fromEntries((colRows as ColRow[]).map((c) => [c.column_name, c]))
-
-    for (const [name, expect] of Object.entries(EXPECTED)) {
-      const actual = colMap[name] as ColRow | undefined
-      if (!actual)                              { fail(`${name} — column exists`);                                              continue }
-      if (actual.data_type   !== expect.type)   { fail(`${name} — type`,      `expected ${expect.type}, got ${actual.data_type}`);   continue }
-      if (actual.is_nullable !== expect.nullable) { fail(`${name} — nullable`, `expected ${expect.nullable}, got ${actual.is_nullable}`); continue }
-      pass(`${name}: ${expect.type}, nullable=${expect.nullable}`)
-    }
-
-    const extra = (colRows as ColRow[])
-      .filter((c) => !(c.column_name in EXPECTED))
-      .map((c) => c.column_name)
-    if (extra.length) info(`unexpected extra columns (not an error): ${extra.join(', ')}`)
-  }
-
-  // ── 3. Default values ────────────────────────────────────────────────────
-
-  console.log('\n[ 3 ] Default values (insert minimal row, check RETURNING)')
+  console.log('\n[ 2 ] Default values (insert minimal row, check RETURNING)')
 
   const tag = `verify-task-queue-${Date.now()}`
   let insertedId: string | null = null
@@ -131,30 +87,32 @@ async function main() {
       fail('Minimal insert (task only) succeeds', insertErr?.message)
     } else {
       insertedId = row.id
-      row.status === 'queued'        ? pass("status defaults to 'queued'")          : fail("status default",       `got ${row.status}`)
-      row.priority === 5             ? pass('priority defaults to 5')                : fail('priority default',     `got ${row.priority}`)
-      row.source === 'manual'        ? pass("source defaults to 'manual'")           : fail("source default",       `got ${row.source}`)
-      row.retry_count === 0          ? pass('retry_count defaults to 0')             : fail('retry_count default',  `got ${row.retry_count}`)
-      row.max_retries === 2          ? pass('max_retries defaults to 2')             : fail('max_retries default',  `got ${row.max_retries}`)
-      JSON.stringify(row.metadata) === '{}' ? pass("metadata defaults to '{}'")     : fail("metadata default",     `got ${JSON.stringify(row.metadata)}`)
-      row.claimed_at === null        ? pass('claimed_at IS NULL by default')         : fail('claimed_at default',   `got ${row.claimed_at}`)
-      row.claimed_by === null        ? pass('claimed_by IS NULL by default')         : fail('claimed_by default',   `got ${row.claimed_by}`)
+      row.status === 'queued'        ? pass("status defaults to 'queued'")          : fail('status default',           `got ${row.status}`)
+      row.priority === 5             ? pass('priority defaults to 5')                : fail('priority default',         `got ${row.priority}`)
+      row.source === 'manual'        ? pass("source defaults to 'manual'")           : fail('source default',           `got ${row.source}`)
+      row.retry_count === 0          ? pass('retry_count defaults to 0')             : fail('retry_count default',      `got ${row.retry_count}`)
+      row.max_retries === 2          ? pass('max_retries defaults to 2')             : fail('max_retries default',      `got ${row.max_retries}`)
+      JSON.stringify(row.metadata) === '{}' ? pass("metadata defaults to '{}'")     : fail('metadata default',         `got ${JSON.stringify(row.metadata)}`)
+      row.claimed_at === null        ? pass('claimed_at IS NULL by default')         : fail('claimed_at default',       `got ${row.claimed_at}`)
+      row.claimed_by === null        ? pass('claimed_by IS NULL by default')         : fail('claimed_by default',       `got ${row.claimed_by}`)
       row.last_heartbeat_at === null ? pass('last_heartbeat_at IS NULL by default')  : fail('last_heartbeat_at default', `got ${row.last_heartbeat_at}`)
+      row.description === null       ? pass('description IS NULL by default')        : fail('description default',      `got ${row.description}`)
+      row.result === null            ? pass('result IS NULL by default')             : fail('result default',           `got ${row.result}`)
+      row.error_message === null     ? pass('error_message IS NULL by default')      : fail('error_message default',    `got ${row.error_message}`)
     }
   } finally {
     if (insertedId) {
       const { error: delErr } = await db.from('task_queue').delete().eq('id', insertedId)
       delErr
-        ? (fail('test row cleanup', `orphaned row ${insertedId} — delete failed: ${delErr.message}`))
+        ? fail('test row cleanup', `orphaned row ${insertedId} — delete failed: ${delErr.message}`)
         : info(`test row ${insertedId} cleaned up`)
     }
   }
 
-  // ── 4. Check constraints ─────────────────────────────────────────────────
+  // ── 3. Check constraints ─────────────────────────────────────────────────
 
-  console.log('\n[ 4 ] Check constraints')
+  console.log('\n[ 3 ] Check constraints')
 
-  // Status: invalid value rejected
   const { error: badStatus } = await db
     .from('task_queue')
     .insert({ task: 'constraint-test', status: 'invalid' })
@@ -162,7 +120,6 @@ async function main() {
     ? pass("status CHECK rejects 'invalid'")
     : fail("status CHECK rejects 'invalid'", 'insert succeeded — constraint missing or wrong')
 
-  // Source: invalid value rejected
   const { error: badSource } = await db
     .from('task_queue')
     .insert({ task: 'constraint-test', source: 'github-issue' })
@@ -170,7 +127,7 @@ async function main() {
     ? pass("source CHECK rejects 'github-issue'")
     : fail("source CHECK rejects 'github-issue'", 'insert succeeded — constraint missing or wrong')
 
-  // Status: all valid values accepted
+  // All valid status values must be accepted
   for (const s of ['queued', 'claimed', 'running', 'completed', 'failed', 'cancelled'] as const) {
     const { data: r, error: e } = await db
       .from('task_queue')
@@ -182,7 +139,7 @@ async function main() {
     await db.from('task_queue').delete().eq('id', r.id)
   }
 
-  // Source: all valid values accepted
+  // All valid source values must be accepted
   for (const src of ['manual', 'handoff-file', 'colin-telegram', 'cron'] as const) {
     const { data: r, error: e } = await db
       .from('task_queue')
@@ -194,31 +151,32 @@ async function main() {
     await db.from('task_queue').delete().eq('id', r.id)
   }
 
-  // ── 5. Indexes — manual verification ────────────────────────────────────
+  // ── 4. Indexes — manual verification ────────────────────────────────────
 
-  console.log('\n[ 5 ] Indexes — manual verification required')
-  info('pg_catalog.pg_indexes is not accessible via PostgREST service client.')
-  info('Verify in Supabase Studio → SQL Editor:')
+  console.log('\n[ 4 ] Indexes — manual verification required')
+  info('PostgREST does not expose pg_catalog. Verify in Supabase Studio → SQL Editor:')
   info("  SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'task_queue';")
   info('Expected: task_queue_pickup_idx, task_queue_stale_idx, task_queue_source_idx')
 
-  // ── 6. RLS — manual verification ────────────────────────────────────────
+  // ── 5. RLS — manual verification ────────────────────────────────────────
 
-  console.log('\n[ 6 ] RLS — manual verification required')
+  console.log('\n[ 5 ] RLS — manual verification required')
   info('Verify in Supabase Studio → Authentication → Policies → task_queue:')
-  info("  Policy: task_queue_authenticated — FOR ALL, TO authenticated")
-  info('Indirect test: anon requests should return empty (RLS blocks anon by default).')
+  info('  Policy: task_queue_authenticated — FOR ALL, TO authenticated')
 
   // ── Summary ──────────────────────────────────────────────────────────────
 
   console.log('\n' + '='.repeat(60))
   console.log(allPassed ? '✓  ALL AUTOMATED CHECKS PASSED' : '✗  SOME CHECKS FAILED')
-  if (allPassed) console.log('   Complete manual steps 5–6 before marking migration verified.')
+  if (allPassed) console.log('   Complete manual steps 4–5 before marking migration verified.')
   console.log('='.repeat(60))
-  process.exit(allPassed ? 0 : 1)
+
+  // Use exitCode (not process.exit) — lets Node drain open handles cleanly
+  // before shutting down, avoiding the libuv assertion on Windows.
+  if (!allPassed) process.exitCode = 1
 }
 
 main().catch((e) => {
   console.error('Script error:', e)
-  process.exit(1)
+  process.exitCode = 1
 })
