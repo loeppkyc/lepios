@@ -8,15 +8,41 @@ Global rules live in `~/.claude/CLAUDE.md` and apply here too.
 
 ## 1 — Quick Context
 
-LepiOS is Colin's life command center. Cockpit-style instrument panel. Next.js App Router, Supabase, Tailwind, shadcn/ui (heavily customized), Vercel.
+LepiOS is Colin's life command center. Cockpit-style instrument panel.
+Next.js App Router, Supabase, Tailwind, shadcn/ui (heavily customized),
+Vercel.
 
-**Phase status:**
-- Phase 1 (Big Picture Definition): COMPLETE — ARCHITECTURE.md is the output
-- Phase 2 (Research Audits): IN PROGRESS — see `audits/`
-- Phase 3 (Delegated Parallel Build): NOT STARTED
-- Phase 4 (Integration & Polish): NOT STARTED
+**Current state (2026-04-21):**
 
-No code changes during Phase 2. Research and inventory only.
+Live in production at `lepios-one.vercel.app`, auto-deploying from
+GitHub main. 370+ tests. Autonomous night_tick + morning_digest crons
+running against production Supabase. Rule-based quality scoring v1
+live, accumulating Tier 1 (`tier_1_laptop_ollama`) baseline data.
+
+**Sprints shipped:**
+
+- Sprint 1: Design Council primitives + cockpit shell
+- Sprint 2: Betting tile (Kelly Sizer) — deployed, not active priority
+- Sprint 3: PageProfit scan flow (Chunks A–E complete)
+- Sprint 4 (current): Business Review Trust Layer (BR Tier 1–3 progression)
+
+**Autonomous harness (parallel track):**
+
+- Step 1–5 complete: knowledge store, handoffs, safety agent, scoring
+  dashboard, Ollama + pgvector
+- Step 6 complete: orchestration loop (night_tick + morning_digest)
+  live in production as of 2026-04-20
+- Step 6.5 pending: daytime Ollama tick + OLLAMA_TUNNEL_URL wiring
+- Step 7–8 pending (see 8-component plan in docs/)
+
+**Feedback loop scoring v1:** shipped 2026-04-21. See
+docs/feedback-loop-scoring.md — §11 lists deferred work with
+revisit triggers.
+
+**Up next (as of this edit):** app-layer work on Sprint 4 Business
+Review or Sprint 5 Amazon Orders + Payouts, per ARCHITECTURE.md §7
+sprint queue. Autonomous harness expansion (Step 6.5 Ollama daytime)
+gated on a clean week of overnight runs.
 
 ---
 
