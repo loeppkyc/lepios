@@ -6,6 +6,7 @@
  * (fire-and-forget — does not block render).
  */
 
+import QualityTrends from './_components/QualityTrends'
 import { logEvent } from '@/lib/knowledge/client'
 import { healthCheck, type OllamaHealthResult } from '@/lib/ollama/client'
 import {
@@ -90,13 +91,7 @@ function LineChart({
   )
 }
 
-function HBarChart({
-  data,
-  width = 400,
-}: {
-  data: ErrorTypeSummary[]
-  width?: number
-}) {
+function HBarChart({ data, width = 400 }: { data: ErrorTypeSummary[]; width?: number }) {
   if (!data.length) return <EmptyChart width={width} height={32} label="no errors" />
 
   const barH = 16
@@ -164,7 +159,8 @@ function StackedBarChart({
   width?: number
   height?: number
 }) {
-  if (!data.length) return <EmptyChart width={width ?? 480} height={height} label="no safety checks yet" />
+  if (!data.length)
+    return <EmptyChart width={width ?? 480} height={height} label="no safety checks yet" />
 
   const n = data.length
   const resolvedWidth = width ?? Math.min(n * 20, 480)
@@ -241,7 +237,9 @@ function OllamaStatusCard({ health }: { health: OllamaHealthResult }) {
   const label = health.reachable ? 'ONLINE' : 'OFFLINE'
   const sub = health.reachable
     ? `${health.latency_ms}ms · ${health.models.length} model(s)${health.tunnel_used ? ' · tunnel' : ' · local'}`
-    : health.tunnel_used ? 'tunnel unreachable' : 'localhost:11434 unreachable'
+    : health.tunnel_used
+      ? 'tunnel unreachable'
+      : 'localhost:11434 unreachable'
 
   return (
     <div
@@ -477,6 +475,8 @@ export default async function AutonomousPage() {
         }}
       />
 
+      <QualityTrends />
+
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <h1
@@ -628,7 +628,12 @@ export default async function AutonomousPage() {
       >
         <span>
           error rate:{' '}
-          <strong style={{ color: summary7.errorRate > 10 ? 'var(--color-critical)' : 'var(--color-text-secondary)' }}>
+          <strong
+            style={{
+              color:
+                summary7.errorRate > 10 ? 'var(--color-critical)' : 'var(--color-text-secondary)',
+            }}
+          >
             {summary7.errorRate}%
           </strong>
         </span>
