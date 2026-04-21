@@ -427,6 +427,56 @@ describe('runPickup — validation failure', () => {
   })
 })
 
+// ── awaited Telegram send (component #2 fix) ──────────────────────────────────
+
+describe('runPickup — awaited Telegram send', () => {
+  it('logs error agent_events row when Telegram send fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    mockPostMessage.mockRejectedValue(new Error('network timeout'))
+
+    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: insertFn }
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    await runPickup('run-abc')
+
+    // Two inserts: first = task_pickup success, second = task_pickup_telegram_fail
+    expect(insertFn).toHaveBeenCalledTimes(2)
+    const errorRow = insertFn.mock.calls[1][0]
+    expect(errorRow.status).toBe('error')
+    expect(errorRow.task_type).toBe('task_pickup_telegram_fail')
+  })
+
+  it('returns ok:true even when Telegram send fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    mockPostMessage.mockRejectedValue(new Error('telegram down'))
+
+    const result = await runPickup('run-abc')
+
+    expect(result.ok).toBe(true)
+    expect(result.claimed).toEqual(mockTask)
+  })
+
+  it('logs task id and error message in error row meta', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    mockPostMessage.mockRejectedValue(new Error('rate limited'))
+
+    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: insertFn }
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    await runPickup('run-abc')
+
+    const errorRow = insertFn.mock.calls[1][0]
+    expect(errorRow.output_summary).toContain(mockTask.id)
+    expect(String(errorRow.meta?.error ?? '')).toContain('rate limited')
+  })
+})
+
 // ── agent_events insert precedes Telegram (component #2 prerequisite) ─────────
 
 describe('runPickup — agent_events insert precedes Telegram send', () => {

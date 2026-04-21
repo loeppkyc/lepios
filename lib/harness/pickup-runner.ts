@@ -34,7 +34,9 @@ async function logEvent(
   status: 'success' | 'warning' | 'error',
   taskId: string | null,
   detail: string,
-  durationMs: number
+  durationMs: number,
+  taskType = 'task_pickup',
+  extraMeta: Record<string, unknown> = {}
 ): Promise<string | null> {
   const id = crypto.randomUUID()
   try {
@@ -45,10 +47,10 @@ async function logEvent(
       action: 'task_pickup',
       actor: 'task_pickup_cron',
       status,
-      task_type: 'task_pickup',
+      task_type: taskType,
       duration_ms: durationMs,
       output_summary: detail,
-      meta: { run_id: runId, claimed_task_id: taskId },
+      meta: { run_id: runId, claimed_task_id: taskId, ...extraMeta },
       tags: ['task_pickup', 'harness', 'step5'],
     })
     return id
@@ -119,8 +121,21 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   const duration_ms = Date.now() - start
   const eventId = await logEvent(runId, 'success', task.id, `claimed: ${task.task}`, duration_ms)
 
-  // Step 5: Telegram notification — sendMessageWithButtons attaches 👍/👎 when flag is set
-  void sendMessageWithButtons(eventId ?? crypto.randomUUID(), buildTelegramMessage(task)).catch(() => {})
+  // Step 5: Telegram notification — awaited so Vercel doesn't kill the fetch mid-flight
+  try {
+    await sendMessageWithButtons(eventId ?? crypto.randomUUID(), buildTelegramMessage(task))
+  } catch (err) {
+    await logEvent(
+      runId,
+      'error',
+      task.id,
+      `Telegram send failed for task ${task.id}`,
+      Date.now() - start,
+      'task_pickup_telegram_fail',
+      { error: String(err) }
+    )
+    // Don't throw — task is already claimed, don't fail the whole pickup
+  }
 
   return {
     ok: true,
