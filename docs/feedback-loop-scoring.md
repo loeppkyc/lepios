@@ -99,6 +99,19 @@ Colin's thumbs or subsequent events. So the initial rule is:
   thumb confirmation)
 - Scores are retroactively updated when thumbs arrive.
 
+**Important note on the 50/70 rule:** This is deliberately a
+placeholder. Zero flags on a rule-based scorer cannot distinguish
+"system is healthy" from "checker is blind," and a flag raised
+cannot distinguish "real signal" from "false positive." The 50/70
+values are intentionally narrow and tilted just enough to reward
+activity over silence — enough to move the aggregate, not enough
+to dominate it. Real signal_quality scoring only becomes meaningful
+once retroactive thumbs (§7.3) and LLM-based second-opinion scoring
+(§7.2) are live. Until then, a signal_quality of 50 does NOT mean
+"bad run" — it means "this dimension does not have enough information
+to score." Treat aggregate scores through Tier 1 with a grain of
+salt for this reason.
+
 ### 4.3 Efficiency (weight: 0.2)
 
 How fast relative to this task type's baseline in this tier?
@@ -204,6 +217,8 @@ row.
 
 Deterministic, fast, free. Captures the obvious stuff. Bakes in
 "what good looks like" explicitly.
+
+Rule-based scoring is weakest on Signal Quality — see §4.2 for the placeholder acknowledgment.
 
 ### 7.2 LLM-based (v2 — ships with Step 6.5 Ollama wiring)
 
