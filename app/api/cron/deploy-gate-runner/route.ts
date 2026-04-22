@@ -1,7 +1,13 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { findPreviewDeployment, runSmokeCheck, detectMigrations } from '@/lib/harness/deploy-gate'
+import {
+  findPreviewDeployment,
+  runSmokeCheck,
+  detectMigrations,
+  mergeToMain,
+  deleteBranch,
+} from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +56,7 @@ async function runSchemaCheck(
   commit_sha: string,
   branch: string,
   results: string[]
-): Promise<void> {
+): Promise<'schema-clean' | 'schema-migrations' | 'schema-error'> {
   let schema: { has_migrations: boolean; migration_files: string[]; error?: string }
   try {
     schema = await detectMigrations(commit_sha, branch)
@@ -84,13 +90,70 @@ async function runSchemaCheck(
     // swallow
   }
 
-  results.push(
+  const outcome: 'schema-clean' | 'schema-migrations' | 'schema-error' =
     schemaStatus === 'error'
-      ? `${commit_sha}:schema-error`
+      ? 'schema-error'
       : schemaStatus === 'warning'
-        ? `${commit_sha}:schema-migrations`
-        : `${commit_sha}:schema-clean`
-  )
+        ? 'schema-migrations'
+        : 'schema-clean'
+  results.push(`${commit_sha}:${outcome}`)
+  return outcome
+}
+
+async function runAutoPromote(
+  commit_sha: string,
+  branch: string,
+  taskId: string,
+  results: string[]
+): Promise<void> {
+  const autoPromote = process.env.DEPLOY_GATE_AUTO_PROMOTE !== '0'
+  if (!autoPromote) {
+    results.push(`${commit_sha}:promotion-skipped`)
+    return
+  }
+
+  let mergeResult: { ok: boolean; merge_sha?: string; error?: string }
+  try {
+    mergeResult = await mergeToMain(branch, taskId, commit_sha)
+  } catch {
+    mergeResult = { ok: false, error: 'exception' }
+  }
+
+  if (mergeResult.ok) {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_promoted',
+        status: 'success',
+        output_summary: `promoted commit ${commit_sha} to production via merge`,
+        meta: {
+          commit_sha,
+          branch,
+          ...(mergeResult.merge_sha ? { merge_sha: mergeResult.merge_sha } : {}),
+        },
+      })
+    } catch {
+      // swallow
+    }
+    results.push(`${commit_sha}:promoted`)
+
+    try {
+      await deleteBranch(branch)
+    } catch {
+      // swallow — branch cleanup must not block the promoted result
+    }
+  } else {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_failed',
+        status: 'error',
+        output_summary: `gate failed: merge failed for commit ${commit_sha} — ${mergeResult.error}`,
+        meta: { commit_sha, branch, reason: 'merge_failed', error: mergeResult.error },
+      })
+    } catch {
+      // swallow
+    }
+    results.push(`${commit_sha}:merge-failed`)
+  }
 }
 
 async function runGateRunner(): Promise<object> {
@@ -176,7 +239,15 @@ async function runGateRunner(): Promise<object> {
 
     // Smoke already passed in a prior tick — skip straight to schema check
     if (smokePassedShas.has(commit_sha)) {
-      await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+      const schemaStatus = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+      if (schemaStatus === 'schema-clean') {
+        await runAutoPromote(
+          commit_sha,
+          trigger.meta.branch ?? '',
+          trigger.meta.task_id ?? commit_sha,
+          results
+        )
+      }
       continue
     }
 
@@ -251,7 +322,15 @@ async function runGateRunner(): Promise<object> {
         // swallow — preview_ready already written
       }
       if (smokePassed) {
-        await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+        const schemaStatus = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+        if (schemaStatus === 'schema-clean') {
+          await runAutoPromote(
+            commit_sha,
+            trigger.meta.branch ?? '',
+            trigger.meta.task_id ?? commit_sha,
+            results
+          )
+        }
       }
     } else if (preview.status === 'error') {
       try {

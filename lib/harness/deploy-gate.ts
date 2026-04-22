@@ -185,3 +185,73 @@ export async function detectMigrations(
 
   return { has_migrations: migration_files.length > 0, migration_files }
 }
+
+export type MergeResult = {
+  ok: boolean
+  merge_sha?: string
+  error?: string
+}
+
+export async function mergeToMain(
+  branch: string,
+  taskId: string,
+  commitSha: string
+): Promise<MergeResult> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return { ok: false, error: 'config' }
+
+  let res: Response
+  try {
+    res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/merges`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify({
+        base: 'main',
+        head: branch,
+        commit_message: `harness: merge task ${taskId} [deploy-gate auto-merge]\n\ncommit: ${commitSha}\nbranch: ${branch}`,
+      }),
+    })
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  if (res.status === 204) return { ok: true }
+  if (res.status === 201) {
+    let json: { sha?: string }
+    try {
+      json = await res.json()
+    } catch {
+      return { ok: true }
+    }
+    return { ok: true, merge_sha: json.sha }
+  }
+
+  return { ok: false, error: `http_${res.status}` }
+}
+
+export async function deleteBranch(branch: string): Promise<boolean> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return false
+
+  try {
+    const res = await fetch(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/git/refs/heads/${branch}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    )
+    return res.status === 204
+  } catch {
+    return false
+  }
+}

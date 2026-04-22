@@ -19,7 +19,13 @@ vi.mock('@/lib/supabase/service', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { findPreviewDeployment, runSmokeCheck, detectMigrations } from '@/lib/harness/deploy-gate'
+import {
+  findPreviewDeployment,
+  runSmokeCheck,
+  detectMigrations,
+  mergeToMain,
+  deleteBranch,
+} from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,6 +95,7 @@ beforeEach(() => {
   process.env.VERCEL_TOKEN = 'test-vercel-token'
   process.env.VERCEL_PROJECT_ID = 'prj-test-id'
   process.env.GITHUB_TOKEN = 'test-github-token'
+  process.env.DEPLOY_GATE_AUTO_PROMOTE = '0' // disable auto-promote in all baseline tests
   delete process.env.VERCEL_TEAM_ID
 })
 
@@ -97,6 +104,7 @@ afterEach(() => {
   delete process.env.VERCEL_TOKEN
   delete process.env.VERCEL_PROJECT_ID
   delete process.env.GITHUB_TOKEN
+  delete process.env.DEPLOY_GATE_AUTO_PROMOTE
   vi.unstubAllGlobals()
 })
 
@@ -935,5 +943,273 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
     const schemaRow = mockInsert.mock.calls[1][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.meta.commit_sha).toBe('smokeonly')
+  })
+})
+
+// ── mergeToMain ───────────────────────────────────────────────────────────────
+
+describe('mergeToMain', () => {
+  it('returns ok=true with merge_sha on 201 response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ sha: 'abc1234' }),
+    })
+
+    const result = await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    expect(result.ok).toBe(true)
+    expect(result.merge_sha).toBe('abc1234')
+  })
+
+  it('returns ok=true on 204 (already up to date)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204, json: () => Promise.resolve({}) })
+
+    const result = await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    expect(result.ok).toBe(true)
+    expect(result.merge_sha).toBeUndefined()
+  })
+
+  it('returns ok=false with http_409 on merge conflict', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({}) })
+
+    const result = await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('http_409')
+  })
+
+  it('returns ok=false with error=config when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+
+    const result = await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns ok=false with error=api_error on fetch throw', async () => {
+    mockFetch.mockRejectedValue(new Error('network'))
+
+    const result = await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('api_error')
+  })
+
+  it('calls the correct GitHub merges URL with POST', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ sha: 'newsha' }),
+    })
+
+    await mergeToMain('harness/task-abc', 'task-uuid', 'commitabc')
+
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.github.com/repos/loeppkyc/lepios/merges')
+    expect(opts.method).toBe('POST')
+    const body = JSON.parse(opts.body as string)
+    expect(body.base).toBe('main')
+    expect(body.head).toBe('harness/task-abc')
+    expect(body.commit_message).toContain('task-uuid')
+    expect(body.commit_message).toContain('commitabc')
+  })
+})
+
+// ── deleteBranch ──────────────────────────────────────────────────────────────
+
+describe('deleteBranch', () => {
+  it('returns true on 204', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204 })
+
+    const result = await deleteBranch('harness/task-abc')
+
+    expect(result).toBe(true)
+  })
+
+  it('returns false on non-204 status', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404 })
+
+    const result = await deleteBranch('harness/task-abc')
+
+    expect(result).toBe(false)
+  })
+
+  it('returns false when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+
+    const result = await deleteBranch('harness/task-abc')
+
+    expect(result).toBe(false)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('calls the correct DELETE URL', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204 })
+
+    await deleteBranch('harness/task-abc')
+
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(
+      'https://api.github.com/repos/loeppkyc/lepios/git/refs/heads/harness/task-abc'
+    )
+    expect(opts.method).toBe('DELETE')
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — auto-promote (Chunk E) ─────────────────
+
+describe('GET /api/cron/deploy-gate-runner — auto-promote kill switch', () => {
+  it('pushes promotion-skipped to results when DEPLOY_GATE_AUTO_PROMOTE=0, no extra DB insert', async () => {
+    // DEPLOY_GATE_AUTO_PROMOTE=0 already set in beforeEach
+    const trigger = makeTriggerRow('f3f43eb', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      if (url.includes('api.github.com') && !url.includes('/merges'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+
+    // 4 inserts only (no deploy_gate_promoted row)
+    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // results includes the promotion-skipped signal
+    expect(body.results.some((r: string) => r.includes('promotion-skipped'))).toBe(true)
+  })
+})
+
+describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
+  beforeEach(() => {
+    process.env.DEPLOY_GATE_AUTO_PROMOTE = '1'
+  })
+
+  it('calls mergeToMain and writes deploy_gate_promoted on successful merge', async () => {
+    const trigger = makeTriggerRow('abc1234', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      if (url.includes('/merges'))
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ sha: 'mergesha123' }),
+        })
+      if (url.includes('api.github.com/repos') && url.includes('git/refs'))
+        return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+
+    // processing + preview_ready + smoke + schema + promoted = 5 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(5)
+    const promotedRow = mockInsert.mock.calls[4][0]
+    expect(promotedRow.task_type).toBe('deploy_gate_promoted')
+    expect(promotedRow.status).toBe('success')
+    expect(promotedRow.meta.commit_sha).toBe('abc1234')
+    expect(promotedRow.meta.merge_sha).toBe('mergesha123')
+
+    expect(body.results.some((r: string) => r.includes(':promoted'))).toBe(true)
+  })
+
+  it('writes deploy_gate_failed when merge returns non-201', async () => {
+    const trigger = makeTriggerRow('abc1234', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      if (url.includes('/merges'))
+        return Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({}) })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+
+    expect(mockInsert).toHaveBeenCalledTimes(5)
+    const failRow = mockInsert.mock.calls[4][0]
+    expect(failRow.task_type).toBe('deploy_gate_failed')
+    expect(failRow.meta.reason).toBe('merge_failed')
+    expect(failRow.meta.error).toBe('http_409')
+
+    expect(body.results.some((r: string) => r.includes(':merge-failed'))).toBe(true)
+  })
+
+  it('does not call merge when schema-migrations detected (waits for Chunk H)', async () => {
+    const trigger = makeTriggerRow('abc1234', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ files: [{ filename: 'supabase/migrations/0017_test.sql' }] }),
+        })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    await GET(makeRequest())
+
+    // No merge call — schema has migrations
+    const mergeCalls = mockFetch.mock.calls.filter(([url]: [string]) => url.includes('/merges'))
+    expect(mergeCalls).toHaveLength(0)
+
+    // 4 inserts only (no promoted row)
+    expect(mockInsert).toHaveBeenCalledTimes(4)
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('warning')
   })
 })
