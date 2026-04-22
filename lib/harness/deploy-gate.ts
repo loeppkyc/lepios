@@ -83,3 +83,55 @@ export async function findPreviewDeployment(commit_sha: string): Promise<Preview
   // BUILDING, QUEUED, INITIALIZING, etc.
   return { status: 'building', deployment_id: d.uid, ready_state: d.readyState }
 }
+
+export type SmokeResult = {
+  status: 'pass' | 'fail'
+  status_code: number
+  response_ms: number
+  body_excerpt?: string
+  error?: string
+}
+
+export async function runSmokeCheck(preview_url: string): Promise<SmokeResult> {
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10_000)
+  const start = Date.now()
+
+  try {
+    const headers: Record<string, string> = {}
+    if (bypassSecret) headers['x-vercel-protection-bypass'] = bypassSecret
+
+    const res = await fetch(`${preview_url}/api/health`, {
+      headers,
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+    const response_ms = Date.now() - start
+    const status_code = res.status
+
+    if (!res.ok) {
+      return { status: 'fail', status_code, response_ms }
+    }
+
+    let body: Record<string, unknown>
+    try {
+      body = await res.json()
+    } catch {
+      return { status: 'fail', status_code, response_ms, error: 'json_parse_error' }
+    }
+
+    const body_excerpt = JSON.stringify(body).slice(0, 200)
+
+    if (body.ok === true) {
+      return { status: 'pass', status_code, response_ms, body_excerpt }
+    }
+    return { status: 'fail', status_code, response_ms, body_excerpt }
+  } catch (err) {
+    clearTimeout(timeoutId)
+    const response_ms = Date.now() - start
+    const error = err instanceof Error ? err.message : 'unknown'
+    return { status: 'fail', status_code: 0, response_ms, error }
+  }
+}

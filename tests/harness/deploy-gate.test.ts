@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/service', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { findPreviewDeployment } from '@/lib/harness/deploy-gate'
+import { findPreviewDeployment, runSmokeCheck } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -267,9 +267,18 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
       .mockReturnValueOnce(makeSelectBuilder([])) // processing markers
       .mockReturnValue(makeInsertBuilder()) // subsequent inserts
 
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
+      })
     })
 
     const res = await GET(makeRequest())
@@ -279,8 +288,8 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     expect(body.processed).toBe(1)
     expect(body.results[0]).toContain('ready')
 
-    // processing marker + preview_ready = 2 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(2)
+    // processing marker + preview_ready + smoke_preview = 3 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(3)
 
     const processingRow = mockInsert.mock.calls[0][0]
     expect(processingRow.task_type).toBe('deploy_gate_processing')
@@ -293,6 +302,13 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     expect(outcomeRow.meta.commit_sha).toBe('f3f43eb')
     expect(outcomeRow.meta.preview_url).toBe('https://preview-abc.vercel.app')
     expect(outcomeRow.meta.trigger_event_id).toBe(trigger.id)
+
+    const smokeRow = mockInsert.mock.calls[2][0]
+    expect(smokeRow.task_type).toBe('deploy_gate_smoke_preview')
+    expect(smokeRow.status).toBe('success')
+    expect(smokeRow.meta.commit_sha).toBe('f3f43eb')
+    expect(smokeRow.meta.preview_url).toBe('https://preview-abc.vercel.app')
+    expect(smokeRow.meta.status_code).toBe(200)
   })
 
   it('leaves building triggers in place (no outcome row written)', async () => {
@@ -418,17 +434,26 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
       .mockReturnValueOnce(makeSelectBuilder([])) // no processing markers
       .mockReturnValue(makeInsertBuilder()) // all inserts
 
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ok: true }),
+      })
     })
 
     const res = await GET(makeRequest())
     const body = await res.json()
 
     expect(body.processed).toBe(5) // capped at MAX_PER_TICK=5
-    // 2 inserts per trigger (processing + preview_ready) × 5 = 10
-    expect(mockInsert).toHaveBeenCalledTimes(10)
+    // 3 inserts per trigger (processing + preview_ready + smoke_preview) × 5 = 15
+    expect(mockInsert).toHaveBeenCalledTimes(15)
 
     // Each SHA processed exactly once — no duplicates
     const processingShas = mockInsert.mock.calls
@@ -457,5 +482,198 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
     expect(body.processed).toBe(0)
     expect(body.reason).toBe('all-in-progress-or-terminal')
     expect(mockInsert).not.toHaveBeenCalled()
+  })
+})
+
+// ── runSmokeCheck ─────────────────────────────────────────────────────────────
+
+describe('runSmokeCheck', () => {
+  afterEach(() => {
+    delete process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  })
+
+  it('returns pass when health endpoint returns 200 with ok:true', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true, commit: 'abc', timestamp: '2026-01-01T00:00:00.000Z' }),
+    })
+
+    const result = await runSmokeCheck('https://preview-abc.vercel.app')
+
+    expect(result.status).toBe('pass')
+    expect(result.status_code).toBe(200)
+    expect(result.response_ms).toBeGreaterThanOrEqual(0)
+    expect(result.body_excerpt).toContain('"ok":true')
+  })
+
+  it('returns fail when health endpoint returns non-200', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, json: () => Promise.resolve({}) })
+
+    const result = await runSmokeCheck('https://preview-abc.vercel.app')
+
+    expect(result.status).toBe('fail')
+    expect(result.status_code).toBe(503)
+  })
+
+  it('returns fail when body.ok is false', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: false }),
+    })
+
+    const result = await runSmokeCheck('https://preview-abc.vercel.app')
+
+    expect(result.status).toBe('fail')
+    expect(result.status_code).toBe(200)
+  })
+
+  it('calls the correct URL (preview_url + /api/health)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true }),
+    })
+
+    await runSmokeCheck('https://preview-abc.vercel.app')
+
+    expect(mockFetch.mock.calls[0][0]).toBe('https://preview-abc.vercel.app/api/health')
+  })
+
+  it('sends x-vercel-protection-bypass header when VERCEL_AUTOMATION_BYPASS_SECRET is set', async () => {
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET = 'bypass-secret-abc'
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true }),
+    })
+
+    await runSmokeCheck('https://preview-abc.vercel.app')
+
+    const call = mockFetch.mock.calls[0]
+    expect(call[1].headers['x-vercel-protection-bypass']).toBe('bypass-secret-abc')
+  })
+
+  it('does not send x-vercel-protection-bypass header when secret is not set', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true }),
+    })
+
+    await runSmokeCheck('https://preview-abc.vercel.app')
+
+    const call = mockFetch.mock.calls[0]
+    expect(call[1].headers['x-vercel-protection-bypass']).toBeUndefined()
+  })
+
+  it('returns fail with error when fetch throws (network error)', async () => {
+    mockFetch.mockRejectedValue(new Error('network failure'))
+
+    const result = await runSmokeCheck('https://preview-abc.vercel.app')
+
+    expect(result.status).toBe('fail')
+    expect(result.error).toBe('network failure')
+    expect(result.status_code).toBe(0)
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — smoke check integration ────────────────
+
+describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
+  it('writes deploy_gate_smoke_preview:success after preview_ready when smoke passes', async () => {
+    const trigger = makeTriggerRow('f3f43eb', 3)
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
+      })
+    })
+
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+
+    // processing + preview_ready + smoke_preview = 3 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(3)
+
+    const smokeRow = mockInsert.mock.calls[2][0]
+    expect(smokeRow.task_type).toBe('deploy_gate_smoke_preview')
+    expect(smokeRow.status).toBe('success')
+    expect(smokeRow.meta.commit_sha).toBe('f3f43eb')
+    expect(smokeRow.meta.preview_url).toBe('https://preview-abc.vercel.app')
+    expect(smokeRow.meta.status_code).toBe(200)
+  })
+
+  it('writes deploy_gate_smoke_preview:error when smoke returns non-200', async () => {
+    const trigger = makeTriggerRow('f3f43eb', 3)
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      return Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({}) })
+    })
+
+    await GET(makeRequest())
+
+    expect(mockInsert).toHaveBeenCalledTimes(3)
+
+    const smokeRow = mockInsert.mock.calls[2][0]
+    expect(smokeRow.task_type).toBe('deploy_gate_smoke_preview')
+    expect(smokeRow.status).toBe('error')
+    expect(smokeRow.meta.status_code).toBe(503)
+  })
+
+  it('does not block preview_ready outcome when smoke fetch throws', async () => {
+    const trigger = makeTriggerRow('f3f43eb', 3)
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      return Promise.reject(new Error('network failure'))
+    })
+
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.results[0]).toContain('ready')
+
+    // preview_ready still written — smoke fetch error swallowed
+    const previewReadyRow = mockInsert.mock.calls[1][0]
+    expect(previewReadyRow.task_type).toBe('deploy_gate_preview_ready')
   })
 })

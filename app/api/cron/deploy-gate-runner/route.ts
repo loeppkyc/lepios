@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { findPreviewDeployment } from '@/lib/harness/deploy-gate'
+import { findPreviewDeployment, runSmokeCheck } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -160,6 +160,28 @@ async function runGateRunner(): Promise<object> {
         results.push(`${commit_sha}:ready`)
       } catch {
         results.push(`${commit_sha}:ready-write-failed`)
+      }
+
+      try {
+        const smoke = await runSmokeCheck(preview.preview_url!)
+        await writeGateEvent({
+          task_type: 'deploy_gate_smoke_preview',
+          status: smoke.status === 'pass' ? 'success' : 'error',
+          output_summary:
+            smoke.status === 'pass'
+              ? `smoke pass on ${preview.preview_url}`
+              : `smoke fail: ${smoke.status_code}`,
+          meta: {
+            commit_sha,
+            preview_url: preview.preview_url,
+            status_code: smoke.status_code,
+            response_ms: smoke.response_ms,
+            ...(smoke.body_excerpt ? { body_excerpt: smoke.body_excerpt } : {}),
+            ...(smoke.error ? { error: smoke.error } : {}),
+          },
+        })
+      } catch {
+        // swallow — preview_ready already written
       }
     } else if (preview.status === 'error') {
       try {
