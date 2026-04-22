@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/deploy-gate-runner",
-      "schedule": "* * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
