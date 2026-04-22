@@ -115,18 +115,30 @@ Smoke passes + no migrations → promote automatically. Post-promotion Telegram 
 
 ## 4. Promotion
 
-**How preview becomes production:**
+**Decided: merge harness branch into main via GitHub API. Vercel auto-deploys main to production.**
 
-Use the Vercel Promote API:
+**Rejected: Vercel alias-promote** (swap deployment alias without merging). Reason: leaves `main` behind production. Any subsequent push to `main` — by Colin or another harness task — would overwrite the promoted deployment. Attribution and git history diverge from what's actually running in prod. Not safe as a long-term pattern.
 
-```
-POST https://api.vercel.com/v10/projects/<projectId>/promote/<deploymentId>
-Authorization: Bearer <VERCEL_TOKEN>
-```
+**Promotion sequence:**
+1. Gate calls GitHub Merges API to merge the harness branch into `main`:
+   ```
+   POST https://api.github.com/repos/loeppkyc/lepios/merges
+   Authorization: Bearer <GITHUB_TOKEN>
+   {
+     "base": "main",
+     "head": "harness/task-{task_id}",
+     "commit_message": "harness: merge task {task_id} [deploy-gate auto-merge]"
+   }
+   ```
+2. The merge triggers Vercel's git integration → Vercel builds and deploys `main` to production automatically (identical path to Colin's manual pushes — no special Vercel config needed).
+3. Gate polls Vercel API until the resulting production deployment reaches `READY`, then writes `deploy_gate_promoted` to `agent_events`.
+4. Gate deletes the harness branch via GitHub API (see §10 Chunk E — branch cleanup).
 
-This promotes the preview deployment to the production alias (`lepios-one.vercel.app`) without a new build. Instantaneous and reversible. `deployment_id` comes from the `deploy_gate_preview_ready` event in `agent_events`.
+**Commit message convention:** Embedding `task {task_id}` in the merge commit message lets Component #7 (attribution) trace the deployment back to the originating task even after the branch is deleted. Belt-and-suspenders: the branch name also encodes the task_id, but the commit message survives branch deletion.
 
-**No merge to main required.** Promotion is an alias swap at the CDN edge. The harness branch never needs to land on `main` for the code to run in production. Whether to merge to main for git history is Colin's call, post-promotion.
+**New env vars needed:**
+- `GITHUB_TOKEN` — personal access token with `repo` scope (merge + branch delete)
+- `GITHUB_REPO` — `loeppkyc/lepios`
 
 ---
 
@@ -198,7 +210,7 @@ Timeout = **30 minutes** → **ABORT** (conservative — don't promote without e
 | Migration gate times out (30 min) | Abort, Telegram alert: "Migration gate expired — no action taken" |
 | Post-promotion Telegram timeout (10 min) | Default keep, write `deploy_gate_override_timeout` |
 | Vercel API down | Polling timeout → gate fails → Telegram alert. Do not promote. |
-| Vercel Promote API call fails | Telegram alert, write `deploy_gate_failed`. Previous production stays active. |
+| GitHub merge fails (conflict or API error) | Telegram alert, write `deploy_gate_failed`. Branch not deleted. Previous production stays active. |
 | Post-promotion smoke fails | Auto-rollback (don't wait for human). Telegram alert separately. |
 | Gate handler itself crashes | Top-level `try/catch` → `deploy_gate_failed` + Telegram alert. Never silently drop. |
 | 👎 rollback tap but rollback API fails | Log `deploy_gate_rollback_failed`, Telegram with manual rollback instructions. |
@@ -225,6 +237,7 @@ All gate events use `domain: 'orchestrator'`, `actor: 'deploy_gate'`. The `meta`
 | `deploy_gate_override_promoted` | `success` | `human approved migration promotion at HH:MM` | `telegram_user_id`, `latency_ms` |
 | `deploy_gate_override_aborted` | `success` | `human aborted migration at HH:MM` | `telegram_user_id`, `latency_ms` |
 | `deploy_gate_override_timeout` | `warning` | `gate expired — defaulting to <keep\|abort>` | `timeout_minutes`, `default_action` |
+| `deploy_gate_promotion_skipped` | `success` | `auto-promote disabled (DEPLOY_GATE_AUTO_PROMOTE=0)` | `branch`, `commit_sha`, `reason` |
 | `deploy_gate_rolled_back` | `success` \| `error` | `rolled back to <deployment_id>` | `from_deployment_id`, `to_deployment_id` |
 | `deploy_gate_failed` | `error` | `gate failed: <reason>` | `error`, `stage_failed_at` |
 
@@ -316,7 +329,19 @@ Expected: `deploy_gate_preview_ready` row with `meta.preview_url` set. Click the
 ### Chunk C — Smoke Check on Preview
 **Goal:** After preview is ready, gate hits `/api/health` on the preview URL and records pass/fail.
 
+**Pre-requisite sub-task: create `/api/health` route.**
+`app/api/health/route.ts` does not currently exist. Must be created before this chunk ships:
+```typescript
+// app/api/health/route.ts
+export const dynamic = 'force-dynamic'
+export async function GET() {
+  return Response.json({ ok: true, commit: process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown' })
+}
+```
+`VERCEL_GIT_COMMIT_SHA` is injected by Vercel at build time — no env var setup needed. The `commit` field lets the gate confirm the correct build is running before running further checks.
+
 **Files:**
+- `app/api/health/route.ts` (new — health endpoint, sub-task)
 - `lib/harness/deploy-gate.ts` (extend — `runSmokeCheck()`)
 - Extend `deploy-gate-runner/route.ts` to invoke smoke after preview ready
 
@@ -349,20 +374,30 @@ Push a commit with no migrations → `status=success`, `meta.migration_files=[]`
 
 ---
 
-### Chunk E — Auto-Promote (non-migration path)
-**Goal:** Smoke passes + no migrations → production is promoted via Vercel API. First end-to-end working path.
+### Chunk E — Merge to Main + Branch Cleanup (non-migration path)
+**Goal:** Smoke passes + no migrations → harness branch merges into main, Vercel auto-deploys, branch is deleted. First end-to-end working path.
+
+**Promotion mechanism (decided — see §4):** Merge to main via GitHub API. Not Vercel alias-promote.
+
+**Kill switch:** `DEPLOY_GATE_AUTO_PROMOTE` env var (default `1`). When set to `0`, gate runs all checks (A–D) but skips the merge and branch deletion. Logs `deploy_gate_promotion_skipped` with `reason: 'DEPLOY_GATE_AUTO_PROMOTE=0'` and sends Telegram alert so Colin can promote manually. Use this to put the gate in observer mode without reverting code.
+
+**Branch cleanup:** After a successful merge, gate deletes the `harness/task-{task_id}` branch via GitHub API:
+```
+DELETE https://api.github.com/repos/loeppkyc/lepios/git/refs/heads/harness/task-{task_id}
+Authorization: Bearer <GITHUB_TOKEN>
+```
+Attribution safety: task_id is captured into the merge commit message (`harness: merge task {task_id} [deploy-gate auto-merge]`) before branch deletion. Component #7 can parse the commit message from git log; does not rely on the branch existing.
 
 **Files:**
-- `lib/harness/deploy-gate.ts` (extend — `promoteDeployment()`)
-- Extend `deploy-gate-runner/route.ts` with promotion call
+- `lib/harness/deploy-gate.ts` (extend — `mergeToMain()`, `deleteBranch()`, `checkKillSwitch()`)
+- Extend `deploy-gate-runner/route.ts` with merge + cleanup step
 
 **Verify standalone:**
-Push a code-only commit to `harness/task-*`. Wait for Chunk B–D to complete. Trigger cron. Check Vercel dashboard — promoted deployment should be active. Query:
-`SELECT * FROM agent_events WHERE task_type = 'deploy_gate_promoted' ORDER BY occurred_at DESC LIMIT 1`
-Expected: `status=success`, `meta.deployment_id` matches Vercel.
+1. Set `DEPLOY_GATE_AUTO_PROMOTE=0`. Push a code-only commit to `harness/task-*`. Run A–D. Trigger cron → confirm `deploy_gate_promotion_skipped` logged, branch still exists, main unchanged.
+2. Set `DEPLOY_GATE_AUTO_PROMOTE=1`. Push a code-only commit. Run A–D. Trigger cron → confirm `deploy_gate_promoted` logged, `main` has the merge commit (check `git log origin/main`), Vercel dashboard shows new production deploy, branch deleted on GitHub.
 
 **Unblocks:** Chunk F (Telegram notification after promotion).
-**Effort:** S (one API call, straightforward)
+**Effort:** S–M (two GitHub API calls + kill switch logic; Vercel deploy is triggered automatically by the merge)
 
 ---
 
@@ -425,7 +460,7 @@ Push a commit with a new migration file. Wait for Chunk B–D to run. Telegram m
 | B | Preview URL discovery | M | Clickable preview URL in agent_events |
 | C | Smoke check | S | First gate pass/fail signal |
 | D | Migration detection | S | Two-tier branch point |
-| E | Auto-promote | S | **First end-to-end promotion** |
+| E | Merge to main + branch cleanup | S–M | **First end-to-end promotion** |
 | F | Telegram + rollback | M | Human oversight loop live |
 | G | Timeout cron | S | Override rows resolve automatically |
 | H | Migration gate | M | Full two-tier gate operational |
