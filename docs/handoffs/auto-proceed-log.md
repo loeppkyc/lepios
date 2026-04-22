@@ -5,7 +5,7 @@ reversibility_check: Plan is a document — fully reversible via git. No code ch
 confidence: high
 outcome: approved-with-edits-applied
 
-last_reviewed_by_colin_at: null
+last_reviewed_by_colin_at: 2026-04-22
 
 ---
 
