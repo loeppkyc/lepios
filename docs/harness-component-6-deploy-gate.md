@@ -329,19 +329,10 @@ Expected: `deploy_gate_preview_ready` row with `meta.preview_url` set. Click the
 ### Chunk C — Smoke Check on Preview
 **Goal:** After preview is ready, gate hits `/api/health` on the preview URL and records pass/fail.
 
-**Pre-requisite sub-task: create `/api/health` route.**
-`app/api/health/route.ts` does not currently exist. Must be created before this chunk ships:
-```typescript
-// app/api/health/route.ts
-export const dynamic = 'force-dynamic'
-export async function GET() {
-  return Response.json({ ok: true, commit: process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown' })
-}
-```
-`VERCEL_GIT_COMMIT_SHA` is injected by Vercel at build time — no env var setup needed. The `commit` field lets the gate confirm the correct build is running before running further checks.
+**Pre-requisite sub-task: ~~create `/api/health` route~~ — already exists.**
+`app/api/health/route.ts` exists and returns `{ ok: true, db: 'reachable', timestamp }` after a live Supabase ping. More thorough than the minimal version planned here. No action needed.
 
 **Files:**
-- `app/api/health/route.ts` (new — health endpoint, sub-task)
 - `lib/harness/deploy-gate.ts` (extend — `runSmokeCheck()`)
 - Extend `deploy-gate-runner/route.ts` to invoke smoke after preview ready
 
