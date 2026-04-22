@@ -1,19 +1,15 @@
 # Autonomous Harness — Component #6: Deploy Gate
 
-## Current Session State (2026-04-22, session 2)
+## Current Session State (2026-04-22, session 3)
 
-- Chunks A, B, C, D, E — all shipped and verified E2E
-- Chunk D verified: 14/14 checks (`scripts/verify-chunk-d-e2e.mjs`)
-  - migration branch → `schema_check:warning`, `has_migrations=true` ✓
-  - no-migration branch → `schema_check:success`, `has_migrations=false` ✓
-- Chunk E verified: real merge + branch delete + kill switch — all working
-  - `mergeToMain` → merge commit `fbccf86` on main, branch auto-deleted ✓
-  - kill switch (`DEPLOY_GATE_AUTO_PROMOTE=0`) → `promotion-skipped` in results, no DB row ✓
-  - `DEPLOY_GATE_AUTO_PROMOTE=1` restored in Vercel (auto-promote ON)
-  - `scripts/verify-chunk-e-e2e.mjs` — 7/7 pass
-- Next chunks pending: F (Telegram rollback button), G (timeout cron), H (migration gate)
+- Deploy gate v0 COMPLETE as of 2026-04-22 ~07:20 MT
+- All 8 chunks (A–H) shipped and verified end-to-end
+- Three migration paths verified: abort, promote, promote+rollback
+- Safety guards verified: main_moved_on, double-tap, tests_passed=false, timeout defaults (10-min KEEP post-promote, 30-min ABORT migrations)
+- Bugs caught + fixed during verify: fire-and-forget webhook edit (eb4c78c), deleteBranch missing on migration promote (d1c279d)
+- Telegram webhook entry/early-return logging added (fb71133)
 - Token rotation reminder: July 22 2026 — rotate VERCEL_TOKEN + GITHUB_TOKEN together
-- GITHUB_TOKEN in Vercel HAS write access (Contents + refs delete) — merge + branch delete both confirmed working
+- GITHUB_TOKEN in Vercel HAS write access (Contents + refs delete) — confirmed across all paths
 
 **Harness tracker (end of this session):**
 
@@ -22,17 +18,12 @@
 | Ollama | 15×10 = 1.5 | |
 | Telegram thumbs | 25×85 = 21.25 | Verified E2E on tasks 48ee30db and 90f952dc |
 | Coordinator | 25×35 = 8.75 | |
-| Deploy gate | 15×65 = 9.75 | A/B/C/D/E verified; F/G/H remain |
+| Deploy gate | 15×100 = 15.0 | v0 COMPLETE — all 8 chunks shipped + E2E verified |
 | Task pickup | 15×80 = 12.0 | |
 | Attribution | 5×0 = 0 | |
-| **Total** | **~55%** | |
+| **Total** | **~58.5%** | |
 
-**Committed this session:**
-
-- `5eb81b6` — Chunk D E2E verify (14/14)
-- `f90c881` — Chunk E: mergeToMain + deleteBranch + kill switch (561 tests)
-- `fbccf86` — auto-merge commit from E2E verify (proof of real merge)
-- `4951e66` — Chunk E E2E verify script (7/7)
+**Next session targets:** Coordinator/Builder routing (main unlock for actual autonomy), task seeding workflow, Ollama wiring.
 
 ---
 
