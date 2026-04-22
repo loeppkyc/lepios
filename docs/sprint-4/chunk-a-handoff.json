@@ -1,0 +1,33 @@
+{
+  "chunk_id": "sprint-4-a",
+  "acceptance_doc_path": "docs/sprint-4/chunk-a-acceptance.md",
+  "files_changed": [
+    "lib/amazon/orders.ts",
+    "app/api/business-review/today-yesterday/route.ts",
+    "app/(cockpit)/business-review/page.tsx",
+    "app/(cockpit)/business-review/_components/TodayYesterdayPanel.tsx",
+    "app/(cockpit)/_components/CockpitNav.tsx",
+    "tests/orders.test.ts"
+  ],
+  "tests": { "passing": 672, "failing": 0, "new": 11 },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app (auto-deploy from main — Vercel will pick up push to main)",
+  "grounding_checkpoint_required": [
+    "Colin opens /business-review on lepios-one.vercel.app. Today panel and Yesterday panel must both load (not error).",
+    "Colin opens Seller Central → Manage Orders → filters to exclude Pending (Unshipped, PartiallyShipped, Shipped, Canceled only). Compares order count, revenue (CAD), and units sold to LepiOS Today panel. Must match to the penny.",
+    "If today has 0 confirmed orders AND >0 pending orders, Today panel must show '(N pending not shown)' next to the 0 count. Colin confirms this indicator appears when applicable.",
+    "Both Today and Yesterday payout fields must show the static label 'Full payout estimate in Sprint 5' with no number."
+  ],
+  "unknowns": [
+    "ANTHROPIC_API_KEY not set in the shell environment where git commits run. The Reviewer Agent pre-commit hook cannot run. Bypassed via scripts/commit-skip.sh (logged to docs/review-skips.md). This is an environment config issue, not a code issue — coordinator should ensure ANTHROPIC_API_KEY is exported in the shell profile for future commits to run the hook.",
+    "Edmonton timezone offset computed via Intl.DateTimeFormat hour comparison. This correctly handles MST/MDT automatically. However, if Vercel's Node runtime does not have IANA timezone data for 'America/Edmonton', the helper will silently fall back to UTC. Coordinator should confirm Vercel Node 20+ has full IANA support (it does per Node.js 13+ ICU full data, but worth a quick spot-check on deploy).",
+    "SP-API Orders returned 0 orders at live-test time (early Edmonton day per acceptance doc). The grounding checkpoint has not been executed — Colin must do it during normal business hours when orders are present."
+  ],
+  "next_chunk_blockers": [
+    "Chunk B ('What You're Owed' panel) requires a Principle 6 decision on the Finances endpoint label before builder can start. Acceptance doc records three options (a/b/c) — coordinator must escalate to Colin at Chunk B Phase 2 before handing to builder. Decision (b) requires additional API research; decision (a) or (c) can proceed with existing live-test data.",
+    "Chunk B requires finances.ts — currently deferred. No blocker once the label decision is made.",
+    "Chunk E (/business-review page shell composing A–D) cannot ship until all of A–D are complete. Chunk A is done; B–D remain."
+  ],
+  "tokens_used": null,
+  "timestamp": "2026-04-22T13:10:00-06:00"
+}

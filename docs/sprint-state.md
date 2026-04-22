@@ -30,14 +30,16 @@ harness_e2e:
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: null
-status: "paused-pending-harness"
-paused_reason: "coordinator/builder pattern (harness #3) blocked by absence of non-human task pickup source; component #5 (task pickup) reprioritized as next build to activate coordinator's latent value; resume after #5 stabilizes. Step 6.5 design at docs/harness-step-6.5-ollama-daytime-tick.md remains valid — deferred one slot."
-last_handoff_path: null
-awaiting: "harness-task-pickup"
+active_chunk: "A"
+status: "awaiting-grounding"
+phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
+acceptance_doc_path: "docs/sprint-4/chunk-a-acceptance.md"
+acceptance_doc_status: "approved-by-colin"
+last_handoff_path: "docs/sprint-4/chunk-a-handoff.json"
+awaiting: "colin"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-22T13:55:00-06:00"
+last_updated_at: "2026-04-22T20:30:00-06:00"
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)

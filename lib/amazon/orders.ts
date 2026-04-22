@@ -104,66 +104,46 @@ export function yesterdayEndEdmontonUTC(): string {
  * Compute the UTC equivalent of midnight (start) or 23:59:59.999 (end) for a
  * given date in the America/Edmonton timezone.
  *
- * Relies on Intl.DateTimeFormat to discover the UTC offset at the given moment
- * rather than hardcoding -6 or -7, so it handles MST/MDT automatically.
+ * Uses an explicit ISO offset string ("2026-04-22T00:00:00.000-06:00") so the
+ * result is server-timezone-independent — correct on Vercel (UTC) and local
+ * machines alike. The offset is derived from localDate via Intl, so MST/MDT
+ * is handled automatically without hardcoding.
  */
 function dayBoundaryUTC(localDate: Date, boundary: 'start' | 'end'): string {
-  // Get year/month/day as seen in Edmonton
-  const fmt = new Intl.DateTimeFormat('en-CA', {
+  // Get year/month/day as seen in Edmonton at this UTC moment
+  const dateFmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Edmonton',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   })
-  const parts = fmt.formatToParts(localDate)
+  const parts = dateFmt.formatToParts(localDate)
   const year = Number(parts.find((p) => p.type === 'year')!.value)
   const month = Number(parts.find((p) => p.type === 'month')!.value)
   const day = Number(parts.find((p) => p.type === 'day')!.value)
 
-  // Build the boundary moment in Edmonton local time, then get its UTC equivalent
-  if (boundary === 'start') {
-    // midnight Edmonton
-    const edmontonMidnight = new Date(`${year}-${pad2(month)}-${pad2(day)}T00:00:00`)
-    const offsetMs = edmontonMidnightOffsetMs(edmontonMidnight)
-    const utcMs = edmontonMidnight.getTime() - offsetMs
-    return new Date(utcMs).toISOString()
-  } else {
-    // 23:59:59.999 Edmonton
-    const edmontonEndOfDay = new Date(`${year}-${pad2(month)}-${pad2(day)}T23:59:59.999`)
-    const offsetMs = edmontonMidnightOffsetMs(edmontonEndOfDay)
-    const utcMs = edmontonEndOfDay.getTime() - offsetMs
-    return new Date(utcMs).toISOString()
-  }
+  // Compute UTC offset for Edmonton at this moment (positive = UTC ahead of Edmonton)
+  // e.g. MDT: UTC is 6h ahead of Edmonton → offsetHours = 6
+  const utcHour = Number(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', hour: '2-digit', hour12: false }).format(localDate)
+  )
+  const edHour = Number(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hour: '2-digit', hour12: false }).format(localDate)
+  )
+  let offsetHours = utcHour - edHour
+  if (offsetHours < 0) offsetHours += 24
+  // Edmonton is UTC-offsetHours → ISO offset string is "-HH:00"
+  const offsetStr = `-${pad2(offsetHours)}:00`
+
+  // Build unambiguous ISO string with explicit timezone offset.
+  // JavaScript's Date parser treats "T00:00:00.000-06:00" as Edmonton midnight,
+  // regardless of the server's local timezone.
+  const timeStr = boundary === 'start' ? 'T00:00:00.000' : 'T23:59:59.999'
+  return new Date(`${year}-${pad2(month)}-${pad2(day)}${timeStr}${offsetStr}`).toISOString()
 }
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
-}
-
-/**
- * Returns the Edmonton UTC offset in milliseconds for a given date.
- * Uses Intl to detect MST (-7h) vs MDT (-6h) automatically.
- */
-function edmontonMidnightOffsetMs(date: Date): number {
-  // Format the date in UTC and in Edmonton; compare the hour difference
-  const utcHour = Number(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'UTC',
-      hour: '2-digit',
-      hour12: false,
-    }).format(date)
-  )
-  const edHour = Number(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Edmonton',
-      hour: '2-digit',
-      hour12: false,
-    }).format(date)
-  )
-  // offset = UTC - local (in hours), convert to ms
-  let offsetHours = utcHour - edHour
-  if (offsetHours < 0) offsetHours += 24
-  return offsetHours * 60 * 60 * 1000
 }
 
 // ── Aggregation ───────────────────────────────────────────────────────────────

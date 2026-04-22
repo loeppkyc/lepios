@@ -28,3 +28,47 @@ reversibility_check: |
 confidence: high
 outcome: escalated (cache-match disabled entire sprint per Phase 0; all decisions went to Colin)
 note: This entry is the Phase 6 audit artifact showing cache-match was correctly disabled and the sprint ran with full Colin oversight throughout.
+
+---
+
+2026-04-22T17:00:00-06:00 sprint=4 chunk=A doc=docs/sprint-4/chunk-a-acceptance.md
+phase: 2 (per-chunk acceptance doc)
+cited_principles: [1, 6, 8, 14, 15, 17, META-C]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+  META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
+  Additionally, Principle 15 (new terrain) independently requires escalation:
+    Principle 15 trigger: "Proposed module is an outlier from the observed pattern ('we've never done this before')."
+    Situation: SP-API Finances (/finances/v0/financialEventGroups) has never been called in the LepiOS codebase.
+    Sprint 3 established SP-API for catalog/pricing/fees — Finances is a new surface with a separate entitlement role.
+  Additionally, Principle 1 (live-test) requires live hits on both SP-API Orders and SP-API Finances before doc is finalized.
+    Principle 1 trigger: "Any external API mentioned in a Streamlit reference file or proposed acceptance doc."
+    Situation: Both endpoints referenced in acceptance doc; neither has been live-tested in LepiOS context.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  sprint-state.md update: document only, no code/schema effect.
+  No code written, no schema changed, no external calls made.
+confidence: high (escalation is correct and unambiguous)
+outcome: escalated
+escalation_reasons:
+
+- cache_match_disabled_sprint_override
+- principle_15_new_terrain (SP-API Finances first use in LepiOS)
+- principle_1_live_test_required (Orders + Finances endpoints not yet verified)
+- open_question_unresolved (Finances entitlement role; "estimated settlement" definition for Today panel)
+
+---
+
+2026-04-22T19:00:00-06:00 sprint=4 chunk=A doc=docs/sprint-4/chunk-a-acceptance.md
+cited_principles: [1, 6, 14, 15, 17]
+trigger_match_evidence: |
+  Cache-match disabled sprint-wide. Doc escalated to Colin. Colin approved explicitly after:
+  live-tests (Orders 200 OK, Finances 200 OK), reserve reconciliation ($928.17 − $96.23 = $831.94),
+  pending-indicator requirement added, confirmed-order-state definition locked,
+  Chunk B grounding target locked as SC Net Proceeds.
+reversibility_check: |
+  Acceptance doc: document only, fully reversible.
+  sprint-state.md update: document only, no code/schema effect.
+confidence: high
+outcome: approved-by-colin
