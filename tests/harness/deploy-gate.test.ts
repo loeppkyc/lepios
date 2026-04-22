@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/service', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { findPreviewDeployment, runSmokeCheck } from '@/lib/harness/deploy-gate'
+import { findPreviewDeployment, runSmokeCheck, detectMigrations } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -88,6 +88,7 @@ beforeEach(() => {
   process.env.CRON_SECRET = VALID_SECRET
   process.env.VERCEL_TOKEN = 'test-vercel-token'
   process.env.VERCEL_PROJECT_ID = 'prj-test-id'
+  process.env.GITHUB_TOKEN = 'test-github-token'
   delete process.env.VERCEL_TEAM_ID
 })
 
@@ -95,6 +96,7 @@ afterEach(() => {
   delete process.env.CRON_SECRET
   delete process.env.VERCEL_TOKEN
   delete process.env.VERCEL_PROJECT_ID
+  delete process.env.GITHUB_TOKEN
   vi.unstubAllGlobals()
 })
 
@@ -265,6 +267,7 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger])) // triggers query
       .mockReturnValueOnce(makeSelectBuilder([])) // terminal rows
       .mockReturnValueOnce(makeSelectBuilder([])) // processing markers
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder()) // subsequent inserts
 
     mockFetch.mockImplementation((url: string) => {
@@ -272,6 +275,12 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      if (url.includes('api.github.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ files: [] }),
         })
       }
       return Promise.resolve({
@@ -288,8 +297,8 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     expect(body.processed).toBe(1)
     expect(body.results[0]).toContain('ready')
 
-    // processing marker + preview_ready + smoke_preview = 3 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(3)
+    // processing + preview_ready + smoke_preview + schema_check = 4 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(4)
 
     const processingRow = mockInsert.mock.calls[0][0]
     expect(processingRow.task_type).toBe('deploy_gate_processing')
@@ -309,6 +318,13 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     expect(smokeRow.meta.commit_sha).toBe('f3f43eb')
     expect(smokeRow.meta.preview_url).toBe('https://preview-abc.vercel.app')
     expect(smokeRow.meta.status_code).toBe(200)
+
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('success')
+    expect(schemaRow.meta.commit_sha).toBe('f3f43eb')
+    expect(schemaRow.meta.has_migrations).toBe(false)
+    expect(schemaRow.meta.migration_files).toEqual([])
   })
 
   it('leaves building triggers in place (no outcome row written)', async () => {
@@ -318,6 +334,7 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     mockFetch.mockResolvedValue({
@@ -338,7 +355,7 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
 // ── GET /api/cron/deploy-gate-runner — skips terminal triggers ────────────────
 
 describe('GET /api/cron/deploy-gate-runner — skips terminal triggers', () => {
-  it('skips trigger that already has a deploy_gate_preview_ready row', async () => {
+  it('skips trigger that already has a deploy_gate_schema_check row', async () => {
     const trigger = makeTriggerRow('abc1234', 3)
     const terminalRow = { id: 'x', meta: { commit_sha: 'abc1234' } }
 
@@ -382,6 +399,7 @@ describe('GET /api/cron/deploy-gate-runner — timeout', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     const res = await GET(makeRequest())
@@ -406,6 +424,7 @@ describe('GET /api/cron/deploy-gate-runner — timeout', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     mockFetch.mockResolvedValue({
@@ -432,6 +451,7 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
       .mockReturnValueOnce(makeSelectBuilder(triggers)) // all 6 returned by DB
       .mockReturnValueOnce(makeSelectBuilder([])) // no terminal rows
       .mockReturnValueOnce(makeSelectBuilder([])) // no processing markers
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder()) // all inserts
 
     mockFetch.mockImplementation((url: string) => {
@@ -439,6 +459,12 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      if (url.includes('api.github.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ files: [] }),
         })
       }
       return Promise.resolve({
@@ -452,8 +478,8 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
     const body = await res.json()
 
     expect(body.processed).toBe(5) // capped at MAX_PER_TICK=5
-    // 3 inserts per trigger (processing + preview_ready + smoke_preview) × 5 = 15
-    expect(mockInsert).toHaveBeenCalledTimes(15)
+    // 4 inserts per trigger (processing + preview_ready + smoke_preview + schema_check) × 5 = 20
+    expect(mockInsert).toHaveBeenCalledTimes(20)
 
     // Each SHA processed exactly once — no duplicates
     const processingShas = mockInsert.mock.calls
@@ -589,6 +615,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     mockFetch.mockImplementation((url: string) => {
@@ -596,6 +623,12 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      if (url.includes('api.github.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ files: [] }),
         })
       }
       return Promise.resolve({
@@ -608,8 +641,8 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
 
-    // processing + preview_ready + smoke_preview = 3 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(3)
+    // processing + preview_ready + smoke_preview + schema_check = 4 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(4)
 
     const smokeRow = mockInsert.mock.calls[2][0]
     expect(smokeRow.task_type).toBe('deploy_gate_smoke_preview')
@@ -617,6 +650,11 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     expect(smokeRow.meta.commit_sha).toBe('f3f43eb')
     expect(smokeRow.meta.preview_url).toBe('https://preview-abc.vercel.app')
     expect(smokeRow.meta.status_code).toBe(200)
+
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('success')
+    expect(schemaRow.meta.has_migrations).toBe(false)
   })
 
   it('writes deploy_gate_smoke_preview:error when smoke returns non-200', async () => {
@@ -626,6 +664,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     mockFetch.mockImplementation((url: string) => {
@@ -655,6 +694,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
     mockFetch.mockImplementation((url: string) => {
@@ -675,5 +715,225 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     // preview_ready still written — smoke fetch error swallowed
     const previewReadyRow = mockInsert.mock.calls[1][0]
     expect(previewReadyRow.task_type).toBe('deploy_gate_preview_ready')
+  })
+})
+
+// ── detectMigrations ──────────────────────────────────────────────────────────
+
+describe('detectMigrations', () => {
+  afterEach(() => {
+    delete process.env.GITHUB_TOKEN
+  })
+
+  it('detects a single migration file', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          files: [
+            { filename: 'supabase/migrations/0001_initial.sql' },
+            { filename: 'app/components/Button.tsx' },
+          ],
+        }),
+    })
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.has_migrations).toBe(true)
+    expect(result.migration_files).toEqual(['supabase/migrations/0001_initial.sql'])
+    expect(result.error).toBeUndefined()
+  })
+
+  it('filters correctly — only supabase/migrations/ files returned', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          files: [
+            { filename: 'supabase/migrations/0002_add_index.sql' },
+            { filename: 'supabase/migrations/0003_add_column.sql' },
+            { filename: 'app/page.tsx' },
+            { filename: 'lib/utils.ts' },
+            { filename: 'package.json' },
+          ],
+        }),
+    })
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.has_migrations).toBe(true)
+    expect(result.migration_files).toHaveLength(2)
+    expect(result.migration_files).toContain('supabase/migrations/0002_add_index.sql')
+    expect(result.migration_files).toContain('supabase/migrations/0003_add_column.sql')
+  })
+
+  it('returns has_migrations=false when no migration files in diff', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ files: [{ filename: 'app/page.tsx' }] }),
+    })
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.has_migrations).toBe(false)
+    expect(result.migration_files).toEqual([])
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error=config when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.error).toBe('config')
+    expect(result.has_migrations).toBe(false)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns error=api_error on 403 from GitHub', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 403, json: () => Promise.resolve({}) })
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.error).toBe('api_error')
+    expect(result.has_migrations).toBe(false)
+  })
+
+  it('returns error=api_error on 404 from GitHub', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, json: () => Promise.resolve({}) })
+
+    const result = await detectMigrations('abc1234', 'harness/task-test')
+
+    expect(result.error).toBe('api_error')
+    expect(result.has_migrations).toBe(false)
+  })
+
+  it('calls the correct GitHub compare URL', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ files: [] }),
+    })
+
+    await detectMigrations('deadbeef', 'harness/task-test')
+
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/loeppkyc/lepios/compare/main...deadbeef'
+    )
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — schema check integration ───────────────
+
+describe('GET /api/cron/deploy-gate-runner — schema check', () => {
+  function makeFullFetchMock(githubFiles: Array<{ filename: string }> = []) {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
+      }
+      if (url.includes('api.github.com')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ files: githubFiles }),
+        })
+      }
+      // smoke health check
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ ok: true }),
+      })
+    })
+  }
+
+  it('writes schema_check:success when no migration files detected', async () => {
+    const trigger = makeTriggerRow('f3f43eb', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+    makeFullFetchMock([])
+
+    await GET(makeRequest())
+
+    expect(mockInsert).toHaveBeenCalledTimes(4)
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('success')
+    expect(schemaRow.meta.has_migrations).toBe(false)
+    expect(schemaRow.meta.migration_files).toEqual([])
+  })
+
+  it('writes schema_check:warning (not error) when migration files detected', async () => {
+    const trigger = makeTriggerRow('f3f43eb', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+    makeFullFetchMock([{ filename: 'supabase/migrations/0010_add_table.sql' }])
+
+    await GET(makeRequest())
+
+    expect(mockInsert).toHaveBeenCalledTimes(4)
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('warning')
+    expect(schemaRow.meta.has_migrations).toBe(true)
+    expect(schemaRow.meta.migration_files).toEqual(['supabase/migrations/0010_add_table.sql'])
+  })
+
+  it('writes schema_check:error and halts on config error (missing GITHUB_TOKEN)', async () => {
+    delete process.env.GITHUB_TOKEN
+    const trigger = makeTriggerRow('f3f43eb', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+    makeFullFetchMock([])
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+
+    expect(mockInsert).toHaveBeenCalledTimes(4)
+    const schemaRow = mockInsert.mock.calls[3][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.status).toBe('error')
+    expect(schemaRow.meta.error).toBe('config')
+
+    // result string signals halt
+    expect(body.results.some((r: string) => r.includes('schema-error'))).toBe(true)
+  })
+
+  it('advances smoke-passed trigger to schema_check in same tick', async () => {
+    const trigger = makeTriggerRow('smokeonly', 3)
+    const smokePassedRow = { meta: { commit_sha: 'smokeonly' } }
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))    // triggers
+      .mockReturnValueOnce(makeSelectBuilder([]))           // terminal (no schema_check yet)
+      .mockReturnValueOnce(makeSelectBuilder([]))           // processing markers
+      .mockReturnValueOnce(makeSelectBuilder([smokePassedRow])) // smoke-passed rows
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ files: [] }),
+    })
+
+    await GET(makeRequest())
+
+    // processing + schema_check = 2 inserts (no Vercel poll, no smoke re-run)
+    expect(mockInsert).toHaveBeenCalledTimes(2)
+    const schemaRow = mockInsert.mock.calls[1][0]
+    expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
+    expect(schemaRow.meta.commit_sha).toBe('smokeonly')
   })
 })

@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { findPreviewDeployment, runSmokeCheck } from '@/lib/harness/deploy-gate'
+import { findPreviewDeployment, runSmokeCheck, detectMigrations } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +46,53 @@ async function writeGateEvent(params: {
   })
 }
 
+async function runSchemaCheck(
+  commit_sha: string,
+  branch: string,
+  results: string[]
+): Promise<void> {
+  let schema: { has_migrations: boolean; migration_files: string[]; error?: string }
+  try {
+    schema = await detectMigrations(commit_sha, branch)
+  } catch {
+    schema = { has_migrations: false, migration_files: [], error: 'api_error' }
+  }
+
+  const schemaStatus: 'success' | 'warning' | 'error' = schema.error
+    ? 'error'
+    : schema.has_migrations
+      ? 'warning'
+      : 'success'
+
+  try {
+    await writeGateEvent({
+      task_type: 'deploy_gate_schema_check',
+      status: schemaStatus,
+      output_summary: schema.error
+        ? `schema check error: ${schema.error}`
+        : schema.has_migrations
+          ? `migration detected: ${schema.migration_files.join(', ')}`
+          : 'no migrations',
+      meta: {
+        commit_sha,
+        ...(schema.error
+          ? { error: schema.error }
+          : { has_migrations: schema.has_migrations, migration_files: schema.migration_files }),
+      },
+    })
+  } catch {
+    // swallow
+  }
+
+  results.push(
+    schemaStatus === 'error'
+      ? `${commit_sha}:schema-error`
+      : schemaStatus === 'warning'
+        ? `${commit_sha}:schema-migrations`
+        : `${commit_sha}:schema-clean`
+  )
+}
+
 async function runGateRunner(): Promise<object> {
   const db = createServiceClient()
   const now = Date.now()
@@ -69,7 +116,7 @@ async function runGateRunner(): Promise<object> {
   const { data: terminalRows } = await db
     .from('agent_events')
     .select('id, meta')
-    .in('task_type', ['deploy_gate_preview_ready', 'deploy_gate_failed'])
+    .in('task_type', ['deploy_gate_schema_check', 'deploy_gate_failed'])
     .gte('occurred_at', new Date(now - TERMINAL_LOOKBACK_MS).toISOString())
 
   const terminalShas = new Set(
@@ -85,6 +132,18 @@ async function runGateRunner(): Promise<object> {
 
   const processingShas = new Set(
     (processingRows ?? []).map((r) => (r.meta as Meta)?.commit_sha as string).filter(Boolean)
+  )
+
+  // Query smoke-passed rows — triggers where smoke succeeded but schema_check not yet written
+  const { data: smokePassedRows } = await db
+    .from('agent_events')
+    .select('meta')
+    .eq('task_type', 'deploy_gate_smoke_preview')
+    .eq('status', 'success')
+    .gte('occurred_at', new Date(now - TERMINAL_LOOKBACK_MS).toISOString())
+
+  const smokePassedShas = new Set(
+    (smokePassedRows ?? []).map((r) => (r.meta as Meta)?.commit_sha as string).filter(Boolean)
   )
 
   const pending = (triggers as TriggerRow[]).filter(({ meta }) => {
@@ -112,6 +171,12 @@ async function runGateRunner(): Promise<object> {
       })
     } catch {
       results.push(`${commit_sha}:processing-write-failed`)
+      continue
+    }
+
+    // Smoke already passed in a prior tick — skip straight to schema check
+    if (smokePassedShas.has(commit_sha)) {
+      await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
       continue
     }
 
@@ -162,6 +227,7 @@ async function runGateRunner(): Promise<object> {
         results.push(`${commit_sha}:ready-write-failed`)
       }
 
+      let smokePassed = false
       try {
         const smoke = await runSmokeCheck(preview.preview_url!)
         await writeGateEvent({
@@ -180,8 +246,12 @@ async function runGateRunner(): Promise<object> {
             ...(smoke.error ? { error: smoke.error } : {}),
           },
         })
+        smokePassed = smoke.status === 'pass'
       } catch {
         // swallow — preview_ready already written
+      }
+      if (smokePassed) {
+        await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
       }
     } else if (preview.status === 'error') {
       try {

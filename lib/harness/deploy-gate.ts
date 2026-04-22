@@ -135,3 +135,53 @@ export async function runSmokeCheck(preview_url: string): Promise<SmokeResult> {
     return { status: 'fail', status_code: 0, response_ms, error }
   }
 }
+
+const GITHUB_API = 'https://api.github.com'
+const GITHUB_REPO = 'loeppkyc/lepios'
+
+export type MigrationResult = {
+  has_migrations: boolean
+  migration_files: string[]
+  error?: string
+}
+
+export async function detectMigrations(
+  commit_sha: string,
+  _branch: string
+): Promise<MigrationResult> {
+  const token = process.env.GITHUB_TOKEN
+
+  if (!token) {
+    return { has_migrations: false, migration_files: [], error: 'config' }
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/compare/main...${commit_sha}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+  } catch {
+    return { has_migrations: false, migration_files: [], error: 'api_error' }
+  }
+
+  if (!res.ok) {
+    return { has_migrations: false, migration_files: [], error: 'api_error' }
+  }
+
+  let json: { files?: Array<{ filename: string }> }
+  try {
+    json = await res.json()
+  } catch {
+    return { has_migrations: false, migration_files: [], error: 'api_error' }
+  }
+
+  const migration_files = (json.files ?? [])
+    .map((f) => f.filename)
+    .filter((name) => name.startsWith('supabase/migrations/'))
+
+  return { has_migrations: migration_files.length > 0, migration_files }
+}
