@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/cron/deploy-gate-timeout",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
