@@ -44,9 +44,10 @@ but is explicitly out of scope for v0.
 ### In scope (v0)
 
 - `task_queue` Supabase table — schema, migration, RLS
-- `GET /api/cron/task-pickup` route — claim, validate, write handoff, notify
-- `docs/harness-tasks/active-task.md` — structured handoff file coordinator reads cold
-- Telegram notification to Colin when a task is claimed: task description, handoff path,
+- `GET /api/cron/task-pickup` route — claim, validate, notify
+- Handoff mechanism: see §8. The `task_queue` row is the sole handoff — no filesystem
+  artifacts are written (Vercel filesystem is read-only; DB is the only Vercel↔laptop bridge)
+- Telegram notification to Colin when a task is claimed: task description, task UUID,
   one-word invocation instruction
 - Feature flag: `TASK_PICKUP_ENABLED` env var
 - Dry-run mode: `TASK_PICKUP_DRY_RUN` env var — claims and notifies but writes "[DRY RUN]"
