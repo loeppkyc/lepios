@@ -1,0 +1,18 @@
+{
+  "chunk_id": "harness-e2e/v0-test",
+  "acceptance_doc_path": "docs/harness-e2e/chunk-v0-test-acceptance.md",
+  "files_changed": [
+    "lib/harness/version.ts",
+    "tests/harness/version.test.ts"
+  ],
+  "tests": { "passing": 661, "failing": 0, "new": 1 },
+  "migrations_applied": [],
+  "deploy_url": "direct-to-main — deploy gate not triggered for this chunk",
+  "grounding_checkpoint_required": [
+    "Colin runs `npm test` in the lepios repo root and confirms: (1) output includes tests/harness/version.test.ts, (2) that test shows as passing (1 passed), (3) overall suite green with no regressions."
+  ],
+  "unknowns": [],
+  "next_chunk_blockers": [],
+  "tokens_used": 0,
+  "timestamp": "2026-04-22T09:29:00-06:00"
+}

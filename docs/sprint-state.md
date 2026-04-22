@@ -1,3 +1,30 @@
+# ============================================================
+# harness-e2e — throwaway plumbing test (parallel track)
+# First-ever coordinator→builder→deploy gate loop exercise.
+# NOT Sprint 4 work.
+# ============================================================
+
+harness_e2e:
+  sprint_id: "harness-e2e"
+  active_chunk: null
+  status: "closed"
+  kill_criterion: "npm test passes with tests/harness/version.test.ts included and green"
+  kill_criterion_answer: "yes — Colin ran grounding checkpoint 2026-04-22, returned pass"
+  throwaway: true
+  opened_at: "2026-04-22T13:55:00-06:00"
+  closed_at: "2026-04-22T15:30:00-06:00"
+  last_updated_at: "2026-04-22T15:30:00-06:00"
+  chunks_planned: ["v0-test"]
+  chunks_complete: ["v0-test"]
+  chunks_escalated: ["v0-test"]
+  close_doc_path: "docs/harness-e2e/close.md"
+  cache_match_enabled: false
+  cache_match_reason: "first run — no audit log reviewed (last_reviewed_by_colin_at: null)"
+  audit_reminder: "Next sprint will run cache-match-disabled until Colin updates last_reviewed_by_colin_at in docs/handoffs/auto-proceed-log.md"
+
+# ============================================================
+# Sprint 4 — Business Review Trust Layer (paused)
+# ============================================================
 # Sprint 4 intake ratified 2026-04-19, paused 2026-04-19 before
 # any chunks executed. Autonomous harness work ongoing in parallel
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
@@ -10,7 +37,7 @@ last_handoff_path: null
 awaiting: "harness-task-pickup"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-21T12:00:00-06:00"
+last_updated_at: "2026-04-22T13:55:00-06:00"
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
