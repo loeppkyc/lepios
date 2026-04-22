@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: '/scan', label: 'Scan' },
   { href: '/hit-lists', label: 'Lists' },
   { href: '/autonomous', label: 'Autonomous' },
+  { href: '/business-review', label: 'Business Review' },
 ]
 
 export function CockpitNav() {
