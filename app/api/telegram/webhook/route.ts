@@ -5,7 +5,12 @@ import {
   parseCallbackData,
   parseGateCallbackData,
 } from '@/lib/harness/telegram-buttons'
-import { rollbackDeployment } from '@/lib/harness/deploy-gate'
+import {
+  rollbackDeployment,
+  mergeToMain,
+  deleteBranch,
+  sendPromotionNotification,
+} from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -193,6 +198,282 @@ async function editRollbackAck(
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  }
+}
+
+async function editTelegramMessage(
+  chatId: number,
+  messageId: number,
+  text: string,
+  keepButtons = false
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text }
+  if (!keepButtons) payload.reply_markup = { inline_keyboard: [] }
+  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  }
+}
+
+async function handleGatePromote(
+  commitShaPrefix: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+  const lookback = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+
+  const { data: reviewRows } = await db
+    .from('agent_events')
+    .select('id, meta')
+    .eq('task_type', 'deploy_gate_migration_review_sent')
+    .eq('status', 'success')
+    .gte('occurred_at', lookback)
+    .limit(20)
+
+  const reviewRow = (reviewRows ?? []).find((r) => {
+    const sha = (r.meta as Record<string, unknown>)?.commit_sha as string | undefined
+    return sha?.startsWith(commitShaPrefix)
+  })
+
+  if (!reviewRow) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: migration review row not found',
+      meta: { reason: 'not_found', commit_sha_prefix: commitShaPrefix },
+    })
+    await editTelegramMessage(
+      chatId,
+      messageId,
+      `${originalText}\n❌ promote failed: not_found`
+    ).catch(() => {})
+    return
+  }
+
+  const meta = reviewRow.meta as Record<string, unknown>
+  const commitSha = meta.commit_sha as string
+  const taskId = meta.task_id as string
+  const branch = meta.branch as string
+
+  const { data: resolvedRows } = await db
+    .from('agent_events')
+    .select('id')
+    .in('task_type', ['deploy_gate_promoted', 'deploy_gate_migration_aborted'])
+    .filter('meta->>commit_sha', 'eq', commitSha)
+    .limit(1)
+
+  if (resolvedRows && resolvedRows.length > 0) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: migration review already resolved',
+      meta: { reason: 'already_resolved', commit_sha: commitSha },
+    })
+    await editTelegramMessage(chatId, messageId, `${originalText}\n✅ already resolved`).catch(
+      () => {}
+    )
+    return
+  }
+
+  let mergeResult: Awaited<ReturnType<typeof mergeToMain>>
+  try {
+    mergeResult = await mergeToMain(branch, taskId, commitSha)
+  } catch {
+    mergeResult = { ok: false, error: 'exception' }
+  }
+
+  if (!mergeResult.ok) {
+    try {
+      await db.from('agent_events').insert({
+        domain: 'orchestrator',
+        action: 'telegram_webhook',
+        actor: 'telegram_webhook',
+        status: 'error',
+        task_type: 'deploy_gate_migration_promote_failed',
+        output_summary: `migration promote failed for commit ${commitSha.slice(0, 8)}: ${mergeResult.error}`,
+        meta: { commit_sha: commitSha, task_id: taskId, branch, error: mergeResult.error },
+        tags: ['deploy_gate', 'harness', 'chunk_h'],
+      })
+    } catch {
+      // swallow
+    }
+    await editTelegramMessage(
+      chatId,
+      messageId,
+      `${originalText}\n❌ promote failed: ${mergeResult.error ?? 'unknown'} — tap to retry`,
+      true
+    ).catch(() => {})
+    return
+  }
+
+  try {
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'telegram_webhook',
+      actor: 'telegram_webhook',
+      status: 'success',
+      task_type: 'deploy_gate_promoted',
+      output_summary: `promoted migration commit ${commitSha.slice(0, 8)} via manual review`,
+      meta: {
+        commit_sha: commitSha,
+        task_id: taskId,
+        branch,
+        source: 'migration_review',
+        ...(mergeResult.merge_sha ? { merge_sha: mergeResult.merge_sha } : {}),
+      },
+      tags: ['deploy_gate', 'harness', 'chunk_h'],
+    })
+  } catch {
+    // swallow
+  }
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  await editTelegramMessage(
+    chatId,
+    messageId,
+    `${originalText}\n✅ promoted (migration approved) at ${timestamp} MT`
+  ).catch(() => {})
+
+  if (mergeResult.merge_sha) {
+    try {
+      const notif = await sendPromotionNotification({
+        task_id: taskId,
+        branch,
+        merge_sha: mergeResult.merge_sha,
+        commit_sha: commitSha,
+      })
+      if (notif.ok && notif.message_id != null) {
+        await db.from('agent_events').insert({
+          domain: 'orchestrator',
+          action: 'telegram_webhook',
+          actor: 'telegram_webhook',
+          status: 'success',
+          task_type: 'deploy_gate_notification_sent',
+          output_summary: `promotion notification sent for migration task ${taskId}`,
+          meta: {
+            commit_sha: commitSha,
+            branch,
+            task_id: taskId,
+            merge_sha: mergeResult.merge_sha,
+            message_id: notif.message_id,
+            source: 'migration_review',
+          },
+          tags: ['deploy_gate', 'harness', 'chunk_h'],
+        })
+      }
+    } catch {
+      // swallow
+    }
+  }
+}
+
+async function handleGateAbort(
+  commitShaPrefix: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+  const lookback = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+
+  const { data: reviewRows } = await db
+    .from('agent_events')
+    .select('id, meta')
+    .eq('task_type', 'deploy_gate_migration_review_sent')
+    .eq('status', 'success')
+    .gte('occurred_at', lookback)
+    .limit(20)
+
+  const reviewRow = (reviewRows ?? []).find((r) => {
+    const sha = (r.meta as Record<string, unknown>)?.commit_sha as string | undefined
+    return sha?.startsWith(commitShaPrefix)
+  })
+
+  if (!reviewRow) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: migration review row not found for abort',
+      meta: { reason: 'not_found', commit_sha_prefix: commitShaPrefix },
+    })
+    await editTelegramMessage(
+      chatId,
+      messageId,
+      `${originalText}\n🛑 abort failed: not_found`
+    ).catch(() => {})
+    return
+  }
+
+  const meta = reviewRow.meta as Record<string, unknown>
+  const commitSha = meta.commit_sha as string
+  const taskId = meta.task_id as string
+  const branch = meta.branch as string
+
+  const { data: resolvedRows } = await db
+    .from('agent_events')
+    .select('id')
+    .in('task_type', ['deploy_gate_promoted', 'deploy_gate_migration_aborted'])
+    .filter('meta->>commit_sha', 'eq', commitSha)
+    .limit(1)
+
+  if (resolvedRows && resolvedRows.length > 0) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: migration review already resolved for abort',
+      meta: { reason: 'already_resolved', commit_sha: commitSha },
+    })
+    await editTelegramMessage(chatId, messageId, `${originalText}\n🛑 already resolved`).catch(
+      () => {}
+    )
+    return
+  }
+
+  try {
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'telegram_webhook',
+      actor: 'telegram_webhook',
+      status: 'success',
+      task_type: 'deploy_gate_migration_aborted',
+      output_summary: `migration aborted for commit ${commitSha.slice(0, 8)} — user tap`,
+      meta: { commit_sha: commitSha, task_id: taskId, reason: 'user_abort' },
+      tags: ['deploy_gate', 'harness', 'chunk_h'],
+    })
+  } catch {
+    // swallow
+  }
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  await editTelegramMessage(
+    chatId,
+    messageId,
+    `${originalText}\n🛑 aborted at ${timestamp} MT — no promotion`
+  ).catch(() => {})
+
+  try {
+    await deleteBranch(branch)
+  } catch {
+    // swallow
   }
 }
 
@@ -405,6 +686,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   } else if (parsedGate?.action === 'rollback') {
     await handleGateRollback(
       parsedGate.mergeShaPrefix,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    )
+  } else if (parsedGate?.action === 'promote') {
+    await handleGatePromote(
+      parsedGate.commitShaPrefix,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    )
+  } else if (parsedGate?.action === 'abort') {
+    await handleGateAbort(
+      parsedGate.commitShaPrefix,
       callbackQuery.message.chat.id,
       callbackQuery.message.message_id,
       callbackQuery.message.text ?? ''

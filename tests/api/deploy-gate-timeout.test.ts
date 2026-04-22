@@ -31,7 +31,10 @@ function makeRequest(headerOverrides: Record<string, string> = {}): Request {
   })
 }
 
-function makeNotification(ageMins: number, overrides: Partial<{ merge_sha: string; task_id: string; message_id: number }> = {}) {
+function makeNotification(
+  ageMins: number,
+  overrides: Partial<{ merge_sha: string; task_id: string; message_id: number }> = {}
+) {
   return {
     id: 'notif-row-1',
     meta: {
@@ -43,27 +46,42 @@ function makeNotification(ageMins: number, overrides: Partial<{ merge_sha: strin
   }
 }
 
-function makeQueryBuilder(data: unknown[], error: unknown = null) {
+function makeQueryBuilder(
+  data: unknown[],
+  error: unknown = null,
+  insertFn?: ReturnType<typeof vi.fn>
+) {
   const p = Promise.resolve({ data, error })
   const b: Record<string, unknown> = {
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
   }
+  if (insertFn) b.insert = insertFn
   for (const m of ['select', 'eq', 'lt', 'gte', 'in', 'order', 'limit', 'filter']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   return b
 }
 
-function setupMocks(notifRows: unknown[], resolvedRows: unknown[] = []) {
+// Every mockFrom() call returns an object that handles BOTH query chains (.select()...)
+// and inserts (.insert()). The queue feeds data for query calls; insert calls share insertFn
+// but ignore the queued data. This means insert calls "consume" queue slots, but since
+// migration review queries always return [] in these tests (migrationReviewRows=[]), any
+// slot beyond resolvedRows resolves to [] regardless, which is correct.
+function setupMocks(
+  notifRows: unknown[],
+  resolvedRows: unknown[] = [],
+  migrationReviewRows: unknown[] = [],
+  resolvedMigrationRows: unknown[] = []
+) {
   const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
-  let callCount = 0
+  const queue: unknown[][] = [notifRows, resolvedRows, migrationReviewRows, resolvedMigrationRows]
+  let callIdx = 0
   mockFrom.mockImplementation(() => {
-    callCount++
-    if (callCount === 1) return makeQueryBuilder(notifRows)   // notification_sent query
-    if (callCount === 2) return makeQueryBuilder(resolvedRows) // resolved rows query
-    return { insert: insertFn }                                // timeout + edit-fail inserts
+    const data = (callIdx < queue.length ? queue[callIdx] : []) as unknown[]
+    callIdx++
+    return makeQueryBuilder(data, null, insertFn)
   })
   return { insertFn }
 }
@@ -171,7 +189,9 @@ describe('POST /api/cron/deploy-gate-timeout — processing', () => {
     await POST(makeRequest())
 
     expect(insertFn).toHaveBeenCalled()
-    const timeoutRow = insertFn.mock.calls.find((c) => c[0].task_type === 'deploy_gate_override_timeout')?.[0]
+    const timeoutRow = insertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_override_timeout'
+    )?.[0]
     expect(timeoutRow).toBeDefined()
     expect(timeoutRow.status).toBe('success')
     expect(timeoutRow.meta.merge_sha).toBe(MERGE_SHA)
@@ -235,11 +255,14 @@ describe('POST /api/cron/deploy-gate-timeout — processing', () => {
 
 describe('POST /api/cron/deploy-gate-timeout — edit failure', () => {
   it('logs telegram_edit_fail and returns 200 when edit fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => 'rate limited',
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+      })
+    )
     const { insertFn } = setupMocks([makeNotification(15)])
     const res = await POST(makeRequest())
 
@@ -253,15 +276,20 @@ describe('POST /api/cron/deploy-gate-timeout — edit failure', () => {
   })
 
   it('includes merge_sha and message_id in telegram_edit_fail meta', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => 'internal error',
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'internal error',
+      })
+    )
     const { insertFn } = setupMocks([makeNotification(15)])
     await POST(makeRequest())
 
-    const editFailRow = insertFn.mock.calls.find((c) => c[0].task_type === 'telegram_edit_fail')?.[0]
+    const editFailRow = insertFn.mock.calls.find(
+      (c) => c[0].task_type === 'telegram_edit_fail'
+    )?.[0]
     expect(editFailRow).toBeDefined()
     expect(editFailRow.meta.merge_sha).toBe(MERGE_SHA)
     expect(editFailRow.meta.message_id).toBe(MESSAGE_ID)
@@ -275,20 +303,16 @@ describe('POST /api/cron/deploy-gate-timeout — edit failure', () => {
       makeNotification(15, { merge_sha: sha2, message_id: 264 }),
     ]
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => 'rate limited',
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+      })
+    )
 
-    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
-    let callCount = 0
-    mockFrom.mockImplementation(() => {
-      callCount++
-      if (callCount === 1) return makeQueryBuilder(notifs)
-      if (callCount === 2) return makeQueryBuilder([])
-      return { insert: insertFn }
-    })
+    const { insertFn } = setupMocks(notifs)
 
     const res = await POST(makeRequest())
     const body = await res.json()
@@ -316,14 +340,7 @@ describe('POST /api/cron/deploy-gate-timeout — multiple pending', () => {
       occurred_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     }))
 
-    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
-    let callCount = 0
-    mockFrom.mockImplementation(() => {
-      callCount++
-      if (callCount === 1) return makeQueryBuilder(notifications)
-      if (callCount === 2) return makeQueryBuilder([])
-      return { insert: insertFn }
-    })
+    const { insertFn } = setupMocks(notifications)
 
     const res = await POST(makeRequest())
     const body = await res.json()
@@ -350,10 +367,7 @@ describe('POST /api/cron/deploy-gate-timeout — multiple pending', () => {
       makeNotification(15, { merge_sha: sha2, message_id: 102 }),
     ]
     // sha1 already rolled back
-    const { insertFn } = setupMocks(
-      notifications,
-      [{ meta: { merge_sha: sha1 } }]
-    )
+    const { insertFn } = setupMocks(notifications, [{ meta: { merge_sha: sha1 } }])
 
     const res = await POST(makeRequest())
     const body = await res.json()
@@ -361,5 +375,150 @@ describe('POST /api/cron/deploy-gate-timeout — multiple pending', () => {
     const writtenShas = insertFn.mock.calls.map((c) => c[0].meta?.merge_sha).filter(Boolean)
     expect(writtenShas).not.toContain(sha1)
     expect(writtenShas).toContain(sha2)
+  })
+})
+
+// ── Migration review timeout (30 min → ABORT) ─────────────────────────────────
+
+// Call order when 1 deploy-gate notification (no message_id) + migration reviews:
+//   1: notification_sent query
+//   2: resolved rows query
+//   3: override_timeout insert (notification without message_id → no Telegram edit)
+//   4: migration_review_sent query
+//   5: resolved_migration rows query (only when migration reviews non-empty)
+//   6+: migration timeout inserts
+function setupMigrationMocks(
+  notif: unknown,
+  migrationRows: unknown[],
+  resolvedMigrationRows: unknown[] = []
+) {
+  const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+  let callCount = 0
+  mockFrom.mockImplementation(() => {
+    callCount++
+    const data =
+      callCount === 1
+        ? [notif]
+        : callCount === 2
+          ? []
+          : callCount === 4
+            ? migrationRows
+            : callCount === 5
+              ? resolvedMigrationRows
+              : ([] as unknown[])
+    return makeQueryBuilder(data as unknown[], null, insertFn)
+  })
+  return { insertFn }
+}
+
+const COMMIT_SHA = 'f3f43eb1deadbeef0000000000000000000000000'
+const MIGRATION_MESSAGE_ID = 500
+const MIGRATION_BRANCH = 'harness/task-migration-abc'
+
+function makeNotifNoMsg() {
+  return {
+    id: 'notif-no-msg',
+    meta: { merge_sha: MERGE_SHA, task_id: TASK_ID }, // no message_id → no Telegram edit
+    occurred_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+  }
+}
+
+function makeMigrationReview(
+  ageMins: number,
+  overrides: Partial<{ commit_sha: string; message_id: number; branch: string }> = {}
+) {
+  return {
+    id: 'migration-review-1',
+    meta: {
+      commit_sha: overrides.commit_sha ?? COMMIT_SHA,
+      task_id: TASK_ID,
+      branch: overrides.branch ?? MIGRATION_BRANCH,
+      ...(overrides.message_id !== undefined
+        ? { message_id: overrides.message_id }
+        : { message_id: MIGRATION_MESSAGE_ID }),
+    },
+    occurred_at: new Date(Date.now() - ageMins * 60 * 1000).toISOString(),
+  }
+}
+
+describe('POST /api/cron/deploy-gate-timeout — migration review timeout', () => {
+  it('writes deploy_gate_migration_review_timeout row with default_action=abort', async () => {
+    const review = makeMigrationReview(35)
+    const { insertFn } = setupMigrationMocks(makeNotifNoMsg(), [review])
+    await POST(makeRequest())
+
+    const timeoutRow = insertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_migration_review_timeout'
+    )?.[0]
+    expect(timeoutRow).toBeDefined()
+    expect(timeoutRow.status).toBe('success')
+    expect(timeoutRow.meta.commit_sha).toBe(COMMIT_SHA)
+    expect(timeoutRow.meta.default_action).toBe('abort')
+    expect(timeoutRow.meta.review_sent_at).toBe(review.occurred_at)
+    expect(timeoutRow.meta.resolved_at).toBeDefined()
+    expect(timeoutRow.meta.message_id).toBe(MIGRATION_MESSAGE_ID)
+    expect(timeoutRow.tags).toContain('chunk_h')
+  })
+
+  it('edits Telegram message with auto-aborted text', async () => {
+    setupMigrationMocks(makeNotifNoMsg(), [makeMigrationReview(35)])
+    await POST(makeRequest())
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.chat_id).toBe('111222')
+    expect(body.message_id).toBe(MIGRATION_MESSAGE_ID)
+    expect(body.text).toContain('auto-aborted')
+    expect(body.text).toContain('no promotion')
+    expect(body.reply_markup.inline_keyboard).toEqual([])
+  })
+
+  it('skips edit when message_id is absent from migration meta', async () => {
+    const review = makeMigrationReview(35, { message_id: undefined })
+    setupMigrationMocks(makeNotifNoMsg(), [
+      { ...review, meta: { ...review.meta, message_id: undefined } },
+    ])
+    await POST(makeRequest())
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    expect(editCall).toBeUndefined()
+  })
+
+  it('skips migration review whose commit_sha is in resolved set', async () => {
+    const sha1 = 'aaaaaaa1' + '0'.repeat(32)
+    const sha2 = 'bbbbbbb2' + '0'.repeat(32)
+    const reviews = [
+      makeMigrationReview(35, { commit_sha: sha1 }),
+      makeMigrationReview(35, { commit_sha: sha2, message_id: 501 }),
+    ]
+    const { insertFn } = setupMigrationMocks(
+      makeNotifNoMsg(),
+      reviews,
+      [{ meta: { commit_sha: sha1 } }] // sha1 already resolved
+    )
+    await POST(makeRequest())
+
+    const migrationTimeouts = insertFn.mock.calls.filter(
+      (c) => c[0].task_type === 'deploy_gate_migration_review_timeout'
+    )
+    const writtenShas = migrationTimeouts.map((c) => c[0].meta?.commit_sha)
+    expect(writtenShas).not.toContain(sha1)
+    expect(writtenShas).toContain(sha2)
+  })
+
+  it('returns 200 with processed=N (deploy-gate) even when migration review also times out', async () => {
+    setupMigrationMocks(makeNotifNoMsg(), [makeMigrationReview(35)])
+    const res = await POST(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.ok).toBe(true)
+    expect(body.processed).toBe(1) // deploy-gate notification processed
   })
 })

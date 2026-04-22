@@ -27,6 +27,8 @@ import {
   deleteBranch,
   rollbackDeployment,
   sendPromotionNotification,
+  fetchMigrationSQL,
+  sendMigrationGateMessage,
 } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
@@ -296,7 +298,8 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
+        json: () =>
+          Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
       })
     })
 
@@ -532,7 +535,8 @@ describe('runSmokeCheck', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ ok: true, commit: 'abc', timestamp: '2026-01-01T00:00:00.000Z' }),
+      json: () =>
+        Promise.resolve({ ok: true, commit: 'abc', timestamp: '2026-01-01T00:00:00.000Z' }),
     })
 
     const result = await runSmokeCheck('https://preview-abc.vercel.app')
@@ -644,7 +648,8 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
+        json: () =>
+          Promise.resolve({ ok: true, commit: null, timestamp: new Date().toISOString() }),
       })
     })
 
@@ -890,12 +895,18 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
 
     await GET(makeRequest())
 
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // 5th insert: runMigrationGate fires after schema-migrations; fetchMigrationSQL fails
+    // because the GitHub mock returns { files: [...] } (compare format) for the contents API
+    // URL, so content is undefined → error='api_error' → deploy_gate_failed written
+    expect(mockInsert).toHaveBeenCalledTimes(5)
     const schemaRow = mockInsert.mock.calls[3][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.status).toBe('warning')
     expect(schemaRow.meta.has_migrations).toBe(true)
     expect(schemaRow.meta.migration_files).toEqual(['supabase/migrations/0010_add_table.sql'])
+    const gateRow = mockInsert.mock.calls[4][0]
+    expect(gateRow.task_type).toBe('deploy_gate_failed')
+    expect(gateRow.meta.reason).toBe('migration_fetch')
   })
 
   it('writes schema_check:error and halts on config error (missing GITHUB_TOKEN)', async () => {
@@ -927,9 +938,9 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
     const smokePassedRow = { meta: { commit_sha: 'smokeonly' } }
 
     mockFrom
-      .mockReturnValueOnce(makeSelectBuilder([trigger]))    // triggers
-      .mockReturnValueOnce(makeSelectBuilder([]))           // terminal (no schema_check yet)
-      .mockReturnValueOnce(makeSelectBuilder([]))           // processing markers
+      .mockReturnValueOnce(makeSelectBuilder([trigger])) // triggers
+      .mockReturnValueOnce(makeSelectBuilder([])) // terminal (no schema_check yet)
+      .mockReturnValueOnce(makeSelectBuilder([])) // processing markers
       .mockReturnValueOnce(makeSelectBuilder([smokePassedRow])) // smoke-passed rows
       .mockReturnValue(makeInsertBuilder())
 
@@ -1055,9 +1066,7 @@ describe('deleteBranch', () => {
     await deleteBranch('harness/task-abc')
 
     const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(
-      'https://api.github.com/repos/loeppkyc/lepios/git/refs/heads/harness/task-abc'
-    )
+    expect(url).toBe('https://api.github.com/repos/loeppkyc/lepios/git/refs/heads/harness/task-abc')
     expect(opts.method).toBe('DELETE')
   })
 })
@@ -1178,7 +1187,7 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
     expect(body.results.some((r: string) => r.includes(':merge-failed'))).toBe(true)
   })
 
-  it('does not call merge when schema-migrations detected (waits for Chunk H)', async () => {
+  it('does not call merge when schema-migrations detected (sends migration gate instead)', async () => {
     const trigger = makeTriggerRow('abc1234', 3)
     mockFrom
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
@@ -1204,15 +1213,18 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
 
     await GET(makeRequest())
 
-    // No merge call — schema has migrations
+    // No merge call — schema has migrations, migration gate fires instead
     const mergeCalls = mockFetch.mock.calls.filter(([url]: [string]) => url.includes('/merges'))
     expect(mergeCalls).toHaveLength(0)
 
-    // 4 inserts only (no promoted row)
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // 5 inserts: smoke×2, promoted×0, schema_check, deploy_gate_failed (migration_fetch)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
     const schemaRow = mockInsert.mock.calls[3][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.status).toBe('warning')
+    const gateRow = mockInsert.mock.calls[4][0]
+    expect(gateRow.task_type).toBe('deploy_gate_failed')
+    expect(gateRow.meta.reason).toBe('migration_fetch')
   })
 })
 
@@ -1243,7 +1255,10 @@ describe('rollbackDeployment', () => {
         })
       }
       // GET main ref
-      if (url.includes('/git/refs/heads/main') && (!opts || !opts.method || opts.method === 'GET')) {
+      if (
+        url.includes('/git/refs/heads/main') &&
+        (!opts || !opts.method || opts.method === 'GET')
+      ) {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -1284,11 +1299,20 @@ describe('rollbackDeployment', () => {
   it('returns ok=false with error=main_moved_on when current HEAD differs from merge_sha', async () => {
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes(`/git/commits/${MERGE_SHA}`))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ parents: [{ sha: PARENT_SHA }] }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ parents: [{ sha: PARENT_SHA }] }),
+        })
       if (url.includes(`/git/commits/${PARENT_SHA}`))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tree: { sha: TREE_SHA } }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ tree: { sha: TREE_SHA } }),
+        })
       if (url.includes('/git/refs/heads/main') && (!opts?.method || opts.method === 'GET'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ object: { sha: 'differentsha' } }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ object: { sha: 'differentsha' } }),
+        })
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
     })
 
@@ -1451,15 +1475,29 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes('api.vercel.com'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
       if (url.includes('/merges'))
-        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergenotif1' }) })
-      if (url.includes('api.github.com/repos') && url.includes('git/refs') && opts?.method === 'DELETE')
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ sha: 'mergenotif1' }),
+        })
+      if (
+        url.includes('api.github.com/repos') &&
+        url.includes('git/refs') &&
+        opts?.method === 'DELETE'
+      )
         return Promise.resolve({ ok: true, status: 204 })
       if (url.includes('api.github.com'))
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
       if (url.includes('telegram.org') && url.includes('sendMessage'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, result: { message_id: 8888 } }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, result: { message_id: 8888 } }),
+        })
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
     })
 
@@ -1485,15 +1523,29 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes('api.vercel.com'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
       if (url.includes('/merges'))
-        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergetaskid1' }) })
-      if (url.includes('api.github.com/repos') && url.includes('git/refs') && opts?.method === 'DELETE')
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ sha: 'mergetaskid1' }),
+        })
+      if (
+        url.includes('api.github.com/repos') &&
+        url.includes('git/refs') &&
+        opts?.method === 'DELETE'
+      )
         return Promise.resolve({ ok: true, status: 204 })
       if (url.includes('api.github.com'))
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
       if (url.includes('telegram.org'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, result: { message_id: 1 } }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, result: { message_id: 1 } }),
+        })
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
     })
 
@@ -1517,9 +1569,16 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('api.vercel.com'))
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }),
+        })
       if (url.includes('/merges'))
-        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergenonotif' }) })
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ sha: 'mergenonotif' }),
+        })
       if (url.includes('api.github.com'))
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
@@ -1529,7 +1588,239 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     // 5 inserts only — no notification_sent (Telegram not configured)
     expect(mockInsert).toHaveBeenCalledTimes(5)
-    const taskTypes = mockInsert.mock.calls.map((c: unknown[][]) => (c[0] as { task_type: string }).task_type)
+    const taskTypes = mockInsert.mock.calls.map(
+      (c: unknown[][]) => (c[0] as { task_type: string }).task_type
+    )
     expect(taskTypes).not.toContain('deploy_gate_notification_sent')
+  })
+})
+
+// ── fetchMigrationSQL ─────────────────────────────────────────────────────────
+
+describe('fetchMigrationSQL', () => {
+  const COMMIT_SHA = 'abc1234deadbeef'
+
+  afterEach(() => {
+    delete process.env.GITHUB_TOKEN
+  })
+
+  it('returns error=config when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+    const result = await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0001.sql'])
+    expect(result.error).toBe('config')
+    expect(result.files).toHaveLength(0)
+  })
+
+  it('returns error=api_error when GitHub returns non-ok status', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404 })
+    const result = await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0001.sql'])
+    expect(result.error).toBe('api_error')
+  })
+
+  it('returns error=api_error when response JSON has no content field', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ name: 'file.sql' }),
+    })
+    const result = await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0001.sql'])
+    expect(result.error).toBe('api_error')
+  })
+
+  it('returns error=api_error when encoding is not base64', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ content: 'SELECT 1;', encoding: 'utf-8' }),
+    })
+    const result = await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0001.sql'])
+    expect(result.error).toBe('api_error')
+  })
+
+  it('decodes base64 content and returns file on success', async () => {
+    const sql = 'CREATE TABLE foo (id serial);'
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          content: Buffer.from(sql).toString('base64'),
+          encoding: 'base64',
+        }),
+    })
+    const result = await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0001.sql'])
+    expect(result.error).toBeUndefined()
+    expect(result.files).toHaveLength(1)
+    expect(result.files[0].content).toBe(sql)
+    expect(result.files[0].filename).toBe('supabase/migrations/0001.sql')
+    expect(result.files[0].size_bytes).toBe(sql.length)
+    expect(result.total_size_bytes).toBe(sql.length)
+  })
+
+  it('fetches the correct contents URL with ref param', async () => {
+    const sql = 'SELECT 1;'
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ content: Buffer.from(sql).toString('base64'), encoding: 'base64' }),
+    })
+    await fetchMigrationSQL(COMMIT_SHA, ['supabase/migrations/0010.sql'])
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      `contents/supabase/migrations/0010.sql?ref=${COMMIT_SHA}`
+    )
+  })
+
+  it('accumulates total_size_bytes across multiple files', async () => {
+    const sql1 = 'CREATE TABLE a (id serial);'
+    const sql2 = 'CREATE TABLE b (id serial);'
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({ content: Buffer.from(sql1).toString('base64'), encoding: 'base64' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({ content: Buffer.from(sql2).toString('base64'), encoding: 'base64' }),
+      })
+    const result = await fetchMigrationSQL(COMMIT_SHA, [
+      'supabase/migrations/0001.sql',
+      'supabase/migrations/0002.sql',
+    ])
+    expect(result.files).toHaveLength(2)
+    expect(result.total_size_bytes).toBe(sql1.length + sql2.length)
+  })
+})
+
+// ── sendMigrationGateMessage ──────────────────────────────────────────────────
+
+describe('sendMigrationGateMessage', () => {
+  const TASK_ID = '885ff1e3-baed-4512-8e7a-8335995ea057'
+  const BRANCH = 'harness/task-migration-test'
+  const COMMIT_SHA = 'f3f43eb1234567890abcdef1234567890abcdef'
+  const SQL_FILE = {
+    filename: 'supabase/migrations/0010.sql',
+    content: 'CREATE TABLE t1;',
+    size_bytes: 16,
+  }
+
+  beforeEach(() => {
+    process.env.TELEGRAM_BOT_TOKEN = 'test-bot-token'
+    process.env.TELEGRAM_CHAT_ID = '111222'
+  })
+
+  afterEach(() => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    delete process.env.TELEGRAM_CHAT_ID
+  })
+
+  it('returns error=config when TELEGRAM_BOT_TOKEN is missing', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    const result = await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+  })
+
+  it('returns error=config when TELEGRAM_CHAT_ID is missing', async () => {
+    delete process.env.TELEGRAM_CHAT_ID
+    const result = await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+  })
+
+  it('returns ok=true with message_id on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 9001 } }),
+    })
+    const result = await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    expect(result.ok).toBe(true)
+    expect(result.message_id).toBe(9001)
+    expect(result.truncated).toBeUndefined()
+  })
+
+  it('sends promote and abort inline keyboard buttons with correct callback_data', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 9002 } }),
+    })
+    await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string)
+    const shaPrefix = COMMIT_SHA.slice(0, 8)
+    expect(body.reply_markup.inline_keyboard[0]).toEqual([
+      { text: '👍 Promote', callback_data: `dg:promote:${shaPrefix}` },
+      { text: '👎 Abort', callback_data: `dg:abort:${shaPrefix}` },
+    ])
+  })
+
+  it('calls the Telegram sendMessage endpoint', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 1 } }),
+    })
+    await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    expect(mockFetch.mock.calls[0][0]).toContain('/sendMessage')
+  })
+
+  it('returns ok=false when Telegram API returns non-ok response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => 'rate limited',
+    })
+    const result = await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [SQL_FILE],
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('429')
+  })
+
+  it('sets truncated=true and stays within 3800 chars when message is too long', async () => {
+    const longContent = 'x'.repeat(4000)
+    const bigFile = {
+      filename: 'supabase/migrations/long.sql',
+      content: longContent,
+      size_bytes: 4000,
+    }
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 9003 } }),
+    })
+    const result = await sendMigrationGateMessage({
+      task_id: TASK_ID,
+      branch: BRANCH,
+      commit_sha: COMMIT_SHA,
+      migration_files_with_sql: [bigFile],
+    })
+    expect(result.ok).toBe(true)
+    expect(result.truncated).toBe(true)
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string)
+    expect(body.text.length).toBeLessThanOrEqual(3800)
   })
 })

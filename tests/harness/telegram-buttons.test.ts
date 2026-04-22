@@ -19,6 +19,8 @@ import {
   buildCallbackData,
   parseCallbackData,
   buildGateCallbackData,
+  buildGatePromoteCallbackData,
+  buildGateAbortCallbackData,
   parseGateCallbackData,
   isAllowedUser,
   sendMessageWithButtons,
@@ -137,7 +139,7 @@ describe('parseGateCallbackData', () => {
   })
 
   it('returns null when sha prefix is not exactly 8 hex chars', () => {
-    expect(parseGateCallbackData('dg:rb:abcdef1')).toBeNull()   // 7 chars
+    expect(parseGateCallbackData('dg:rb:abcdef1')).toBeNull() // 7 chars
     expect(parseGateCallbackData('dg:rb:abcdef123')).toBeNull() // 9 chars
   })
 
@@ -256,12 +258,98 @@ describe('sendMessageWithButtons', () => {
     process.env.TELEGRAM_THUMBS_ENABLED = '1'
     process.env.TELEGRAM_BOT_TOKEN = 'test-token'
     process.env.TELEGRAM_CHAT_ID = '111'
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => 'rate limited',
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+      })
+    )
 
-    await expect(sendMessageWithButtons(VALID_UUID, 'text')).rejects.toThrow('Telegram API error 429')
+    await expect(sendMessageWithButtons(VALID_UUID, 'text')).rejects.toThrow(
+      'Telegram API error 429'
+    )
+  })
+})
+
+// ── buildGatePromoteCallbackData ──────────────────────────────────────────────
+
+describe('buildGatePromoteCallbackData', () => {
+  it('formats promote as dg:promote:<first-8-chars>', () => {
+    expect(buildGatePromoteCallbackData('abcdef1234567890')).toBe('dg:promote:abcdef12')
+  })
+
+  it('truncates long commit SHA to 8 characters', () => {
+    const sha = 'ffffffff00000000111111112222222233333333'
+    expect(buildGatePromoteCallbackData(sha)).toBe('dg:promote:ffffffff')
+  })
+
+  it('resulting string is within Telegram 64-byte limit', () => {
+    const result = buildGatePromoteCallbackData('abcdef1234567890')
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(64)
+  })
+})
+
+// ── buildGateAbortCallbackData ────────────────────────────────────────────────
+
+describe('buildGateAbortCallbackData', () => {
+  it('formats abort as dg:abort:<first-8-chars>', () => {
+    expect(buildGateAbortCallbackData('abcdef1234567890')).toBe('dg:abort:abcdef12')
+  })
+
+  it('truncates long commit SHA to 8 characters', () => {
+    const sha = 'ffffffff00000000111111112222222233333333'
+    expect(buildGateAbortCallbackData(sha)).toBe('dg:abort:ffffffff')
+  })
+
+  it('resulting string is within Telegram 64-byte limit', () => {
+    const result = buildGateAbortCallbackData('abcdef1234567890')
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(64)
+  })
+})
+
+// ── parseGateCallbackData — promote + abort ───────────────────────────────────
+
+describe('parseGateCallbackData — promote and abort', () => {
+  it('parses valid promote data', () => {
+    expect(parseGateCallbackData('dg:promote:abcdef12')).toEqual({
+      action: 'promote',
+      commitShaPrefix: 'abcdef12',
+    })
+  })
+
+  it('parses valid abort data', () => {
+    expect(parseGateCallbackData('dg:abort:abcdef12')).toEqual({
+      action: 'abort',
+      commitShaPrefix: 'abcdef12',
+    })
+  })
+
+  it('returns null for sha prefix shorter than 8 hex chars in promote', () => {
+    expect(parseGateCallbackData('dg:promote:abcdef1')).toBeNull()
+  })
+
+  it('returns null for sha prefix longer than 8 hex chars in abort', () => {
+    expect(parseGateCallbackData('dg:abort:abcdef123')).toBeNull()
+  })
+
+  it('returns null for uppercase hex in promote', () => {
+    expect(parseGateCallbackData('dg:promote:ABCDEF12')).toBeNull()
+  })
+
+  it('round-trips buildGatePromoteCallbackData through parseGateCallbackData', () => {
+    const sha = 'abcdef1234567890'
+    const encoded = buildGatePromoteCallbackData(sha)
+    expect(parseGateCallbackData(encoded)).toEqual({
+      action: 'promote',
+      commitShaPrefix: 'abcdef12',
+    })
+  })
+
+  it('round-trips buildGateAbortCallbackData through parseGateCallbackData', () => {
+    const sha = 'abcdef1234567890'
+    const encoded = buildGateAbortCallbackData(sha)
+    expect(parseGateCallbackData(encoded)).toEqual({ action: 'abort', commitShaPrefix: 'abcdef12' })
   })
 })

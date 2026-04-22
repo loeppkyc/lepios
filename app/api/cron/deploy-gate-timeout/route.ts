@@ -1,12 +1,14 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { deleteBranch } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_PER_TICK = 10
-const OVERRIDE_WINDOW_MS = 10 * 60 * 1000 // 10-minute tap window
-const LOOKBACK_MS = 2 * 60 * 60 * 1000   // look back 2h for notification rows
+const OVERRIDE_WINDOW_MS = 10 * 60 * 1000 // 10-minute rollback tap window
+const MIGRATION_OVERRIDE_WINDOW_MS = 30 * 60 * 1000 // 30-minute migration review window
+const LOOKBACK_MS = 2 * 60 * 60 * 1000 // look back 2h for notification rows
 
 type Meta = Record<string, unknown>
 type NotifRow = { id: string; meta: Meta; occurred_at: string }
@@ -29,6 +31,34 @@ async function editTimeoutMessage(messageId: number): Promise<void> {
       chat_id: chatId,
       message_id: messageId,
       text: '✅ kept in production (override window closed)',
+      reply_markup: { inline_keyboard: [] },
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  }
+}
+
+async function editMigrationTimeoutMessage(messageId: number): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!token || !chatId) return
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text: `⏰ auto-aborted at ${timestamp} MT (30min no response) — no promotion`,
       reply_markup: { inline_keyboard: [] },
     }),
   })
@@ -132,6 +162,107 @@ async function runTimeoutCron(): Promise<object> {
           })
         } catch {
           // swallow — timeout row already written
+        }
+      }
+    }
+  }
+
+  // ── Migration review timeout (30 min → ABORT) ───────────────────────────────
+  const migrationCutoff = new Date(now - MIGRATION_OVERRIDE_WINDOW_MS).toISOString()
+
+  const { data: migrationReviews, error: migrationErr } = await db
+    .from('agent_events')
+    .select('id, meta, occurred_at')
+    .eq('task_type', 'deploy_gate_migration_review_sent')
+    .eq('status', 'success')
+    .lt('occurred_at', migrationCutoff)
+    .gte('occurred_at', lookbackStart)
+    .order('occurred_at', { ascending: true })
+    .limit(MAX_PER_TICK)
+
+  if (migrationErr) throw migrationErr
+
+  if (migrationReviews && migrationReviews.length > 0) {
+    const { data: resolvedMigrationRows } = await db
+      .from('agent_events')
+      .select('meta')
+      .in('task_type', [
+        'deploy_gate_promoted',
+        'deploy_gate_migration_aborted',
+        'deploy_gate_migration_review_timeout',
+      ])
+      .gte('occurred_at', lookbackStart)
+
+    const resolvedMigrationShas = new Set(
+      (resolvedMigrationRows ?? [])
+        .map((r) => (r.meta as Meta)?.commit_sha as string)
+        .filter(Boolean)
+    )
+
+    const pendingMigrations = (migrationReviews as NotifRow[]).filter((n) => {
+      const sha = n.meta?.commit_sha as string
+      return sha && !resolvedMigrationShas.has(sha)
+    })
+
+    for (const review of pendingMigrations) {
+      const commitSha = review.meta.commit_sha as string
+      const taskId = review.meta.task_id as string
+      const branch = review.meta.branch as string | undefined
+      const messageId = review.meta.message_id as number | undefined
+      const shaPrefix = commitSha.slice(0, 8)
+
+      try {
+        await db.from('agent_events').insert({
+          id: crypto.randomUUID(),
+          domain: 'orchestrator',
+          action: 'deploy_gate_runner',
+          actor: 'deploy_gate',
+          status: 'success',
+          task_type: 'deploy_gate_migration_review_timeout',
+          output_summary: `migration gate expired — defaulting to abort for commit ${shaPrefix}`,
+          meta: {
+            commit_sha: commitSha,
+            task_id: taskId,
+            default_action: 'abort',
+            review_sent_at: review.occurred_at,
+            resolved_at: new Date().toISOString(),
+            ...(messageId != null ? { message_id: messageId } : {}),
+          },
+          tags: ['deploy_gate', 'harness', 'chunk_h'],
+        })
+      } catch {
+        results.push(`${shaPrefix}:migration-timeout-write-failed`)
+        continue
+      }
+
+      results.push(`${shaPrefix}:migration-timed-out-abort`)
+
+      if (messageId != null) {
+        try {
+          await editMigrationTimeoutMessage(messageId)
+        } catch (err) {
+          try {
+            await db.from('agent_events').insert({
+              domain: 'orchestrator',
+              action: 'deploy_gate_runner',
+              actor: 'deploy_gate',
+              status: 'error',
+              task_type: 'telegram_edit_fail',
+              output_summary: `Failed to edit migration timeout message ${messageId} for commit ${shaPrefix}`,
+              meta: { message_id: messageId, commit_sha: commitSha, error: String(err) },
+              tags: ['deploy_gate', 'harness', 'chunk_h'],
+            })
+          } catch {
+            // swallow
+          }
+        }
+      }
+
+      if (branch) {
+        try {
+          await deleteBranch(branch)
+        } catch {
+          // swallow
         }
       }
     }

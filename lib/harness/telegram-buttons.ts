@@ -20,14 +20,35 @@ export function buildGateCallbackData(action: 'rollback', mergeSha: string): str
   return `dg:rb:${mergeSha.slice(0, 8)}`
 }
 
+export function buildGatePromoteCallbackData(commitSha: string): string {
+  return `dg:promote:${commitSha.slice(0, 8)}`
+}
+
+export function buildGateAbortCallbackData(commitSha: string): string {
+  return `dg:abort:${commitSha.slice(0, 8)}`
+}
+
 export function parseGateCallbackData(
   data: string
-): { action: 'rollback'; mergeShaPrefix: string } | null {
+):
+  | { action: 'rollback'; mergeShaPrefix: string }
+  | { action: 'promote'; commitShaPrefix: string }
+  | { action: 'abort'; commitShaPrefix: string }
+  | null {
   const parts = data.split(':')
   if (parts.length !== 3 || parts[0] !== 'dg') return null
-  if (parts[1] !== 'rb') return null
-  if (!/^[0-9a-f]{8}$/.test(parts[2])) return null
-  return { action: 'rollback', mergeShaPrefix: parts[2] }
+
+  if (parts[1] === 'rb') {
+    if (!/^[0-9a-f]{8}$/.test(parts[2])) return null
+    return { action: 'rollback', mergeShaPrefix: parts[2] }
+  }
+
+  if (parts[1] === 'promote' || parts[1] === 'abort') {
+    if (!/^[0-9a-f]{8}$/.test(parts[2])) return null
+    return { action: parts[1] as 'promote' | 'abort', commitShaPrefix: parts[2] }
+  }
+
+  return null
 }
 
 export function isAllowedUser(telegramUserId: number): boolean {
@@ -38,10 +59,7 @@ export function isAllowedUser(telegramUserId: number): boolean {
 
 // Sends text with 👍/👎 inline keyboard when TELEGRAM_THUMBS_ENABLED is set.
 // Falls back to plain postMessage when the flag is absent or bot config is missing.
-export async function sendMessageWithButtons(
-  agentEventId: string,
-  text: string
-): Promise<void> {
+export async function sendMessageWithButtons(agentEventId: string, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
 
@@ -56,10 +74,12 @@ export async function sendMessageWithButtons(
       chat_id: chatId,
       text,
       reply_markup: {
-        inline_keyboard: [[
-          { text: '👍', callback_data: buildCallbackData('up', agentEventId) },
-          { text: '👎', callback_data: buildCallbackData('dn', agentEventId) },
-        ]],
+        inline_keyboard: [
+          [
+            { text: '👍', callback_data: buildCallbackData('up', agentEventId) },
+            { text: '👎', callback_data: buildCallbackData('dn', agentEventId) },
+          ],
+        ],
       },
     }),
   })

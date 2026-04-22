@@ -20,14 +20,21 @@ vi.mock('@/lib/harness/telegram-buttons', () => ({
   parseGateCallbackData: mockParseGateCallbackData,
 }))
 
-// ── Mock deploy-gate rollbackDeployment ───────────────────────────────────────
+// ── Mock deploy-gate functions ────────────────────────────────────────────────
 
-const { mockRollbackDeployment } = vi.hoisted(() => ({
-  mockRollbackDeployment: vi.fn(),
-}))
+const { mockRollbackDeployment, mockMergeToMain, mockDeleteBranch, mockSendPromotionNotification } =
+  vi.hoisted(() => ({
+    mockRollbackDeployment: vi.fn(),
+    mockMergeToMain: vi.fn(),
+    mockDeleteBranch: vi.fn(),
+    mockSendPromotionNotification: vi.fn(),
+  }))
 
 vi.mock('@/lib/harness/deploy-gate', () => ({
   rollbackDeployment: mockRollbackDeployment,
+  mergeToMain: mockMergeToMain,
+  deleteBranch: mockDeleteBranch,
+  sendPromotionNotification: mockSendPromotionNotification,
 }))
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
@@ -109,6 +116,9 @@ beforeEach(() => {
   mockParseCallbackData.mockReturnValue({ action: 'up', agentEventId: VALID_UUID })
   mockParseGateCallbackData.mockReturnValue(null)
   mockRollbackDeployment.mockResolvedValue({ ok: true, revert_sha: 'revertabc' })
+  mockMergeToMain.mockResolvedValue({ ok: true, merge_sha: 'mergeshaabcdef' })
+  mockDeleteBranch.mockResolvedValue(true)
+  mockSendPromotionNotification.mockResolvedValue({ ok: true, message_id: 9999 })
   // Default builder handles all table operations without crashing
   mockFrom.mockReturnValue(makeDefaultBuilder())
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
@@ -845,6 +855,303 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
 
     const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
     const res = await POST(req)
+    expect(res.status).toBe(200)
+  })
+})
+
+// ── dg:promote: / dg:abort: handler helpers ───────────────────────────────────
+
+// DB call sequence for promote/abort:
+//   1: logEvent(entry) insert
+//   2: logWebhookEvent insert
+//   3: migration_review_sent query (returns reviewRows)
+//   4: resolved rows query (returns resolvedRows) — only if review row found
+//   5+: handler-specific inserts
+function makeMigrationGateBuilder(reviewRows: unknown[], resolvedRows: unknown[] = []) {
+  const logInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+  const gateInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+  let callCount = 0
+  const qb = (data: unknown[]) => {
+    const p = Promise.resolve({ data, error: null })
+    const b: Record<string, unknown> = {
+      then: p.then.bind(p),
+      catch: p.catch.bind(p),
+      finally: p.finally.bind(p),
+    }
+    for (const m of ['select', 'eq', 'in', 'gte', 'limit', 'filter']) {
+      b[m] = vi.fn().mockReturnValue(b)
+    }
+    return b
+  }
+  return {
+    mockFrom: (_table: string) => {
+      callCount++
+      if (callCount === 1) return { insert: logInsertFn } // entry insert
+      if (callCount === 2) return { insert: logInsertFn } // callback insert
+      if (callCount === 3) return qb(reviewRows) // migration_review_sent query
+      if (callCount === 4) return qb(resolvedRows) // resolved double-tap guard
+      return { insert: gateInsertFn } // handler inserts
+    },
+    logInsertFn,
+    gateInsertFn,
+  }
+}
+
+// ── dg:promote: promote handler ───────────────────────────────────────────────
+
+describe('POST /api/telegram/webhook — dg:promote: promote handler', () => {
+  const COMMIT_SHA = 'f3f43eb1deadbeef0000000000000000000000000'
+  const SHA_PREFIX = 'f3f43eb1'
+  const BRANCH = 'harness/task-migration-abc'
+  const TASK_ID = '885ff1e3-baed-4512-8e7a-8335995ea057'
+
+  function makeReviewRow() {
+    return {
+      id: 'evt-review-1',
+      meta: { commit_sha: COMMIT_SHA, task_id: TASK_ID, branch: BRANCH },
+    }
+  }
+
+  beforeEach(() => {
+    mockParseCallbackData.mockReturnValue(null)
+    mockParseGateCallbackData.mockReturnValue({ action: 'promote', commitShaPrefix: SHA_PREFIX })
+  })
+
+  it('calls mergeToMain with correct branch and commit_sha', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    expect(mockMergeToMain).toHaveBeenCalledOnce()
+    const [branch, _taskId, commitSha] = mockMergeToMain.mock.calls[0]
+    expect(branch).toBe(BRANCH)
+    expect(commitSha).toBe(COMMIT_SHA)
+  })
+
+  it('writes deploy_gate_promoted row with source=migration_review on success', async () => {
+    const { mockFrom: pmf, gateInsertFn } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockMergeToMain.mockResolvedValue({ ok: true, merge_sha: 'newmergesha' })
+    mockSendPromotionNotification.mockResolvedValue({ ok: false })
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    const promotedRow = gateInsertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_promoted'
+    )
+    expect(promotedRow).toBeDefined()
+    expect(promotedRow![0].status).toBe('success')
+    expect(promotedRow![0].meta.source).toBe('migration_review')
+    expect(promotedRow![0].meta.commit_sha).toBe(COMMIT_SHA)
+    expect(promotedRow![0].meta.merge_sha).toBe('newmergesha')
+  })
+
+  it('edits message with promoted timestamp on success', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockMergeToMain.mockResolvedValue({ ok: true, merge_sha: 'newmergesha' })
+    mockSendPromotionNotification.mockResolvedValue({ ok: false })
+
+    await POST(
+      makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`, VALID_USER_ID, 'Original text'))
+    )
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('promoted (migration approved) at')
+    expect(body.reply_markup.inline_keyboard).toEqual([])
+  })
+
+  it('writes deploy_gate_migration_promote_failed and keeps buttons when merge fails', async () => {
+    const { mockFrom: pmf, gateInsertFn } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockMergeToMain.mockResolvedValue({ ok: false, error: 'conflict' })
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    const failRow = gateInsertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_migration_promote_failed'
+    )
+    expect(failRow).toBeDefined()
+    expect(failRow![0].status).toBe('error')
+    expect(failRow![0].meta.error).toBe('conflict')
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('promote failed')
+    expect(body.text).toContain('tap to retry')
+    expect(body.reply_markup).toBeUndefined()
+  })
+
+  it('does not call merge and edits with not_found when review row missing', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([])
+    mockFrom.mockImplementation(pmf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    expect(mockMergeToMain).not.toHaveBeenCalled()
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('promote failed: not_found')
+  })
+
+  it('double-tap guard: does not merge if already resolved', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()], [{ id: 'resolved-1' }])
+    mockFrom.mockImplementation(pmf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    expect(mockMergeToMain).not.toHaveBeenCalled()
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('already resolved')
+  })
+
+  it('writes notification_sent row when sendPromotionNotification returns message_id', async () => {
+    const { mockFrom: pmf, gateInsertFn } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockMergeToMain.mockResolvedValue({ ok: true, merge_sha: 'newmergesha' })
+    mockSendPromotionNotification.mockResolvedValue({ ok: true, message_id: 7777 })
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    const notifRow = gateInsertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_notification_sent'
+    )
+    expect(notifRow).toBeDefined()
+    expect(notifRow![0].meta.message_id).toBe(7777)
+    expect(notifRow![0].meta.source).toBe('migration_review')
+  })
+
+  it('returns 200 even when mergeToMain throws', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockMergeToMain.mockRejectedValue(new Error('unexpected'))
+
+    const res = await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+    expect(res.status).toBe(200)
+  })
+})
+
+// ── dg:abort: abort handler ───────────────────────────────────────────────────
+
+describe('POST /api/telegram/webhook — dg:abort: abort handler', () => {
+  const COMMIT_SHA = 'f3f43eb1deadbeef0000000000000000000000000'
+  const SHA_PREFIX = 'f3f43eb1'
+  const BRANCH = 'harness/task-migration-abc'
+  const TASK_ID = '885ff1e3-baed-4512-8e7a-8335995ea057'
+
+  function makeReviewRow() {
+    return {
+      id: 'evt-review-1',
+      meta: { commit_sha: COMMIT_SHA, task_id: TASK_ID, branch: BRANCH },
+    }
+  }
+
+  beforeEach(() => {
+    mockParseCallbackData.mockReturnValue(null)
+    mockParseGateCallbackData.mockReturnValue({ action: 'abort', commitShaPrefix: SHA_PREFIX })
+  })
+
+  it('writes deploy_gate_migration_aborted row with reason=user_abort', async () => {
+    const { mockFrom: amf, gateInsertFn } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(amf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
+
+    const abortRow = gateInsertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_migration_aborted'
+    )
+    expect(abortRow).toBeDefined()
+    expect(abortRow![0].status).toBe('success')
+    expect(abortRow![0].meta.commit_sha).toBe(COMMIT_SHA)
+    expect(abortRow![0].meta.reason).toBe('user_abort')
+  })
+
+  it('edits message with aborted timestamp on success', async () => {
+    const { mockFrom: amf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(amf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`, VALID_USER_ID, 'Original')))
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('aborted at')
+    expect(body.text).toContain('no promotion')
+    expect(body.reply_markup.inline_keyboard).toEqual([])
+  })
+
+  it('calls deleteBranch with the correct branch', async () => {
+    const { mockFrom: amf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(amf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
+
+    expect(mockDeleteBranch).toHaveBeenCalledOnce()
+    expect(mockDeleteBranch.mock.calls[0][0]).toBe(BRANCH)
+  })
+
+  it('does not call deleteBranch and edits with not_found when review row missing', async () => {
+    const { mockFrom: amf } = makeMigrationGateBuilder([])
+    mockFrom.mockImplementation(amf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
+
+    expect(mockDeleteBranch).not.toHaveBeenCalled()
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('abort failed: not_found')
+  })
+
+  it('double-tap guard: does not abort if already resolved', async () => {
+    const { mockFrom: amf, gateInsertFn } = makeMigrationGateBuilder(
+      [makeReviewRow()],
+      [{ id: 'already-1' }]
+    )
+    mockFrom.mockImplementation(amf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
+
+    const abortRow = gateInsertFn.mock.calls.find(
+      (c) => c[0].task_type === 'deploy_gate_migration_aborted'
+    )
+    expect(abortRow).toBeUndefined()
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('already resolved')
+  })
+
+  it('returns 200 even when deleteBranch throws', async () => {
+    const { mockFrom: amf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(amf)
+    mockDeleteBranch.mockRejectedValue(new Error('branch delete failed'))
+
+    const res = await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
     expect(res.status).toBe(200)
   })
 })

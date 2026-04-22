@@ -8,6 +8,8 @@ import {
   mergeToMain,
   deleteBranch,
   sendPromotionNotification,
+  fetchMigrationSQL,
+  sendMigrationGateMessage,
 } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +59,10 @@ async function runSchemaCheck(
   commit_sha: string,
   branch: string,
   results: string[]
-): Promise<'schema-clean' | 'schema-migrations' | 'schema-error'> {
+): Promise<{
+  outcome: 'schema-clean' | 'schema-migrations' | 'schema-error'
+  migration_files: string[]
+}> {
   let schema: { has_migrations: boolean; migration_files: string[]; error?: string }
   try {
     schema = await detectMigrations(commit_sha, branch)
@@ -98,7 +103,97 @@ async function runSchemaCheck(
         ? 'schema-migrations'
         : 'schema-clean'
   results.push(`${commit_sha}:${outcome}`)
-  return outcome
+  return { outcome, migration_files: schema.migration_files }
+}
+
+async function runMigrationGate(
+  commit_sha: string,
+  branch: string,
+  taskId: string,
+  migration_files: string[],
+  results: string[]
+): Promise<void> {
+  let sqlResult: Awaited<ReturnType<typeof fetchMigrationSQL>>
+  try {
+    sqlResult = await fetchMigrationSQL(commit_sha, migration_files)
+  } catch {
+    sqlResult = { files: [], total_size_bytes: 0, error: 'exception' }
+  }
+
+  if (sqlResult.error) {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_failed',
+        status: 'error',
+        output_summary: `gate failed: migration_fetch error for commit ${commit_sha.slice(0, 8)}`,
+        meta: {
+          commit_sha,
+          branch,
+          task_id: taskId,
+          reason: 'migration_fetch',
+          error: sqlResult.error,
+        },
+      })
+    } catch {
+      // swallow
+    }
+    results.push(`${commit_sha}:migration-fetch-failed`)
+    return
+  }
+
+  let msgResult: Awaited<ReturnType<typeof sendMigrationGateMessage>>
+  try {
+    msgResult = await sendMigrationGateMessage({
+      task_id: taskId,
+      branch,
+      commit_sha,
+      migration_files_with_sql: sqlResult.files,
+    })
+  } catch {
+    msgResult = { ok: false, error: 'exception' }
+  }
+
+  if (!msgResult.ok) {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_failed',
+        status: 'error',
+        output_summary: `gate failed: migration message send failed for commit ${commit_sha.slice(0, 8)}`,
+        meta: {
+          commit_sha,
+          branch,
+          task_id: taskId,
+          reason: 'migration_send',
+          error: msgResult.error,
+        },
+      })
+    } catch {
+      // swallow
+    }
+    results.push(`${commit_sha}:migration-send-failed`)
+    return
+  }
+
+  try {
+    await writeGateEvent({
+      task_type: 'deploy_gate_migration_review_sent',
+      status: 'success',
+      output_summary: `migration review sent for task ${taskId}`,
+      meta: {
+        commit_sha,
+        branch,
+        task_id: taskId,
+        migration_files,
+        message_id: msgResult.message_id,
+        truncated: msgResult.truncated ?? false,
+        sent_at: new Date().toISOString(),
+      },
+    })
+  } catch {
+    // swallow
+  }
+
+  results.push(`${commit_sha}:migration-review-sent`)
 }
 
 async function runAutoPromote(
@@ -164,7 +259,9 @@ async function runAutoPromote(
           console.error(`sendPromotionNotification failed: ${notif.error}`)
         }
       } catch (err) {
-        console.error(`sendPromotionNotification threw: ${err instanceof Error ? err.message : err}`)
+        console.error(
+          `sendPromotionNotification threw: ${err instanceof Error ? err.message : err}`
+        )
       }
     }
 
@@ -211,7 +308,13 @@ async function runGateRunner(): Promise<object> {
   const { data: terminalRows } = await db
     .from('agent_events')
     .select('id, meta')
-    .in('task_type', ['deploy_gate_schema_check', 'deploy_gate_failed'])
+    .in('task_type', [
+      'deploy_gate_schema_check',
+      'deploy_gate_failed',
+      'deploy_gate_migration_review_sent',
+      'deploy_gate_promoted',
+      'deploy_gate_migration_aborted',
+    ])
     .gte('occurred_at', new Date(now - TERMINAL_LOOKBACK_MS).toISOString())
 
   const terminalShas = new Set(
@@ -271,12 +374,20 @@ async function runGateRunner(): Promise<object> {
 
     // Smoke already passed in a prior tick — skip straight to schema check
     if (smokePassedShas.has(commit_sha)) {
-      const schemaStatus = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
-      if (schemaStatus === 'schema-clean') {
+      const schemaResult = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+      if (schemaResult.outcome === 'schema-clean') {
         await runAutoPromote(
           commit_sha,
           trigger.meta.branch ?? '',
           trigger.meta.task_id ?? commit_sha,
+          results
+        )
+      } else if (schemaResult.outcome === 'schema-migrations') {
+        await runMigrationGate(
+          commit_sha,
+          trigger.meta.branch ?? '',
+          trigger.meta.task_id ?? commit_sha,
+          schemaResult.migration_files,
           results
         )
       }
@@ -354,12 +465,20 @@ async function runGateRunner(): Promise<object> {
         // swallow — preview_ready already written
       }
       if (smokePassed) {
-        const schemaStatus = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
-        if (schemaStatus === 'schema-clean') {
+        const schemaResult = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+        if (schemaResult.outcome === 'schema-clean') {
           await runAutoPromote(
             commit_sha,
             trigger.meta.branch ?? '',
             trigger.meta.task_id ?? commit_sha,
+            results
+          )
+        } else if (schemaResult.outcome === 'schema-migrations') {
+          await runMigrationGate(
+            commit_sha,
+            trigger.meta.branch ?? '',
+            trigger.meta.task_id ?? commit_sha,
+            schemaResult.migration_files,
             results
           )
         }
