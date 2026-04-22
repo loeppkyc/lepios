@@ -379,6 +379,12 @@ async function handleGatePromote(
       // swallow
     }
   }
+
+  try {
+    await deleteBranch(branch)
+  } catch {
+    // swallow — branch cleanup must not block the promoted result
+  }
 }
 
 async function handleGateAbort(

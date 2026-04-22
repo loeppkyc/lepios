@@ -1046,6 +1046,26 @@ describe('POST /api/telegram/webhook — dg:promote: promote handler', () => {
     const res = await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
     expect(res.status).toBe(200)
   })
+
+  it('calls deleteBranch with the correct branch after successful promote', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+
+    await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+
+    expect(mockDeleteBranch).toHaveBeenCalledOnce()
+    expect(mockDeleteBranch.mock.calls[0][0]).toBe(BRANCH)
+  })
+
+  it('returns 200 even when deleteBranch throws after promote', async () => {
+    const { mockFrom: pmf } = makeMigrationGateBuilder([makeReviewRow()])
+    mockFrom.mockImplementation(pmf)
+    mockDeleteBranch.mockRejectedValue(new Error('branch delete failed'))
+
+    const res = await POST(makeRequest(makeCallbackUpdate(`dg:promote:${SHA_PREFIX}`)))
+    expect(res.status).toBe(200)
+    expect(mockMergeToMain).toHaveBeenCalledOnce()
+  })
 })
 
 // ── dg:abort: abort handler ───────────────────────────────────────────────────
