@@ -142,10 +142,19 @@ describe('POST /api/telegram/webhook — auth', () => {
     expect(res.status).toBe(403)
   })
 
-  it('does not write agent_events on unauthorized requests', async () => {
+  it('only writes entry/early-return observe rows on unauthorized requests (no callback row)', async () => {
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
     const req = makeRequest({ update_id: 1 }, { 'x-telegram-bot-api-secret-token': 'wrong' })
     await POST(req)
-    expect(mockFrom).not.toHaveBeenCalled()
+    // entry + early-return rows are written; no telegram_callback row
+    expect(agentInsert).toHaveBeenCalled()
+    const taskTypes = agentInsert.mock.calls.map((c) => c[0].task_type)
+    expect(taskTypes).not.toContain('telegram_callback')
+    expect(taskTypes).toContain('telegram_webhook_entry')
   })
 })
 
@@ -188,11 +197,18 @@ describe('POST /api/telegram/webhook — user ID allowlist', () => {
     expect(answerCall).toBeDefined()
   })
 
-  it('does not write agent_events when user is rejected', async () => {
+  it('only writes entry/early-return observe rows when user is rejected (no callback row)', async () => {
     mockIsAllowedUser.mockReturnValue(false)
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
     const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
     await POST(req)
-    expect(mockFrom).not.toHaveBeenCalled()
+    const taskTypes = agentInsert.mock.calls.map((c) => c[0].task_type)
+    expect(taskTypes).not.toContain('telegram_callback')
+    expect(taskTypes).toContain('telegram_webhook_entry')
   })
 })
 
@@ -231,7 +247,9 @@ describe('POST /api/telegram/webhook — agent_events logging', () => {
     await Promise.resolve()
 
     expect(agentInsert).toHaveBeenCalled()
-    const row = agentInsert.mock.calls[0]?.[0]
+    // calls[0] = telegram_webhook_entry; calls[1] = telegram_callback
+    const row = agentInsert.mock.calls.find((c) => c[0].task_type === 'telegram_callback')?.[0]
+    expect(row).toBeDefined()
     expect(row.task_type).toBe('telegram_callback')
     expect(row.status).toBe('success')
     expect(row.meta.agent_event_id).toBe(VALID_UUID)
@@ -249,7 +267,8 @@ describe('POST /api/telegram/webhook — agent_events logging', () => {
     await POST(req)
     await Promise.resolve()
 
-    const row = agentInsert.mock.calls[0]?.[0]
+    const row = agentInsert.mock.calls.find((c) => c[0].task_type === 'telegram_callback')?.[0]
+    expect(row).toBeDefined()
     expect(row.status).toBe('warning')
     expect(row.meta.agent_event_id).toBeNull()
   })
@@ -570,8 +589,7 @@ describe('POST /api/telegram/webhook — message edit await', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
-        if ((url as string).includes('editMessageText'))
-          return Promise.reject(new Error('timeout'))
+        if ((url as string).includes('editMessageText')) return Promise.reject(new Error('timeout'))
         return Promise.resolve({ ok: true })
       })
     )
@@ -588,8 +606,7 @@ describe('POST /api/telegram/webhook — message edit await', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
-        if ((url as string).includes('editMessageText'))
-          return Promise.reject(new Error('timeout'))
+        if ((url as string).includes('editMessageText')) return Promise.reject(new Error('timeout'))
         return Promise.resolve({ ok: true })
       })
     )
@@ -627,8 +644,8 @@ describe('POST /api/telegram/webhook — malformed body', () => {
 // ── dg:rb: rollback callbacks ─────────────────────────────────────────────────
 
 function makeRollbackBuilder(promotedRows: unknown[], rolledBackRows: unknown[] = []) {
-  // logInsertFn: used by logWebhookEvent (1st from('agent_events') call — sync before handleGateRollback)
-  // rollbackInsertFn: used by the rollback/rollback-failed event write (4th call)
+  // logInsertFn: used by telegram_webhook_entry (call 1) and logWebhookEvent (call 2)
+  // rollbackInsertFn: used by the rollback/rollback-failed event write (call 5+)
   const logInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
   const rollbackInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
   let callCount = 0
@@ -648,13 +665,15 @@ function makeRollbackBuilder(promotedRows: unknown[], rolledBackRows: unknown[] 
     mockFrom: (table: string) => {
       if (table === 'agent_events') {
         callCount++
-        // Call 1: logWebhookEvent insert (synchronous before handleGateRollback runs)
+        // Call 1: logEvent(telegram_webhook_entry) insert
         if (callCount === 1) return { insert: logInsertFn }
-        // Call 2: promoted rows lookup
-        if (callCount === 2) return builder(promotedRows)
-        // Call 3: rolled_back guard
-        if (callCount === 3) return builder(rolledBackRows)
-        // Call 4+: rollback/rollback-failed event insert
+        // Call 2: logWebhookEvent insert
+        if (callCount === 2) return { insert: logInsertFn }
+        // Call 3: promoted rows lookup
+        if (callCount === 3) return builder(promotedRows)
+        // Call 4: rolled_back guard
+        if (callCount === 4) return builder(rolledBackRows)
+        // Call 5+: rollback/rollback-failed event insert
         return { insert: rollbackInsertFn }
       }
       return makeDefaultBuilder()
@@ -670,7 +689,10 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
   beforeEach(() => {
     // Switch to gate callback mode
     mockParseCallbackData.mockReturnValue(null)
-    mockParseGateCallbackData.mockReturnValue({ action: 'rollback', mergeShaPrefix: MERGE_SHA_PREFIX })
+    mockParseGateCallbackData.mockReturnValue({
+      action: 'rollback',
+      mergeShaPrefix: MERGE_SHA_PREFIX,
+    })
   })
 
   it('calls rollbackDeployment with correct merge_sha and task_id', async () => {
@@ -703,7 +725,9 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
     await POST(req)
 
     const fetchMock = vi.mocked(fetch)
-    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
     expect(editCall).toBeDefined()
     const body = JSON.parse(editCall![1]!.body as string)
     expect(body.text).toContain('↩️ rolled back at')
@@ -724,7 +748,9 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
     await POST(req)
 
     const fetchMock = vi.mocked(fetch)
-    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
     expect(editCall).toBeDefined()
     const body = JSON.parse(editCall![1]!.body as string)
     expect(body.text).toContain('❌ rollback failed: main_moved_on')
@@ -745,7 +771,9 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
     expect(mockRollbackDeployment).not.toHaveBeenCalled()
 
     const fetchMock = vi.mocked(fetch)
-    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
     const body = JSON.parse(editCall![1]!.body as string)
     expect(body.text).toContain('↩️ already rolled back')
   })
@@ -760,7 +788,9 @@ describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
     expect(mockRollbackDeployment).not.toHaveBeenCalled()
 
     const fetchMock = vi.mocked(fetch)
-    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const editCall = fetchMock.mock.calls.find(([url]) =>
+      (url as string).includes('editMessageText')
+    )
     const body = JSON.parse(editCall![1]!.body as string)
     expect(body.text).toContain('❌ rollback failed: not_found')
   })

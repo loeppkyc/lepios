@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { isAllowedUser, parseCallbackData, parseGateCallbackData } from '@/lib/harness/telegram-buttons'
+import {
+  isAllowedUser,
+  parseCallbackData,
+  parseGateCallbackData,
+} from '@/lib/harness/telegram-buttons'
 import { rollbackDeployment } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
@@ -53,6 +57,26 @@ async function logWebhookEvent(
     })
   } catch {
     // Swallow — webhook still returns 200
+  }
+}
+
+async function logEvent(fields: {
+  task_type: string
+  status: 'success' | 'error' | 'warning'
+  output_summary: string
+  meta?: Record<string, unknown>
+}): Promise<void> {
+  try {
+    const db = createServiceClient()
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'telegram_webhook',
+      actor: 'telegram_webhook',
+      tags: ['telegram', 'webhook', 'observe'],
+      ...fields,
+    })
+  } catch {
+    // swallow
   }
 }
 
@@ -195,6 +219,12 @@ async function handleGateRollback(
   })
 
   if (!promotedRow) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: promoted row not found',
+      meta: { reason: 'not_found', merge_sha_prefix: mergeShaPrefix },
+    })
     await editRollbackAck(chatId, messageId, originalText, false, 'not_found').catch(() => {})
     return
   }
@@ -212,7 +242,15 @@ async function handleGateRollback(
     .limit(1)
 
   if (rolledBackRows && rolledBackRows.length > 0) {
-    await editRollbackAck(chatId, messageId, originalText, false, 'already_rolled_back').catch(() => {})
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'warning',
+      output_summary: 'early return: already rolled back',
+      meta: { reason: 'already_rolled_back', merge_sha: mergeSha },
+    })
+    await editRollbackAck(chatId, messageId, originalText, false, 'already_rolled_back').catch(
+      () => {}
+    )
     return
   }
 
@@ -249,7 +287,27 @@ async function handleGateRollback(
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  console.log('[webhook] POST received', {
+    hasSecret: request.headers.has('x-telegram-bot-api-secret-token'),
+    ts: new Date().toISOString(),
+  })
+  await logEvent({
+    task_type: 'telegram_webhook_entry',
+    status: 'success',
+    output_summary: 'webhook POST received',
+    meta: {
+      ts: new Date().toISOString(),
+      has_secret_header: request.headers.has('x-telegram-bot-api-secret-token'),
+    },
+  })
+
   if (!verifyWebhookSecret(request)) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'error',
+      output_summary: 'early return: auth_fail',
+      meta: { reason: 'secret_mismatch_or_missing' },
+    })
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 403 })
   }
 
@@ -257,24 +315,42 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     update = (await request.json()) as TelegramUpdate
   } catch {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'error',
+      output_summary: 'early return: invalid_json',
+      meta: { reason: 'json_parse_error' },
+    })
     return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 })
   }
 
   const { callback_query: callbackQuery } = update
 
   if (!callbackQuery) {
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'success',
+      output_summary: 'early return: no_callback_query',
+      meta: { reason: 'not_a_button_tap', update_id: update.update_id },
+    })
     return NextResponse.json({ ok: true })
   }
 
   if (!isAllowedUser(callbackQuery.from.id)) {
     await answerCallbackQuery(callbackQuery.id)
+    await logEvent({
+      task_type: 'telegram_webhook_early_return',
+      status: 'error',
+      output_summary: 'early return: forbidden_user',
+      meta: { reason: 'user_not_allowed', from_user_id: callbackQuery.from.id },
+    })
     return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   }
 
   const parsed = parseCallbackData(callbackQuery.data ?? '')
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
 
-  void logWebhookEvent(
+  await logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
