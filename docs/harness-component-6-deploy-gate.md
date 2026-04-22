@@ -1,39 +1,38 @@
 # Autonomous Harness — Component #6: Deploy Gate
 
-## Current Session State (2026-04-22, 03:xx UTC)
+## Current Session State (2026-04-22, session 2)
 
-- Chunks A, B, C shipped and verified E2E against real harness branches
-- Chunk D shipped, NOT YET VERIFIED
-- Pending verify for Chunk D: two test branches needed
-  - `harness/task-chunk-d-migration-verify` (add file `supabase/migrations/0001_chunk_d_test.sql` with any trivial SQL like `-- chunk d test migration`)
-  - `harness/task-chunk-d-nomigration-verify` (just a README bump)
-  - For each: push, wait ~20s, fire trigger curl, fire runner curl until smoke_preview lands, then verify `deploy_gate_schema_check` row exists with expected `has_migrations` value (true/warning for migration branch, false/success for README-only)
-- Next chunks pending: E (auto-promote), F (telegram rollback), G (timeout cron), H (migration gate)
-- Token rotation reminder needed: July 22 2026, rotate both VERCEL_TOKEN and GITHUB_TOKEN together. Set Google Calendar reminder manually for now.
+- Chunks A, B, C, D, E — all shipped and verified E2E
+- Chunk D verified: 14/14 checks (`scripts/verify-chunk-d-e2e.mjs`)
+  - migration branch → `schema_check:warning`, `has_migrations=true` ✓
+  - no-migration branch → `schema_check:success`, `has_migrations=false` ✓
+- Chunk E verified: real merge + branch delete + kill switch — all working
+  - `mergeToMain` → merge commit `fbccf86` on main, branch auto-deleted ✓
+  - kill switch (`DEPLOY_GATE_AUTO_PROMOTE=0`) → `promotion-skipped` in results, no DB row ✓
+  - `DEPLOY_GATE_AUTO_PROMOTE=1` restored in Vercel (auto-promote ON)
+  - `scripts/verify-chunk-e-e2e.mjs` — 7/7 pass
+- Next chunks pending: F (Telegram rollback button), G (timeout cron), H (migration gate)
+- Token rotation reminder: July 22 2026 — rotate VERCEL_TOKEN + GITHUB_TOKEN together
+- GITHUB_TOKEN in Vercel HAS write access (Contents + refs delete) — merge + branch delete both confirmed working
 
-**Harness tracker at session end:**
+**Harness tracker (end of this session):**
 
 | Component | Score | Notes |
 | --- | --- | --- |
 | Ollama | 15×10 = 1.5 | |
 | Telegram thumbs | 25×85 = 21.25 | Verified E2E on tasks 48ee30db and 90f952dc |
 | Coordinator | 25×35 = 8.75 | |
-| Deploy gate | 15×45 = 6.75 | A/B/C verified, D shipped unverified; D hits 50 when verified, then E/F/G/H remain |
+| Deploy gate | 15×65 = 9.75 | A/B/C/D/E verified; F/G/H remain |
 | Task pickup | 15×80 = 12.0 | |
 | Attribution | 5×0 = 0 | |
-| **Total** | **~50%** | |
+| **Total** | **~55%** | |
 
-**Committed and pushed today:**
+**Committed this session:**
 
-- `451d1cc` — fire-and-forget fix in pickup-runner (Component #2 bug)
-- `eb4c78c` — fire-and-forget fix in webhook edit (Component #2 bug)
-- `765fd2b` — deploy gate design doc v0
-- `d2eb4a1` — design decisions + chunked build plan
-- `e46357f` — Chunk E promote mechanism + kill switch decisions
-- `f3f43eb` — Chunk A trigger endpoint
-- `5fff46b` — Chunk B runner cron + preview discovery
-- `1c5ab09` — Chunk C smoke check + /api/health
-- `d74d4c7` — Chunk D migration detection
+- `5eb81b6` — Chunk D E2E verify (14/14)
+- `f90c881` — Chunk E: mergeToMain + deleteBranch + kill switch (561 tests)
+- `fbccf86` — auto-merge commit from E2E verify (proof of real merge)
+- `4951e66` — Chunk E E2E verify script (7/7)
 
 ---
 
