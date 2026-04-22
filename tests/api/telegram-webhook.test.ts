@@ -8,14 +8,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock telegram-buttons ─────────────────────────────────────────────────────
 
-const { mockIsAllowedUser, mockParseCallbackData } = vi.hoisted(() => ({
+const { mockIsAllowedUser, mockParseCallbackData, mockParseGateCallbackData } = vi.hoisted(() => ({
   mockIsAllowedUser: vi.fn(),
   mockParseCallbackData: vi.fn(),
+  mockParseGateCallbackData: vi.fn(),
 }))
 
 vi.mock('@/lib/harness/telegram-buttons', () => ({
   isAllowedUser: mockIsAllowedUser,
   parseCallbackData: mockParseCallbackData,
+  parseGateCallbackData: mockParseGateCallbackData,
+}))
+
+// ── Mock deploy-gate rollbackDeployment ───────────────────────────────────────
+
+const { mockRollbackDeployment } = vi.hoisted(() => ({
+  mockRollbackDeployment: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/deploy-gate', () => ({
+  rollbackDeployment: mockRollbackDeployment,
 }))
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
@@ -95,6 +107,8 @@ beforeEach(() => {
   process.env.TELEGRAM_BOT_TOKEN = 'test-token'
   mockIsAllowedUser.mockReturnValue(true)
   mockParseCallbackData.mockReturnValue({ action: 'up', agentEventId: VALID_UUID })
+  mockParseGateCallbackData.mockReturnValue(null)
+  mockRollbackDeployment.mockResolvedValue({ ok: true, revert_sha: 'revertabc' })
   // Default builder handles all table operations without crashing
   mockFrom.mockReturnValue(makeDefaultBuilder())
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
@@ -607,5 +621,200 @@ describe('POST /api/telegram/webhook — malformed body', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(400)
+  })
+})
+
+// ── dg:rb: rollback callbacks ─────────────────────────────────────────────────
+
+function makeRollbackBuilder(promotedRows: unknown[], rolledBackRows: unknown[] = []) {
+  // logInsertFn: used by logWebhookEvent (1st from('agent_events') call — sync before handleGateRollback)
+  // rollbackInsertFn: used by the rollback/rollback-failed event write (4th call)
+  const logInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+  const rollbackInsertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+  let callCount = 0
+  const builder = (data: unknown[]) => {
+    const p = Promise.resolve({ data, error: null })
+    const b: Record<string, unknown> = {
+      then: p.then.bind(p),
+      catch: p.catch.bind(p),
+      finally: p.finally.bind(p),
+    }
+    for (const m of ['select', 'eq', 'gte', 'limit', 'filter']) {
+      b[m] = vi.fn().mockReturnValue(b)
+    }
+    return b
+  }
+  return {
+    mockFrom: (table: string) => {
+      if (table === 'agent_events') {
+        callCount++
+        // Call 1: logWebhookEvent insert (synchronous before handleGateRollback runs)
+        if (callCount === 1) return { insert: logInsertFn }
+        // Call 2: promoted rows lookup
+        if (callCount === 2) return builder(promotedRows)
+        // Call 3: rolled_back guard
+        if (callCount === 3) return builder(rolledBackRows)
+        // Call 4+: rollback/rollback-failed event insert
+        return { insert: rollbackInsertFn }
+      }
+      return makeDefaultBuilder()
+    },
+    logInsertFn,
+    rollbackInsertFn,
+  }
+}
+
+describe('POST /api/telegram/webhook — dg:rb: rollback handler', () => {
+  const MERGE_SHA_PREFIX = 'abcdef12'
+
+  beforeEach(() => {
+    // Switch to gate callback mode
+    mockParseCallbackData.mockReturnValue(null)
+    mockParseGateCallbackData.mockReturnValue({ action: 'rollback', mergeShaPrefix: MERGE_SHA_PREFIX })
+  })
+
+  it('calls rollbackDeployment with correct merge_sha and task_id', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(mockRollbackDeployment).toHaveBeenCalledOnce()
+    const [mergeSha, taskId] = mockRollbackDeployment.mock.calls[0]
+    expect(mergeSha).toBe('abcdef1234567890')
+    expect(taskId).toBe('task-uuid-abc')
+  })
+
+  it('edits message to show rolled back timestamp on success', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+    mockRollbackDeployment.mockResolvedValue({ ok: true, revert_sha: 'revert123' })
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12', VALID_USER_ID, 'Original text'))
+    await POST(req)
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('↩️ rolled back at')
+    expect(body.text).toContain('Original text')
+    expect(body.reply_markup.inline_keyboard).toEqual([])
+  })
+
+  it('edits message to show rollback failed when rollback returns error', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+    mockRollbackDeployment.mockResolvedValue({ ok: false, error: 'main_moved_on' })
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12', VALID_USER_ID, 'Original'))
+    await POST(req)
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    expect(editCall).toBeDefined()
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('❌ rollback failed: main_moved_on')
+  })
+
+  it('double-tap guard: does not call rollbackDeployment if already rolled back', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const existingRollback = [{ id: 'evt-rb-1' }]
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow], existingRollback)
+    mockFrom.mockImplementation(rbMockFrom)
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(mockRollbackDeployment).not.toHaveBeenCalled()
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('↩️ already rolled back')
+  })
+
+  it('edits message with not_found error when no promoted row matches prefix', async () => {
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([]) // no promoted rows
+    mockFrom.mockImplementation(rbMockFrom)
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(mockRollbackDeployment).not.toHaveBeenCalled()
+
+    const fetchMock = vi.mocked(fetch)
+    const editCall = fetchMock.mock.calls.find(([url]) => (url as string).includes('editMessageText'))
+    const body = JSON.parse(editCall![1]!.body as string)
+    expect(body.text).toContain('❌ rollback failed: not_found')
+  })
+
+  it('writes deploy_gate_rolled_back row on successful rollback', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom, rollbackInsertFn } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+    mockRollbackDeployment.mockResolvedValue({ ok: true, revert_sha: 'revert123' })
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(rollbackInsertFn).toHaveBeenCalledOnce()
+    const row = rollbackInsertFn.mock.calls[0][0]
+    expect(row.task_type).toBe('deploy_gate_rolled_back')
+    expect(row.status).toBe('success')
+    expect(row.meta.merge_sha).toBe('abcdef1234567890')
+    expect(row.meta.revert_sha).toBe('revert123')
+  })
+
+  it('writes deploy_gate_rollback_failed row when rollback fails', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom, rollbackInsertFn } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+    mockRollbackDeployment.mockResolvedValue({ ok: false, error: 'api_error' })
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(rollbackInsertFn).toHaveBeenCalledOnce()
+    const row = rollbackInsertFn.mock.calls[0][0]
+    expect(row.task_type).toBe('deploy_gate_rollback_failed')
+    expect(row.status).toBe('error')
+    expect(row.meta.error).toBe('api_error')
+  })
+
+  it('still returns 200 even when rollback throws', async () => {
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid-abc', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation(rbMockFrom)
+    mockRollbackDeployment.mockRejectedValue(new Error('unexpected crash'))
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    const res = await POST(req)
+    expect(res.status).toBe(200)
   })
 })

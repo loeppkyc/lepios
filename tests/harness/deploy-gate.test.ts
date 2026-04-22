@@ -25,6 +25,8 @@ import {
   detectMigrations,
   mergeToMain,
   deleteBranch,
+  rollbackDeployment,
+  sendPromotionNotification,
 } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
@@ -1211,5 +1213,323 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
     const schemaRow = mockInsert.mock.calls[3][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.status).toBe('warning')
+  })
+})
+
+// ── rollbackDeployment ────────────────────────────────────────────────────────
+
+describe('rollbackDeployment', () => {
+  const MERGE_SHA = 'mergesha1'
+  const PARENT_SHA = 'parentsha1'
+  const TREE_SHA = 'treesha1'
+  const REVERT_SHA = 'revertsha1'
+
+  function makeRollbackFetch() {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      // GET merge commit
+      if (url.includes(`/git/commits/${MERGE_SHA}`)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ parents: [{ sha: PARENT_SHA }] }),
+        })
+      }
+      // GET parent commit
+      if (url.includes(`/git/commits/${PARENT_SHA}`)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ tree: { sha: TREE_SHA } }),
+        })
+      }
+      // GET main ref
+      if (url.includes('/git/refs/heads/main') && (!opts || !opts.method || opts.method === 'GET')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ object: { sha: MERGE_SHA } }),
+        })
+      }
+      // POST new commit
+      if (url.includes('/git/commits') && opts?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ sha: REVERT_SHA }),
+        })
+      }
+      // PATCH main ref
+      if (url.includes('/git/refs/heads/main') && opts?.method === 'PATCH') {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+  }
+
+  it('returns ok=true with revert_sha on success', async () => {
+    makeRollbackFetch()
+    const result = await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+    expect(result.ok).toBe(true)
+    expect(result.revert_sha).toBe(REVERT_SHA)
+  })
+
+  it('returns ok=false with error=config when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+    const result = await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns ok=false with error=main_moved_on when current HEAD differs from merge_sha', async () => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes(`/git/commits/${MERGE_SHA}`))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ parents: [{ sha: PARENT_SHA }] }) })
+      if (url.includes(`/git/commits/${PARENT_SHA}`))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tree: { sha: TREE_SHA } }) })
+      if (url.includes('/git/refs/heads/main') && (!opts?.method || opts.method === 'GET'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ object: { sha: 'differentsha' } }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    const result = await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('main_moved_on')
+  })
+
+  it('returns ok=false with http error when GET merge commit fails', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+    const result = await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('http_404')
+  })
+
+  it('returns ok=false with api_error when fetch throws', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('network'))
+
+    const result = await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('api_error')
+  })
+
+  it('POSTs revert commit with correct tree and parent', async () => {
+    makeRollbackFetch()
+    await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+
+    const postCall = mockFetch.mock.calls.find(
+      ([url, opts]: [string, RequestInit]) =>
+        url.includes('/git/commits') && opts?.method === 'POST'
+    )
+    expect(postCall).toBeDefined()
+    const body = JSON.parse(postCall![1].body as string)
+    expect(body.tree).toBe(TREE_SHA)
+    expect(body.parents).toEqual([MERGE_SHA])
+    expect(body.message).toContain('task-uuid-1')
+  })
+
+  it('PATCHes main ref to revert commit SHA', async () => {
+    makeRollbackFetch()
+    await rollbackDeployment(MERGE_SHA, 'task-uuid-1')
+
+    const patchCall = mockFetch.mock.calls.find(
+      ([url, opts]: [string, RequestInit]) =>
+        url.includes('/git/refs/heads/main') && opts?.method === 'PATCH'
+    )
+    expect(patchCall).toBeDefined()
+    const body = JSON.parse(patchCall![1].body as string)
+    expect(body.sha).toBe(REVERT_SHA)
+  })
+})
+
+// ── sendPromotionNotification ─────────────────────────────────────────────────
+
+describe('sendPromotionNotification', () => {
+  const params = {
+    task_id: 'task-uuid-2',
+    branch: 'harness/task-task-uuid-2',
+    merge_sha: 'abcdef1234567890',
+    commit_sha: 'feedbeef1234',
+  }
+
+  beforeEach(() => {
+    process.env.TELEGRAM_BOT_TOKEN = 'test-tg-token'
+    process.env.TELEGRAM_CHAT_ID = '111222'
+  })
+
+  afterEach(() => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    delete process.env.TELEGRAM_CHAT_ID
+  })
+
+  it('returns ok=false error=config when TELEGRAM_BOT_TOKEN is missing', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    const result = await sendPromotionNotification(params)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns ok=false error=config when TELEGRAM_CHAT_ID is missing', async () => {
+    delete process.env.TELEGRAM_CHAT_ID
+    const result = await sendPromotionNotification(params)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('config')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns ok=true with message_id on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 9999 } }),
+    })
+
+    const result = await sendPromotionNotification(params)
+    expect(result.ok).toBe(true)
+    expect(result.message_id).toBe(9999)
+  })
+
+  it('sends rollback button with correct dg:rb: callback_data', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, result: { message_id: 1 } }),
+    })
+
+    await sendPromotionNotification(params)
+
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/sendMessage')
+    const body = JSON.parse(opts.body as string)
+    const buttons = body.reply_markup.inline_keyboard[0]
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].callback_data).toBe(`dg:rb:${params.merge_sha.slice(0, 8)}`)
+    expect(buttons[0].text).toBe('👎 Rollback')
+  })
+
+  it('returns ok=false when Telegram API returns non-200', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => 'rate limited',
+    })
+
+    const result = await sendPromotionNotification(params)
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('telegram_429')
+  })
+
+  it('returns ok=false with error message on fetch throw', async () => {
+    mockFetch.mockRejectedValue(new Error('timeout'))
+    const result = await sendPromotionNotification(params)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('timeout')
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — notification sent (Chunk F) ─────────────
+
+describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
+  beforeEach(() => {
+    process.env.DEPLOY_GATE_AUTO_PROMOTE = '1'
+    process.env.TELEGRAM_BOT_TOKEN = 'test-tg-token'
+    process.env.TELEGRAM_CHAT_ID = '111222'
+  })
+
+  afterEach(() => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    delete process.env.TELEGRAM_CHAT_ID
+  })
+
+  it('writes deploy_gate_notification_sent row when Telegram succeeds', async () => {
+    const trigger = makeTriggerRow('notifsha', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+      if (url.includes('/merges'))
+        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergenotif1' }) })
+      if (url.includes('api.github.com/repos') && url.includes('git/refs') && opts?.method === 'DELETE')
+        return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      if (url.includes('telegram.org') && url.includes('sendMessage'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, result: { message_id: 8888 } }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    await GET(makeRequest())
+
+    // processing + preview_ready + smoke + schema + promoted + notification_sent = 6
+    expect(mockInsert).toHaveBeenCalledTimes(6)
+    const notifRow = mockInsert.mock.calls[5][0]
+    expect(notifRow.task_type).toBe('deploy_gate_notification_sent')
+    expect(notifRow.status).toBe('success')
+    expect(notifRow.meta.message_id).toBe(8888)
+    expect(notifRow.meta.merge_sha).toBe('mergenotif1')
+  })
+
+  it('promoted row includes task_id in meta', async () => {
+    const trigger = makeTriggerRow('taskidsha', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+      if (url.includes('/merges'))
+        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergetaskid1' }) })
+      if (url.includes('api.github.com/repos') && url.includes('git/refs') && opts?.method === 'DELETE')
+        return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      if (url.includes('telegram.org'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, result: { message_id: 1 } }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    await GET(makeRequest())
+
+    const promotedRow = mockInsert.mock.calls[4][0]
+    expect(promotedRow.task_type).toBe('deploy_gate_promoted')
+    expect(promotedRow.meta.task_id).toBe('00000000-0000-0000-0000-000000000001')
+  })
+
+  it('does not write notification_sent when Telegram is unconfigured (no insert count change)', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+
+    const trigger = makeTriggerRow('nonotif', 3)
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([trigger]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValueOnce(makeSelectBuilder([]))
+      .mockReturnValue(makeInsertBuilder())
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('api.vercel.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deployments: [makeVercelDeployment('READY')] }) })
+      if (url.includes('/merges'))
+        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ sha: 'mergenonotif' }) })
+      if (url.includes('api.github.com'))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ files: [] }) })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+
+    await GET(makeRequest())
+
+    // 5 inserts only — no notification_sent (Telegram not configured)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
+    const taskTypes = mockInsert.mock.calls.map((c: unknown[][]) => (c[0] as { task_type: string }).task_type)
+    expect(taskTypes).not.toContain('deploy_gate_notification_sent')
   })
 })

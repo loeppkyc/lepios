@@ -15,6 +15,21 @@ export function parseCallbackData(
   return { action: parts[1] as 'up' | 'dn', agentEventId: parts[2] }
 }
 
+export function buildGateCallbackData(action: 'rollback', mergeSha: string): string {
+  void action // discriminator reserved for future gate actions
+  return `dg:rb:${mergeSha.slice(0, 8)}`
+}
+
+export function parseGateCallbackData(
+  data: string
+): { action: 'rollback'; mergeShaPrefix: string } | null {
+  const parts = data.split(':')
+  if (parts.length !== 3 || parts[0] !== 'dg') return null
+  if (parts[1] !== 'rb') return null
+  if (!/^[0-9a-f]{8}$/.test(parts[2])) return null
+  return { action: 'rollback', mergeShaPrefix: parts[2] }
+}
+
 export function isAllowedUser(telegramUserId: number): boolean {
   const allowed = process.env.TELEGRAM_ALLOWED_USER_ID
   if (!allowed) return false

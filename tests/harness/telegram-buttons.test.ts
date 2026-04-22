@@ -18,6 +18,8 @@ vi.mock('@/lib/orchestrator/telegram', () => ({
 import {
   buildCallbackData,
   parseCallbackData,
+  buildGateCallbackData,
+  parseGateCallbackData,
   isAllowedUser,
   sendMessageWithButtons,
 } from '@/lib/harness/telegram-buttons'
@@ -95,6 +97,68 @@ describe('parseCallbackData', () => {
   it('round-trips through buildCallbackData', () => {
     const encoded = buildCallbackData('dn', VALID_UUID)
     expect(parseCallbackData(encoded)).toEqual({ action: 'dn', agentEventId: VALID_UUID })
+  })
+})
+
+// ── buildGateCallbackData ─────────────────────────────────────────────────────
+
+describe('buildGateCallbackData', () => {
+  it('formats rollback as dg:rb:<first-8-chars>', () => {
+    expect(buildGateCallbackData('rollback', 'abcdef1234567890')).toBe('dg:rb:abcdef12')
+  })
+
+  it('truncates long merge SHA to 8 characters', () => {
+    const sha = 'ffffffff00000000111111112222222233333333'
+    expect(buildGateCallbackData('rollback', sha)).toBe('dg:rb:ffffffff')
+  })
+
+  it('resulting string is within Telegram 64-byte limit', () => {
+    const result = buildGateCallbackData('rollback', 'abcdef1234567890')
+    expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(64)
+  })
+})
+
+// ── parseGateCallbackData ─────────────────────────────────────────────────────
+
+describe('parseGateCallbackData', () => {
+  it('parses valid rollback data', () => {
+    expect(parseGateCallbackData('dg:rb:abcdef12')).toEqual({
+      action: 'rollback',
+      mergeShaPrefix: 'abcdef12',
+    })
+  })
+
+  it('returns null for wrong prefix', () => {
+    expect(parseGateCallbackData('tf:rb:abcdef12')).toBeNull()
+  })
+
+  it('returns null for wrong action segment', () => {
+    expect(parseGateCallbackData('dg:up:abcdef12')).toBeNull()
+  })
+
+  it('returns null when sha prefix is not exactly 8 hex chars', () => {
+    expect(parseGateCallbackData('dg:rb:abcdef1')).toBeNull()   // 7 chars
+    expect(parseGateCallbackData('dg:rb:abcdef123')).toBeNull() // 9 chars
+  })
+
+  it('returns null when sha prefix contains non-hex characters', () => {
+    expect(parseGateCallbackData('dg:rb:ABCDEF12')).toBeNull()
+    expect(parseGateCallbackData('dg:rb:zzzzzzzz')).toBeNull()
+  })
+
+  it('returns null for garbage input', () => {
+    expect(parseGateCallbackData('garbage')).toBeNull()
+  })
+
+  it('returns null for empty string', () => {
+    expect(parseGateCallbackData('')).toBeNull()
+  })
+
+  it('round-trips through buildGateCallbackData', () => {
+    const sha = 'abcdef1234567890'
+    const encoded = buildGateCallbackData('rollback', sha)
+    const parsed = parseGateCallbackData(encoded)
+    expect(parsed).toEqual({ action: 'rollback', mergeShaPrefix: 'abcdef12' })
   })
 })
 

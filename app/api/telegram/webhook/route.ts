@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { isAllowedUser, parseCallbackData } from '@/lib/harness/telegram-buttons'
+import { isAllowedUser, parseCallbackData, parseGateCallbackData } from '@/lib/harness/telegram-buttons'
+import { rollbackDeployment } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -132,6 +133,121 @@ async function editMessageWithAck(
   }
 }
 
+async function editRollbackAck(
+  chatId: number,
+  messageId: number,
+  originalText: string,
+  success: boolean,
+  errorCode?: string
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  const suffix = success
+    ? `\n↩️ rolled back at ${timestamp} MT`
+    : errorCode === 'already_rolled_back'
+      ? `\n↩️ already rolled back`
+      : `\n❌ rollback failed: ${errorCode ?? 'unknown'}`
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text: `${originalText}${suffix}`,
+      reply_markup: { inline_keyboard: [] },
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  }
+}
+
+async function handleGateRollback(
+  mergeShaPrefix: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  // Find the promoted row matching the merge_sha prefix (last hour)
+  const { data: promotedRows } = await db
+    .from('agent_events')
+    .select('id, meta')
+    .eq('task_type', 'deploy_gate_promoted')
+    .eq('status', 'success')
+    .gte('occurred_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .limit(20)
+
+  const promotedRow = (promotedRows ?? []).find((r) => {
+    const sha = (r.meta as Record<string, unknown>)?.merge_sha as string | undefined
+    return sha?.startsWith(mergeShaPrefix)
+  })
+
+  if (!promotedRow) {
+    await editRollbackAck(chatId, messageId, originalText, false, 'not_found').catch(() => {})
+    return
+  }
+
+  const meta = promotedRow.meta as Record<string, unknown>
+  const mergeSha = meta.merge_sha as string
+  const taskId = (meta.task_id as string | undefined) ?? (meta.commit_sha as string)
+
+  // Double-tap guard
+  const { data: rolledBackRows } = await db
+    .from('agent_events')
+    .select('id')
+    .eq('task_type', 'deploy_gate_rolled_back')
+    .filter('meta->>merge_sha', 'eq', mergeSha)
+    .limit(1)
+
+  if (rolledBackRows && rolledBackRows.length > 0) {
+    await editRollbackAck(chatId, messageId, originalText, false, 'already_rolled_back').catch(() => {})
+    return
+  }
+
+  let result: Awaited<ReturnType<typeof rollbackDeployment>>
+  try {
+    result = await rollbackDeployment(mergeSha, taskId)
+  } catch {
+    result = { ok: false, error: 'exception' }
+  }
+
+  try {
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'deploy_gate_runner',
+      actor: 'deploy_gate',
+      status: result.ok ? 'success' : 'error',
+      task_type: result.ok ? 'deploy_gate_rolled_back' : 'deploy_gate_rollback_failed',
+      output_summary: result.ok
+        ? `rolled back merge ${mergeSha.slice(0, 8)} via revert commit ${result.revert_sha?.slice(0, 8)}`
+        : `rollback failed: ${result.error}`,
+      meta: {
+        merge_sha: mergeSha,
+        task_id: taskId,
+        ...(result.revert_sha ? { revert_sha: result.revert_sha } : {}),
+        ...(result.error ? { error: result.error } : {}),
+      },
+      tags: ['deploy_gate', 'harness', 'chunk_f'],
+    })
+  } catch {
+    // swallow — edit still proceeds
+  }
+
+  await editRollbackAck(chatId, messageId, originalText, result.ok, result.error).catch(() => {})
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   if (!verifyWebhookSecret(request)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 403 })
@@ -156,12 +272,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const parsed = parseCallbackData(callbackQuery.data ?? '')
+  const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
 
   void logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed ? 'success' : 'warning'
+    parsed || parsedGate ? 'success' : 'warning'
   )
 
   if (parsed) {
@@ -209,6 +326,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         // logEvent itself failed — swallow, we already acked.
       }
     }
+  } else if (parsedGate?.action === 'rollback') {
+    await handleGateRollback(
+      parsedGate.mergeShaPrefix,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    )
   }
 
   return NextResponse.json({ ok: true })

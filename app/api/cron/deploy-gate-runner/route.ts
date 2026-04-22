@@ -7,6 +7,7 @@ import {
   detectMigrations,
   mergeToMain,
   deleteBranch,
+  sendPromotionNotification,
 } from '@/lib/harness/deploy-gate'
 
 export const dynamic = 'force-dynamic'
@@ -128,6 +129,7 @@ async function runAutoPromote(
         meta: {
           commit_sha,
           branch,
+          task_id: taskId,
           ...(mergeResult.merge_sha ? { merge_sha: mergeResult.merge_sha } : {}),
         },
       })
@@ -135,6 +137,36 @@ async function runAutoPromote(
       // swallow
     }
     results.push(`${commit_sha}:promoted`)
+
+    // Send Telegram notification with rollback button — awaited, failure is logged only
+    if (mergeResult.merge_sha) {
+      try {
+        const notif = await sendPromotionNotification({
+          task_id: taskId,
+          branch,
+          merge_sha: mergeResult.merge_sha,
+          commit_sha,
+        })
+        if (notif.ok && notif.message_id != null) {
+          await writeGateEvent({
+            task_type: 'deploy_gate_notification_sent',
+            status: 'success',
+            output_summary: `promotion notification sent for task ${taskId}`,
+            meta: {
+              commit_sha,
+              branch,
+              task_id: taskId,
+              merge_sha: mergeResult.merge_sha,
+              message_id: notif.message_id,
+            },
+          })
+        } else if (!notif.ok) {
+          console.error(`sendPromotionNotification failed: ${notif.error}`)
+        }
+      } catch (err) {
+        console.error(`sendPromotionNotification threw: ${err instanceof Error ? err.message : err}`)
+      }
+    }
 
     try {
       await deleteBranch(branch)

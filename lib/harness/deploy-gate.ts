@@ -255,3 +255,155 @@ export async function deleteBranch(branch: string): Promise<boolean> {
     return false
   }
 }
+
+export type RollbackResult = {
+  ok: boolean
+  revert_sha?: string
+  error?: string
+}
+
+// Reverts a merge commit on main using the GitHub Git Data API.
+// Sequence: GET merge commit → GET parent tree → GET main HEAD →
+//   safety check (main must not have moved) → POST revert commit → PATCH main ref.
+export async function rollbackDeployment(
+  mergeSha: string,
+  taskId: string
+): Promise<RollbackResult> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return { ok: false, error: 'config' }
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+
+  // 1 — Resolve merge commit parents
+  let mergeCommit: { parents?: Array<{ sha: string }> }
+  try {
+    const res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/git/commits/${mergeSha}`, { headers })
+    if (!res.ok) return { ok: false, error: `http_${res.status}` }
+    mergeCommit = await res.json()
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  const parentSha = mergeCommit.parents?.[0]?.sha
+  if (!parentSha) return { ok: false, error: 'no_parent' }
+
+  // 2 — Get parent commit tree (the tree to restore)
+  let parentCommit: { tree?: { sha: string } }
+  try {
+    const res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/git/commits/${parentSha}`, { headers })
+    if (!res.ok) return { ok: false, error: `http_${res.status}` }
+    parentCommit = await res.json()
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  const preMergeTree = parentCommit.tree?.sha
+  if (!preMergeTree) return { ok: false, error: 'no_tree' }
+
+  // 3 — Get current main HEAD
+  let mainRef: { object?: { sha: string } }
+  try {
+    const res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/git/refs/heads/main`, { headers })
+    if (!res.ok) return { ok: false, error: `http_${res.status}` }
+    mainRef = await res.json()
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  const currentHead = mainRef.object?.sha
+  if (!currentHead) return { ok: false, error: 'no_head' }
+
+  // 4 — Safety: refuse if another commit has landed on main since the merge
+  if (currentHead !== mergeSha) return { ok: false, error: 'main_moved_on' }
+
+  // 5 — Create revert commit (same tree as pre-merge parent, parent = merge commit)
+  let revertCommit: { sha?: string }
+  try {
+    const res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/git/commits`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        message: `revert: rollback task ${taskId}\n\nreverts merge commit ${mergeSha}`,
+        tree: preMergeTree,
+        parents: [mergeSha],
+      }),
+    })
+    if (!res.ok) return { ok: false, error: `http_${res.status}` }
+    revertCommit = await res.json()
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  const revertSha = revertCommit.sha
+  if (!revertSha) return { ok: false, error: 'no_revert_sha' }
+
+  // 6 — Advance main ref to the revert commit
+  try {
+    const res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/git/refs/heads/main`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ sha: revertSha }),
+    })
+    if (!res.ok) return { ok: false, error: `http_${res.status}` }
+  } catch {
+    return { ok: false, error: 'api_error' }
+  }
+
+  return { ok: true, revert_sha: revertSha }
+}
+
+export type NotificationResult = {
+  ok: boolean
+  message_id?: number
+  error?: string
+}
+
+export async function sendPromotionNotification(params: {
+  task_id: string
+  branch: string
+  merge_sha: string
+  commit_sha: string
+}): Promise<NotificationResult> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!token || !chatId) return { ok: false, error: 'config' }
+
+  const { task_id, branch, merge_sha, commit_sha } = params
+  const callbackData = `dg:rb:${merge_sha.slice(0, 8)}`
+
+  const text = [
+    `✅ Promoted to production`,
+    `task: ${task_id}`,
+    `branch: ${branch}`,
+    `sha: ${commit_sha.slice(0, 12)}`,
+    `merge: ${merge_sha.slice(0, 12)}`,
+    `👎 rollback available for 10 min`,
+  ].join('\n')
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        reply_markup: {
+          inline_keyboard: [[{ text: '👎 Rollback', callback_data: callbackData }]],
+        },
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      return { ok: false, error: `telegram_${res.status}: ${body.slice(0, 100)}` }
+    }
+    const json = (await res.json()) as { ok: boolean; result?: { message_id: number } }
+    return { ok: true, message_id: json.result?.message_id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'unknown' }
+  }
+}
