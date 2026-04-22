@@ -179,6 +179,7 @@ describe('POST /api/cron/deploy-gate-timeout — processing', () => {
     expect(timeoutRow.meta.default_action).toBe('keep')
     expect(timeoutRow.meta.notification_sent_at).toBe(notif.occurred_at)
     expect(timeoutRow.meta.resolved_at).toBeDefined()
+    expect(timeoutRow.meta.message_id).toBe(MESSAGE_ID)
     expect(timeoutRow.tags).toContain('chunk_g')
   })
 

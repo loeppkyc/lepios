@@ -104,6 +104,7 @@ async function runTimeoutCron(): Promise<object> {
           default_action: 'keep',
           notification_sent_at: notif.occurred_at,
           resolved_at: new Date().toISOString(),
+          ...(messageId != null ? { message_id: messageId } : {}),
         },
         tags: ['deploy_gate', 'harness', 'chunk_g'],
       })
