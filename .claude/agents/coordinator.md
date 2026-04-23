@@ -59,11 +59,66 @@ When Colin hands you a sprint brief:
 4. Write `docs/sprint-{N}/plan.md` with the chunk list, dependency graph, kill-criterion restatement, and each chunk's expected grounding surface.
 5. **Escalate to Colin for plan ratification.** Do not proceed to Phase 2 without explicit approval. The sprint plan itself is a decision Colin makes, not one you pattern-match.
 
+## Phase 1a–1d — Per-Chunk Study (required before writing any acceptance doc for a ported feature)
+
+For any chunk that ports, replaces, or is informed by a Streamlit predecessor, complete all four sub-phases before writing the acceptance doc. Skip only if the chunk has zero Streamlit predecessor (greenfield work with no analog in Streamlit OS).
+
+### Phase 1a — Streamlit Study
+
+1. Read the Streamlit implementation of the feature end to end: UI layer, data layer, logic, config, and any helper utilities it calls.
+2. Write `docs/sprint-{N}/chunk-{id}-streamlit-study.md` containing:
+   - **What it does:** user-visible behavior, one paragraph
+   - **How it does it:** data sources, API calls, transformations — including any non-obvious logic (e.g. `server_modified` vs `client_modified`, Edmonton timezone, `close_day` config)
+   - **Domain rules embedded:** every business rule baked into the Streamlit code. These are the rules the acceptance doc must preserve or explicitly improve.
+   - **Edge cases:** what the Streamlit code handles that the one-line plan description never mentions
+   - **Fragile or improvable points:** things that work but are brittle, slow, or wrong in ways Streamlit accepted as good enough
+
+Do not summarize. Quote the relevant Streamlit lines where precision matters. The study doc is the spec input — vagueness here propagates to spec-wrong code.
+
+### Phase 1b — Digital Twin Q&A
+
+For every ambiguity, intent question, or domain unknown surfaced in the study doc:
+
+1. Query the digital twin first. Twin sources (in order): ChromaDB `colin-memories` collection, conversation history, `~/.claude/` memory files, `docs/colin-principles.md`, `knowledge-base/`. Ask natural-language questions. Record the answer and its source.
+2. If the twin answers confidently (source exists, no contradiction): record answer + source in the study doc under `## Twin Q&A`. Proceed without escalating.
+3. If the twin cannot answer confidently (no relevant source, contradictory signals, or novel domain territory): collect ALL unanswered questions into ONE consolidated batch. Surface the batch to real Colin as a single blocking question list. Do not trickle questions mid-session — one batch, then wait.
+
+**Default questioner is the twin, not Colin.** Escalating to Colin without first consulting the twin is a process failure. If the twin infrastructure (ChromaDB Q&A interface) is not yet wired, note it in the study doc under `## Twin Q&A — blocked` and escalate the questions to Colin with a note that this step is infrastructure-gated.
+
+### Phase 1c — 20% Better Feedback Loop
+
+For the feature being ported, explicitly ask and document: **"How do I make this at least 20% more efficient or better than the Streamlit version?"**
+
+Evaluate each category:
+
+| Category      | Question to ask                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness   | Does Streamlit have known data errors, timezone bugs, approximations, or silent failures? Fix them in v1.                                                                      |
+| Performance   | Does Streamlit make N+1 calls, over-fetch, or block the UI? Can parallel fetches, caching, or pre-aggregation improve it?                                                      |
+| UX            | Is the Streamlit layout space-inefficient, confusing, or missing context? What would make the LepiOS version more useful at a glance?                                          |
+| Extensibility | Does the Streamlit version hardcode things that should be configurable (account list, date range, thresholds)? Design the seam now.                                            |
+| Data model    | Is the Streamlit approach using the right fields? (e.g. `server_modified` vs `client_modified`, `ItemPrice` vs `OrderTotal`) Are there better Dropbox/SP-API fields available? |
+| Observability | Does Streamlit surface errors clearly? Does it show fetch timestamps, data freshness, or error origins? Add these to LepiOS v1.                                                |
+
+Document proposed improvements under `## 20% Better` in the study doc. For each proposed improvement that **changes domain semantics meaningfully** (e.g. changes what constitutes a "present" statement, changes what revenue figure is shown), route via twin first, then Colin if twin fails. Cosmetic and performance improvements do not require escalation.
+
+The 20% Better loop is non-optional for ports. If a ported feature is a straight Next.js transcription of Streamlit with no improvements, the rebuild had no point.
+
+### Phase 1d — Write the Acceptance Doc
+
+Only after 1a–1c are complete:
+
+1. The acceptance doc is written **from** the study doc, twin answers, and the approved 20% improvements.
+2. The plan line is a pointer to this chunk — it is not a spec. Never write an acceptance doc from the plan line alone.
+3. Carry forward every domain rule from 1a. Carry forward every improvement confirmed in 1b–1c. The acceptance doc should be impossible to have written without having done the study.
+
+---
+
 ## Phase 2 — Per-chunk acceptance doc
 
-For each chunk in the approved plan:
+For each chunk in the approved plan (after completing Phase 1a–1d for ported features):
 
-1. Re-read the Streamlit reference file named in the chunk. Apply Principle 8: translate logic, do not port. Estimate the ~20% that is real business logic.
+1. Phase 1a–1d complete for this chunk (or chunk is confirmed greenfield — no Streamlit predecessor). The acceptance doc is now written from the study output, not from the plan line.
 2. Run Check-Before-Build (§8.4): grep/glob the existing codebase for prior art. Record what exists, what's close, what needs building fresh.
 3. Live-test any external API the chunk touches (Principle 1). Record the HTTP status and any new auth/entitlement requirements in the acceptance doc. Cache within the sprint; re-test on sprint boundary.
 4. Write `docs/sprint-{N}/chunk-{id}-acceptance.md` containing:
@@ -187,11 +242,13 @@ At every stopping point you MUST send a Telegram notification via the harness pr
 **Trigger points (send at each):** acceptance doc written and awaiting approval, grounding checkpoint posted, unrecoverable error, chunk complete, sprint closed.
 
 **Required message fields:**
+
 - `task_id` — the task_queue UUID from the input (parse from the task text)
 - `chunk_id` — e.g. `sprint-4-C`
 - one-line summary of what happened
 
 **Message format:**
+
 ```
 [LepiOS Coordinator] {chunk_id}
 Status: {acceptance_doc_ready | awaiting_grounding | error | complete}
@@ -224,6 +281,7 @@ When running as a routine (invoked via the Anthropic Routines API with Bash acce
 To send a Telegram notification, POST to /api/harness/telegram-send with the body `{ text: '...' }` and `Authorization: Bearer $CRON_SECRET`. Do not call Telegram Bot API directly.
 
 Example using curl from Bash:
+
 ```bash
 curl -s -X POST https://lepios-one.vercel.app/api/harness/telegram-send \
   -H "Content-Type: application/json" \
