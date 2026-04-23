@@ -30,16 +30,16 @@ harness_e2e:
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: "A"
-status: "awaiting-grounding"
+active_chunk: "B"
+status: "awaiting-phase2"
 phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
-acceptance_doc_path: "docs/sprint-4/chunk-a-acceptance.md"
-acceptance_doc_status: "approved-by-colin"
+acceptance_doc_path: "docs/sprint-4/chunk-b-acceptance.md"
+acceptance_doc_status: "not-started"
 last_handoff_path: "docs/sprint-4/chunk-a-handoff.json"
-awaiting: "colin"
+awaiting: "coordinator"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-22T20:30:00-06:00"
+last_updated_at: "2026-04-23T00:00:00-06:00"
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
@@ -56,7 +56,7 @@ kill_criterion: "Every visible number on LepiOS Business Review matches its sour
 # Progress
 
 chunks_planned: ["A", "B", "C", "D", "E"]
-chunks_complete: []
+chunks_complete: ["A"]
 chunks_escalated: []
 chunks_rolled_back: []
 

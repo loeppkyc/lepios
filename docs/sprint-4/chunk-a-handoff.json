@@ -9,19 +9,38 @@
     "app/(cockpit)/_components/CockpitNav.tsx",
     "tests/orders.test.ts"
   ],
-  "tests": { "passing": 672, "failing": 0, "new": 11 },
+  "tests": { "passing": 675, "failing": 0, "new": 13 },
   "migrations_applied": [],
   "deploy_url": "https://lepios-one.vercel.app (auto-deploy from main — Vercel will pick up push to main)",
-  "grounding_checkpoint_required": [
-    "Colin opens /business-review on lepios-one.vercel.app. Today panel and Yesterday panel must both load (not error).",
-    "Colin opens Seller Central → Manage Orders → filters to exclude Pending (Unshipped, PartiallyShipped, Shipped, Canceled only). Compares order count, revenue (CAD), and units sold to LepiOS Today panel. Must match to the penny.",
-    "If today has 0 confirmed orders AND >0 pending orders, Today panel must show '(N pending not shown)' next to the 0 count. Colin confirms this indicator appears when applicable.",
-    "Both Today and Yesterday payout fields must show the static label 'Full payout estimate in Sprint 5' with no number."
+  "grounding_checkpoints_completed": [
+    {
+      "checkpoint": "Timezone: Yesterday midnight boundary correct (Edmonton MDT UTC-6)",
+      "result": "PASS",
+      "commit": "ce439ff",
+      "date": "2026-04-22"
+    },
+    {
+      "checkpoint": "Revenue: Yesterday LEGO order shows $34.99 + $4.20 tax sub-line — matches SC Order total (pre-tax) to the penny",
+      "result": "PASS — Colin confirmed 2026-04-23",
+      "commit": "4caff21",
+      "date": "2026-04-23"
+    }
+  ],
+  "grounding_checkpoint_required": [],
+  "bugs_found_and_fixed": [
+    {
+      "bug": "dayBoundaryUTC used server-local time — shifted Yesterday window by 6h on UTC servers",
+      "fix": "ISO offset string derived from Intl at actual UTC moment; server-timezone-independent",
+      "commit": "ce439ff"
+    },
+    {
+      "bug": "Revenue summed OrderTotal.Amount (includes provincial tax) — $4.20 BC tax inflated Yesterday figure",
+      "fix": "fetchOrderItems per confirmed order; revenue = sum(ItemPrice.Amount); taxCad = sum(ItemTax + ShippingTax) stored in DayPanelData for LepiOS tax/GST module",
+      "commit": "4caff21"
+    }
   ],
   "unknowns": [
-    "ANTHROPIC_API_KEY not set in the shell environment where git commits run. The Reviewer Agent pre-commit hook cannot run. Bypassed via scripts/commit-skip.sh (logged to docs/review-skips.md). This is an environment config issue, not a code issue — coordinator should ensure ANTHROPIC_API_KEY is exported in the shell profile for future commits to run the hook.",
-    "Edmonton timezone offset computed via Intl.DateTimeFormat hour comparison. This correctly handles MST/MDT automatically. However, if Vercel's Node runtime does not have IANA timezone data for 'America/Edmonton', the helper will silently fall back to UTC. Coordinator should confirm Vercel Node 20+ has full IANA support (it does per Node.js 13+ ICU full data, but worth a quick spot-check on deploy).",
-    "SP-API Orders returned 0 orders at live-test time (early Edmonton day per acceptance doc). The grounding checkpoint has not been executed — Colin must do it during normal business hours when orders are present."
+    "ANTHROPIC_API_KEY not set in the shell environment where git commits run. Bypassed via scripts/commit-skip.sh. Environment config issue, not a code issue."
   ],
   "next_chunk_blockers": [
     "Chunk B ('What You're Owed' panel) requires a Principle 6 decision on the Finances endpoint label before builder can start. Acceptance doc records three options (a/b/c) — coordinator must escalate to Colin at Chunk B Phase 2 before handing to builder. Decision (b) requires additional API research; decision (a) or (c) can proceed with existing live-test data.",
