@@ -40,12 +40,12 @@ audit_reminder: "Next sprint will run cache-match-disabled until Colin updates l
 
 active_sprint: 4
 active_chunk: "C"
-status: "active"
+status: "awaiting-grounding"
 phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
 acceptance_doc_path: "docs/sprint-4/chunk-c-acceptance.md"
 acceptance_doc_status: "colin-approved"
-last_handoff_path: "docs/sprint-4/chunk-b-handoff.json"
-awaiting: "builder-chunk-c"
+last_handoff_path: "docs/sprint-4/chunk-c-handoff.json"
+awaiting: "grounding-checkpoint-chunk-c"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
 last_updated_at: "2026-04-23T17:00:00-06:00"
