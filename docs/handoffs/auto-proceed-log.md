@@ -72,3 +72,24 @@ reversibility_check: |
   sprint-state.md update: document only, no code/schema effect.
 confidence: high
 outcome: approved-by-colin
+
+---
+
+2026-04-23T16:30:00-06:00 sprint=4 chunk=C doc=docs/sprint-4/chunk-c-acceptance.md
+cited_principles: [1, 6, 8, 14, 17, META-C]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+  META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
+  Additionally, Open Question Q1 (fee/payout column display) requires Colin's explicit decision
+  before builder starts — cannot proceed autonomously on a visible UI decision with cache-match disabled.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  sprint-state.md update: document only, no code/schema effect.
+  No code written, no schema changed, no external calls made.
+  No decisions with irreversible effects in this doc.
+confidence: high (escalation is correct and unambiguous)
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - open_question_Q1 (fee/payout column display requires Colin decision before builder starts)
