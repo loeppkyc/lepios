@@ -17,7 +17,13 @@ Wire the SP-API Orders endpoint into LepiOS and display, side by side, a Today p
 
 **Pending indicator requirement:** When confirmed order count = 0 and pending count > 0, the Today panel must display a small secondary label: `"(N pending not shown)"` alongside the zero count. This prevents the panel from being indistinguishable from "no sales today" when all sales are still in Pending state. The indicator is display-only — it does not contribute to revenue, units, or any number.
 
-**One acceptance criterion:** Today and Yesterday panels display confirmed order count, revenue (pre-fees, confirmed orders only), and units sold — and the numbers match the **confirmed-only view in Seller Central** (Pending excluded) to the penny on Colin's spot-check. When confirmed = 0 and pending > 0, the panel shows "(N pending not shown)" indicator. The payout field on both panels renders as the static label "Full payout estimate in Sprint 5" with no number shown.
+**Revenue definition (locked):** Revenue = sum of `ItemPrice.Amount` across all items in confirmed orders — **pre-tax, pre-fee item price only**. `OrderTotal.Amount` (which includes tax) must NOT be summed — this was the source of the $4.20 grounding failure (buyer in BC, 12% provincial tax). Requires `GET /orders/v0/orders/{orderId}/orderItems` per confirmed order to retrieve `ItemPrice.Amount`.
+
+**Tax capture (locked — v0 infrastructure for LepiOS tax/GST module):** Tax = sum of `ItemTax.Amount` + `ShippingTax.Amount` across all items in confirmed orders. Tax is NOT decorative — it is intentionally plumbed through `DayPanelData.taxCad` so the future LepiOS income tax + GST module can pull daily tax totals without re-querying SP-API. Display: revenue is the primary value; tax appears as a secondary sub-line (e.g. "+ $4.20 tax"). Do not aggregate tax for Pending orders — consistent with revenue exclusion. `ShippingPrice.Amount` and `PromotionDiscount.Amount` are excluded from both revenue and tax.
+
+Rationale for pre-tax revenue: (a) SC displays item price pre-tax as the default "Order total" — penny-match is achievable against that number; (b) tax is collected for CRA and remitted, never earned by the seller; (c) consistent with how Finances (Chunk B) treats settlement amounts.
+
+**One acceptance criterion:** Today and Yesterday panels display confirmed order count, revenue (pre-tax `ItemPrice.Amount`, confirmed orders only) with tax as a sub-line, and units sold — and the revenue numbers match the **confirmed-only view in Seller Central** (Order total, pre-tax, Pending excluded) to the penny on Colin's spot-check. When confirmed = 0 and pending > 0, the panel shows "(N pending not shown)" indicator. The payout field on both panels renders as the static label "Full payout estimate in Sprint 5" with no number shown. Both `revenueCad` and `taxCad` are stored in `DayPanelData` for downstream use by the tax/GST module.
 
 ---
 

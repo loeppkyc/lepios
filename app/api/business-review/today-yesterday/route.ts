@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { spApiConfigured } from '@/lib/amazon/client'
 import {
   fetchOrders,
+  fetchOrderItems,
   aggregateOrders,
   todayMidnightEdmontonUTC,
   yesterdayMidnightEdmontonUTC,
   yesterdayEndEdmontonUTC,
+  type SpOrder,
+  type SpOrderItem,
   type DayPanelData,
 } from '@/lib/amazon/orders'
 
@@ -15,6 +18,29 @@ export interface TodayYesterdayResponse {
   today: DayPanelData
   yesterday: DayPanelData
   fetchedAt: string
+}
+
+/** Build orderId → { revenue, tax } map from fetched order items. */
+async function buildFinanceMap(
+  orders: SpOrder[]
+): Promise<Map<string, { revenue: number; tax: number }>> {
+  const confirmedIds = orders.filter((o) => o.OrderStatus !== 'Pending').map((o) => o.AmazonOrderId)
+
+  const allItems = await Promise.all(
+    confirmedIds.map((id) => fetchOrderItems(id).then((items) => ({ id, items })))
+  )
+
+  const map = new Map<string, { revenue: number; tax: number }>()
+  for (const { id, items } of allItems) {
+    let revenue = 0
+    let tax = 0
+    for (const item of items as SpOrderItem[]) {
+      revenue += Number(item.ItemPrice?.Amount ?? 0)
+      tax += Number(item.ItemTax?.Amount ?? 0) + Number(item.ShippingTax?.Amount ?? 0)
+    }
+    map.set(id, { revenue, tax })
+  }
+  return map
 }
 
 export async function GET() {
@@ -35,8 +61,15 @@ export async function GET() {
       fetchOrders({ createdAfter: yesterdayAfter, createdBefore: yesterdayBefore }),
     ])
 
-    const today = aggregateOrders(todayOrders)
-    const yesterday = aggregateOrders(yesterdayOrders)
+    // Fetch per-item prices for confirmed orders — required for pre-tax revenue.
+    // Pending orders are excluded from both fetches.
+    const [todayFinanceMap, yesterdayFinanceMap] = await Promise.all([
+      buildFinanceMap(todayOrders),
+      buildFinanceMap(yesterdayOrders),
+    ])
+
+    const today = aggregateOrders(todayOrders, todayFinanceMap)
+    const yesterday = aggregateOrders(yesterdayOrders, yesterdayFinanceMap)
 
     const body: TodayYesterdayResponse = {
       today,

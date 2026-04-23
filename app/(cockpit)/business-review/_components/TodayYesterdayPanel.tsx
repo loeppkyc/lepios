@@ -94,6 +94,11 @@ function DayPanel({
         <StatRow
           label="Revenue"
           value={data.confirmedCount > 0 ? `$${data.revenueCad.toFixed(2)}` : '—'}
+          sub={
+            data.confirmedCount > 0 && data.taxCad > 0
+              ? `+ $${data.taxCad.toFixed(2)} tax`
+              : undefined
+          }
         />
         <StatRow label="Units" value={data.confirmedCount > 0 ? data.unitsSold.toString() : '—'} />
         {/* Constraint 6: static payout label — no number */}

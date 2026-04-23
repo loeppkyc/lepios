@@ -11,12 +11,33 @@ export type OrderStatus = 'Unshipped' | 'PartiallyShipped' | 'Shipped' | 'Cancel
 export interface SpOrder {
   AmazonOrderId: string
   OrderStatus: OrderStatus
+  // OrderTotal includes tax — do NOT use for revenue. Use ItemPrice from order items.
   OrderTotal?: {
     Amount: string
     CurrencyCode: string
   }
   NumberOfItemsShipped?: number
   NumberOfItemsUnshipped?: number
+}
+
+export interface SpOrderItem {
+  OrderItemId: string
+  ASIN?: string
+  QuantityOrdered: number
+  // Pre-tax item price — the correct revenue field (Principle 6)
+  ItemPrice?: { Amount: string; CurrencyCode: string }
+  // Excluded from revenue: tax passes through to CRA
+  ItemTax?: { Amount: string; CurrencyCode: string }
+  ShippingPrice?: { Amount: string; CurrencyCode: string }
+  ShippingTax?: { Amount: string; CurrencyCode: string }
+  PromotionDiscount?: { Amount: string; CurrencyCode: string }
+}
+
+interface OrderItemsResponse {
+  payload?: {
+    OrderItems?: SpOrderItem[]
+    NextToken?: string
+  }
 }
 
 interface OrdersPageResponse {
@@ -79,6 +100,29 @@ export async function fetchOrders(params: FetchOrdersParams): Promise<SpOrder[]>
   return orders
 }
 
+/**
+ * Fetch all items for a single order.
+ * Used to get pre-tax ItemPrice.Amount — OrderTotal includes tax and must not
+ * be used for revenue (grounding failure: $4.20 tax on BC buyer, 12% rate).
+ */
+export async function fetchOrderItems(orderId: string): Promise<SpOrderItem[]> {
+  const items: SpOrderItem[] = []
+  let params: Record<string, string> = {}
+
+  while (true) {
+    const data = await spFetch<OrderItemsResponse>(
+      `/orders/v0/orders/${encodeURIComponent(orderId)}/orderItems`,
+      { method: 'GET', params: Object.keys(params).length ? params : undefined }
+    )
+    items.push(...(data.payload?.OrderItems ?? []))
+    const next = data.payload?.NextToken
+    if (!next) break
+    params = { NextToken: next }
+  }
+
+  return items
+}
+
 // ── Day-boundary helpers (Edmonton = America/Edmonton) ────────────────────────
 
 /** Returns ISO-8601 UTC string for today at midnight Edmonton time. */
@@ -125,10 +169,16 @@ function dayBoundaryUTC(localDate: Date, boundary: 'start' | 'end'): string {
   // Compute UTC offset for Edmonton at this moment (positive = UTC ahead of Edmonton)
   // e.g. MDT: UTC is 6h ahead of Edmonton → offsetHours = 6
   const utcHour = Number(
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', hour: '2-digit', hour12: false }).format(localDate)
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', hour: '2-digit', hour12: false }).format(
+      localDate
+    )
   )
   const edHour = Number(
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hour: '2-digit', hour12: false }).format(localDate)
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Edmonton',
+      hour: '2-digit',
+      hour12: false,
+    }).format(localDate)
   )
   let offsetHours = utcHour - edHour
   if (offsetHours < 0) offsetHours += 24
@@ -160,17 +210,33 @@ const CONFIRMED_STATUSES = new Set<OrderStatus>([
 export interface DayPanelData {
   /** Count of confirmed orders (Unshipped + PartiallyShipped + Shipped + Canceled) */
   confirmedCount: number
-  /** Sum of OrderTotal.Amount across confirmed orders (CAD) */
+  /** Sum of ItemPrice.Amount across confirmed orders (CAD, pre-tax) */
   revenueCad: number
+  /** Sum of ItemTax.Amount + ShippingTax.Amount across confirmed orders — v0 infra for LepiOS tax/GST module */
+  taxCad: number
   /** Sum of NumberOfItemsShipped + NumberOfItemsUnshipped across confirmed orders */
   unitsSold: number
   /** Count of Pending orders — drives indicator only, not headline numbers */
   pendingCount: number
 }
 
-export function aggregateOrders(orders: SpOrder[]): DayPanelData {
+/**
+ * Aggregate orders into panel data.
+ *
+ * itemFinanceMap: orderId → { revenue, tax } fetched from /orderItems.
+ * revenue = sum(ItemPrice.Amount) — pre-tax item price (correct revenue field).
+ * tax = sum(ItemTax.Amount + ShippingTax.Amount) — captured for LepiOS tax/GST module.
+ * OrderTotal.Amount must NOT be used — includes provincial tax (grounding failure: $4.20
+ * BC tax at 12% inflated revenue on grounding check).
+ * Pending orders are excluded from both revenue and tax.
+ */
+export function aggregateOrders(
+  orders: SpOrder[],
+  itemFinanceMap: Map<string, { revenue: number; tax: number }>
+): DayPanelData {
   let confirmedCount = 0
   let revenueCad = 0
+  let taxCad = 0
   let unitsSold = 0
   let pendingCount = 0
 
@@ -181,16 +247,14 @@ export function aggregateOrders(orders: SpOrder[]): DayPanelData {
     }
     if (CONFIRMED_STATUSES.has(order.OrderStatus)) {
       confirmedCount++
-      // Constraint 3: revenue from OrderTotal.Amount
-      const amount = parseFloat(order.OrderTotal?.Amount ?? '0')
-      if (!isNaN(amount)) revenueCad += amount
-      // Constraint 3: units = shipped + unshipped
+      const finance = itemFinanceMap.get(order.AmazonOrderId) ?? { revenue: 0, tax: 0 }
+      revenueCad += finance.revenue
+      taxCad += finance.tax
       unitsSold += (order.NumberOfItemsShipped ?? 0) + (order.NumberOfItemsUnshipped ?? 0)
     }
   }
 
-  // Round revenue to 2dp to avoid floating-point drift
   revenueCad = Math.round(revenueCad * 100) / 100
-
-  return { confirmedCount, revenueCad, unitsSold, pendingCount }
+  taxCad = Math.round(taxCad * 100) / 100
+  return { confirmedCount, revenueCad, taxCad, unitsSold, pendingCount }
 }
