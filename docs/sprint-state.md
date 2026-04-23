@@ -39,16 +39,16 @@ audit_reminder: "Next sprint will run cache-match-disabled until Colin updates l
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: "C-pending"
+active_chunk: "C"
 status: "active"
 phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
-acceptance_doc_path: null
-acceptance_doc_status: "pending-coordinator"
+acceptance_doc_path: "docs/sprint-4/chunk-c-acceptance.md"
+acceptance_doc_status: "awaiting-colin-approval"
 last_handoff_path: "docs/sprint-4/chunk-b-handoff.json"
-awaiting: null
+awaiting: "colin-approval-chunk-c-acceptance-doc"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-23T15:00:00-06:00"
+last_updated_at: "2026-04-23T16:30:00-06:00"
 resumed_at: "2026-04-23T15:00:00-06:00"
 resume_reason: "Component #3 Remote Invocation shipped (commit bebac8e). Clean unattended run verified: task 90f952dc claimed autonomously, session session_01Y4Ca2VMWjFF9WYhrkqxFYV spawned without human step. Resume trigger met."
 pause_reason: "Harness remote invocation is higher priority than more LepiOS features. Chunks C/D/E are scoped and ready but will run through the harness unattended once remote invocation ships."
