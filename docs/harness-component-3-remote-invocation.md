@@ -1,11 +1,12 @@
 # Autonomous Harness — Component #3: Remote Invocation
 
-**Status:** Design — ready for Colin review
+**Status:** Design — spec locked, ready to build
 **Author:** Colin + Claude, 2026-04-23
 **Scope:** Programmatic invocation of the coordinator sub-agent from the Vercel task-pickup cron, eliminating the last human step between task-queue claim and coordinator execution
-**Rationale:** Component #5 (task pickup) v0 ends with a Telegram message asking Colin to paste one line into Claude Code. That line is the only human step remaining before true unattended operation. Component #3 removes it by having the Vercel pickup cron call the Claude Code remote trigger API directly after claiming a task.
-**Sequencing:** After component #5 v0 is stable (3 clean pickup days). Coordinator trigger must exist before pickup cron can call it. Both are in-scope here.
+**Rationale:** Component #5 (task pickup) v0 ends with a Telegram message asking Colin to paste one line into Claude Code. That line is the only human step remaining before true unattended operation. Component #3 removes it by having the Vercel pickup cron call the Anthropic Routines API directly after claiming a task.
+**Sequencing:** After component #5 v0 is stable (3 clean pickup days). Coordinator routine must exist before pickup cron can call it. Both are in-scope here.
 **Sprint 4 unblock:** Sprint 4 Chunks C/D/E are scoped and ready. They will run through the harness unattended once this component ships and one clean end-to-end coordinator run is verified.
+**API status:** Experimental — `anthropic-beta: experimental-cc-routine-2026-04-01`. Pin this header; monitor for deprecation notices.
 
 ---
 
@@ -24,11 +25,11 @@ Colin reads it, opens Claude Code, pastes one line. Coordinator runs.
 
 That paste is the last human step. Component #3 removes it.
 
-**What changes:** After claiming a task, the pickup cron calls `POST /v1/code/triggers/{coordinator_trigger_id}/run` with the `task_id` in the request body. The coordinator agent starts in the remote environment, reads the full task row from Supabase, and executes the coordinator loop. Escalations and grounding checkpoints surface via Telegram. Colin sees the work without having typed anything.
+**What changes:** After claiming a task, the pickup cron calls `POST https://api.anthropic.com/v1/claude_code/routines/{routine_id}/fire` with the `task_id` as the body text. The coordinator agent starts in the remote environment, reads the full task row from Supabase, and executes the coordinator loop. Escalations and grounding checkpoints surface via Telegram. Colin sees the work without having typed anything.
 
 **What stays the same:** Every coordinator rule in `coordinator.md` — escalation gates, non-negotiables, grounding-checkpoint authority — is unchanged. Remote invocation changes _how_ the coordinator starts, not _what_ it does.
 
-**The v0 constraint:** In v0, the remote invocation is fire-and-forget from Vercel's perspective. The pickup cron calls `/run`, gets a `run_id` back, logs it to `agent_events`, and exits. It does not poll the run for completion. Coordinator lifecycle (running, awaiting-grounding, completed) is tracked via `task_queue.status` and `last_heartbeat_at`, same as if Colin had invoked it manually.
+**The v0 constraint:** In v0, the remote invocation is fire-and-forget from Vercel's perspective. The `/fire` call returns `claude_code_session_id` and `claude_code_session_url` immediately — it does not stream output or wait for completion. The pickup cron logs the session ID to `agent_events` and exits. Coordinator lifecycle (running, awaiting-grounding, completed) is tracked via `task_queue.status` and `last_heartbeat_at`, same as if Colin had invoked it manually.
 
 ---
 
@@ -36,158 +37,167 @@ That paste is the last human step. Component #3 removes it.
 
 ### In scope (v0)
 
-- **Coordinator trigger registration** — one persistent trigger at claude.ai (`POST /v1/code/triggers`). Configuration: lepios repo source, coordinator model and tools, base prompt instructing coordinator to fetch and execute a specific task from `task_queue`.
-- **`/api/harness/invoke-coordinator` endpoint** — thin Vercel route that calls the remote trigger `/run` endpoint. Receives `task_id`, calls the API, returns the run ID. Separated from the pickup cron so it can be invoked independently for testing.
+- **Coordinator routine registration** — one persistent routine created at claude.ai/code/routines. Configuration: lepios repo source, coordinator model and tools, saved prompt instructing coordinator to fetch and execute a task from `task_queue`. Created once in the UI; `routine_id` stored in Vercel env.
+- **`/api/harness/invoke-coordinator` endpoint** — thin Vercel route that calls `POST https://api.anthropic.com/v1/claude_code/routines/{routine_id}/fire`. Receives `task_id`, calls the API, returns the `claude_code_session_id`. Separated from the pickup cron so it can be invoked independently for testing.
 - **Pickup cron integration** — modify `app/api/cron/task-pickup/route.ts` to call `invoke-coordinator` after a successful claim, instead of (or in addition to) the v0 Telegram notification.
 - **Feature flag: `REMOTE_INVOCATION_ENABLED`** — when absent or falsy, pickup cron behaves exactly like component #5 v0 (Telegram only, no remote trigger call). Fast-disable without deploy.
 - **Fallback: Telegram on remote invocation failure** — if the `/run` call fails, pickup cron falls back to the v0 Telegram message so Colin can invoke manually. The task remains claimed; stale recovery applies.
-- **`agent_events` row** — written after each `/run` call: `task_type: 'remote_invocation_sent'`, includes `run_id` returned by the API, `task_id`, and `trigger_id`.
+- **`agent_events` row** — written after each `/fire` call: `task_type: 'remote_invocation_sent'`, includes `claude_code_session_id` returned by the API, `task_id`, and `routine_id`.
 - **Coordinator startup behavior** — coordinator reads `task_id` from its initial message, fetches the full row from Supabase, updates `task_queue.status = 'running'`, begins the heartbeat, and proceeds with the coordinator loop.
 
 ### Explicitly out of scope
 
-- **Builder trigger** — builder is invoked by coordinator within the same session or as a sub-agent. It does not get a separate remote trigger in v0.
-- **Run polling / completion tracking** — the Vercel cron does not poll for coordinator run completion. Coordinator manages its own lifecycle via `task_queue` updates.
+- **Builder routine** — builder is invoked by coordinator within the same session or as a sub-agent. It does not get a separate remote routine in v0.
+- **Run polling / completion tracking** — the Vercel cron does not poll for coordinator session completion. The `/fire` API does not stream or wait; coordinator manages its own lifecycle via `task_queue` updates.
 - **Multi-task parallelism** — one coordinator run per pickup cycle. Queue is FIFO with one claimed task at a time.
-- **Trigger management UI** — triggers are created and updated via the API directly. No dashboard.
+- **Routine management UI** — routines are created and configured via the UI at claude.ai/code/routines. The per-routine API token is generated there.
 - **Automatic task re-submission on coordinator crash** — stale heartbeat recovery (component #5 §6) handles re-queuing. This component does not add additional recovery logic.
+- **Retry logic in invoke-coordinator** — the `/fire` endpoint has no idempotency key; each call creates a new session. Pickup cron must NOT retry `/fire` on failure — let stale reclaim handle it.
 
 ---
 
-## 3. The Remote Trigger API
+## 3. The Anthropic Routines API
 
-The claude.ai remote trigger API is the invocation mechanism. Based on inspection of existing triggers (`/v1/code/triggers` — 20+ triggers live for the Loeppky Streamlit project), the API is fully operational. Key fields confirmed from live trigger objects:
+Source: `https://platform.claude.com/docs/en/api/claude-code/routines-fire`
 
-```json
+### 3.1 Fire endpoint
+
+```http
+POST https://api.anthropic.com/v1/claude_code/routines/{routine_id}/fire
+Authorization: Bearer sk-ant-oat01-...
+anthropic-version: 2023-06-01
+anthropic-beta: experimental-cc-routine-2026-04-01
+Content-Type: application/json
+
 {
-  "id": "trig_01...",
-  "name": "Human-readable name",
-  "cron_expression": "0 4 * * *",
-  "enabled": true,
-  "job_config": {
-    "ccr": {
-      "environment_id": "env_01CkF4M1HtoFEcDLDqN1KMtT",
-      "events": [
-        {
-          "data": {
-            "message": {
-              "content": "Initial prompt sent to the agent",
-              "role": "user"
-            },
-            "type": "user",
-            "uuid": "unique-event-id"
-          }
-        }
-      ],
-      "session_context": {
-        "allowed_tools": ["Read", "Glob", "Grep", "Write", "Edit"],
-        "model": "claude-sonnet-4-6",
-        "sources": [
-          {
-            "git_repository": {
-              "url": "https://github.com/loeppkyc/lepios"
-            }
-          }
-        ]
-      }
-    }
-  }
+  "text": "<freeform string, max 65,536 chars>"
 }
 ```
 
-**On-demand invocation:** `POST /v1/code/triggers/{trigger_id}/run` fires the trigger immediately, regardless of `cron_expression`. The optional body can pass additional context (see §5 — open question Q2 on whether body content is injected into the initial message).
+**`routine_id`:** Prefixed `trig_` (e.g., `trig_01...`) despite the parameter name being `routine_id`. Use the ID from claude.ai/code/routines.
 
-**Environment:** `env_01CkF4M1HtoFEcDLDqN1KMtT` is the existing environment used by all Loeppky Streamlit triggers. The coordinator trigger will use the same environment unless a lepios-specific environment is needed (see §9 Q3).
+**`text` field:** Freeform string. Passed to the routine alongside its saved prompt as **initial context** — not structured injection. If we send JSON it is received as a literal string. For our use: the routine's saved prompt contains the coordinator's base instructions; `text` carries the `task_id`. Coordinator reads `text` to parse `task_id`, then queries `task_queue`.
 
-**Auth:** The `RemoteTrigger` tool in Claude Code handles auth automatically (OAuth token injected in-process). For Vercel-side calls, a user API token is required — see §4.
+**Response:** Returns immediately — does not stream or wait for session completion:
+
+```json
+{
+  "claude_code_session_id": "sess_01...",
+  "claude_code_session_url": "https://claude.ai/code/sessions/sess_01..."
+}
+```
+
+**No idempotency key.** Each `/fire` call creates a new session. Pickup cron must NOT retry on failure — let task stale-reclaim handle re-queuing.
+
+### 3.2 Plan requirement
+
+Requires Pro/Max/Team/Enterprise plan with Claude Code on the web enabled. Colin has Max. Verify "Claude Code on the web" is enabled at claude.ai/settings before Chunk A.
+
+### 3.3 Rate limits
+
+Per-account daily allowance (varies by plan), surfaced at claude.ai/code/routines. 429 returns `Retry-After` header. At 3–4 invocations/day during stale-recovery cycles, well under any limit on Max plan.
+
+### 3.4 Experimental status
+
+The `anthropic-beta: experimental-cc-routine-2026-04-01` header is required. This API may change. Pin the beta header version in code and monitor Anthropic changelog for deprecation notices. Do not build production-critical logic that can't be adapted if the API changes.
 
 ---
 
 ## 4. Authentication
 
-Two auth boundaries:
+Three auth boundaries, all resolved.
 
-### 4.1 Vercel → Claude Code API
+### 4.1 Vercel → Anthropic Routines API ✓ RESOLVED
 
-The `invoke-coordinator` endpoint in Vercel calls `POST /v1/code/triggers/{id}/run`. This requires a bearer token with permission to invoke Claude Code remote triggers.
+**Token type:** Per-routine bearer token. Format: `sk-ant-oat01-...`
 
-**Token:** Store as `CLAUDE_CODE_API_KEY` in Vercel environment. This is a user-scoped OAuth token from claude.ai. It is **not** the Anthropic API key — it is a claude.ai session/access token that can be generated from the account.
+**How to generate:** claude.ai/code/routines → select routine → Edit → "Add another trigger" → API → "Generate token". Shown once on generation; not retrievable afterward. Revocable at any time from the same UI.
 
-**Security note:** This token has broad scope (it can invoke any trigger owned by the account). Treat it with the same care as `CRON_SECRET`. If compromised, an attacker could invoke coordinator triggers at will. Rotate alongside `VERCEL_TOKEN` on the July 22 2026 rotation schedule.
+**Scope:** Scoped to exactly one routine. A compromised token can only fire that one routine — no read access, no account data, no access to other routines. This is safe to store as a Vercel environment secret.
 
-**Request shape:**
+**Token variable:** `COORDINATOR_ROUTINE_TOKEN` in Vercel env and in `.env.local`. NOT `ANTHROPIC_API_KEY` (that's the LLM API key — different thing entirely).
+
+**Security note:** Treat like `CRON_SECRET`. Add to the July 22 2026 rotation schedule alongside `VERCEL_TOKEN` and `GITHUB_TOKEN`.
+
+**Request shape (confirmed):**
 
 ```http
-POST https://claude.ai/v1/code/triggers/{coordinator_trigger_id}/run
-Authorization: Bearer {CLAUDE_CODE_API_KEY}
+POST https://api.anthropic.com/v1/claude_code/routines/{routine_id}/fire
+Authorization: Bearer sk-ant-oat01-...
+anthropic-version: 2023-06-01
+anthropic-beta: experimental-cc-routine-2026-04-01
 Content-Type: application/json
 
-{ "task_id": "<uuid>", "run_id": "<pickup-run-id>" }
+{ "text": "task_id: <uuid>\nrun_id: <pickup-run-uuid>" }
 ```
 
-### 4.2 Coordinator → Supabase
+### 4.2 Coordinator → Supabase ✓ RESOLVED BY ARCHITECTURE
 
-Coordinator reads and writes `task_queue` via the Supabase service role client. The service key must be available inside the coordinator trigger's runtime environment.
+Secrets for coordinator runtime (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, etc.) are configured as **connectors** when creating the routine in the UI at claude.ai/code/routines. They are saved per-routine and available to every session fired from that routine. No per-request secret passing required.
 
-**Open question (§9 Q4):** Does the claude.ai trigger environment support injecting environment variables per-trigger, or per-run? If yes, `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` are set at trigger creation time and available to coordinator as `process.env`. If not, coordinator must receive them in its initial prompt (insecure — keys in logs) or they must be baked into the trigger's environment via another mechanism.
+Action: add Supabase connector when creating the coordinator routine in Chunk A.
 
-### 4.3 Coordinator → GitHub (lepios repo)
+### 4.3 Coordinator → GitHub (lepios repo) ✓ RESOLVED BY ARCHITECTURE
 
-Coordinator reads files from the lepios repo. The `sources` config with `git_repository.url` handles this for reading. If coordinator needs to write commits (builder does; coordinator does not in normal operation), a `GITHUB_TOKEN` with write access to `loeppkyc/lepios` is required.
+Same connector pattern as 4.2. The lepios repo source is configured in the routine's saved config (repo URL + credentials). Coordinator reads files from the cloned repo automatically. No per-request credential passing.
 
-For coordinator-only runs (no commits), public read of the repo is sufficient — or the token used in `sources` handles it. Confirm whether the `git_repository` source in the trigger config uses the same OAuth token as the invocation auth.
+For coordinator-only runs (no commits), read access is sufficient. Builder commits are out of scope for coordinator.
 
 ---
 
-## 5. Coordinator Trigger Configuration
+## 5. Coordinator Routine Configuration
 
-### 5.1 Base trigger (created once)
+### 5.1 Saved prompt (configured in UI when creating the routine)
 
-```json
-{
-  "name": "LepiOS Coordinator",
-  "enabled": false,
-  "cron_expression": null,
-  "job_config": {
-    "ccr": {
-      "environment_id": "env_01CkF4M1HtoFEcDLDqN1KMtT",
-      "events": [
-        {
-          "data": {
-            "message": {
-              "content": "COORDINATOR RUN — task_id: {{TASK_ID}}\n\nYou are the coordinator sub-agent for LepiOS. Your instructions are in .claude/agents/coordinator.md.\n\n1. Read .claude/agents/coordinator.md\n2. Read docs/sprint-state.md\n3. Query Supabase: SELECT * FROM task_queue WHERE id = '{{TASK_ID}}'\n4. Update task_queue SET status = 'running', last_heartbeat_at = NOW() WHERE id = '{{TASK_ID}}'\n5. Execute the coordinator loop per coordinator.md starting at Phase 2 (the chunk is already defined in the task row's metadata field)\n6. Write last_heartbeat_at every 5 minutes while running\n7. Surface escalations and grounding checkpoints via Telegram (loeppky_trigger_bot)\n8. On completion: UPDATE task_queue SET status = 'completed', completed_at = NOW() WHERE id = '{{TASK_ID}}'\n\nFetch SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from environment.",
-              "role": "user"
-            },
-            "type": "user",
-            "uuid": "coordinator-base-event"
-          }
-        }
-      ],
-      "session_context": {
-        "allowed_tools": ["Read", "Glob", "Grep", "Write", "Edit"],
-        "model": "claude-sonnet-4-6",
-        "sources": [
-          {
-            "git_repository": {
-              "url": "https://github.com/loeppkyc/lepios"
-            }
-          }
-        ]
-      }
-    }
-  }
-}
+The routine's saved prompt is the stable base instruction set. The `/fire` body `text` field carries the per-invocation context (task_id). Coordinator reads both.
+
+```text
+You are the coordinator sub-agent for LepiOS. Your instructions are in .claude/agents/coordinator.md.
+
+The INITIAL CONTEXT field (provided at run time) contains the task_id and run_id for this invocation. Parse them first.
+
+On every invocation:
+1. Read .claude/agents/coordinator.md
+2. Read docs/sprint-state.md
+3. Parse task_id from the initial context text
+4. Query Supabase: SELECT * FROM task_queue WHERE id = '<task_id>'
+   - If status != 'claimed': write error_message, terminate cleanly
+5. UPDATE task_queue SET status = 'running', last_heartbeat_at = NOW() WHERE id = '<task_id>'
+6. Execute the coordinator loop per coordinator.md Phase 2 for the chunk named in task.metadata.chunk
+7. Write last_heartbeat_at = NOW() every 5 minutes while running
+8. Surface escalations and grounding checkpoints via Telegram (loeppky_trigger_bot)
+   - On escalation: UPDATE status = 'awaiting-grounding', write checkpoint list to result column, terminate
+9. On completion: UPDATE status = 'completed', completed_at = NOW(), write summary to result column
+   - Send Telegram: "✅ Coordinator completed [task_id prefix] — [one-line summary]"
 ```
 
-**Tool scope:** Matches `coordinator.md` — Read, Glob, Grep, Write, Edit. No Bash (coordinator never runs shell commands). No sub-agent invocation in v0 (builder is a future remote trigger).
+### 5.2 Routine settings (configured in UI)
 
-**`{{TASK_ID}}` placeholder:** Whether this is injected at `/run` call time depends on the API's body-injection behavior (§9 Q2). If not supported, the base event omits the placeholder and coordinator fetches the most recently claimed task from `task_queue WHERE status = 'claimed' ORDER BY claimed_at DESC LIMIT 1`.
+- **Name:** LepiOS Coordinator
+- **Model:** claude-sonnet-4-6
+- **Tools:** Read, Glob, Grep, Write, Edit (no Bash — coordinator never runs shell commands)
+- **Repo source:** `https://github.com/loeppkyc/lepios` (private — connect via GitHub connector)
+- **Connectors:** Supabase (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY), Telegram bot token (loeppky_trigger_bot)
+- **Cron schedule:** None — on-demand only via `/fire`
 
-### 5.2 Registration
+### 5.3 `/fire` request body
 
-Trigger is created once via `RemoteTrigger` tool (or direct API call from Claude Code session). The resulting `trigger_id` is stored as `COORDINATOR_TRIGGER_ID` in Vercel env and in `docs/secrets-notes.md` (non-secret metadata only — the trigger ID is not a secret).
+Freeform `text` string, passed as initial context alongside the saved prompt:
 
-Trigger starts `enabled: false`. It is invoked on-demand via `/run`, not on a cron schedule. This ensures coordinator only runs when a task is actually claimed, not on a fixed schedule.
+```json
+{ "text": "task_id: <full-uuid>\nrun_id: <pickup-run-uuid>" }
+```
+
+Coordinator parses this text to extract `task_id`. No structured injection — straightforward string parsing.
+
+### 5.4 Registration
+
+Routine is created once in the UI at claude.ai/code/routines. The resulting `routine_id` (prefixed `trig_`) is stored:
+
+- As `COORDINATOR_ROUTINE_ID` in Vercel env (non-secret — it's an ID, not a token)
+- In `docs/secrets-notes.md` under "Coordinator Routine" for reference
+
+The per-routine API token is generated separately in the same UI screen (§4.1) and stored as `COORDINATOR_ROUTINE_TOKEN` in Vercel env (this IS a secret).
 
 ---
 
@@ -195,27 +205,38 @@ Trigger starts `enabled: false`. It is invoked on-demand via `/run`, not on a cr
 
 ### 6.1 `/api/harness/invoke-coordinator/route.ts`
 
-New route. Thin wrapper over the remote trigger `/run` call.
+New route. Thin wrapper over the Anthropic Routines `/fire` call.
 
-**Auth:** Requires `Authorization: Bearer {CRON_SECRET}` — same pattern as all other harness routes. Coordinator trigger is only invocable from within the LepiOS harness.
+**Auth:** Requires `Authorization: Bearer {CRON_SECRET}` — same pattern as all other harness routes. Only the LepiOS harness can invoke the coordinator routine.
 
 **Input:**
 
 ```typescript
-{
-  task_id: string
-  run_id: string
-}
+{ task_id: string; run_id: string }
 ```
 
 **Behavior:**
 
 1. Validate `task_id` and `run_id` are non-empty UUIDs.
-2. Call `POST https://claude.ai/v1/code/triggers/{COORDINATOR_TRIGGER_ID}/run` with the task context in the body.
-3. On success (HTTP 2xx): return `{ ok: true, trigger_run_id: response.run_id }`.
-4. On failure: return `{ ok: false, error: response.error }` with HTTP 200 (the Vercel route itself succeeded; the upstream call failed). Pickup cron handles the fallback.
+2. Build the `text` body: `"task_id: ${task_id}\nrun_id: ${run_id}"`.
+3. Call the Routines API — exactly once, no retries (see request shape below).
+4. On success (HTTP 2xx): return `{ ok: true, session_id: response.claude_code_session_id, session_url: response.claude_code_session_url }`.
+5. On failure or network error: return `{ ok: false, error: string }` with HTTP 200. Pickup cron handles the fallback. Do NOT retry — duplicate `/fire` calls create duplicate sessions.
 
-**No polling.** This route fires and returns. Coordinator lifecycle is tracked via `task_queue`, not via polling the `/run` status.
+```typescript
+fetch(`https://api.anthropic.com/v1/claude_code/routines/${COORDINATOR_ROUTINE_ID}/fire`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${COORDINATOR_ROUTINE_TOKEN}`,
+    'anthropic-version': '2023-06-01',
+    'anthropic-beta': 'experimental-cc-routine-2026-04-01',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ text: `task_id: ${task_id}\nrun_id: ${run_id}` }),
+})
+```
+
+**No polling.** This route fires and returns. Coordinator lifecycle is tracked via `task_queue`, not the session URL.
 
 ### 6.2 Pickup cron modification
 
@@ -223,24 +244,22 @@ Modify `app/api/cron/task-pickup/route.ts`. After a successful task claim:
 
 ```typescript
 if (process.env.REMOTE_INVOCATION_ENABLED) {
-  const result = await invokeCoordinator({ task_id: claimed.id, run_id })
+  const result = await invokeCoordinator({ task_id: claimed.id, run_id });
   if (result.ok) {
     await writeAgentEvent('remote_invocation_sent', {
       task_id: claimed.id,
-      trigger_run_id: result.trigger_run_id,
-      trigger_id: COORDINATOR_TRIGGER_ID,
-    })
-    // Still send Telegram — but now as an FYI, not as an action prompt
+      session_id: result.session_id,
+      routine_id: COORDINATOR_ROUTINE_ID,
+    });
     await sendTelegram(
       `🤖 Coordinator invoked for task ${claimed.id.slice(0, 8)}\n${claimed.task.slice(0, 80)}`
-    )
-    return
+    );
+    return;
   }
-  // Fallback: remote invocation failed, send v0 Telegram
-  await sendTelegram(v0ManualPickupMessage(claimed))
+  // Fallback: fire failed — send v0 Telegram so Colin can run manually
+  await sendTelegram(v0ManualPickupMessage(claimed));
 } else {
-  // v0 behavior: Telegram only
-  await sendTelegram(v0ManualPickupMessage(claimed))
+  await sendTelegram(v0ManualPickupMessage(claimed));
 }
 ```
 
@@ -276,161 +295,149 @@ This is v0's escalation model. In v1, a two-way Telegram channel (component #2 t
 
 ## 8. Failure Modes
 
-| Scenario                                                                           | Behavior                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invoke-coordinator` endpoint returns 4xx/5xx                                      | Pickup cron falls back to v0 Telegram ("paste this to run manually"). Task stays `claimed`. Stale recovery applies.                                                                                                                                 |
-| Remote trigger fires but coordinator fails to start (repo clone fails, auth error) | Task stays `claimed` with no heartbeat. Stale recovery re-queues after 10 minutes. No Telegram — coordinator never started. This is a silent failure; see §9 Q7 on run status polling.                                                              |
-| Coordinator starts but crashes mid-run                                             | Heartbeat stops. Stale recovery re-queues after 10 minutes. On re-queue, next pickup fires a fresh coordinator run (retry 1 of `max_retries`).                                                                                                      |
-| Coordinator hits escalation gate                                                   | Sends Telegram, sets `status = 'awaiting-grounding'`, terminates cleanly. Not a failure — expected path. Colin responds, task is re-queued or a new task is inserted.                                                                               |
-| `SUPABASE_SERVICE_ROLE_KEY` not in trigger environment                             | Coordinator fails at step 3 (Supabase fetch). Writes a clear error to `task_queue.error_message` (if it can — may fail there too). Silent otherwise. Stale recovery applies.                                                                        |
-| `COORDINATOR_TRIGGER_ID` not set in Vercel env                                     | `invoke-coordinator` returns 500. Pickup cron falls back to v0 Telegram. Feature flag `REMOTE_INVOCATION_ENABLED` should be forced false if this var is missing.                                                                                    |
-| Remote trigger API unreachable (claude.ai outage)                                  | `invoke-coordinator` catches fetch error, returns `{ ok: false }`. Pickup cron falls back to v0 Telegram.                                                                                                                                           |
-| Multiple concurrent pickup cron invocations                                        | Each invocation claims a different task (component #5 `FOR UPDATE SKIP LOCKED`). Each fires its own coordinator run. In practice the queue is designed for single-task throughput; concurrent runs are a misconfiguration risk, not a normal state. |
+| Scenario | Behavior |
+| --- | --- |
+| `/fire` returns 4xx/5xx | Pickup cron falls back to v0 Telegram ("paste this to run manually"). Task stays `claimed`. Stale recovery applies. Do NOT retry. |
+| Routine fires but coordinator fails to start (repo clone, connector auth) | Task stays `claimed` with no heartbeat. Stale recovery re-queues after 10 minutes. Silent failure — session was created but coordinator never wrote to `task_queue`. |
+| Coordinator starts but crashes mid-run | Heartbeat stops. Stale recovery re-queues after 10 minutes. Next pickup fires a fresh coordinator run (retry 1 of `max_retries`). |
+| Coordinator hits escalation / grounding checkpoint | Sends Telegram, sets `status = 'awaiting-grounding'`, terminates cleanly. Expected path. Colin re-queues a response task; next pickup invokes coordinator again. |
+| Supabase connector not configured on routine | Coordinator fails at Supabase fetch step. Writes error to `task_queue.error_message` if possible; stale recovery re-queues. Fix: add connector in routine UI. |
+| `COORDINATOR_ROUTINE_ID` or `COORDINATOR_ROUTINE_TOKEN` missing in Vercel env | `invoke-coordinator` returns 500. Pickup cron falls back to v0 Telegram. `REMOTE_INVOCATION_ENABLED` should be forced false when either var is missing. |
+| Routines API unreachable (Anthropic outage) | `invoke-coordinator` catches fetch error, returns `{ ok: false }`. Pickup cron falls back to v0 Telegram. |
+| 429 rate limit hit | `/fire` returns 429 with `Retry-After` header. Log the header value to `agent_events`. Do NOT retry inline — fall back to v0 Telegram. |
+| Multiple concurrent pickup invocations | Each claims a different task via `FOR UPDATE SKIP LOCKED`. Each fires its own coordinator session. Queue designed for single-task throughput; concurrent runs indicate misconfiguration. |
 
 ---
 
 ## 9. Open Questions
 
-**Q1 — Token type for Vercel → Claude Code API: UNRESOLVED**
-What token type does `POST /v1/code/triggers/{id}/run` require? The existing `RemoteTrigger` tool in Claude Code uses OAuth (injected in-process). For a Vercel function, there is no Claude Code process — just an HTTP call. Is there a machine-to-machine token (API key) available from claude.ai, or does this require a user OAuth refresh-token flow? If only OAuth is supported, Vercel would need to store a refresh token and exchange it for an access token on each invocation. This is non-trivial and may be the hardest problem in this component.
+Q1 (token type), Q2 (body injection), Q3 (environment), Q4 (secret injection), Q6 (rate limits), Q7 (session poll), Q8 (non-negotiables) — all resolved. See §3, §4, §5 for the locked spec.
 
-**Q2 — Body injection into initial message: UNRESOLVED**
-Does the `/run` body get injected into the trigger's `events[0].message.content` (replacing `{{TASK_ID}}` placeholders), or does it appear as a separate message after the base event, or is it ignored entirely? If the body is not available to the coordinator's initial prompt, coordinator must query `task_queue WHERE status = 'claimed' ORDER BY claimed_at DESC LIMIT 1` and process whatever it finds — workable but less precise than task_id injection.
+### Q5 — Coordinator escalation response loop: ARCHITECTURE DECISION NEEDED before Chunk D
 
-**Q3 — Environment: reuse Loeppky env or create lepios-specific one: UNRESOLVED**
-All existing triggers use `env_01CkF4M1HtoFEcDLDqN1KMtT`. Does this environment have the right compute config for the lepios coordinator (different repo, different secrets)? Or does lepios need its own environment with separate secret injection? The environment may also control which secrets are available to the agent process — critical for SUPABASE_SERVICE_ROLE_KEY availability (Q4).
-
-**Q4 — Secret injection for coordinator runtime: UNRESOLVED**
-Coordinator needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to read `task_queue`. These are not in the trigger's `job_config` fields visible from the list endpoint. Three options:
-
-- (a) Secrets are configured at the environment level (`env_01CkF4M1HtoFEcDLDqN1KMtT`) and available to all agents in that env — confirm this with Anthropic docs or by testing.
-- (b) Secrets can be passed in the `/run` body — would require the body injection to work (Q2).
-- (c) Coordinator reads secrets from a config file committed to the repo — bad practice, non-starter for production secrets.
-  Option (a) is the desired path. Must verify before writing any coordinator trigger code.
-
-**Q5 — Coordinator escalation response loop: ARCHITECTURE DECISION NEEDED**
 When coordinator hits a grounding checkpoint and terminates with `status = 'awaiting-grounding'`, how does Colin's response re-trigger the coordinator? Two options:
 
-- (a) Colin inserts a new task into `task_queue` with `description` containing his response. Next pickup cycle invokes coordinator with the new task. Coordinator reads the prior task from `metadata.prior_task_id` for context. Simple, preserves queue semantics, but adds latency (next pickup cron = up to 24 hours on the current daily schedule).
-- (b) A Telegram callback button (component #2 infrastructure) triggers a new coordinator invocation immediately when Colin taps a response. Fast, but requires component #2 to be wired to `invoke-coordinator` — more complex, adds cross-component dependency.
-  Option (a) is correct for v0 (no dependency on component #2 beyond notifications). Option (b) is the v1 target. Document this decision in §10 and in `sprint-state.md`.
+- **(a) New task row (v0 — recommended):** Colin inserts a new `task_queue` row with his grounding result in `description` and `metadata.prior_task_id` pointing to the original task. Next pickup cycle invokes coordinator with the new task. Coordinator reads both rows for full context. Simple, no new dependencies, preserves queue semantics. Latency: up to 24 hours if Colin responds after the daily pickup window; invoke pickup manually to go faster.
 
-**Q6 — Rate limits on remote trigger invocations: UNRESOLVED**
-Is there a per-account or per-trigger rate limit on `/run` calls? If the daily pickup cron fires once per day and each coordinator run takes 30–60 minutes, the call cadence is very low. But if coordinator runs fail and stale recovery re-queues multiple times in a day, the rate could be 3–4 invocations/day per task. Confirm no limit that would block this.
+- **(b) Telegram callback → immediate re-fire (v1 target):** A component #2 callback button calls `/api/harness/invoke-coordinator` directly when Colin taps a response in Telegram. Fast. Requires component #2 to be wired to `invoke-coordinator`. Cross-component dependency; do not build until component #2 is stable.
 
-**Q7 — Run start confirmation: UNRESOLVED**
-The `/run` call returns a `run_id`. Does the API provide a way to confirm the run actually started (vs. queued or failed to start)? If coordinator fails to start (repo clone error, auth failure), the task stays `claimed` indefinitely until stale recovery kicks in. If the API has a status endpoint (`GET /v1/code/runs/{run_id}`), the pickup cron could poll once after 30 seconds to confirm the run is live. This would surface silent start failures faster than the 10-minute stale window.
-
-**Q8 — Coordinator non-negotiables in remote context: CONFIRMED UNCHANGED**
-Coordinator's non-negotiables (coordinator.md §Non-negotiables) apply identically in remote invocation. Remote context does not grant coordinator new authority. In particular: it cannot self-approve acceptance docs, cannot execute destructive operations, and cannot mark grounding checkpoints as passed without Colin's physical verification. The only behavioral change is how escalations are surfaced (Telegram vs. inline response) and how the run terminates on escalation (cleanly exits vs. pauses).
+Option (a) is the v0 decision unless Colin says otherwise. Option (b) is the natural v1 upgrade — no architectural changes required, just wiring the callback.
 
 ---
 
 ## 10. v0 Build Plan
 
-Each chunk is independently verifiable. Chunks A–B can be done in Claude Code session (not via harness). Chunks C–E extend the pickup cron and require a Vercel deploy.
+Spec is locked. No blockers. Chunks A–B are manual setup; Chunk C is the first code deploy; Chunk D is the grounding verification.
 
 ---
 
-### Chunk A — Coordinator Trigger Registration
+### Chunk A — Coordinator Routine Registration
 
-**Goal:** A persistent coordinator trigger exists at claude.ai. Its ID is documented. It can be invoked manually and coordinator runs.
+**Goal:** A persistent coordinator routine exists at claude.ai/code/routines. `routine_id` and per-routine token are documented and stored. A manual `/fire` call confirms coordinator starts and reads the task row.
 
 **How:**
 
-1. Use `RemoteTrigger` tool (action: `create`) to create the coordinator trigger with the config in §5.1.
-2. Record the returned `trigger_id` in `docs/secrets-notes.md` under "Coordinator Trigger" (non-secret; just a reference).
-3. Set `COORDINATOR_TRIGGER_ID={trigger_id}` in Vercel env (non-secret) and in `.env.local`.
+1. Create the routine in the UI at claude.ai/code/routines with the config in §5.2.
+2. Generate the per-routine API token (§4.1) — store immediately as `COORDINATOR_ROUTINE_TOKEN` in Vercel env and `.env.local`. Shown once only.
+3. Record `routine_id` (`trig_...`) as `COORDINATOR_ROUTINE_ID` in Vercel env, `.env.local`, and `docs/secrets-notes.md`.
+4. Pre-insert a test task in `task_queue` (`status='claimed'`, `metadata.chunk='test'`).
+5. Fire manually via Claude Code `RemoteTrigger` tool to confirm the session starts.
 
 **Verify standalone:**
 
-```
-RemoteTrigger: { action: "run", trigger_id: "<coordinator_trigger_id>", body: { task_id: "<test-uuid>" } }
-→ HTTP 2xx, run_id returned
-→ Check task_queue: test task (pre-inserted with status='claimed') should transition to 'running'
-→ Coordinator Telegram message arrives confirming startup
+```bash
+curl -X POST https://api.anthropic.com/v1/claude_code/routines/$COORDINATOR_ROUTINE_ID/fire \
+  -H "Authorization: Bearer $COORDINATOR_ROUTINE_TOKEN" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"task_id: <test-uuid>\nrun_id: test-run-1"}'
+→ HTTP 200, claude_code_session_id returned
+→ task_queue: test task transitions to status='running', last_heartbeat_at set
+→ Telegram: coordinator startup message arrives
 ```
 
-**Unblocks:** Chunk B (needs the trigger_id).
-**Effort:** S (one API call + documentation)
+**Unblocks:** Chunk B (needs COORDINATOR_ROUTINE_ID and token confirmed working).
+**Effort:** S (UI setup + one curl verify)
 
 ---
 
 ### Chunk B — `/api/harness/invoke-coordinator` Route
 
-**Goal:** A Vercel route wraps the remote trigger `/run` call. It can be tested independently of the pickup cron.
+**Goal:** A Vercel route wraps the `/fire` call with CRON_SECRET auth. Independently testable before wiring into the pickup cron.
 
 **Files:**
 
 - `app/api/harness/invoke-coordinator/route.ts` (new)
-- `tests/api/invoke-coordinator.test.ts` (new — mock the remote trigger call)
+- `tests/api/invoke-coordinator.test.ts` (new — mock the Routines API call)
 
 **Verify standalone:**
 
 ```bash
 curl -X POST https://lepios-one.vercel.app/api/harness/invoke-coordinator \
   -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
   -d '{"task_id":"<uuid>","run_id":"<uuid>"}'
-→ HTTP 200, body.ok = true, body.trigger_run_id present
-→ agent_events row: task_type = 'remote_invocation_sent'
+→ HTTP 200, body.ok = true, body.session_id present
+→ agent_events row: task_type = 'remote_invocation_sent', meta.session_id set
 ```
 
-**Unblocks:** Chunk C (pickup cron calls this route).
+**Unblocks:** Chunk C.
 **Effort:** S
 
 ---
 
 ### Chunk C — Pickup Cron Integration + Feature Flag
 
-**Goal:** After claiming a task, pickup cron calls `invoke-coordinator` (when flag enabled). Telegram notification changes from "paste this" to "FYI — invoked."
+**Goal:** Pickup cron calls `invoke-coordinator` after claiming a task (when `REMOTE_INVOCATION_ENABLED=1`). Telegram changes from "paste this" to FYI. Fallback to v0 Telegram on failure. No retries.
 
 **Files:**
 
-- `app/api/cron/task-pickup/route.ts` (modify — add invoke-coordinator call after claim)
-- `tests/api/task-pickup.test.ts` (extend — test both flag states)
+- `app/api/cron/task-pickup/route.ts` (modify — add invoke-coordinator call, feature flag, fallback)
+- `tests/api/task-pickup.test.ts` (extend — flag-off, flag-on success, flag-on fire failure)
 
 **Verify standalone:**
 
-1. `REMOTE_INVOCATION_ENABLED=0`: claim task, confirm Telegram is v0 "paste this" message. No `remote_invocation_sent` event.
-2. `REMOTE_INVOCATION_ENABLED=1`: claim task, confirm `remote_invocation_sent` event written, Telegram is FYI message, coordinator run starts (check task_queue status).
-3. `REMOTE_INVOCATION_ENABLED=1` + invoke-coordinator returns `{ ok: false }`: confirm v0 fallback Telegram fires.
+1. `REMOTE_INVOCATION_ENABLED=` (unset): claim task → v0 "paste this" Telegram, no `remote_invocation_sent` event.
+2. `REMOTE_INVOCATION_ENABLED=1`: claim task → `remote_invocation_sent` event written, FYI Telegram, `task_queue` transitions to `running`.
+3. `REMOTE_INVOCATION_ENABLED=1` + mock fire failure → v0 fallback Telegram fires, no `remote_invocation_sent` event.
 
-**Unblocks:** Chunk D (end-to-end).
+**Unblocks:** Chunk D.
 **Effort:** S–M
 
 ---
 
-### Chunk D — End-to-End Test
+### Chunk D — End-to-End Verification
 
-**Goal:** Full path verified: task queued → pickup cron fires → task claimed → coordinator invoked → coordinator runs Phase 2 of Sprint 4 Chunk C → coordinator surfaces grounding checkpoint via Telegram → task status = 'awaiting-grounding'.
+**Goal:** Full live path confirmed. Q5 (escalation loop) decision validated against real coordinator behavior.
 
-**Not a code chunk.** This is the grounding verification that proves the wiring is live.
+**Not a code chunk.** This is the grounding checkpoint for the component.
+
+**Pre-condition:** Decide Q5 before starting. If option (a) — Colin inserts a new task on escalation — document it in `sprint-state.md` and coordinator.md. If option (b) — defer to v1.
 
 **How:**
 
-1. Insert Sprint 4 Chunk C task into `task_queue` (manual SQL).
+1. Insert Sprint 4 Chunk C task into `task_queue` with correct `metadata.sprint` and `metadata.chunk`.
 2. Invoke pickup cron manually (`GET /api/cron/task-pickup` authorized).
-3. Confirm `remote_invocation_sent` event written.
-4. Confirm coordinator Telegram arrives: "Coordinator invoked for task …"
-5. Wait for coordinator to complete Chunk C work (may take 20–40 minutes).
-6. Confirm Telegram escalation or completion message.
+3. Confirm `remote_invocation_sent` event written with `session_id`.
+4. Confirm FYI Telegram arrives with session reference.
+5. Wait for coordinator to run (20–40 minutes).
+6. Confirm Telegram escalation or completion message arrives.
 7. Confirm `task_queue.status = 'awaiting-grounding'` or `'completed'`.
-8. Confirm `last_heartbeat_at` was updated during the run.
+8. Confirm `last_heartbeat_at` was updated at least once during the run.
 
-**Unblocks:** Sprint 4 Chunk C execution; resume-trigger criteria in `sprint-state.md`.
-**Effort:** M (time-bound by coordinator run duration; no new code)
+**Unblocks:** Sprint 4 resume — Chunks C/D/E can now run unattended. Update `sprint-state.md`: `status: active`, clear `pause_reason`, update `resume_trigger`.
+**Effort:** M (coordinator run time; no new code)
 
 ---
 
 ### Summary
 
-| Chunk | Goal                       | Effort | Produces                              |
-| ----- | -------------------------- | ------ | ------------------------------------- |
-| A     | Create coordinator trigger | S      | Trigger ID, manual invoke verified    |
-| B     | `invoke-coordinator` route | S      | Testable API wrapper                  |
-| C     | Pickup cron integration    | S–M    | **Feature-flagged end-to-end wiring** |
-| D     | End-to-end verification    | M      | Sprint 4 resume trigger satisfied     |
+| Chunk | Goal | Effort | Produces |
+| --- | --- | --- | --- |
+| A | Create coordinator routine + token | S | Live `/fire` confirmed |
+| B | `invoke-coordinator` route | S | Testable API wrapper |
+| C | Pickup cron integration | S–M | **Feature-flagged end-to-end wiring** |
+| D | End-to-end verification | M | Sprint 4 resume trigger satisfied |
 
-Chunk C is the ship-it moment. Once C is live and flag-enabled, the harness can run Sprint 4 Chunks C/D/E without Colin typing.
-
-**Largest unknown before Chunk A:** Q1 (token type) and Q4 (secret injection) must be resolved first. If Vercel cannot call the remote trigger API with a storable token, Chunk B cannot be built, and the design needs to be revised toward a laptop-local approach (Colin's machine runs a lightweight server that receives pickup events from Vercel and invokes Claude Code via CLI).
+Chunk C is the ship-it moment. Once live with `REMOTE_INVOCATION_ENABLED=1`, the harness runs Sprint 4 Chunks C/D/E without Colin typing. Chunk D proves it happened.
