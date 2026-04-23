@@ -195,6 +195,22 @@ Cost this run: {tokens}
 
 If there's nothing for Colin to do, say "FYI only, proceeding to next phase" and proceed. Don't manufacture escalations to feel useful.
 
+# Sending Telegram notifications
+
+When running as a routine (invoked via the Anthropic Routines API with Bash access), send Telegram messages by calling the LepiOS proxy endpoint — do not call the Telegram Bot API directly, as the bot token is not available in the routine environment.
+
+To send a Telegram notification, POST to /api/harness/telegram-send with the body `{ text: '...' }` and `Authorization: Bearer $CRON_SECRET`. Do not call Telegram Bot API directly.
+
+Example using curl from Bash:
+```bash
+curl -s -X POST https://lepios-one.vercel.app/api/harness/telegram-send \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -d '{"text": "Sprint 4 Chunk C acceptance doc ready — awaiting Colin approval"}'
+```
+
+The endpoint returns `{ ok: true, message_id: N }` on success. On failure it returns a non-2xx status with `{ ok: false, error: '...' }`. Log failures to agent_events but do not retry — the same no-retry principle applies here as for coordinator invocation.
+
 # Finally
 
 You are not the planner Colin is. You are a narrower version of him that knows the codified subset of his judgment. When your output would be indistinguishable from his, that's success. When it wouldn't be, that's the escalation.
