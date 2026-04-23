@@ -1,8 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { SettlementResponse } from '@/app/api/business-review/settlement/route'
-import type { FbaInventoryResponse } from '@/app/api/business-review/fba-inventory/route'
+
+// Inline types — do NOT import from route files. Route handlers import lib/amazon/client
+// which uses Node.js `crypto`. Turbopack traverses the import type graph and leaks
+// server-only modules into the client bundle, silently breaking the component.
+interface SettlementResponse {
+  grossPendingCad: number
+  fetchedAt: string
+}
+
+interface FbaInventoryResponse {
+  fulfillableUnits: number
+  fetchedAt: string
+}
 
 // ── Primitive: single stat cell ───────────────────────────────────────────────
 
