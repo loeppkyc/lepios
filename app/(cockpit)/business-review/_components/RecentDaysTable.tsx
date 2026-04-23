@@ -10,6 +10,9 @@ interface RecentDayRow {
   orders: number
   revenueCad: number
   units: number
+  pendingOrders: number
+  pendingRevenueCad: number
+  pendingUnits: number
 }
 
 interface RecentDaysResponse {
@@ -66,6 +69,31 @@ function TableSkeleton() {
       </div>
     </div>
   )
+}
+
+// ── Shared cell styles ────────────────────────────────────────────────────────
+
+const cellBase: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 'var(--text-small)',
+  color: 'var(--color-text-primary)',
+  fontVariantNumeric: 'tabular-nums',
+  padding: '10px 0',
+  borderBottom: '1px solid var(--color-border)',
+  verticalAlign: 'top',
+}
+
+const cellRight: React.CSSProperties = {
+  ...cellBase,
+  textAlign: 'right',
+  paddingLeft: 16,
+}
+
+const pendingSubline: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-nano)',
+  color: 'var(--color-text-disabled)',
+  marginTop: 3,
 }
 
 // ── Main exported component ───────────────────────────────────────────────────
@@ -154,7 +182,6 @@ export function RecentDaysTable() {
           >
             <thead>
               <tr>
-                {/* Column headers */}
                 {(
                   [
                     { label: 'Date', align: 'left' },
@@ -188,75 +215,35 @@ export function RecentDaysTable() {
             <tbody>
               {data.rows.map((row) => (
                 <tr key={row.date}>
-                  {/* Date — "Apr 22" format */}
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
-                      color: 'var(--color-text-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                      padding: '10px 0',
-                      borderBottom: '1px solid var(--color-border)',
-                    }}
-                  >
-                    {formatDate(row.date)}
-                  </td>
+                  {/* Date */}
+                  <td style={cellBase}>{formatDate(row.date)}</td>
 
                   {/* Orders — confirmed count (Constraint C-7: 0 not blank) */}
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
-                      color: 'var(--color-text-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                      textAlign: 'right',
-                      paddingLeft: 16,
-                      padding: '10px 0 10px 16px',
-                      borderBottom: '1px solid var(--color-border)',
-                    }}
-                  >
-                    {row.orders}
+                  <td style={cellRight}>{row.orders}</td>
+
+                  {/* Revenue (CAD) — confirmed pre-tax primary; pending sub-line when > 0 */}
+                  <td style={cellRight}>
+                    <div>${row.revenueCad.toFixed(2)}</div>
+                    {row.pendingRevenueCad > 0 && (
+                      <div style={pendingSubline}>
+                        + ${row.pendingRevenueCad.toFixed(2)} pending
+                      </div>
+                    )}
                   </td>
 
-                  {/* Revenue (CAD) — ItemPrice.Amount, pre-tax (Constraint C-3) */}
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
-                      color: 'var(--color-text-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                      textAlign: 'right',
-                      padding: '10px 0 10px 16px',
-                      borderBottom: '1px solid var(--color-border)',
-                    }}
-                  >
-                    ${row.revenueCad.toFixed(2)}
-                  </td>
-
-                  {/* Units — NumberOfItemsShipped + NumberOfItemsUnshipped */}
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
-                      color: 'var(--color-text-primary)',
-                      fontVariantNumeric: 'tabular-nums',
-                      textAlign: 'right',
-                      padding: '10px 0 10px 16px',
-                      borderBottom: '1px solid var(--color-border)',
-                    }}
-                  >
-                    {row.units}
+                  {/* Units — confirmed primary; pending sub-line when > 0 */}
+                  <td style={cellRight}>
+                    <div>{row.units}</div>
+                    {row.pendingUnits > 0 && (
+                      <div style={pendingSubline}>+ {row.pendingUnits} pending</div>
+                    )}
                   </td>
 
                   {/* Fees (Sprint 5) — placeholder dash. No formula. (Constraint C-8) */}
                   <td
                     style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
+                      ...cellRight,
                       color: 'var(--color-text-disabled)',
-                      textAlign: 'right',
-                      padding: '10px 0 10px 16px',
-                      borderBottom: '1px solid var(--color-border)',
                     }}
                   >
                     —
@@ -265,12 +252,8 @@ export function RecentDaysTable() {
                   {/* Net (Sprint 5) — placeholder dash. No formula. (Constraint C-8) */}
                   <td
                     style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-small)',
+                      ...cellRight,
                       color: 'var(--color-text-disabled)',
-                      textAlign: 'right',
-                      padding: '10px 0 10px 16px',
-                      borderBottom: '1px solid var(--color-border)',
                     }}
                   >
                     —

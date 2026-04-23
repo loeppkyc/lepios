@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
 import { spApiConfigured } from '@/lib/amazon/client'
-import {
-  fetchOrders,
-  fetchOrderItems,
-  aggregateOrders,
-  type SpOrder,
-  type SpOrderItem,
-} from '@/lib/amazon/orders'
+import { fetchOrders, fetchOrderItems, type SpOrder, type SpOrderItem } from '@/lib/amazon/orders'
 
 // 15-minute server-side cache. Historical days are finalized — data does not change.
 // Do NOT use force-dynamic; that would make 10 × N orderItems calls on every page load.
@@ -18,6 +12,9 @@ interface RecentDayRow {
   orders: number
   revenueCad: number
   units: number
+  pendingOrders: number
+  pendingRevenueCad: number
+  pendingUnits: number
 }
 
 interface RecentDaysResponse {
@@ -83,14 +80,19 @@ function edmontonDateString(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
-/** Build orderId → { revenue, tax } map from confirmed order items. */
+/**
+ * Build orderId → { revenue, tax } map from ALL orders (confirmed + pending).
+ * Pending orders are included so their revenue can be surfaced as a sub-line
+ * alongside the confirmed totals, matching the "(X pending)" pattern on the
+ * Today panel.
+ */
 async function buildFinanceMap(
   orders: SpOrder[]
 ): Promise<Map<string, { revenue: number; tax: number }>> {
-  const confirmedIds = orders.filter((o) => o.OrderStatus !== 'Pending').map((o) => o.AmazonOrderId)
-
   const allItems = await Promise.all(
-    confirmedIds.map((id) => fetchOrderItems(id).then((items) => ({ id, items })))
+    orders.map((o) =>
+      fetchOrderItems(o.AmazonOrderId).then((items) => ({ id: o.AmazonOrderId, items }))
+    )
   )
 
   const map = new Map<string, { revenue: number; tax: number }>()
@@ -104,6 +106,50 @@ async function buildFinanceMap(
     map.set(id, { revenue, tax })
   }
   return map
+}
+
+/** Aggregate one day's orders into confirmed and pending buckets. */
+function aggregateDay(
+  orders: SpOrder[],
+  financeMap: Map<string, { revenue: number; tax: number }>
+): {
+  confirmedCount: number
+  revenueCad: number
+  units: number
+  pendingOrders: number
+  pendingRevenueCad: number
+  pendingUnits: number
+} {
+  let confirmedCount = 0
+  let revenueCad = 0
+  let units = 0
+  let pendingOrders = 0
+  let pendingRevenueCad = 0
+  let pendingUnits = 0
+
+  for (const order of orders) {
+    const finance = financeMap.get(order.AmazonOrderId) ?? { revenue: 0, tax: 0 }
+    const orderUnits = (order.NumberOfItemsShipped ?? 0) + (order.NumberOfItemsUnshipped ?? 0)
+
+    if (order.OrderStatus === 'Pending') {
+      pendingOrders++
+      pendingRevenueCad += finance.revenue
+      pendingUnits += orderUnits
+    } else {
+      confirmedCount++
+      revenueCad += finance.revenue
+      units += orderUnits
+    }
+  }
+
+  return {
+    confirmedCount,
+    revenueCad: Math.round(revenueCad * 100) / 100,
+    units,
+    pendingOrders,
+    pendingRevenueCad: Math.round(pendingRevenueCad * 100) / 100,
+    pendingUnits,
+  }
 }
 
 export async function GET() {
@@ -130,25 +176,27 @@ export async function GET() {
     }
 
     // Constraint C-5: fetch 10 order-list requests sequentially to respect SP-API rate limits.
-    // Per-day orderItems are then fetched in parallel (one per confirmed order ID).
+    // Per-day orderItems (confirmed + pending) are then fetched in parallel.
     const rows: RecentDayRow[] = []
 
-    // Collect all orders per day for sequential fetching
     for (const window of dayWindows) {
       const orders = await fetchOrders({
         createdAfter: window.createdAfter,
         createdBefore: window.createdBefore,
       })
 
-      // Fetch all orderItems in parallel for this day's confirmed orders
+      // Fetch items for ALL orders so pending revenue can be surfaced as sub-line
       const financeMap = await buildFinanceMap(orders)
-      const agg = aggregateOrders(orders, financeMap)
+      const agg = aggregateDay(orders, financeMap)
 
       rows.push({
         date: window.dateStr,
         orders: agg.confirmedCount,
         revenueCad: agg.revenueCad,
-        units: agg.unitsSold,
+        units: agg.units,
+        pendingOrders: agg.pendingOrders,
+        pendingRevenueCad: agg.pendingRevenueCad,
+        pendingUnits: agg.pendingUnits,
       })
     }
 
