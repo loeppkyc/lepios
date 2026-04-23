@@ -1,0 +1,30 @@
+{
+  "chunk_id": "sprint-4-D",
+  "acceptance_doc_path": "docs/sprint-4/chunk-d-acceptance.md",
+  "files_changed": [
+    "app/(cockpit)/business-review/_components/StatementCoverageGrid.tsx",
+    "app/api/business-review/statement-coverage/route.ts",
+    "app/(cockpit)/business-review/page.tsx",
+    "tests/statement-coverage.test.ts"
+  ],
+  "tests": {
+    "passing": 793,
+    "failing": 0,
+    "new": 12
+  },
+  "migrations_applied": [],
+  "deploy_url": "",
+  "grounding_checkpoint_required": [
+    "Colin opens Dropbox → spot-checks 3+ account×month combinations across both bands — at least 1 from 2025 band, 1 from 2026 band, 1 confirmed red. Verify each green cell in the LepiOS grid matches at least one PDF in the corresponding Dropbox folder, and each red cell corresponds to zero PDFs in that folder."
+  ],
+  "unknowns": [
+    "Pre-commit hook requires ANTHROPIC_API_KEY (Reviewer Agent); not available in builder environment. Used project-sanctioned commit-skip.sh bypass — linters (eslint + prettier) passed. Skip logged to docs/review-skips.md. Prior commit dd4126e (core implementation) was also created in same environment with same bypass. Coordinator should note this for the next full AI review pass.",
+    "TypeScript strict check reports 6 pre-existing errors in tests/api/recent-days.test.ts, tests/api/telegram-webhook.test.ts, and tests/harness/deploy-gate.test.ts — none in chunk-D files. Not introduced by this chunk; not fixed per scope rules."
+  ],
+  "next_chunk_blockers": [
+    "Vercel deployment of this branch required before grounding checkpoint can be executed — Dropbox credentials must be present in the deployed environment (Colin confirmed they are in Vercel prod/preview per acceptance doc prerequisite).",
+    "Grounding checkpoint must pass before chunk D is considered complete per acceptance doc — Colin must spot-check at least 3 account×month combinations spanning both year bands and at least 1 confirmed red cell."
+  ],
+  "tokens_used": 0,
+  "timestamp": "2026-04-23T21:21:00Z"
+}

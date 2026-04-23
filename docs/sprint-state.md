@@ -39,16 +39,20 @@ audit_reminder: "Next sprint will run cache-match-disabled until Colin updates l
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: null
-status: "chunk-c-complete"
+active_chunk: "D"
+active_chunk_acceptance_doc: "docs/sprint-4/chunk-d-acceptance.md"
+status: "awaiting-grounding"
+chunk_d_build_complete_at: "2026-04-23T21:21:00Z"
+chunk_d_tests: "793 passing, 0 failing, 12 new"
+chunk_d_commits: ["7f8b1f8 (.env.example)", "dd4126e (implementation)", "d2b1176 (page wiring)"]
 phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
 last_chunk_completed: "C"
 last_chunk_grounding: "passed-with-limitation"
 last_chunk_limitation: "SP-API Orders strips ItemPrice and OrderTotal from Pending orders >1 day old (B2B/net-30). Revenue gap vs SC for those orders is expected; resolves in Sprint 5 Finances integration."
-awaiting: "colin-queue-chunk-D"
+chunk_d_approval: "colin-explicit — task_queue 9bf44f91-1fcf-4ca4-b050-ed2f5f0bce56 created with status=ready-for-builder and prerequisites_verified_at=2026-04-23T20:00:00Z"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-23T18:55:00-06:00"
+last_updated_at: "2026-04-23T21:25:00-06:00"
 resumed_at: "2026-04-23T15:00:00-06:00"
 resume_reason: "Component #3 Remote Invocation shipped (commit bebac8e). Clean unattended run verified: task 90f952dc claimed autonomously, session session_01Y4Ca2VMWjFF9WYhrkqxFYV spawned without human step. Resume trigger met."
 plan_written_at: "2026-04-19T12:00:00-06:00"
