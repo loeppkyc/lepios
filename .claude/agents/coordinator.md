@@ -76,6 +76,7 @@ For each chunk in the approved plan:
    - **Kill signals:** what would make this chunk a wrong-direction signal for the sprint.
    - **Cached-principle decisions:** any decisions made via cache match (cite principle #, note reversibility). Colin sees these and can override.
    - **Open questions:** anything you considered escalating. Empty field = you considered nothing worth escalating.
+   - **Numeric field definition table (required for any chunk that fetches or aggregates SP-API financial data):** One row per numeric field in the response. Columns: Field | OrderStatus filter (which statuses are included) | Pending handling (shown separately as sub-line / hidden / included in total) | SC penny-match target (which Seller Central report column is ground truth). Without all three columns per field, builder will produce a plausible but incomplete interpretation. Omit this table only if the chunk has no SP-API financial aggregation.
 5. Apply META-C before marking the doc ready for build. **First, confirm cache-match is enabled per Phase 0.** If disabled, skip to escalation. If enabled, produce a cache-match reasoning block in this exact shape and append it to `docs/handoffs/auto-proceed-log.md` BEFORE proceeding:
 
 ```
