@@ -18,20 +18,20 @@ Build a `RecentDaysTable` component that renders the last 10 **complete** calend
 
 **Columns — locked definition:**
 
-| Column        | Source                                                        | Notes                                                                   |
-| ------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Date          | Derived (Edmonton calendar date)                              | e.g. "Apr 22"                                                           |
-| Orders        | SP-API Orders `confirmedCount`                                | Confirmed only (Unshipped + PartiallyShipped + Shipped + Canceled)      |
-| Revenue (CAD) | SP-API Orders `ItemPrice.Amount` per confirmed order          | Pre-tax, same method as Today/Yesterday panel — NOT `OrderTotal.Amount` |
-| Units         | SP-API Orders `NumberOfItemsShipped + NumberOfItemsUnshipped` | Confirmed orders only                                                   |
-| Fees          | None available this sprint                                    | Shows `—` with column sub-label "Sprint 5" — no `revenue × 0.35`        |
-| Net           | None available this sprint                                    | Shows `—` with column sub-label "Sprint 5" — no formula estimate        |
+| Column        | Source                                                        | Notes                                                                                                              |
+| ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Date          | Derived (Edmonton calendar date)                              | e.g. "Apr 22"                                                                                                      |
+| Orders        | SP-API Orders `confirmedCount`                                | Confirmed only (Unshipped + PartiallyShipped + Shipped + Canceled)                                                 |
+| Revenue (CAD) | SP-API Orders `ItemPrice.Amount` per confirmed order          | Primary = confirmed pre-tax. Sub-line "+ $X.XX pending" shown when pendingRevenueCad > 0 — NOT `OrderTotal.Amount` |
+| Units         | SP-API Orders `NumberOfItemsShipped + NumberOfItemsUnshipped` | Primary = confirmed only. Sub-line "+ N pending" shown when pendingUnits > 0                                       |
+| Fees          | None available this sprint                                    | Shows `—` with column sub-label "Sprint 5" — no `revenue × 0.35`                                                   |
+| Net           | None available this sprint                                    | Shows `—` with column sub-label "Sprint 5" — no formula estimate                                                   |
 
 The Fees and Net columns exist as clearly-labeled placeholders, consistent with the pattern established in Chunk A (static "Full payout estimate in Sprint 5" label) and Chunk B (Avg Cost / Unit = "—" + "Coming in Sprint 5"). This makes explicit to Colin that fee data is intentionally absent, not silently suppressed. The anti-pattern from Streamlit — `revenue * 0.35` back-filled as estimated fees — is explicitly banned.
 
 **Column header source attribution:** Table caption or header row must include the text "SP-API Orders" to identify the data source.
 
-**One acceptance criterion:** Table renders 10 rows (yesterday → day-10 in Edmonton time); each row shows date, confirmed order count, revenue (pre-tax `ItemPrice.Amount` CAD, confirmed orders only), and units sold; Fees and Net columns show `—` for every row with a "Sprint 5" label (no formula estimate in any cell); days with zero confirmed orders show `0` for orders/units and `$0.00` for revenue (not blank — zero is the honest value); table heading or caption identifies source as "SP-API Orders"; revenue numbers match Seller Central Business Reports on Colin's 3-day spot-check to the penny.
+**One acceptance criterion:** Table renders 10 rows (yesterday → day-10 in Edmonton time); each row shows date, confirmed order count, confirmed revenue (pre-tax `ItemPrice.Amount` CAD), and confirmed units; Revenue and Units cells show a muted sub-line ("+ $X.XX pending" / "+ N pending") when that day has Pending orders — sub-line hidden when pendingRevenueCad/pendingUnits = 0; Fees and Net columns show `—` for every row with a "Sprint 5" label (no formula estimate in any cell); days with zero confirmed orders show `0` for orders/units and `$0.00` for revenue (not blank — zero is the honest value); table heading or caption identifies source as "SP-API Orders"; confirmed revenue matches Seller Central Business Reports on Colin's 3-day spot-check to the penny; on days with visible pending sub-lines, confirmed + pending together should account for the SC total.
 
 ---
 
@@ -115,11 +115,12 @@ SP-API Orders endpoint (`GET /orders/v0/orders`) was live-tested 2026-04-22 (Chu
 
 Colin opens **Seller Central → Business Reports → Sales Dashboard** (or the date-filtered Orders report). Selects 3 of the last 10 displayed days. For each chosen day, compares:
 
-- Order count in LepiOS vs. SC
-- Revenue (CAD) in LepiOS vs. SC (note: SC may show order total including tax; compare confirmed revenue pre-tax vs. SC's "Product Sales" field, not "Order Total")
-- Units in LepiOS vs. SC
-
-All three days must match to the penny. Fees and Net columns must show `—` (not a calculated number). Days with zero confirmed orders must show `0` not blank.
+- **Confirmed revenue** (LepiOS primary value) + **pending revenue** (LepiOS sub-line, if shown) should sum to SC "Product Sales" for that day (pre-tax)
+- On days with no pending sub-line: LepiOS confirmed revenue must match SC "Product Sales" to the penny
+- Units: same logic — confirmed + pending units should account for SC units total
+- Fees and Net columns must show `—` (not a calculated number)
+- Days with zero confirmed orders must show `0` not blank
+- Apr 13 specifically: LepiOS should now show a pending sub-line for the B2B/net-30 order (~$766); confirmed + pending should reach SC's $1,130.87
 
 "Tests pass" is not this checkpoint. Colin must physically compare numbers against Seller Central.
 
@@ -166,8 +167,8 @@ Generate 10 day windows using the existing `dayBoundaryUTC(date, 'start' | 'end'
 **Constraint C-5 — Fetch strategy to avoid rate limits**
 With 10 day windows + N orderItems calls, naive parallel fetching risks SP-API rate limiting. Recommended: fetch the 10 order-list requests sequentially (to respect the Orders endpoint rate limit), collect all confirmed order IDs across all days, then fetch all orderItems in parallel (as per today-yesterday route's `buildFinanceMap` pattern). The 15-minute cache (Constraint C-1) means this expensive fetch only runs once per cache period.
 
-**Constraint C-6 — Pending orders excluded from table**
-Consistent with Today/Yesterday panel: confirmed orders only (Unshipped + PartiallyShipped + Shipped + Canceled). Pending orders are excluded from count, revenue, and units. The Pending indicator from the Today panel does NOT appear in the historical table (historical Pending orders that didn't cancel will have moved to Shipped/Canceled by the time they appear in the 10-day window).
+**Constraint C-6 — Pending orders shown as sub-line, not primary**
+Primary numbers (Orders, Revenue, Units) are confirmed-only (Unshipped + PartiallyShipped + Shipped + Canceled) — the numbers that matter for tax and payout. Pending orders on the same creation date are surfaced as a muted sub-line beneath the primary value: "+ $X.XX pending" in Revenue and "+ N pending" in Units. Sub-line is hidden (not rendered) when pendingRevenueCad/pendingUnits = 0 for that day. This matches the "(X pending not shown)" pattern on the Today panel and resolves the SC mismatch: confirmed + pending together account for the SC Business Report total. Historical Pending is real (net-30 B2B orders can stay Pending > 10 days) — suppressing it silently caused the grounding failure.
 
 **Constraint C-7 — Zero display**
 Days with zero confirmed orders display `0` for order count and units, and `$0.00` for revenue. Do NOT display blank or `—` for these fields — zero is the honest value (we know there were no confirmed orders, not that we failed to fetch them). The `—` is reserved for Fees and Net (data that was never available from this endpoint).
