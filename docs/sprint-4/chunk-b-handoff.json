@@ -14,20 +14,49 @@
   "tests": { "passing": 694, "failing": 0, "new": 9 },
   "migrations_applied": [],
   "deploy_url": "https://lepios-one.vercel.app",
-  "grounding_checkpoint_required": [
-    "Settlement balance: Colin opens LepiOS Business Review, confirms 'Gross pending (before reserve)' matches SP-API Finances OriginalTotal.CurrencyAmount for the open CAD group. Current expected: $928.17 (live value will differ). Must show whatever the API returns — not hardcoded.",
-    "FBA units: Colin opens SC → Manage FBA Inventory, notes Available column total, compares to LepiOS 'FBA Units'. Must be within ±1% (tolerance for multi-copy SKUs and sub-minute fulfillment timing). Confirmed total on 2026-04-23 was 1,063 fulfillable.",
-    "Avg Cost / Unit: Colin confirms cell shows '—' and sub-label 'Coming in Sprint 5'. No number present.",
-    "Cache label: Colin confirms FBA Units cell shows 'Last updated: X min ago' sub-label reflecting actual cache age."
+  "grounding_checkpoints_completed": [
+    {
+      "checkpoint": "Gross pending (before reserve) displays live SP-API Finances balance",
+      "result": "PASS — Colin confirmed 2026-04-23",
+      "commit": "67c0b7f",
+      "date": "2026-04-23"
+    },
+    {
+      "checkpoint": "FBA Units within ±1% of SC Manage FBA Inventory Available total",
+      "result": "PASS — 1,062 displayed, within tolerance of ~1,049–1,063 SC Available. Colin confirmed 2026-04-23",
+      "commit": "67c0b7f",
+      "date": "2026-04-23"
+    },
+    {
+      "checkpoint": "Avg Cost / Unit shows '—' with 'Coming in Sprint 5'",
+      "result": "PASS — Colin confirmed 2026-04-23",
+      "commit": "67c0b7f",
+      "date": "2026-04-23"
+    },
+    {
+      "checkpoint": "FBA Units cell shows 'Last updated: X min ago' sub-label",
+      "result": "PASS — Colin confirmed 2026-04-23",
+      "commit": "67c0b7f",
+      "date": "2026-04-23"
+    }
+  ],
+  "grounding_checkpoint_required": [],
+  "bugs_found_and_fixed": [
+    {
+      "bug": "WhatYouOwePanel never mounted — zero API requests in Vercel runtime logs",
+      "fix": "Removed 'import type' from route handler files in the client component. Route handlers import lib/amazon/client which uses Node.js crypto. Turbopack traverses the full module graph even for type-only imports — browser can't execute crypto, silent runtime error prevented mounting.",
+      "commit": "c9d7ee1"
+    },
+    {
+      "bug": "Settlement route returned 400 'Date range not valid, startDate: null'",
+      "fix": "Added FinancialEventGroupStartedAfter (180-day lookback) to finances.ts initial params. SP-API requires this param; builder omitted it from the initial params object.",
+      "commit": "67c0b7f"
+    }
   ],
   "unknowns": [
-    "page.tsx not in acceptance doc's 'files expected to change' list, but is the minimal wire-up required to render WhatYouOwePanel in the cockpit. Change is 5 lines (import + div wrapper). Flagged for coordinator awareness — no scope concern, purely additive.",
-    "Acceptance doc status was 'awaiting-colin-approval' in the file header. Proceeded on Colin's explicit instruction in the agent invocation prompt. Coordinator should update acceptance_doc_status in sprint-state.md.",
-    "Pre-existing TypeScript errors in tests/api/telegram-webhook.test.ts, tests/harness/deploy-gate.test.ts, and .next/types/validator.ts are not introduced by this chunk. Not fixed per Principle 13 (feature first, cosmetic errors later). Noted for coordinator."
+    "Pre-existing TypeScript errors in tests/api/telegram-webhook.test.ts, tests/harness/deploy-gate.test.ts, and .next/types/validator.ts are not introduced by this chunk. Not fixed per Principle 13."
   ],
-  "next_chunk_blockers": [
-    "Chunk C is unknown from this builder's context. Coordinator should confirm Chunk C scope and generate acceptance doc before next builder run."
-  ],
+  "next_chunk_blockers": [],
   "tokens_used": 0,
-  "timestamp": "2026-04-23T04:05:30Z"
+  "timestamp": "2026-04-23T04:30:00Z"
 }
