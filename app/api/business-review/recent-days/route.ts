@@ -133,7 +133,15 @@ function aggregateDay(
 
     if (order.OrderStatus === 'Pending') {
       pendingOrders++
-      pendingRevenueCad += finance.revenue
+      // SP-API returns empty orderItems for most Pending orders (order not yet committed
+      // financially), so ItemPrice.Amount is unavailable. Fall back to OrderTotal.Amount,
+      // which is the only order-level revenue field. For B2B orders (the common Pending
+      // case — net-30 invoicing) OrderTotal equals ItemPrice since B2B is tax-exempt.
+      // For consumer Pending orders, OrderTotal includes tax (~5-15% overestimate) but
+      // the sub-line is already labeled "pending" implying it is approximate.
+      const itemsRevenue = finance.revenue
+      pendingRevenueCad +=
+        itemsRevenue > 0 ? itemsRevenue : Number(order.OrderTotal?.Amount ?? 0)
       pendingUnits += orderUnits
     } else {
       confirmedCount++
