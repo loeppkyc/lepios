@@ -1,0 +1,33 @@
+{
+  "chunk_id": "sprint-4-b",
+  "acceptance_doc_path": "docs/sprint-4/chunk-b-acceptance.md",
+  "files_changed": [
+    "lib/amazon/finances.ts",
+    "lib/amazon/inventory.ts",
+    "app/api/business-review/settlement/route.ts",
+    "app/api/business-review/fba-inventory/route.ts",
+    "app/(cockpit)/business-review/_components/WhatYouOwePanel.tsx",
+    "app/(cockpit)/business-review/page.tsx",
+    "tests/finances.test.ts",
+    "tests/inventory.test.ts"
+  ],
+  "tests": { "passing": 694, "failing": 0, "new": 9 },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "grounding_checkpoint_required": [
+    "Settlement balance: Colin opens LepiOS Business Review, confirms 'Gross pending (before reserve)' matches SP-API Finances OriginalTotal.CurrencyAmount for the open CAD group. Current expected: $928.17 (live value will differ). Must show whatever the API returns — not hardcoded.",
+    "FBA units: Colin opens SC → Manage FBA Inventory, notes Available column total, compares to LepiOS 'FBA Units'. Must be within ±1% (tolerance for multi-copy SKUs and sub-minute fulfillment timing). Confirmed total on 2026-04-23 was 1,063 fulfillable.",
+    "Avg Cost / Unit: Colin confirms cell shows '—' and sub-label 'Coming in Sprint 5'. No number present.",
+    "Cache label: Colin confirms FBA Units cell shows 'Last updated: X min ago' sub-label reflecting actual cache age."
+  ],
+  "unknowns": [
+    "page.tsx not in acceptance doc's 'files expected to change' list, but is the minimal wire-up required to render WhatYouOwePanel in the cockpit. Change is 5 lines (import + div wrapper). Flagged for coordinator awareness — no scope concern, purely additive.",
+    "Acceptance doc status was 'awaiting-colin-approval' in the file header. Proceeded on Colin's explicit instruction in the agent invocation prompt. Coordinator should update acceptance_doc_status in sprint-state.md.",
+    "Pre-existing TypeScript errors in tests/api/telegram-webhook.test.ts, tests/harness/deploy-gate.test.ts, and .next/types/validator.ts are not introduced by this chunk. Not fixed per Principle 13 (feature first, cosmetic errors later). Noted for coordinator."
+  ],
+  "next_chunk_blockers": [
+    "Chunk C is unknown from this builder's context. Coordinator should confirm Chunk C scope and generate acceptance doc before next builder run."
+  ],
+  "tokens_used": 0,
+  "timestamp": "2026-04-23T04:05:30Z"
+}
