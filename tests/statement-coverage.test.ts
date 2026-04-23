@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { utcToEdmontonYearMonth, get2025Months, get2026YtdMonths } from '@/app/api/business-review/statement-coverage/route'
 
 // ── Required timezone boundary tests (from acceptance doc) ────────────────────
@@ -91,5 +91,48 @@ describe('get2026YtdMonths', () => {
   it('returns at least 1 month (Jan 2026 has passed)', () => {
     const months = get2026YtdMonths()
     expect(months.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ── F15: Vercel CLI Windows CRLF trim test ────────────────────────────────────
+// When Vercel CLI stdin adds on Windows, stored env values contain trailing \r\n
+// (2 extra bytes). The route must trim before using creds — Dropbox rejects
+// untrimmed values as invalid_client (HTTP 400).
+
+describe('env var trimming (F15 — Vercel CLI Windows CRLF)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('GET returns 503 when DROPBOX_APP_KEY is whitespace-only after trim', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', '   \r\n')
+    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
+    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
+    const { GET } = await import('@/app/api/business-review/statement-coverage/route')
+    const res = await GET()
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error).toBe('dropbox_credentials_missing')
+  })
+
+  it('trimmed creds with trailing \\r\\n still attempt auth (no 503)', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', 'validkey\r\n')
+    vi.stubEnv('DROPBOX_APP_SECRET', 'validsecret\r\n')
+    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'validtoken\r\n')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })
+    )
+    const { GET } = await import('@/app/api/business-review/statement-coverage/route')
+    await GET()
+    // fetch was called (credentials were not empty after trim → auth attempted)
+    expect(fetchSpy).toHaveBeenCalled()
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.dropboxapi.com/oauth2/token')
+    // Body must NOT contain raw \r\n bytes inside the field values
+    const body = new URLSearchParams(init.body as string)
+    expect(body.get('client_id')).toBe('validkey')
+    expect(body.get('client_secret')).toBe('validsecret')
+    expect(body.get('refresh_token')).toBe('validtoken')
+    vi.restoreAllMocks()
   })
 })

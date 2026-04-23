@@ -71,9 +71,12 @@ export function get2026YtdMonths(): string[] {
 // ── Dropbox auth ──────────────────────────────────────────────────────────────
 
 async function getDropboxAccessToken(): Promise<string> {
-  const appKey = process.env.DROPBOX_APP_KEY
-  const appSecret = process.env.DROPBOX_APP_SECRET
-  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN
+  // .trim() is mandatory: Vercel CLI stdin adds on Windows inject trailing \r\n
+  // into stored values, making them 2 bytes longer than source. Dropbox (and
+  // any strict-auth API) rejects these as invalid_client. See F15 in CLAUDE.md.
+  const appKey = process.env.DROPBOX_APP_KEY?.trim()
+  const appSecret = process.env.DROPBOX_APP_SECRET?.trim()
+  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN?.trim()
 
   if (!appKey || !appSecret || !refreshToken) {
     throw new Error('dropbox_credentials_missing')
@@ -182,11 +185,11 @@ export interface StatementCoverageResponse {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function GET() {
-  // Kill signal 1: credentials check
+  // Kill signal 1: credentials check (trim first — see F15)
   if (
-    !process.env.DROPBOX_APP_KEY ||
-    !process.env.DROPBOX_APP_SECRET ||
-    !process.env.DROPBOX_REFRESH_TOKEN
+    !process.env.DROPBOX_APP_KEY?.trim() ||
+    !process.env.DROPBOX_APP_SECRET?.trim() ||
+    !process.env.DROPBOX_REFRESH_TOKEN?.trim()
   ) {
     return NextResponse.json({ error: 'dropbox_credentials_missing' }, { status: 503 })
   }
