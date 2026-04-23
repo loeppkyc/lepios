@@ -448,4 +448,24 @@ The autonomous path works end-to-end with no human "Run task" step. Coordinator 
 | C ✓   | Pickup cron integration            | S–M    | 15 new tests, flag live in prod (2026-04-23)  |
 | D ✓   | End-to-end verification            | M      | Session spawned autonomously (2026-04-23)     |
 
+---
+
+## Known Limitations (discovered 2026-04-23)
+
+### Coordinator sessions cannot send outbound HTTP requests
+
+**Root cause:** The Anthropic Claude Code sandbox enforces a host allowlist for outbound network connections. When a coordinator session (spawned via the Routines API) runs `curl` or any fetch to an arbitrary external host — including `lepios-one.vercel.app` — the request is blocked at the sandbox level. This is not a secret/auth issue; it is a hard network restriction on the execution environment.
+
+**Observed:** `session_01KUpL9BTJ5H2Vsh6wJMBVuy` (Sprint 4 Chunk C) attempted to POST to `/api/harness/telegram-send` as instructed. The curl was blocked. The session correctly logged a `notification_failed` agent_events row with `error: "curl blocked by host allowlist in Claude sandbox"`.
+
+**Impact:** The `/api/harness/telegram-send` proxy endpoint works correctly from Vercel crons and local curl. It does NOT work from coordinator sessions. Coordinator sessions have no async signal path to Colin beyond Supabase writes and git commits.
+
+**Workaround candidates (not yet built — deferred):**
+
+- **(a) Supabase-side poller:** A Vercel cron reads `agent_events` rows with `action=notification_failed` and sends the Telegram on behalf. Adds ~1 cron tick of latency.
+- **(b) Morning digest:** The existing `morning_digest` cron surfaces `notification_failed` events in the daily digest. No new infrastructure; latency up to 24h.
+- **(c) Anthropic allowlist request:** File feedback to Anthropic asking for `lepios-one.vercel.app` (or `*.vercel.app`) to be added to the Claude Code sandbox outbound allowlist.
+
+**Current state:** Option (b) is passive fallback until a decision is made. No code changes. Revisit when coordinator-to-Colin latency becomes a real bottleneck.
+
 Chunk C is the ship-it moment. Once live with `REMOTE_INVOCATION_ENABLED=1`, the harness runs Sprint 4 Chunks C/D/E without Colin typing. Chunk D proves it happened.
