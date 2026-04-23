@@ -1,4 +1,30 @@
-# Secrets Diagnostic Notes — alerts_bot
+# Secrets and Routine Reference Notes
+
+## Coordinator Routine — Reference IDs
+
+**Created:** 2026-04-23
+**Not secrets — IDs only. Token is stored separately in Vercel env.**
+
+| Item | Value |
+| --- | --- |
+| Routine name | LepiOS Coordinator |
+| `routine_id` | `trig_01AC9K3asFWrHZpK7HrRBhak` |
+| Vercel env var (ID) | `COORDINATOR_ROUTINE_ID=trig_01AC9K3asFWrHZpK7HrRBhak` |
+| Vercel env var (token) | `COORDINATOR_ROUTINE_TOKEN=<generated in UI — secret>` |
+| UI management | claude.ai/code/routines |
+
+**Token generation (one-time, UI only):**
+claude.ai/code/routines → LepiOS Coordinator → Edit → "Add another trigger" → API → "Generate token"
+Store as `COORDINATOR_ROUTINE_TOKEN` in Vercel env and `.env.local`. Shown once only.
+
+**Connectors to add in UI before first live run:**
+
+- Supabase: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+- Telegram: loeppky_trigger_bot token
+
+---
+
+## Secrets Diagnostic Notes — alerts_bot
 
 **Audit date:** 2026-04-17
 **Resolution date:** 2026-04-17
