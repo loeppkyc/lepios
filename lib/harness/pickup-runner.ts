@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { claimTask, peekTask, reclaimStale, failTask } from '@/lib/harness/task-pickup'
 import { postMessage } from '@/lib/orchestrator/telegram'
 import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
+import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 
 export type PickupResult = {
@@ -24,6 +25,18 @@ export function buildTelegramMessage(task: TaskRow, dryRun = false): string {
     preview,
     '',
     `To run: paste \`Run task ${task.id}\` into Claude Code`,
+  ].join('\n')
+}
+
+export function buildRemoteTelegramMessage(task: TaskRow, sessionUrl: string): string {
+  const shortId = task.id.slice(0, 8)
+  const preview = task.task.length > 80 ? task.task.slice(0, 80) + '...' : task.task
+  return [
+    `✅ Task claimed: ${shortId}`,
+    preview,
+    '',
+    `Coordinator invoked automatically.`,
+    `Session: ${sessionUrl}`,
   ].join('\n')
 }
 
@@ -121,9 +134,20 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   const duration_ms = Date.now() - start
   const eventId = await logEvent(runId, 'success', task.id, `claimed: ${task.task}`, duration_ms)
 
-  // Step 5: Telegram notification — awaited so Vercel doesn't kill the fetch mid-flight
+  // Step 5: Remote invocation — fire coordinator automatically when flag is set.
+  // On failure: fireCoordinator already logged to agent_events. Fall back to manual message.
+  // No retries — duplicate /fire calls create duplicate sessions.
+  let telegramMsg = buildTelegramMessage(task)
+  if (process.env.HARNESS_REMOTE_INVOCATION_ENABLED) {
+    const invokeResult = await fireCoordinator({ task_id: task.id, run_id: runId })
+    if (invokeResult.ok) {
+      telegramMsg = buildRemoteTelegramMessage(task, invokeResult.session_url)
+    }
+  }
+
+  // Step 6: Telegram notification — awaited so Vercel doesn't kill the fetch mid-flight
   try {
-    await sendMessageWithButtons(eventId ?? crypto.randomUUID(), buildTelegramMessage(task))
+    await sendMessageWithButtons(eventId ?? crypto.randomUUID(), telegramMsg)
   } catch (err) {
     await logEvent(
       runId,

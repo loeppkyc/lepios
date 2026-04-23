@@ -6,7 +6,7 @@
  * (AC-12 = existing test suite remains green — verified by npm test overall.)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock lib/harness/task-pickup ──────────────────────────────────────────────
 
@@ -44,7 +44,17 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
-import { runPickup, buildTelegramMessage } from '@/lib/harness/pickup-runner'
+// ── Mock fireCoordinator ──────────────────────────────────────────────────────
+
+const { mockFireCoordinator } = vi.hoisted(() => ({
+  mockFireCoordinator: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/invoke-coordinator', () => ({
+  fireCoordinator: mockFireCoordinator,
+}))
+
+import { runPickup, buildTelegramMessage, buildRemoteTelegramMessage } from '@/lib/harness/pickup-runner'
 import type { TaskRow } from '@/lib/harness/task-pickup'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -78,9 +88,19 @@ function makeInsertBuilder() {
 beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.TASK_PICKUP_DRY_RUN
+  delete process.env.HARNESS_REMOTE_INVOCATION_ENABLED
   mockReclaimStale.mockResolvedValue([])
   mockPostMessage.mockResolvedValue(undefined)
   mockFrom.mockReturnValue(makeInsertBuilder())
+  mockFireCoordinator.mockResolvedValue({
+    ok: true,
+    session_id: 'session_test123',
+    session_url: 'https://claude.ai/code/session_test123',
+  })
+})
+
+afterEach(() => {
+  delete process.env.HARNESS_REMOTE_INVOCATION_ENABLED
 })
 
 // ── buildTelegramMessage (pure) ───────────────────────────────────────────────
@@ -520,5 +540,136 @@ describe('runPickup — agent_events insert precedes Telegram send', () => {
     expect(row).toHaveProperty('id')
     expect(typeof row.id).toBe('string')
     expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  })
+})
+
+// ── buildRemoteTelegramMessage (pure) ─────────────────────────────────────────
+
+describe('buildRemoteTelegramMessage', () => {
+  const SESSION_URL = 'https://claude.ai/code/session_test123'
+
+  it('contains task short id (first 8 chars)', () => {
+    const msg = buildRemoteTelegramMessage(mockTask, SESSION_URL)
+    expect(msg).toContain(mockTask.id.slice(0, 8))
+  })
+
+  it('contains task text preview', () => {
+    const msg = buildRemoteTelegramMessage(mockTask, SESSION_URL)
+    expect(msg).toContain('Sprint 4 Chunk A')
+  })
+
+  it('contains session URL', () => {
+    const msg = buildRemoteTelegramMessage(mockTask, SESSION_URL)
+    expect(msg).toContain(SESSION_URL)
+  })
+
+  it('does not contain manual run instruction', () => {
+    const msg = buildRemoteTelegramMessage(mockTask, SESSION_URL)
+    expect(msg).not.toContain('Run task')
+  })
+})
+
+// ── HARNESS_REMOTE_INVOCATION_ENABLED: flag off ───────────────────────────────
+
+describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag off', () => {
+  it('does not call fireCoordinator when flag is not set', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    expect(mockFireCoordinator).not.toHaveBeenCalled()
+  })
+
+  it('sends manual Telegram message (with Run task instruction) when flag is off', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
+    expect(msg).toContain(`Run task ${mockTask.id}`)
+  })
+
+  it('does not call fireCoordinator when queue is empty and flag is off', async () => {
+    mockClaimTask.mockResolvedValue(null)
+    await runPickup('run-abc')
+    expect(mockFireCoordinator).not.toHaveBeenCalled()
+  })
+})
+
+// ── HARNESS_REMOTE_INVOCATION_ENABLED: flag on, success ──────────────────────
+
+describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation success', () => {
+  beforeEach(() => {
+    process.env.HARNESS_REMOTE_INVOCATION_ENABLED = '1'
+  })
+
+  it('calls fireCoordinator with task_id and run_id', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    expect(mockFireCoordinator).toHaveBeenCalledWith({
+      task_id: mockTask.id,
+      run_id: 'run-abc',
+    })
+  })
+
+  it('Telegram message contains session URL on success', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
+    expect(msg).toContain('https://claude.ai/code/session_test123')
+  })
+
+  it('Telegram message says automatically invoked on success', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
+    expect(msg).toContain('automatically')
+  })
+
+  it('Telegram message does not include manual run instruction on success', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
+    expect(msg).not.toContain('Run task')
+  })
+
+  it('does not call fireCoordinator when queue is empty', async () => {
+    mockClaimTask.mockResolvedValue(null)
+    await runPickup('run-abc')
+    expect(mockFireCoordinator).not.toHaveBeenCalled()
+  })
+})
+
+// ── HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure ────────────
+
+describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure', () => {
+  beforeEach(() => {
+    process.env.HARNESS_REMOTE_INVOCATION_ENABLED = '1'
+    mockFireCoordinator.mockResolvedValue({
+      ok: false,
+      error: 'Routine is paused.',
+      failure_type: 'upstream',
+      upstream_status: 400,
+    })
+  })
+
+  it('falls back to manual Telegram message when invocation fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
+    expect(msg).toContain(`Run task ${mockTask.id}`)
+  })
+
+  it('returns ok:true even when invocation fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const result = await runPickup('run-abc')
+    expect(result.ok).toBe(true)
+  })
+
+  it('returns claimed task even when invocation fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const result = await runPickup('run-abc')
+    expect(result.claimed).toEqual(mockTask)
   })
 })
