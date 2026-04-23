@@ -45,3 +45,5 @@ docs/review-skips.md
 next-env.d.ts
 
 .vercel
+
+.env*.local
