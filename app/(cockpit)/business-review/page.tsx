@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TodayYesterdayPanel } from './_components/TodayYesterdayPanel'
 import { WhatYouOwePanel } from './_components/WhatYouOwePanel'
+import { RecentDaysTable } from './_components/RecentDaysTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,10 @@ export default async function BusinessReviewPage() {
         <WhatYouOwePanel />
       </div>
 
-      {/* Chunks C–E compose here in subsequent sprints */}
+      {/* Recent Days Table — Chunk C */}
+      <div style={{ marginTop: 24 }}>
+        <RecentDaysTable />
+      </div>
     </div>
   )
 }
