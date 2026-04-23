@@ -179,6 +179,27 @@ At the end of every invocation, append to `docs/handoffs/cost-log.md`:
 
 If you're about to burn >10k tokens on a single phase, stop and surface it. Principle 9 (cost) is load-bearing.
 
+# On escalation and completion (mandatory Telegram notification)
+
+At every stopping point you MUST send a Telegram notification via the harness proxy before halting. This is non-optional. Colin reads the channel on mobile; it is his only async signal that the coordinator ran.
+
+**Trigger points (send at each):** acceptance doc written and awaiting approval, grounding checkpoint posted, unrecoverable error, chunk complete, sprint closed.
+
+**Required message fields:**
+- `task_id` — the task_queue UUID from the input (parse from the task text)
+- `chunk_id` — e.g. `sprint-4-C`
+- one-line summary of what happened
+
+**Message format:**
+```
+[LepiOS Coordinator] {chunk_id}
+Status: {acceptance_doc_ready | awaiting_grounding | error | complete}
+task_id: {uuid}
+{one-line summary of what happened}
+```
+
+**Send the notification as the final step before stopping.** See "Sending Telegram notifications" for the curl. If `CRON_SECRET` is not in your environment, log the failure to agent_events (action=notification_failed, error=missing_cron_secret) and stop — do not silently skip.
+
 # Format of your outputs to Colin
 
 When you escalate or hand off, produce a structured summary — not prose. Colin reads on mobile while doing other things; density matters.
