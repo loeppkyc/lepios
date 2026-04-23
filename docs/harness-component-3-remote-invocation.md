@@ -452,6 +452,20 @@ The autonomous path works end-to-end with no human "Run task" step. Coordinator 
 
 ## Known Limitations (discovered 2026-04-23)
 
+### SP-API credentials are Production-only — preview deployments cannot ground business-review routes
+
+**Root cause:** SP-API credentials (`AMAZON_SP_*` env vars) are scoped to the Production environment in Vercel. Preview deployments do not have these credentials, so `spApiConfigured()` returns `false` and all business-review routes return HTTP 503 `{"error":"SP-API credentials not configured"}`.
+
+**Observed:** Sprint 4 Chunk C grounding attempt against preview URL `lepios-ev8rfod9h-loeppkycs-projects.vercel.app` — every `/api/business-review/recent-days` call returned 503. The correct production numbers were only visible at `lepios-one.vercel.app`.
+
+**Impact:** Grounding of any feature that calls SP-API (business-review, today-yesterday, recent-days, order lookup) must happen against the production URL, not preview. This means a merge to main is required before grounding is possible — there is no preview-stage grounding path for Amazon data features.
+
+**Workaround:** Merge the branch to main and wait for the production Vercel deploy to reach READY before grounding. This is the correct flow for SP-API features.
+
+**Alternative (not recommended):** Add SP-API credentials to the Preview environment scope in Vercel. Consequence: every PR preview build would hit the real Amazon SP-API. Possible rate limit exhaustion, unexpected order state side effects. Not worth it — the merge-first pattern is safer.
+
+---
+
 ### Coordinator sessions cannot send outbound HTTP requests
 
 **Root cause:** The Anthropic Claude Code sandbox enforces a host allowlist for outbound network connections. When a coordinator session (spawned via the Routines API) runs `curl` or any fetch to an arbitrary external host — including `lepios-one.vercel.app` — the request is blocked at the sandbox level. This is not a secret/auth issue; it is a hard network restriction on the execution environment.

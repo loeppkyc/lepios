@@ -39,20 +39,18 @@ audit_reminder: "Next sprint will run cache-match-disabled until Colin updates l
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: "C"
-status: "awaiting-grounding"
+active_chunk: null
+status: "chunk-c-complete"
 phase0_result: "cache_match_enabled: false — explicit override in sprint-state.md (cache_match_reason: 'Sprint 4 baseline') per Phase 0 rule 4; overrides audit-log date check; every acceptance doc escalates to Colin"
-acceptance_doc_path: "docs/sprint-4/chunk-c-acceptance.md"
-acceptance_doc_status: "colin-approved"
-last_handoff_path: "docs/sprint-4/chunk-c-handoff.json"
-awaiting: "grounding-checkpoint-chunk-c"
+last_chunk_completed: "C"
+last_chunk_grounding: "passed-with-limitation"
+last_chunk_limitation: "SP-API Orders strips ItemPrice and OrderTotal from Pending orders >1 day old (B2B/net-30). Revenue gap vs SC for those orders is expected; resolves in Sprint 5 Finances integration."
+awaiting: "colin-queue-chunk-D"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-23T17:00:00-06:00"
+last_updated_at: "2026-04-23T18:55:00-06:00"
 resumed_at: "2026-04-23T15:00:00-06:00"
 resume_reason: "Component #3 Remote Invocation shipped (commit bebac8e). Clean unattended run verified: task 90f952dc claimed autonomously, session session_01Y4Ca2VMWjFF9WYhrkqxFYV spawned without human step. Resume trigger met."
-pause_reason: "Harness remote invocation is higher priority than more LepiOS features. Chunks C/D/E are scoped and ready but will run through the harness unattended once remote invocation ships."
-resume_trigger: "Harness remote invocation shipped + one clean unattended chunk run verified"
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
@@ -69,7 +67,7 @@ kill_criterion: "Every visible number on LepiOS Business Review matches its sour
 # Progress
 
 chunks_planned: ["A", "B", "C", "D", "E"]
-chunks_complete: ["A", "B"]
+chunks_complete: ["A", "B", "C"]
 chunks_escalated: []
 chunks_rolled_back: []
 
