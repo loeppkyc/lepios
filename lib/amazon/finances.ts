@@ -45,7 +45,12 @@ export interface SettlementBalance {
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups: FinancialEventGroup[] = []
 
-  let currentParams: Record<string, string> = { MaxResultsPerPage: '100' }
+  // SP-API requires FinancialEventGroupStartedAfter — returns 400 "Date range not valid" without it
+  const startedAfter = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()
+  let currentParams: Record<string, string> = {
+    MaxResultsPerPage: '100',
+    FinancialEventGroupStartedAfter: startedAfter,
+  }
 
   // Paginate until no NextToken
   while (true) {
