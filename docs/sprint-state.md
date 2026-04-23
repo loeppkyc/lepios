@@ -36,12 +36,23 @@ phase0_result: "cache_match_enabled: false — explicit override in sprint-state
 acceptance_doc_path: null
 acceptance_doc_status: "not-started"
 last_handoff_path: "docs/sprint-4/chunk-b-handoff.json"
-awaiting: "remote-invocation-ship"
+awaiting: "first-clean-chunk-run"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-23T04:35:00-06:00"
+last_updated_at: "2026-04-23T14:00:00-06:00"
 pause_reason: "Harness remote invocation is higher priority than more LepiOS features. Chunks C/D/E are scoped and ready but will run through the harness unattended once remote invocation ships."
 resume_trigger: "Harness remote invocation shipped + one clean unattended chunk run verified"
+
+# Remote invocation milestone (2026-04-23)
+remote_invocation_smoke_test: "PASS — 2026-04-23T14:00:00-06:00"
+remote_invocation_task_id: "90f952dc-ce4d-4a2c-b9fe-0d513ca38c45"
+remote_invocation_notes: |
+  Coordinator startup behavior verified: task fetch, status running update, heartbeat,
+  coordinator.md + ARCHITECTURE.md reads all succeeded. Phase 2 chunk work could not
+  run (no metadata.chunk in smoke-test task — expected). Two items still needed before
+  full unattended chunk run:
+  1. Wire loeppky_trigger_bot token as Telegram connector in routine at claude.ai/code/routines
+  2. Create a real chunk task with metadata.chunk = chunk-id to exercise Phase 2 loop
 plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
