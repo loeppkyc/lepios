@@ -12,3 +12,4 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 2026-04-22T18:30:00-06:00 coordinator sprint=4 chunk=A phase=2-update tokens_in=~12000 tokens_out=~2500 escalated=true auto_proceeded=false
 2026-04-22T19:00:00-06:00 coordinator sprint=4 chunk=A phase=3 tokens_in=~2000 tokens_out=~500 escalated=true auto_proceeded=false
 2026-04-22T20:30:00-06:00 coordinator sprint=4 chunk=A phase=4 tokens_in=~12000 tokens_out=~3000 escalated=true auto_proceeded=false
+2026-04-23T00:00:00-06:00 coordinator sprint=null chunk=null phase=0 tokens_in=~8000 tokens_out=~500 escalated=true auto_proceeded=false error="task_id 00000000-0000-0000-0000-000000000001 not found in task_queue; run_id=chunk-b-verify-1; Telegram alert NOT sent (no send mechanism available from coordinator toolset)"
