@@ -313,15 +313,13 @@ This is v0's escalation model. In v1, a two-way Telegram channel (component #2 t
 
 Q1 (token type), Q2 (body injection), Q3 (environment), Q4 (secret injection), Q6 (rate limits), Q7 (session poll), Q8 (non-negotiables) — all resolved. See §3, §4, §5 for the locked spec.
 
-### Q5 — Coordinator escalation response loop: ARCHITECTURE DECISION NEEDED before Chunk D
+### Q5 — Coordinator escalation response loop: LOCKED (a)
 
-When coordinator hits a grounding checkpoint and terminates with `status = 'awaiting-grounding'`, how does Colin's response re-trigger the coordinator? Two options:
+When coordinator hits a grounding checkpoint and terminates with `status = 'awaiting-grounding'`, Colin inserts a new `task_queue` row containing his grounding result in `description` and `metadata.prior_task_id` pointing to the original task. Next pickup cycle invokes coordinator with the new task; coordinator reads both rows for full context.
 
-- **(a) New task row (v0 — recommended):** Colin inserts a new `task_queue` row with his grounding result in `description` and `metadata.prior_task_id` pointing to the original task. Next pickup cycle invokes coordinator with the new task. Coordinator reads both rows for full context. Simple, no new dependencies, preserves queue semantics. Latency: up to 24 hours if Colin responds after the daily pickup window; invoke pickup manually to go faster.
+**Rationale:** Matches the permissions-first pattern from coordinator v0 — start safe and auditable. Option (b) (Telegram callback → immediate re-fire) adds a cross-component dependency on component #2, which is at 85% and not yet stable. Upgrade to (b) only if latency becomes a real operational bottleneck.
 
-- **(b) Telegram callback → immediate re-fire (v1 target):** A component #2 callback button calls `/api/harness/invoke-coordinator` directly when Colin taps a response in Telegram. Fast. Requires component #2 to be wired to `invoke-coordinator`. Cross-component dependency; do not build until component #2 is stable.
-
-Option (a) is the v0 decision unless Colin says otherwise. Option (b) is the natural v1 upgrade — no architectural changes required, just wiring the callback.
+**Implications for coordinator.md:** Coordinator must document the escalation write path — specifically that on `awaiting-grounding`, it writes the full checkpoint list to `task_queue.result` (JSONB) and sets `error_message` to a human-readable summary Colin can act on without querying the DB. This is the contract Colin reads before inserting the response task.
 
 ---
 
