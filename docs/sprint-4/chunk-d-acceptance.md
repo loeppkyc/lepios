@@ -214,13 +214,29 @@ object — that returns UTC month, not Edmonton month. Use `Intl.DateTimeFormat`
 
 ## Grounding Checkpoint
 
+**Grounding method used: Streamlit-parity diff (F14 — not Dropbox-direct)**
+
+The Loeppky Streamlit OS (`utils/dropbox_statements.py`) has a verified-correct Statement
+Coverage view for the same 8 accounts and same folder paths. Bookkeeper sign-off on 2025
+full-year data and Q1 2026 data was obtained prior to this grounding session. Per F14
+(CLAUDE.md §4), when a ported Streamlit view has a verified baseline, the grounding
+checkpoint defaults to LepiOS vs. Streamlit cell-by-cell diff for the verified period.
+
+**Pass criterion:** LepiOS Statement Coverage Grid matches the Streamlit grid cell-for-cell
+across all 8 accounts for the 2025 · Tax Year band and the 2026 YTD columns through Q1 2026
+(the bookkeeper-verified period). No extra greens, no missing reds vs. Streamlit.
+
+**Fallback to Dropbox-direct:** Only required if a discrepancy is found between LepiOS and
+Streamlit, or if Streamlit is suspected stale for a specific account/period.
+
+**Original spec checkpoint (retained for reference):**
 Colin opens Dropbox → navigates to each of the 8 account folders → for each folder, notes
 which months in 2025 and 2026 YTD have at least one PDF. Compares that pattern to the LepiOS
 Statement Coverage Grid (both bands). Every green cell must correspond to at least one PDF
 with `server_modified` in that Edmonton month. Every red cell must correspond to zero such PDFs.
 
-**Minimum spot-check:** 3 account × month combinations — at least one from the 2025 band,
-at least one from the 2026 band, at least one confirmed red.
+**Minimum spot-check (if fallback required):** 3 account × month combinations — at least one
+from the 2025 band, at least one from the 2026 band, at least one confirmed red.
 
 ---
 
