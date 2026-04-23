@@ -212,7 +212,10 @@ New route. Thin wrapper over the Anthropic Routines `/fire` call.
 **Input:**
 
 ```typescript
-{ task_id: string; run_id: string }
+{
+  task_id: string
+  run_id: string
+}
 ```
 
 **Behavior:**
@@ -244,22 +247,22 @@ Modify `app/api/cron/task-pickup/route.ts`. After a successful task claim:
 
 ```typescript
 if (process.env.REMOTE_INVOCATION_ENABLED) {
-  const result = await invokeCoordinator({ task_id: claimed.id, run_id });
+  const result = await invokeCoordinator({ task_id: claimed.id, run_id })
   if (result.ok) {
     await writeAgentEvent('remote_invocation_sent', {
       task_id: claimed.id,
       session_id: result.session_id,
       routine_id: COORDINATOR_ROUTINE_ID,
-    });
+    })
     await sendTelegram(
       `🤖 Coordinator invoked for task ${claimed.id.slice(0, 8)}\n${claimed.task.slice(0, 80)}`
-    );
-    return;
+    )
+    return
   }
   // Fallback: fire failed — send v0 Telegram so Colin can run manually
-  await sendTelegram(v0ManualPickupMessage(claimed));
+  await sendTelegram(v0ManualPickupMessage(claimed))
 } else {
-  await sendTelegram(v0ManualPickupMessage(claimed));
+  await sendTelegram(v0ManualPickupMessage(claimed))
 }
 ```
 
@@ -295,17 +298,17 @@ This is v0's escalation model. In v1, a two-way Telegram channel (component #2 t
 
 ## 8. Failure Modes
 
-| Scenario | Behavior |
-| --- | --- |
-| `/fire` returns 4xx/5xx | Pickup cron falls back to v0 Telegram ("paste this to run manually"). Task stays `claimed`. Stale recovery applies. Do NOT retry. |
-| Routine fires but coordinator fails to start (repo clone, connector auth) | Task stays `claimed` with no heartbeat. Stale recovery re-queues after 10 minutes. Silent failure — session was created but coordinator never wrote to `task_queue`. |
-| Coordinator starts but crashes mid-run | Heartbeat stops. Stale recovery re-queues after 10 minutes. Next pickup fires a fresh coordinator run (retry 1 of `max_retries`). |
-| Coordinator hits escalation / grounding checkpoint | Sends Telegram, sets `status = 'awaiting-grounding'`, terminates cleanly. Expected path. Colin re-queues a response task; next pickup invokes coordinator again. |
-| Supabase connector not configured on routine | Coordinator fails at Supabase fetch step. Writes error to `task_queue.error_message` if possible; stale recovery re-queues. Fix: add connector in routine UI. |
-| `COORDINATOR_ROUTINE_ID` or `COORDINATOR_ROUTINE_TOKEN` missing in Vercel env | `invoke-coordinator` returns 500. Pickup cron falls back to v0 Telegram. `REMOTE_INVOCATION_ENABLED` should be forced false when either var is missing. |
-| Routines API unreachable (Anthropic outage) | `invoke-coordinator` catches fetch error, returns `{ ok: false }`. Pickup cron falls back to v0 Telegram. |
-| 429 rate limit hit | `/fire` returns 429 with `Retry-After` header. Log the header value to `agent_events`. Do NOT retry inline — fall back to v0 Telegram. |
-| Multiple concurrent pickup invocations | Each claims a different task via `FOR UPDATE SKIP LOCKED`. Each fires its own coordinator session. Queue designed for single-task throughput; concurrent runs indicate misconfiguration. |
+| Scenario                                                                      | Behavior                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/fire` returns 4xx/5xx                                                       | Pickup cron falls back to v0 Telegram ("paste this to run manually"). Task stays `claimed`. Stale recovery applies. Do NOT retry.                                                        |
+| Routine fires but coordinator fails to start (repo clone, connector auth)     | Task stays `claimed` with no heartbeat. Stale recovery re-queues after 10 minutes. Silent failure — session was created but coordinator never wrote to `task_queue`.                     |
+| Coordinator starts but crashes mid-run                                        | Heartbeat stops. Stale recovery re-queues after 10 minutes. Next pickup fires a fresh coordinator run (retry 1 of `max_retries`).                                                        |
+| Coordinator hits escalation / grounding checkpoint                            | Sends Telegram, sets `status = 'awaiting-grounding'`, terminates cleanly. Expected path. Colin re-queues a response task; next pickup invokes coordinator again.                         |
+| Supabase connector not configured on routine                                  | Coordinator fails at Supabase fetch step. Writes error to `task_queue.error_message` if possible; stale recovery re-queues. Fix: add connector in routine UI.                            |
+| `COORDINATOR_ROUTINE_ID` or `COORDINATOR_ROUTINE_TOKEN` missing in Vercel env | `invoke-coordinator` returns 500. Pickup cron falls back to v0 Telegram. `REMOTE_INVOCATION_ENABLED` should be forced false when either var is missing.                                  |
+| Routines API unreachable (Anthropic outage)                                   | `invoke-coordinator` catches fetch error, returns `{ ok: false }`. Pickup cron falls back to v0 Telegram.                                                                                |
+| 429 rate limit hit                                                            | `/fire` returns 429 with `Retry-After` header. Log the header value to `agent_events`. Do NOT retry inline — fall back to v0 Telegram.                                                   |
+| Multiple concurrent pickup invocations                                        | Each claims a different task via `FOR UPDATE SKIP LOCKED`. Each fires its own coordinator session. Queue designed for single-task throughput; concurrent runs indicate misconfiguration. |
 
 ---
 
@@ -329,7 +332,7 @@ Spec is locked. No blockers. Chunks A–B are manual setup; Chunk C is the first
 
 ---
 
-### Chunk A — Coordinator Routine Registration
+### Chunk A — Coordinator Routine Registration ✓ COMPLETE (2026-04-23)
 
 **Goal:** A persistent coordinator routine exists at claude.ai/code/routines. `routine_id` and per-routine token are documented and stored. A manual `/fire` call confirms coordinator starts and reads the task row.
 
@@ -341,7 +344,7 @@ Spec is locked. No blockers. Chunks A–B are manual setup; Chunk C is the first
 4. Pre-insert a test task in `task_queue` (`status='claimed'`, `metadata.chunk='test'`).
 5. Fire manually via Claude Code `RemoteTrigger` tool to confirm the session starts.
 
-**Verify standalone:**
+**Verified (2026-04-23):**
 
 ```bash
 curl -X POST https://api.anthropic.com/v1/claude_code/routines/$COORDINATOR_ROUTINE_ID/fire \
@@ -349,18 +352,22 @@ curl -X POST https://api.anthropic.com/v1/claude_code/routines/$COORDINATOR_ROUT
   -H "anthropic-version: 2023-06-01" \
   -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
   -H "Content-Type: application/json" \
-  -d '{"text":"task_id: <test-uuid>\nrun_id: test-run-1"}'
-→ HTTP 200, claude_code_session_id returned
-→ task_queue: test task transitions to status='running', last_heartbeat_at set
-→ Telegram: coordinator startup message arrives
+  -d '{"text":"task_id: 00000000-0000-0000-0000-000000000001\nrun_id: test-run-1"}'
+→ HTTP 200 {"type":"routine_fire","claude_code_session_id":"session_01NGghDFEDJK4w8f4jUn8tgs",...}
+→ Coordinator ran: detected test row (status != 'claimed' on row 00000000-0000-0000-0000-000000000001), terminated correctly
+→ Test branch claude/vibrant-heisenberg-aJAUM created by coordinator run; deleted (test noise, not merged)
 ```
 
-**Unblocks:** Chunk B (needs COORDINATOR_ROUTINE_ID and token confirmed working).
+**Gap surfaced:** `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are not available in the coordinator routine's runtime — escalation Telegrams did not fire during the test run. See Chunk B known gap below.
+
+**Unblocks:** Chunk B (COORDINATOR_ROUTINE_ID and token confirmed working).
 **Effort:** S (UI setup + one curl verify)
 
 ---
 
 ### Chunk B — `/api/harness/invoke-coordinator` Route
+
+**Known gap to close:** `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are not configured as connectors on the coordinator routine. Without them the coordinator cannot send escalation or completion Telegrams. Add both as connectors in the routine UI (claude.ai/code/routines → select routine → Edit → Connectors) before Chunk D end-to-end verification. Verify by confirming a Telegram arrives on the next test fire.
 
 **Goal:** A Vercel route wraps the `/fire` call with CRON_SECRET auth. Independently testable before wiring into the pickup cron.
 
@@ -431,11 +438,11 @@ curl -X POST https://lepios-one.vercel.app/api/harness/invoke-coordinator \
 
 ### Summary
 
-| Chunk | Goal | Effort | Produces |
-| --- | --- | --- | --- |
-| A | Create coordinator routine + token | S | Live `/fire` confirmed |
-| B | `invoke-coordinator` route | S | Testable API wrapper |
-| C | Pickup cron integration | S–M | **Feature-flagged end-to-end wiring** |
-| D | End-to-end verification | M | Sprint 4 resume trigger satisfied |
+| Chunk | Goal                               | Effort | Produces                              |
+| ----- | ---------------------------------- | ------ | ------------------------------------- |
+| A ✓   | Create coordinator routine + token | S      | Live `/fire` confirmed (2026-04-23)   |
+| B     | `invoke-coordinator` route         | S      | Testable API wrapper                  |
+| C     | Pickup cron integration            | S–M    | **Feature-flagged end-to-end wiring** |
+| D     | End-to-end verification            | M      | Sprint 4 resume trigger satisfied     |
 
 Chunk C is the ship-it moment. Once live with `REMOTE_INVOCATION_ENABLED=1`, the harness runs Sprint 4 Chunks C/D/E without Colin typing. Chunk D proves it happened.
