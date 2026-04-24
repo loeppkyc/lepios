@@ -1185,6 +1185,122 @@ describe('POST /api/telegram/webhook — dg:abort: abort handler', () => {
   })
 })
 
+// ── Queue-loop correlation acceptance tests ────────────────────────────────────
+// Tests 4-6 from the outbound_notifications acceptance spec:
+//   4. Strategy A: callback_query + correlation_id → response_received
+//   5. Strategy B: reply_to_message match → response_received (see dispatch order)
+//   6. Strategy C: bare message 24h fallback → response_received
+// Tests 7-9: routing guards (thumbs/gate/no-match — see dispatch order block)
+
+describe('POST /api/telegram/webhook — queue-loop correlation', () => {
+  function makeOutboundBuilderQL(matchedId: string | null) {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: matchedId ? { id: matchedId } : null,
+      error: null,
+    })
+    const chain: Record<string, unknown> = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      filter: vi.fn(),
+      is: vi.fn(),
+      gte: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle,
+    }
+    for (const m of ['select', 'eq', 'filter', 'is', 'gte', 'order', 'limit']) {
+      ;(chain[m] as ReturnType<typeof vi.fn>).mockReturnValue(chain)
+    }
+    const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
+    const update = vi.fn().mockReturnValue({ eq: updateEq })
+    return { ...chain, update, _update: update, _updateEq: updateEq }
+  }
+
+  it('strategy A: callback_query with JSON {correlation_id} → response captured with type=callback and callback_data', async () => {
+    const outbound = makeOutboundBuilderQL('corr-match-id')
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    const CORR_ID = 'ab12cd34'
+    const req = makeRequest(
+      makeCallbackUpdate(JSON.stringify({ correlation_id: CORR_ID, action: 'approve' }))
+    )
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(outbound._update).toHaveBeenCalledOnce()
+    const updateArg = (outbound._update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(updateArg.status).toBe('response_received')
+    expect(updateArg.response.type).toBe('callback')
+    expect(updateArg.response.callback_data).toBe(
+      JSON.stringify({ correlation_id: CORR_ID, action: 'approve' })
+    )
+    expect(typeof updateArg.response_received_at).toBe('string')
+  })
+
+  it('strategy C: bare message with no reply_to, no correlation_id → response_received via 24h fallback', async () => {
+    // Strategy A skipped (no callback_query), Strategy B skipped (no reply_to_message).
+    // Strategy C query fires and returns a match.
+    const outbound = makeOutboundBuilderQL('strategy-c-row')
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    const req = makeRequest({
+      update_id: 202,
+      message: {
+        message_id: 300,
+        chat: { id: 111 },
+        from: { id: VALID_USER_ID, username: 'colinl' },
+        text: 'looks good, proceed',
+        // No reply_to_message
+      },
+    })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(outbound._update).toHaveBeenCalledOnce()
+    const updateArg = (outbound._update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(updateArg.status).toBe('response_received')
+    expect(updateArg.response.type).toBe('message')
+    expect(updateArg.response.text).toBe('looks good, proceed')
+    const eqArg = (outbound._updateEq as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(eqArg[1]).toBe('strategy-c-row')
+  })
+
+  it('unmatched callback_query with no outbound match → webhook_no_match NOT logged (falls to legacy handlers), returns 200', async () => {
+    // When a callback_query has no outbound_notifications match, the code falls
+    // through to parseCallbackData / parseGateCallbackData, not webhook_no_match.
+    // webhook_no_match is only logged for plain messages that have no match.
+    mockParseCallbackData.mockReturnValue(null)
+    mockParseGateCallbackData.mockReturnValue(null)
+
+    const outbound = makeOutboundBuilderQL(null)
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
+
+    const req = makeRequest(makeCallbackUpdate('unknown:payload:xyz'))
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    const noMatchCall = agentInsert.mock.calls.find(
+      (c: unknown[]) => (c[0] as { task_type: string }).task_type === 'webhook_no_match'
+    )
+    // Unmatched callback_query does NOT log webhook_no_match — that path is for plain messages only
+    expect(noMatchCall).toBeUndefined()
+    // legacy thumbs/gate do not fire either (both parsers return null)
+    expect(mockRollbackDeployment).not.toHaveBeenCalled()
+    expect(mockMergeToMain).not.toHaveBeenCalled()
+  })
+})
+
 // ── Dispatch order: outbound_notifications > thumbs > deploy-gate > no-match ──
 
 describe('POST /api/telegram/webhook — dispatch order', () => {
