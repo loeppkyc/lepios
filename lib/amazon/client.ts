@@ -1,6 +1,15 @@
 import { createHmac, createHash } from 'crypto'
+import { logEvent } from '@/lib/knowledge/client'
 
 const SP_API_BASE = 'https://sellingpartnerapi-na.amazon.com'
+
+const MAX_RETRIES = 5
+const BASE_DELAY_MS = 1_000
+const MAX_DELAY_MS = 30_000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 const SP_REGION = 'us-east-1'
 const SP_SERVICE = 'execute-api'
 
@@ -125,26 +134,60 @@ export async function spFetch<T>(
   options: { method?: string; params?: Record<string, string>; body?: unknown } = {}
 ): Promise<T> {
   const { method = 'GET', params, body } = options
-  const lwaToken = await getLwaToken()
 
-  const url = new URL(SP_API_BASE + path)
-  if (params) {
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const lwaToken = await getLwaToken()
+
+    const url = new URL(SP_API_BASE + path)
+    if (params) {
+      for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    }
+
+    const bodyStr = body ? JSON.stringify(body) : ''
+    const headers = buildAuthHeaders(method, url, lwaToken, bodyStr)
+
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      ...(bodyStr ? { body: bodyStr } : {}),
+    })
+
+    if (res.status === 429) {
+      if (attempt === MAX_RETRIES) {
+        const text = await res.text()
+        throw new Error(
+          `SP-API ${method} ${path} (429): rate limited after ${MAX_RETRIES} retries. ${text.slice(0, 200)}`
+        )
+      }
+
+      const retryAfterHeader = res.headers.get('Retry-After')
+      const waitMs = retryAfterHeader
+        ? Math.min(parseFloat(retryAfterHeader) * 1_000, MAX_DELAY_MS)
+        : Math.min(BASE_DELAY_MS * 2 ** attempt + Math.random() * 500, MAX_DELAY_MS)
+
+      void logEvent('amazon', 'sp_api.429_retry', {
+        actor: 'system',
+        status: 'pending',
+        meta: {
+          path,
+          attempt: attempt + 1,
+          waitMs: Math.round(waitMs),
+          retryAfter: retryAfterHeader ?? null,
+        },
+      })
+
+      await sleep(waitMs)
+      continue
+    }
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`SP-API ${method} ${path} (${res.status}): ${text.slice(0, 300)}`)
+    }
+
+    return res.json() as Promise<T>
   }
 
-  const bodyStr = body ? JSON.stringify(body) : ''
-  const headers = buildAuthHeaders(method, url, lwaToken, bodyStr)
-
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    ...(bodyStr ? { body: bodyStr } : {}),
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`SP-API ${method} ${path} (${res.status}): ${text.slice(0, 300)}`)
-  }
-
-  return res.json() as Promise<T>
+  // Unreachable: loop exits via return or throw above on every path
+  throw new Error(`SP-API ${method} ${path}: retry loop exhausted`)
 }
