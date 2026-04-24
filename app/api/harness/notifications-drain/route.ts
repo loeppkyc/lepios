@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 
@@ -22,7 +22,7 @@ async function triggerImprovementEngineForRecentCompletions(): Promise<{
 }> {
   const db = createServiceClient()
   let triggered = 0
-  let errors = 0
+  const errors = 0
 
   const lookback = new Date(Date.now() - IMPROVEMENT_ENGINE_LOOKBACK_MS).toISOString()
 
@@ -50,10 +50,14 @@ async function triggerImprovementEngineForRecentCompletions(): Promise<{
 
     if (existingEvent) continue // already processed
 
-    // Fire the engine async — do not await so drain is not blocked
-    void runImprovementEngine(row.id).catch((err: unknown) => {
-      console.error('[improvement-engine] runImprovementEngine error:', err)
-    })
+    // after() keeps the serverless function alive until the engine finishes,
+    // even after the HTTP response is sent. void+catch pattern is not sufficient
+    // in Vercel serverless — function is killed at response time without after().
+    after(
+      runImprovementEngine(row.id).catch((err: unknown) => {
+        console.error('[improvement-engine] runImprovementEngine error:', err)
+      })
+    )
 
     triggered++
   }
