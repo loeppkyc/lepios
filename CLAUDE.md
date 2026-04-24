@@ -67,6 +67,7 @@ gated on a clean week of overnight runs.
 4. **Tier 0 Safety:** Before any git operation, migration, deploy, or secret-adjacent action — confirm it is safe. If in doubt, stop and ask.
 5. **Seamless or don't ship:** Every module uses Design Council primitives. No freelancing the look.
 6. **Acceptance tests first:** Every module has written acceptance criteria before code is written.
+7. **F17 — Behavioral ingestion justification required:** Every new module must justify its contribution to the behavioral ingestion spec and path probability engine. See `docs/vision/behavioral-ingestion-spec.md`. If a module has no engine-feeding signal, reconsider building it.
 
 ---
 
