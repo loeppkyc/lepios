@@ -322,20 +322,164 @@ If there's nothing for Colin to do, say "FYI only, proceeding to next phase" and
 
 # Sending Telegram notifications
 
-When running as a routine (invoked via the Anthropic Routines API with Bash access), send Telegram messages by calling the LepiOS proxy endpoint — do not call the Telegram Bot API directly, as the bot token is not available in the routine environment.
+The coordinator sandbox blocks direct calls to `api.telegram.org`. All Telegram messages go through the `outbound_notifications` Supabase queue. The drain route (`/api/harness/notifications-drain`) delivers queued rows to Telegram.
 
-To send a Telegram notification, POST to /api/harness/telegram-send with the body `{ text: '...' }` and `Authorization: Bearer $CRON_SECRET`. Do not call Telegram Bot API directly.
+## Step 1 — Build correlation_id
 
-Example using curl from Bash:
+Telegram `callback_data` is limited to 64 bytes. A full UUID with the key `"correlation_id"` exceeds this. Use the **first 8 hex characters** of the `task_id` as the correlation token — store this same value in the `outbound_notifications.correlation_id` column AND in every button's `callback_data`.
 
 ```bash
-curl -s -X POST https://lepios-one.vercel.app/api/harness/telegram-send \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  -d '{"text": "Sprint 4 Chunk C acceptance doc ready — awaiting Colin approval"}'
+CORR_ID="${TASK_ID:0:8}"   # e.g. "246da395" from "246da395-..."
 ```
 
-The endpoint returns `{ ok: true, message_id: N }` on success. On failure it returns a non-2xx status with `{ ok: false, error: '...' }`. Log failures to agent_events but do not retry — the same no-retry principle applies here as for coordinator invocation.
+## Step 2 — Insert into outbound_notifications
+
+Insert via the Supabase REST API. For approval messages include an inline keyboard; for fire-and-forget notifications omit `reply_markup` and set `requires_response=false`.
+
+```bash
+ROW=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notifications" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d "{
+    \"channel\": \"telegram\",
+    \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
+    \"payload\": {
+      \"text\": \"[LepiOS Coordinator] {chunk_id}\\nStatus: {status}\\ntask_id: ${TASK_ID}\\n{one-line summary}\",
+      \"parse_mode\": \"Markdown\",
+      \"reply_markup\": {
+        \"inline_keyboard\": [[
+          {\"text\": \"👍 Approve\", \"callback_data\": \"{\\\"correlation_id\\\":\\\"${CORR_ID}\\\",\\\"action\\\":\\\"approve\\\"}\"},
+          {\"text\": \"👎 Reject\",  \"callback_data\": \"{\\\"correlation_id\\\":\\\"${CORR_ID}\\\",\\\"action\\\":\\\"reject\\\"}\"}
+        ]]
+      }
+    },
+    \"correlation_id\": \"${CORR_ID}\",
+    \"requires_response\": true
+  }")
+
+ROW_ID=$(echo "$ROW" | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d,list) and d else 'INSERT_FAILED')" \
+  2>/dev/null)
+```
+
+If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notification_insert_failed) and **stop** — do not silently skip notifications.
+
+## Step 3 — Trigger drain (best-effort)
+
+```bash
+DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
+  -H "Authorization: Bearer ${CRON_SECRET}" 2>/dev/null || echo "000")
+
+if [ "$DRAIN_HTTP" != "200" ]; then
+  # Log drain_trigger_failed to agent_events (non-fatal — drain runs on next cron cycle)
+  true
+fi
+```
+
+Do not abort on drain failure. The message will be delivered when the drain next runs (daily cron or manual trigger). For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
+
+## Step 4 — Fire-and-forget vs. polling
+
+**`requires_response=false`:** insert + drain trigger complete. Proceed immediately.
+
+**`requires_response=true`:** insert + drain trigger, then poll Supabase for up to 30 minutes:
+
+```bash
+POLL_START=$(date +%s)
+TIMEOUT=1800   # 30 minutes
+RESPONSE_JSON=""
+
+while true; do
+  ELAPSED=$(( $(date +%s) - POLL_START ))
+  [ "$ELAPSED" -ge "$TIMEOUT" ] && break
+
+  RESULT=$(curl -s \
+    "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notifications?id=eq.${ROW_ID}&select=status,response" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
+
+  ROW_STATUS=$(echo "$RESULT" | python3 -c \
+    "import json,sys; d=json.load(sys.stdin); print(d[0]['status'] if d else 'missing')" 2>/dev/null)
+
+  if [ "$ROW_STATUS" = "response_received" ]; then
+    RESPONSE_JSON=$(echo "$RESULT" | python3 -c \
+      "import json,sys; d=json.load(sys.stdin); print(json.dumps(d[0].get('response',{})))" 2>/dev/null)
+    break
+  fi
+
+  sleep 15
+done
+```
+
+## Step 5 — Parse response
+
+`$RESPONSE_JSON` has this shape (written by the inbound webhook handler):
+
+```json
+{
+  "type": "callback",
+  "callback_data": "{\"correlation_id\":\"246da395\",\"action\":\"approve\"}",
+  "text": null,
+  "from_user": "123456789 (@username)",
+  "raw_update_id": "..."
+}
+```
+
+Parse `callback_data` as JSON; read `action`:
+
+- `"approve"` → mark chunk approved, proceed to Phase 5
+- `"reject"` → escalate; include `reason` if present
+
+## On timeout (30 min, no response_received)
+
+1. Update `docs/sprint-state.md`: `status: awaiting-async-response`, `pending_notification_id: {ROW_ID}`.
+2. Log to agent_events: action=coordinator_await_timeout, meta.row_id=ROW_ID, meta.task_id=TASK_ID.
+3. Exit Phase 4 gracefully. Next coordinator invocation queries `pending_notification_id` to resume.
+
+## Callback data patterns
+
+All coordinator approval buttons embed `correlation_id` = first 8 hex chars of `task_id`. Max 64 bytes per Telegram.
+
+| Button              | callback_data                                                                 | Bytes |
+| ------------------- | ----------------------------------------------------------------------------- | ----- |
+| 👍 Approve          | `{"correlation_id":"12345678","action":"approve"}`                            | 48    |
+| 👎 Reject           | `{"correlation_id":"12345678","action":"reject"}`                             | 47    |
+| 👎 Scope too large  | `{"correlation_id":"12345678","action":"reject","reason":"scope_too_large"}`  | 62    |
+| 👎 Wrong direction  | `{"correlation_id":"12345678","action":"reject","reason":"wrong_direction"}`  | 63    |
+| 👎 Needs more study | `{"correlation_id":"12345678","action":"reject","reason":"needs_more_study"}` | 64    |
+| 👎 Blocked on dep   | `{"correlation_id":"12345678","action":"reject","reason":"blocked_on_dep"}`   | 62    |
+
+Reasons come from inline keyboard buttons — never free-text input.
+
+## Inline keyboard builder
+
+Base 2-button pattern (all approval messages):
+
+```json
+{
+  "inline_keyboard": [
+    [
+      {
+        "text": "👍 Approve",
+        "callback_data": "{\"correlation_id\":\"CORR_ID\",\"action\":\"approve\"}"
+      },
+      {
+        "text": "👎 Reject",
+        "callback_data": "{\"correlation_id\":\"CORR_ID\",\"action\":\"reject\"}"
+      }
+    ]
+  ]
+}
+```
+
+For multi-choice (e.g. grounding pass/partial/fail), use a second row of 3 buttons. Keep each `callback_data` ≤ 64 bytes — verify with:
+
+```bash
+echo -n '{"correlation_id":"12345678","action":"approve"}' | wc -c
+```
 
 # Finally
 
