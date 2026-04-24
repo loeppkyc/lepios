@@ -93,3 +93,33 @@ outcome: escalated
 escalation_reasons:
   - cache_match_disabled_sprint_override
   - open_question_Q1 (fee/payout column display requires Colin decision before builder starts)
+
+---
+
+2026-04-24T16:10:00Z sprint=harness-polish chunk=branch-naming doc=docs/harness-polish/chunk-branch-naming-acceptance.md
+phase: 2 (per-chunk acceptance doc)
+cited_principles: [15, META-C, Phase-0]
+trigger_match_evidence: |
+  Phase 0 check: last_reviewed_by_colin_at = 2026-04-22, same date as harness-e2e close.
+  Ambiguous whether review post-dates close → conservative: cache-match disabled.
+  No explicit sprint-state.md override exists for harness-polish sprint
+  (sprint not registered in sprint-state.md or ARCHITECTURE.md §7).
+  Principle 15 (new terrain): harness-polish sprint has no ratified plan — first coordinator
+  invocation for this sprint.
+  Colin manually seeded the task (source=manual) with a self-contained task description
+  that includes the acceptance criterion implicitly — treated as parallel-track authorization
+  (analogous to harness-e2e pattern), but explicit Colin approval of acceptance doc is
+  still required before builder executes per Principle 15.
+reversibility_check: |
+  Acceptance doc: new file at docs/harness-polish/chunk-branch-naming-acceptance.md.
+  Fully reversible — delete or rewrite. No code, no schema, no external effects.
+  Builder changes (if approved): edits to .claude/agents/builder.md and coordinator.md.
+  Both files are docs/instructions only; reversible via git revert. No application code.
+  No schema migrations, no destructive operations.
+confidence: high (escalation is correct — cache-match disabled, new sprint terrain)
+outcome: escalated
+escalation_reasons:
+  - cache_match_conservatively_disabled (ambiguous Phase 0 date check)
+  - harness_polish_sprint_not_ratified (no plan in sprint-state.md or ARCHITECTURE.md §7)
+  - principle_15_new_terrain (first coordinator invocation for harness-polish sprint)
+acceptance_doc_path: docs/harness-polish/chunk-branch-naming-acceptance.md
