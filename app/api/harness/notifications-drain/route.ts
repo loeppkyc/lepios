@@ -1,10 +1,65 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 
 export const dynamic = 'force-dynamic'
 
 const BATCH_SIZE = 20
 const MAX_ATTEMPTS = 5
+
+// ── Component 1 — Improvement Engine Trigger (Option A) ───────────────────────
+// Scans for task_queue rows completed in the last 2 minutes that have not yet
+// been processed by the improvement engine (no agent_events row with
+// action='improvement_engine.triggered' and meta.task_id = row.id).
+// Fires runImprovementEngine for each unprocessed row — async/fire-and-forget
+// so it does not block the notification drain.
+
+const IMPROVEMENT_ENGINE_LOOKBACK_MS = 2 * 60 * 1000 // 2 minutes
+
+async function triggerImprovementEngineForRecentCompletions(): Promise<{
+  triggered: number
+  errors: number
+}> {
+  const db = createServiceClient()
+  let triggered = 0
+  let errors = 0
+
+  const lookback = new Date(Date.now() - IMPROVEMENT_ENGINE_LOOKBACK_MS).toISOString()
+
+  // Find recently-completed task_queue rows
+  const { data: completedRows, error: rowErr } = await db
+    .from('task_queue')
+    .select('id, completed_at')
+    .in('status', ['completed', 'grounded'])
+    .gte('completed_at', lookback)
+    .limit(10) // safety cap — should never be more than a few per run
+
+  if (rowErr || !completedRows || completedRows.length === 0) {
+    return { triggered: 0, errors: rowErr ? 1 : 0 }
+  }
+
+  for (const row of completedRows as { id: string; completed_at: string }[]) {
+    // Check if the engine has already been triggered for this row
+    const { data: existingEvent } = await db
+      .from('agent_events')
+      .select('id')
+      .eq('action', 'improvement_engine.triggered')
+      .filter('meta->>task_id', 'eq', row.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingEvent) continue // already processed
+
+    // Fire the engine async — do not await so drain is not blocked
+    void runImprovementEngine(row.id).catch((err: unknown) => {
+      console.error('[improvement-engine] runImprovementEngine error:', err)
+    })
+
+    triggered++
+  }
+
+  return { triggered, errors }
+}
 
 interface PendingRow {
   id: string
@@ -62,6 +117,13 @@ async function drain(request: Request): Promise<NextResponse> {
 
   const db = createServiceClient()
 
+  // ── Component 1: trigger improvement engine for recently-completed chunks ─────
+  // Fire-and-forget — errors are logged inside but do not block the drain.
+  const engineResult = await triggerImprovementEngineForRecentCompletions().catch(() => ({
+    triggered: 0,
+    errors: 1,
+  }))
+
   const { data: rows, error: fetchError } = await db
     .from('outbound_notifications')
     .select('id, channel, chat_id, payload, attempts')
@@ -75,7 +137,12 @@ async function drain(request: Request): Promise<NextResponse> {
   }
 
   if (!rows || rows.length === 0) {
-    return NextResponse.json({ ok: true, drained: 0, failed: 0 })
+    return NextResponse.json({
+      ok: true,
+      drained: 0,
+      failed: 0,
+      improvement_engine: engineResult,
+    })
   }
 
   let drained = 0
@@ -129,7 +196,7 @@ async function drain(request: Request): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ ok: true, drained, failed })
+  return NextResponse.json({ ok: true, drained, failed, improvement_engine: engineResult })
 }
 
 export async function GET(request: Request): Promise<NextResponse> {

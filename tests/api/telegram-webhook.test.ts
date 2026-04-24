@@ -8,16 +8,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock telegram-buttons ─────────────────────────────────────────────────────
 
-const { mockIsAllowedUser, mockParseCallbackData, mockParseGateCallbackData } = vi.hoisted(() => ({
+const { mockIsAllowedUser, mockParseCallbackData, mockParseGateCallbackData, mockParseImproveCallbackData } = vi.hoisted(() => ({
   mockIsAllowedUser: vi.fn(),
   mockParseCallbackData: vi.fn(),
   mockParseGateCallbackData: vi.fn(),
+  mockParseImproveCallbackData: vi.fn().mockReturnValue(null), // default: not an improve callback
 }))
 
 vi.mock('@/lib/harness/telegram-buttons', () => ({
   isAllowedUser: mockIsAllowedUser,
   parseCallbackData: mockParseCallbackData,
   parseGateCallbackData: mockParseGateCallbackData,
+  parseImproveCallbackData: mockParseImproveCallbackData,
 }))
 
 // ── Mock deploy-gate functions ────────────────────────────────────────────────

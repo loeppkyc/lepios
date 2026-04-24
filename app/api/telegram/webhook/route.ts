@@ -4,6 +4,7 @@ import {
   isAllowedUser,
   parseCallbackData,
   parseGateCallbackData,
+  parseImproveCallbackData,
 } from '@/lib/harness/telegram-buttons'
 import {
   rollbackDeployment,
@@ -651,6 +652,139 @@ async function handleGateRollback(
   await editRollbackAck(chatId, messageId, originalText, result.ok, result.error).catch(() => {})
 }
 
+// ── Improvement Engine handlers ───────────────────────────────────────────────
+
+/**
+ * Handles improve_approve_all:<chunk_id> callback.
+ * Marks all queued improvement proposals for this chunk_id as status='approved'.
+ */
+async function handleImproveApproveAll(
+  chunkId: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  const { error } = await db
+    .from('task_queue')
+    .update({ status: 'approved' })
+    .eq('status', 'queued')
+    .filter('metadata->>source_chunk_id', 'eq', chunkId)
+    .filter('metadata->>task_type_label', 'eq', 'improvement_proposal')
+
+  await logEvent({
+    task_type: 'improvement_engine_approve_all',
+    status: error ? 'error' : 'success',
+    output_summary: error
+      ? `approve_all failed for chunk ${chunkId}: ${error.message}`
+      : `approved all proposals for chunk ${chunkId}`,
+    meta: { chunk_id: chunkId, error: error?.message ?? null },
+  })
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  await editTelegramMessage(
+    chatId,
+    messageId,
+    error
+      ? `${originalText}\nApprove failed: ${error.message.slice(0, 80)}`
+      : `${originalText}\nAll approved at ${timestamp} MT`
+  ).catch(() => {})
+}
+
+/**
+ * Handles improve_dismiss:<chunk_id> callback.
+ * Marks all queued improvement proposals for this chunk_id as status='dismissed'.
+ */
+async function handleImproveDismiss(
+  chunkId: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  const { error } = await db
+    .from('task_queue')
+    .update({ status: 'dismissed' })
+    .eq('status', 'queued')
+    .filter('metadata->>source_chunk_id', 'eq', chunkId)
+    .filter('metadata->>task_type_label', 'eq', 'improvement_proposal')
+
+  await logEvent({
+    task_type: 'improvement_engine_dismiss',
+    status: error ? 'error' : 'success',
+    output_summary: error
+      ? `dismiss failed for chunk ${chunkId}: ${error.message}`
+      : `dismissed all proposals for chunk ${chunkId}`,
+    meta: { chunk_id: chunkId, error: error?.message ?? null },
+  })
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  await editTelegramMessage(
+    chatId,
+    messageId,
+    error
+      ? `${originalText}\nDismiss failed: ${error.message.slice(0, 80)}`
+      : `${originalText}\nAll dismissed at ${timestamp} MT`
+  ).catch(() => {})
+}
+
+/**
+ * Handles improve_review:<chunk_id> callback.
+ * Sends individual proposal messages (one per proposal, approve/dismiss buttons).
+ * Best-effort fire-and-forget — if it fails, log and return 200.
+ */
+async function handleImproveReview(chunkId: string, chatId: number): Promise<void> {
+  const db = createServiceClient()
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+
+  const { data: proposals } = await db
+    .from('task_queue')
+    .select('id, description, metadata')
+    .eq('status', 'queued')
+    .filter('metadata->>source_chunk_id', 'eq', chunkId)
+    .filter('metadata->>task_type_label', 'eq', 'improvement_proposal')
+    .order('created_at', { ascending: true })
+    .limit(20)
+
+  if (!proposals || proposals.length === 0) return
+
+  for (const p of proposals as { id: string; description: string | null; metadata: Record<string, unknown> }[]) {
+    const category = (p.metadata?.category as string) ?? 'unknown'
+    const severity = (p.metadata?.severity as string) ?? 'unknown'
+    const text = `[${category}] Severity: ${severity}\n${(p.description ?? '').slice(0, 200)}`
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Approve', callback_data: `improve_approve_all:${chunkId}` },
+            { text: 'Dismiss', callback_data: `improve_dismiss:${chunkId}` },
+          ]],
+        },
+      }),
+    }).catch(() => {})
+  }
+}
+
 // ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -785,12 +919,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = parseCallbackData(callbackQuery.data ?? '')
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
+  const parsedImprove = parseImproveCallbackData(callbackQuery.data ?? '')
 
   await logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove ? 'success' : 'warning'
   )
 
   if (parsed) {
@@ -853,6 +988,32 @@ export async function POST(request: Request): Promise<NextResponse> {
       callbackQuery.message.chat.id,
       callbackQuery.message.message_id,
       callbackQuery.message.text ?? ''
+    )
+  } else if (parsedImprove?.action === 'approve_all') {
+    await handleImproveApproveAll(
+      parsedImprove.chunkId,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    )
+  } else if (parsedImprove?.action === 'dismiss') {
+    await handleImproveDismiss(
+      parsedImprove.chunkId,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    )
+  } else if (parsedImprove?.action === 'review') {
+    // Best-effort fire-and-forget — log failure, return 200 regardless
+    void handleImproveReview(parsedImprove.chunkId, callbackQuery.message.chat.id).catch(
+      (err: unknown) => {
+        void logEvent({
+          task_type: 'improvement_engine_review_fail',
+          status: 'error',
+          output_summary: `handleImproveReview failed for chunk ${parsedImprove.chunkId}: ${String(err)}`,
+          meta: { chunk_id: parsedImprove.chunkId, error: String(err) },
+        })
+      }
     )
   }
 

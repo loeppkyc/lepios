@@ -45,17 +45,31 @@ function makeSelectChain(rows: PendingRow[]) {
   return chain
 }
 
-// Wires mockFrom: first call → select chain, subsequent calls → update builder.
+// Wires mockFrom: first call → task_queue (improvement engine trigger — returns empty),
+// second call → outbound_notifications select chain, subsequent calls → update builder.
 // Returns update/updateEq spies for assertions.
 function setupDrainMock(rows: PendingRow[]) {
   const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
   const update = vi.fn().mockReturnValue({ eq: updateEq })
   const selectChain = makeSelectChain(rows)
 
+  // Chain for task_queue select in improvement engine trigger (returns no completed rows)
+  const emptyTaskQueueChain: Record<string, unknown> = {
+    then: (fn: Parameters<Promise<unknown>['then']>[0], rej?: Parameters<Promise<unknown>['then']>[1]) =>
+      Promise.resolve({ data: [], error: null }).then(fn, rej),
+    catch: (fn: Parameters<Promise<unknown>['catch']>[0]) => Promise.resolve({ data: [], error: null }).catch(fn),
+    finally: (fn: Parameters<Promise<unknown>['finally']>[0]) => Promise.resolve({ data: [], error: null }).finally(fn),
+  }
+  for (const m of ['select', 'in', 'gte', 'lt', 'eq', 'order', 'limit']) {
+    emptyTaskQueueChain[m] = vi.fn().mockReturnValue(emptyTaskQueueChain)
+  }
+
   let fromCallCount = 0
   mockFrom.mockImplementation(() => {
     fromCallCount++
-    return fromCallCount === 1 ? selectChain : { update }
+    if (fromCallCount === 1) return { select: vi.fn().mockReturnValue(emptyTaskQueueChain) } // task_queue trigger
+    if (fromCallCount === 2) return selectChain  // outbound_notifications select
+    return { update }                            // outbound_notifications update
   })
 
   return { update, updateEq }
@@ -185,7 +199,8 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
     const res = await GET(makeAuthorizedRequest())
     const body = await res.json()
 
-    expect(body).toEqual({ ok: true, drained: 0, failed: 0 })
+    // improvement_engine field added by Component 1 trigger — present but Telegram not called
+    expect(body).toMatchObject({ ok: true, drained: 0, failed: 0 })
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
 

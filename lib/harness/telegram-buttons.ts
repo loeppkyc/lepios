@@ -51,6 +51,24 @@ export function parseGateCallbackData(
   return null
 }
 
+// ── Improvement Engine callback parser ───────────────────────────────────────
+
+/**
+ * Parses callback_data for improvement engine approve/review/dismiss actions.
+ * Format: improve_<action>:<chunk_id>
+ * Examples:
+ *   improve_approve_all:sprint-5-e1
+ *   improve_review:sprint-5-e1
+ *   improve_dismiss:sprint-5-e1
+ */
+export function parseImproveCallbackData(
+  data: string
+): { action: 'approve_all' | 'review' | 'dismiss'; chunkId: string } | null {
+  const m = data.match(/^improve_(approve_all|review|dismiss):(.+)$/)
+  if (!m) return null
+  return { action: m[1] as 'approve_all' | 'review' | 'dismiss', chunkId: m[2] }
+}
+
 export function isAllowedUser(telegramUserId: number): boolean {
   const allowed = process.env.TELEGRAM_ALLOWED_USER_ID
   if (!allowed) return false
