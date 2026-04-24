@@ -24,7 +24,7 @@ async function sendTelegram(
   token: string,
   chatId: string,
   payload: Record<string, unknown>
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; messageId?: number; error?: string }> {
   let res: Response
   try {
     res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -41,7 +41,8 @@ async function sendTelegram(
     return { ok: false, error: `Telegram ${res.status}: ${body.slice(0, 200)}` }
   }
 
-  return { ok: true }
+  const data = (await res.json()) as { ok: boolean; result?: { message_id: number } }
+  return { ok: true, messageId: data.result?.message_id }
 }
 
 async function drain(request: Request): Promise<NextResponse> {
@@ -103,7 +104,15 @@ async function drain(request: Request): Promise<NextResponse> {
     if (result.ok) {
       await db
         .from('outbound_notifications')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          // Merge Telegram's returned message_id into payload so the inbound
+          // webhook can match reply_to_message.message_id (strategy B correlation).
+          ...(result.messageId != null
+            ? { payload: { ...row.payload, message_id: result.messageId } }
+            : {}),
+        })
         .eq('id', row.id)
       drained++
     } else {
