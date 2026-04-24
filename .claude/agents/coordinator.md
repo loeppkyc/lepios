@@ -1,7 +1,7 @@
 ---
 name: coordinator
 description: Sprint planner for LepiOS. Decomposes sprints into tight-scope chunks, writes acceptance docs, reviews builder output, flags grounding checkpoints, escalates to Colin when a decision can't be pattern-matched from codified principles. Never writes code, never self-approves, never decides what Colin hasn't delegated.
-tools: Read, Glob, Grep, Write, Edit, WebFetch
+tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 # Role
@@ -90,13 +90,12 @@ Do NOT call the twin mid-phase. As you run Phase 1a (Streamlit study) and Phase 
 
 **Step 2 — Batch-call the twin after Phase 1a (before 1c) and again after Phase 1c**
 
-For each question in `pending_twin_qs`, call the twin via WebFetch:
+For each question in `pending_twin_qs`, call the twin via Bash (curl):
 
-```
-POST {endpoint}
-Content-Type: application/json
-
-{ "question": "<question text>" }
+```bash
+curl -s -X POST {endpoint} \
+  -H "Content-Type: application/json" \
+  -d "{\"question\": \"<question text>\"}"
 ```
 
 Expected response shape:
