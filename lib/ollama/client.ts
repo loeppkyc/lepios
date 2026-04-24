@@ -150,6 +150,7 @@ export interface GenerateOptions {
   task?: 'code' | 'analysis' | 'general'
   model?: string
   timeoutMs?: number
+  systemPrompt?: string
 }
 
 export interface GenerateResult {
@@ -171,7 +172,7 @@ export async function generate(
   try {
     res = await ollamaFetch(
       '/api/generate',
-      { model, prompt, stream: false },
+      { model, prompt, system: opts.systemPrompt, stream: false },
       opts.timeoutMs ?? 30_000,
     )
   } catch (err) {
