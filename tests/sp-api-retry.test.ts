@@ -68,7 +68,7 @@ describe('spFetch — 429 retry', () => {
       'sp_api.429_retry',
       expect.objectContaining({
         actor: 'system',
-        status: 'pending',
+        status: 'warning',
         meta: expect.objectContaining({ attempt: 1, retryAfter: '0' }),
       })
     )
