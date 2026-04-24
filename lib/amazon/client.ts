@@ -167,7 +167,7 @@ export async function spFetch<T>(
 
       void logEvent('amazon', 'sp_api.429_retry', {
         actor: 'system',
-        status: 'pending',
+        status: 'warning',
         meta: {
           path,
           attempt: attempt + 1,
