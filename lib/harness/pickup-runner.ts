@@ -104,6 +104,27 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     }
   }
 
+  // F18: Log stale reclaim event when any rows were affected
+  if (staleRows.length > 0) {
+    const reclaimedIds = staleRows.filter((r) => r.action === 'queued').map((r) => r.task_id)
+    const cancelledStaleIds = staleRows
+      .filter((r) => r.action === 'cancelled')
+      .map((r) => r.task_id)
+    void logEvent(
+      runId,
+      'warning',
+      null,
+      `stale reclaim: ${staleRows.length} task(s) affected`,
+      Date.now() - start,
+      'task_pickup_stale_reclaimed',
+      {
+        count: staleRows.length,
+        reclaimed: reclaimedIds,
+        cancelled: cancelledStaleIds,
+      }
+    )
+  }
+
   // Step 2: claim the top-priority queued task
   const task = await claimTask(runId)
 
@@ -143,9 +164,36 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     { task: task.task, source: task.source }
   )
 
+  // F18: latency_ms — time from task creation to claim
+  const latencyMs = task.created_at ? Date.now() - new Date(task.created_at).getTime() : null
+
+  // F18: queue_depth — count of remaining queued tasks after this claim
+  let queueDepth: number | null = null
+  try {
+    const db = createServiceClient()
+    const { count } = await db
+      .from('task_queue')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'queued')
+    queueDepth = count
+  } catch {
+    // Non-fatal — pickup already succeeded; depth is informational only
+  }
+
   // Step 4: agent_events row — inserted first so its UUID can go in the button callback_data
   const duration_ms = Date.now() - start
-  const eventId = await logEvent(runId, 'success', task.id, `claimed: ${task.task}`, duration_ms)
+  const eventId = await logEvent(
+    runId,
+    'success',
+    task.id,
+    `claimed: ${task.task}`,
+    duration_ms,
+    'task_pickup',
+    {
+      latency_ms: latencyMs,
+      queue_depth: queueDepth,
+    }
+  )
 
   // Step 5: Remote invocation — fire coordinator automatically when flag is set.
   // On failure: fireCoordinator already logged to agent_events. Fall back to manual message.

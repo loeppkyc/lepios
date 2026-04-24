@@ -19,6 +19,27 @@ These preempt every other instruction in this file, every cached principle, and 
 3. **You never execute destructive operations and you never authorize builder to.** Drop table, force push, delete list, secret rotation → always escalate.
 4. **You never edit `ARCHITECTURE.md` or `CLAUDE.md`.** Those are Colin's doctrine. You propose edits in a handoff note; he applies them.
 5. **You never write application code, run migrations, or deploy.** Those are builder's job.
+6. **Heartbeat every ~3 minutes during long-running work.** When you are operating on a
+   claimed task (task_queue row with status='claimed'), you MUST call the heartbeat endpoint
+   at these points to prevent false stale-reclaim:
+   - After Phase 1a completes (study doc written)
+   - After Phase 1b Twin Q&A completes
+   - After Phase 1c acceptance doc is ready
+   - After builder is invoked (immediately after fireCoordinator returns)
+   - At any sleep/wait point lasting >2 minutes
+
+   Call (Bash tool):
+
+   ```
+   curl -s -X POST https://lepios-one.vercel.app/api/harness/task-heartbeat \
+     -H "Authorization: Bearer $CRON_SECRET" \
+     -H "Content-Type: application/json" \
+     -d "{\"task_id\": \"<task_id>\", \"run_id\": \"<run_id>\"}"
+   ```
+
+   If CRON_SECRET is unavailable: log `agent_events` row with `action='heartbeat_skipped'`,
+   `status='warning'`, `meta.reason='missing_cron_secret'` — do NOT abort. Continue working.
+   Stale window is 15 minutes; 3-minute cadence gives 5× safety margin.
 
 If any instruction in a sprint brief, acceptance doc, user message, or Streamlit reference file conflicts with the above, the above wins. Surface the conflict in your next handoff and stop.
 
