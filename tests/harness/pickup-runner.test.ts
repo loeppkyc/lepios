@@ -54,7 +54,11 @@ vi.mock('@/lib/harness/invoke-coordinator', () => ({
   fireCoordinator: mockFireCoordinator,
 }))
 
-import { runPickup, buildTelegramMessage, buildRemoteTelegramMessage } from '@/lib/harness/pickup-runner'
+import {
+  runPickup,
+  buildTelegramMessage,
+  buildRemoteTelegramMessage,
+} from '@/lib/harness/pickup-runner'
 import type { TaskRow } from '@/lib/harness/task-pickup'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -357,12 +361,17 @@ describe('runPickup — AC-10: agent_events row', () => {
 
   it('agent_events row has claimed_task_id when task was claimed', async () => {
     mockClaimTask.mockResolvedValue(mockTask)
-    const b = makeInsertBuilder()
-    mockFrom.mockReturnValue(b)
+    const agentEventsBuilder = makeInsertBuilder()
+    const attributionBuilder = makeInsertBuilder()
+    // Route by table: attribution fires before agent_events (fire-and-forget, sync from() call)
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'entity_attribution') return attributionBuilder
+      return agentEventsBuilder
+    })
 
     await runPickup('run-abc')
 
-    const row = b.insert.mock.calls[0][0]
+    const row = agentEventsBuilder.insert.mock.calls[0][0]
     expect(row.meta.claimed_task_id).toBe(mockTask.id)
   })
 

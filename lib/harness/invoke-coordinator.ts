@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { recordAttribution } from '@/lib/attribution/writer'
 
 export type InvokeCoordinatorResult =
   | { ok: true; session_id: string; session_url: string }
@@ -56,19 +57,16 @@ export async function fireCoordinator(params: {
 
   let fireRes: Response
   try {
-    fireRes = await fetch(
-      `https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${routineToken}`,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'experimental-cc-routine-2026-04-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: `task_id: ${task_id}\nrun_id: ${run_id}` }),
-      }
-    )
+    fireRes = await fetch(`https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${routineToken}`,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'experimental-cc-routine-2026-04-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: `task_id: ${task_id}\nrun_id: ${run_id}` }),
+    })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'network error'
     await writeEvent({
@@ -134,6 +132,20 @@ export async function fireCoordinator(params: {
       routine_id: routineId,
     },
   })
+
+  // Attribution: coordinator fired for this task
+  void recordAttribution(
+    {
+      actor_type: 'coordinator',
+      actor_id: fireData.claude_code_session_id,
+      coordinator_session_id: fireData.claude_code_session_id,
+      run_id,
+      source_task_id: task_id,
+    },
+    { type: 'task_queue', id: task_id },
+    'coordinator_fired',
+    { session_url: fireData.claude_code_session_url }
+  )
 
   return {
     ok: true,

@@ -195,9 +195,7 @@ describe('POST /api/harness/invoke-coordinator — happy path', () => {
 
     expect(mockFetch).toHaveBeenCalledOnce()
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(
-      `https://api.anthropic.com/v1/claude_code/routines/${VALID_ROUTINE_ID}/fire`
-    )
+    expect(url).toBe(`https://api.anthropic.com/v1/claude_code/routines/${VALID_ROUTINE_ID}/fire`)
     expect((options.headers as Record<string, string>)['Authorization']).toBe(
       `Bearer ${VALID_ROUTINE_TOKEN}`
     )
@@ -209,15 +207,19 @@ describe('POST /api/harness/invoke-coordinator — happy path', () => {
   })
 
   it('writes coordinator_invoked event with status=success', async () => {
-    const b = makeInsertBuilder()
-    mockFrom.mockReturnValue(b)
+    const agentEventsBuilder = makeInsertBuilder()
+    const attributionBuilder = makeInsertBuilder()
+    // Route by table: attribution fires synchronously before agent_events
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'entity_attribution') return attributionBuilder
+      return agentEventsBuilder
+    })
 
     const req = makeRequest(VALID_BODY)
     await POST(req)
 
     expect(mockFrom).toHaveBeenCalledWith('agent_events')
-    expect(b.insert).toHaveBeenCalledTimes(1)
-    const row = b.insert.mock.calls[0][0]
+    const row = agentEventsBuilder.insert.mock.calls[0][0]
     expect(row.task_type).toBe('coordinator_invoked')
     expect(row.status).toBe('success')
   })
@@ -249,7 +251,11 @@ describe('POST /api/harness/invoke-coordinator — upstream failure', () => {
   it('returns 503 when Routines API returns 400 (paused)', async () => {
     mockFetch.mockResolvedValue(
       makeFireResponse(400, {
-        error: { message: 'Routine is paused.', reason: 'routine_paused', type: 'invalid_request_error' },
+        error: {
+          message: 'Routine is paused.',
+          reason: 'routine_paused',
+          type: 'invalid_request_error',
+        },
         type: 'error',
       })
     )
@@ -298,9 +304,7 @@ describe('POST /api/harness/invoke-coordinator — upstream failure', () => {
   it('writes error event to agent_events on upstream failure', async () => {
     const b = makeInsertBuilder()
     mockFrom.mockReturnValue(b)
-    mockFetch.mockResolvedValue(
-      makeFireResponse(400, { error: { message: 'Routine is paused.' } })
-    )
+    mockFetch.mockResolvedValue(makeFireResponse(400, { error: { message: 'Routine is paused.' } }))
 
     const req = makeRequest(VALID_BODY)
     await POST(req)

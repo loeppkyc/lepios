@@ -22,6 +22,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { recordAttribution } from '@/lib/attribution/writer'
 
 // ── Constants (Principle 11 — centralized, TODO-tagged thresholds) ─────────────
 
@@ -288,7 +289,9 @@ export async function analyzeChunk(taskQueueId: string): Promise<ChunkAudit> {
     (e) => e.action === 'grounding.failed' || e.task_type === 'grounding_failed'
   )
   const groundingLimited = allChunkEvents.some(
-    (e) => e.action === 'grounding.passed_with_limitation' || e.task_type === 'grounding_passed_with_limitation'
+    (e) =>
+      e.action === 'grounding.passed_with_limitation' ||
+      e.task_type === 'grounding_passed_with_limitation'
   )
   const grounding_status: ChunkAudit['grounding_status'] = groundingFailed
     ? 'failed'
@@ -341,7 +344,9 @@ export async function generateProposals(audit: ChunkAudit): Promise<ImprovementP
     return `${category}:${concrete_action.slice(0, 60)}`
   }
 
-  function addProposal(p: Omit<ImprovementProposal, 'fingerprint' | 'severity' | 'source_chunk_id'>) {
+  function addProposal(
+    p: Omit<ImprovementProposal, 'fingerprint' | 'severity' | 'source_chunk_id'>
+  ) {
     const fingerprint = makeFingerprint(p.category, p.concrete_action)
     proposals.push({
       ...p,
@@ -351,7 +356,11 @@ export async function generateProposals(audit: ChunkAudit): Promise<ImprovementP
     })
   }
 
-  async function rejectVague(category: ProposalCategory, concrete_action: string, reason: string): Promise<void> {
+  async function rejectVague(
+    category: ProposalCategory,
+    concrete_action: string,
+    reason: string
+  ): Promise<void> {
     await logEngineEvent({
       action: 'improvement_engine.proposal_rejected',
       status: 'warning',
@@ -379,13 +388,23 @@ export async function generateProposals(audit: ChunkAudit): Promise<ImprovementP
     category: ProposalCategory,
     concrete_action: string
   ): Promise<boolean> {
-    const hasFileRef = /[./§]/.test(concrete_action) ||
-      /\b(migration|table|column|cron|route|hook|endpoint|function|module|script|doc|policy|config|index|constraint)\b/i.test(concrete_action)
+    const hasFileRef =
+      /[./§]/.test(concrete_action) ||
+      /\b(migration|table|column|cron|route|hook|endpoint|function|module|script|doc|policy|config|index|constraint)\b/i.test(
+        concrete_action
+      )
 
-    const hasVerb = /\b(add|update|export|wire|remove|create|insert|extend|require|enforce|source|set|enable|check|log|alert|include|replace|move|rename|delete|refactor|fix|configure)\b/i.test(concrete_action)
+    const hasVerb =
+      /\b(add|update|export|wire|remove|create|insert|extend|require|enforce|source|set|enable|check|log|alert|include|replace|move|rename|delete|refactor|fix|configure)\b/i.test(
+        concrete_action
+      )
 
     if (!hasFileRef || !hasVerb) {
-      await rejectVague(category, concrete_action, `missing ${!hasFileRef ? '(a) file/doc reference' : '(b) exact change verb'}`)
+      await rejectVague(
+        category,
+        concrete_action,
+        `missing ${!hasFileRef ? '(a) file/doc reference' : '(b) exact change verb'}`
+      )
       return false
     }
     return true
@@ -717,9 +736,8 @@ export async function notifyProposals(
   ]
 
   proposals.forEach((p, i) => {
-    const truncated = p.concrete_action.length > 100
-      ? p.concrete_action.slice(0, 100) + '...'
-      : p.concrete_action
+    const truncated =
+      p.concrete_action.length > 100 ? p.concrete_action.slice(0, 100) + '...' : p.concrete_action
     lines.push(`${i + 1}. [${p.category}] ${truncated}`)
     lines.push(`   Severity: ${p.severity}`)
   })
@@ -769,6 +787,35 @@ export async function runImprovementEngine(taskQueueId: string): Promise<{
   // Step 2: Analyze
   const audit = await analyzeChunk(taskQueueId)
 
+  // Reconstruct attribution context from the completed task row.
+  // run_id = claimed_by of the completed task (the pickup cron's UUID that ran it).
+  // coordinator_session_id = first agent_events row with action='coordinator.session_started'
+  // and meta.task_id = taskQueueId, if present; else null.
+  let engineRunId: string | undefined
+  let engineCoordinatorSessionId: string | undefined
+  try {
+    const db = createServiceClient()
+    const { data: taskCtx } = await db
+      .from('task_queue')
+      .select('claimed_by')
+      .eq('id', taskQueueId)
+      .maybeSingle()
+    engineRunId = (taskCtx as { claimed_by: string | null } | null)?.claimed_by ?? undefined
+
+    const { data: sessionEvent } = await db
+      .from('agent_events')
+      .select('meta')
+      .eq('action', 'coordinator.session_started')
+      .filter('meta->>task_id', 'eq', taskQueueId)
+      .limit(1)
+      .maybeSingle()
+    const sessionMeta = (sessionEvent as { meta: Record<string, unknown> } | null)?.meta
+    engineCoordinatorSessionId =
+      (sessionMeta?.coordinator_session_id as string | undefined) ?? undefined
+  } catch {
+    // Context reconstruction failure is non-fatal — attribution will have nulls for these fields
+  }
+
   // Step 3: Generate proposals
   const proposals = await generateProposals(audit)
 
@@ -779,6 +826,27 @@ export async function runImprovementEngine(taskQueueId: string): Promise<{
   // First insert all proposals to get their IDs, then check auto-proceed
   const insertedIds = await deduplicateAndQueue(proposals, audit.chunk_id)
 
+  // Attribution: one row per successfully inserted proposal
+  for (let i = 0; i < insertedIds.length; i++) {
+    const newId = insertedIds[i]
+    if (!newId) continue
+    void recordAttribution(
+      {
+        actor_type: 'improvement_engine',
+        source_task_id: taskQueueId,
+        run_id: engineRunId,
+        coordinator_session_id: engineCoordinatorSessionId,
+      },
+      { type: 'task_queue', id: newId },
+      'created',
+      {
+        category: proposals[i]?.category,
+        fingerprint: proposals[i]?.fingerprint,
+        severity: proposals[i]?.severity,
+      }
+    )
+  }
+
   // Step 7: Check auto-proceed for each inserted proposal
   for (let i = 0; i < proposals.length; i++) {
     const rowId = insertedIds[i]
@@ -787,6 +855,22 @@ export async function runImprovementEngine(taskQueueId: string): Promise<{
     const autoProceeded = await checkAutoProceed(proposals[i], rowId)
     if (autoProceeded) {
       autoProceededCount.value++
+      // Attribution: auto-proceed path
+      void recordAttribution(
+        {
+          actor_type: 'improvement_engine',
+          source_task_id: taskQueueId,
+          run_id: engineRunId,
+          coordinator_session_id: engineCoordinatorSessionId,
+        },
+        { type: 'task_queue', id: rowId },
+        'auto_proceeded',
+        {
+          reason: 'auto_proceed_pattern_match',
+          category: proposals[i]?.category,
+          fingerprint: proposals[i]?.fingerprint,
+        }
+      )
     } else {
       queuedProposals.push(proposals[i])
     }

@@ -5,6 +5,7 @@ import { postMessage } from '@/lib/orchestrator/telegram'
 import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
+import { recordAttribution } from '@/lib/attribution/writer'
 
 export type PickupResult = {
   ok: boolean
@@ -129,6 +130,18 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     await logEvent(runId, 'error', task.id, 'validation-failed: task field empty', duration_ms)
     return { ok: true, claimed: null, reason: 'validation-failed', run_id: runId, duration_ms }
   }
+
+  // Attribution: one row per successful task claim
+  void recordAttribution(
+    {
+      actor_type: 'task_pickup_cron',
+      actor_id: 'task-pickup',
+      run_id: runId,
+    },
+    { type: 'task_queue', id: task.id },
+    'claimed',
+    { task: task.task, source: task.source }
+  )
 
   // Step 4: agent_events row — inserted first so its UUID can go in the button callback_data
   const duration_ms = Date.now() - start
