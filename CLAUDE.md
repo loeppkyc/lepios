@@ -68,6 +68,7 @@ gated on a clean week of overnight runs.
 5. **Seamless or don't ship:** Every module uses Design Council primitives. No freelancing the look.
 6. **Acceptance tests first:** Every module has written acceptance criteria before code is written.
 7. **F17 — Behavioral ingestion justification required:** Every new module must justify its contribution to the behavioral ingestion spec and path probability engine. See `docs/vision/behavioral-ingestion-spec.md`. If a module has no engine-feeding signal, reconsider building it.
+8. **F18 — Measurement + benchmark required:** Every new module must ship with (a) metrics capture (`agent_events` or a dedicated table), (b) a defined benchmark to compare against (industry standard, known-good reference, or explicit Colin target), and (c) a surfacing path so Colin can ask "how is X doing?" and get a number + comparison. Required for autonomous operation — Colin must be able to audit any system's health, security, or reliability against a known reference without reading code. See `docs/vision/measurement-framework.md`. Companion rule to F17.
 
 ---
 
