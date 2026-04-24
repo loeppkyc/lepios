@@ -14,23 +14,40 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type CallbackQuery = {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type TgUser = { id: number; username?: string; first_name?: string }
+
+type TgMessage = {
+  message_id: number
+  chat: { id: number }
+  from?: TgUser
+  text?: string
+  reply_to_message?: { message_id: number }
+}
+
+type TgCallbackQuery = {
   id: string
-  from: { id: number; username?: string }
-  message: { message_id: number; chat: { id: number }; text?: string }
+  from: TgUser
+  message: TgMessage
   data?: string
 }
 
 type TelegramUpdate = {
   update_id: number
-  callback_query?: CallbackQuery
+  message?: TgMessage
+  callback_query?: TgCallbackQuery
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
 
 function verifyWebhookSecret(request: Request): boolean {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET
   if (!secret) return false
   return request.headers.get('x-telegram-bot-api-secret-token') === secret
 }
+
+// ── Telegram helpers ──────────────────────────────────────────────────────────
 
 async function answerCallbackQuery(callbackQueryId: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -85,8 +102,6 @@ async function logEvent(fields: {
   }
 }
 
-// Upsert: update if a tap already exists for this (agent_event_id, source) pair,
-// insert otherwise. Latest tap wins — allows 👍 → 👎 correction.
 async function writeFeedback(params: {
   agentEventId: string
   feedbackType: 'thumbs_up' | 'thumbs_down'
@@ -127,8 +142,6 @@ async function writeFeedback(params: {
   }
 }
 
-// Removes the inline keyboard and appends "👍 recorded at HH:MM MT" to the message.
-// Fire-and-forget; edit failure is non-fatal.
 async function editMessageWithAck(
   chatId: number,
   messageId: number,
@@ -221,6 +234,73 @@ async function editTelegramMessage(
     throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
   }
 }
+
+// ── Outbound notifications correlation ────────────────────────────────────────
+
+// Three strategies tried in order; returns the matched outbound_notifications
+// row id, or null if no requires_response row is pending a reply.
+//
+// Strategy B (reply-to match) requires the drain to store the Telegram
+// message_id in payload->>'message_id' after a successful send.
+async function findMatchingRow(
+  db: ReturnType<typeof createServiceClient>,
+  update: TelegramUpdate,
+  chatId: number
+): Promise<string | null> {
+  // A: callback_query whose data is JSON containing {correlation_id: "..."}
+  const rawCallbackData = update.callback_query?.data
+  if (rawCallbackData) {
+    try {
+      const parsed = JSON.parse(rawCallbackData) as Record<string, unknown>
+      if (typeof parsed.correlation_id === 'string') {
+        const { data } = await db
+          .from('outbound_notifications')
+          .select('id')
+          .eq('correlation_id', parsed.correlation_id)
+          .eq('requires_response', true)
+          .eq('status', 'sent')
+          .maybeSingle()
+        if (data) return (data as { id: string }).id
+      }
+    } catch {
+      // Not JSON or no correlation_id — fall through to B/C
+    }
+  }
+
+  // B: text reply with reply_to_message — match by Telegram message_id stored
+  //    in payload->>'message_id' by the drain after a successful send
+  const replyToId = update.message?.reply_to_message?.message_id
+  if (replyToId != null) {
+    const { data } = await db
+      .from('outbound_notifications')
+      .select('id')
+      .eq('requires_response', true)
+      .eq('status', 'sent')
+      .eq('chat_id', String(chatId))
+      .filter('payload->>message_id', 'eq', String(replyToId))
+      .maybeSingle()
+    if (data) return (data as { id: string }).id
+  }
+
+  // C: fallback — most recent sent+requires_response row for this chat in last 24h
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data } = await db
+    .from('outbound_notifications')
+    .select('id')
+    .eq('requires_response', true)
+    .eq('status', 'sent')
+    .eq('chat_id', String(chatId))
+    .is('response_received_at', null)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (data) return (data as { id: string }).id
+
+  return null
+}
+
+// ── Deploy-gate handlers ──────────────────────────────────────────────────────
 
 async function handleGatePromote(
   commitShaPrefix: string,
@@ -383,7 +463,7 @@ async function handleGatePromote(
   try {
     await deleteBranch(branch)
   } catch {
-    // swallow — branch cleanup must not block the promoted result
+    // swallow
   }
 }
 
@@ -491,7 +571,6 @@ async function handleGateRollback(
 ): Promise<void> {
   const db = createServiceClient()
 
-  // Find the promoted row matching the merge_sha prefix (last hour)
   const { data: promotedRows } = await db
     .from('agent_events')
     .select('id, meta')
@@ -520,7 +599,6 @@ async function handleGateRollback(
   const mergeSha = meta.merge_sha as string
   const taskId = (meta.task_id as string | undefined) ?? (meta.commit_sha as string)
 
-  // Double-tap guard
   const { data: rolledBackRows } = await db
     .from('agent_events')
     .select('id')
@@ -567,11 +645,13 @@ async function handleGateRollback(
       tags: ['deploy_gate', 'harness', 'chunk_f'],
     })
   } catch {
-    // swallow — edit still proceeds
+    // swallow
   }
 
   await editRollbackAck(chatId, messageId, originalText, result.ok, result.error).catch(() => {})
 }
+
+// ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: Request): Promise<NextResponse> {
   console.log('[webhook] POST received', {
@@ -611,27 +691,96 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 })
   }
 
-  const { callback_query: callbackQuery } = update
+  const { message, callback_query: callbackQuery } = update
 
-  if (!callbackQuery) {
+  // Ack callback immediately so Telegram's spinner clears — fires before any DB work
+  if (callbackQuery) {
+    void answerCallbackQuery(callbackQuery.id)
+  }
+
+  if (!message && !callbackQuery) {
     await logEvent({
       task_type: 'telegram_webhook_early_return',
       status: 'success',
-      output_summary: 'early return: no_callback_query',
-      meta: { reason: 'not_a_button_tap', update_id: update.update_id },
+      output_summary: 'early return: no_callback_query_or_message',
+      meta: { reason: 'unsupported_update_type', update_id: update.update_id },
     })
     return NextResponse.json({ ok: true })
   }
 
-  if (!isAllowedUser(callbackQuery.from.id)) {
-    await answerCallbackQuery(callbackQuery.id)
+  // Allowlist applies to all update types — skip if no from field (channel posts, etc.)
+  const fromUser = callbackQuery?.from ?? message?.from ?? null
+  if (fromUser && !isAllowedUser(fromUser.id)) {
     await logEvent({
       task_type: 'telegram_webhook_early_return',
       status: 'error',
       output_summary: 'early return: forbidden_user',
-      meta: { reason: 'user_not_allowed', from_user_id: callbackQuery.from.id },
+      meta: { reason: 'user_not_allowed', from_user_id: fromUser.id },
     })
     return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+  }
+
+  const chatId = callbackQuery?.message.chat.id ?? message?.chat?.id ?? null
+  if (chatId == null) {
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Dispatch i: outbound_notifications correlation (first match wins) ─────────
+
+  const db = createServiceClient()
+  let matchedId: string | null = null
+  try {
+    matchedId = await findMatchingRow(db, update, chatId)
+  } catch {
+    // DB error during correlation lookup — fall through to legacy handlers
+  }
+
+  if (matchedId) {
+    const isCallback = Boolean(callbackQuery)
+    const responsePayload = {
+      type: isCallback ? 'callback' : 'message',
+      text: message?.text ?? null,
+      callback_data: callbackQuery?.data ?? null,
+      from_user: fromUser
+        ? `${fromUser.id}${fromUser.username ? ` (@${fromUser.username})` : ''}`
+        : null,
+      raw_update_id: String(update.update_id),
+    }
+    await db
+      .from('outbound_notifications')
+      .update({
+        response: responsePayload,
+        response_received_at: new Date().toISOString(),
+        status: 'response_received',
+      })
+      .eq('id', matchedId)
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Dispatch ii–iii: legacy thumbs + deploy-gate (callback_query only) ────────
+
+  if (!callbackQuery) {
+    // Plain message with no correlation match
+    try {
+      await db.from('agent_events').insert({
+        domain: 'telegram',
+        action: 'webhook_no_match',
+        actor: 'harness',
+        status: 'warning',
+        task_type: 'webhook_no_match',
+        output_summary: `inbound update ${update.update_id} — no outbound_notifications match`,
+        meta: {
+          update_id: update.update_id,
+          chat_id: chatId,
+          is_callback: false,
+          has_reply_to: Boolean(message?.reply_to_message),
+          text_preview: message?.text?.slice(0, 100) ?? null,
+        },
+      })
+    } catch {
+      // swallow
+    }
+    return NextResponse.json({ ok: true })
   }
 
   const parsed = parseCallbackData(callbackQuery.data ?? '')
@@ -655,9 +804,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     })
   }
 
-  // Dismiss spinner before the edit — answerCallbackQuery must fire first
-  await answerCallbackQuery(callbackQuery.id)
-
   if (parsed) {
     try {
       await editMessageWithAck(
@@ -667,9 +813,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         parsed.action
       )
     } catch (err) {
-      // Don't throw — callback is already acked, feedback row is written.
       try {
-        const db = createServiceClient()
         await db.from('agent_events').insert({
           domain: 'orchestrator',
           action: 'telegram_edit',
@@ -686,7 +830,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           tags: ['telegram', 'webhook', 'component2'],
         })
       } catch {
-        // logEvent itself failed — swallow, we already acked.
+        // logEvent itself failed — swallow
       }
     }
   } else if (parsedGate?.action === 'rollback') {

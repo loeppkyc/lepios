@@ -55,17 +55,23 @@ const VALID_SECRET = 'test-webhook-secret-abc123'
 const VALID_USER_ID = 987654321
 const VALID_UUID = '885ff1e3-baed-4512-8e7a-8335995ea057'
 
-// Supports select().eq().eq().maybeSingle(), update().eq(), and insert() —
-// needed because writeFeedback now calls all three paths on task_feedback.
+// Supports the full chain used by findMatchingRow (filter/is/gte/order/limit)
+// plus select().eq().maybeSingle(), update().eq(), and insert().
 function makeDefaultBuilder(existingRow: { id: string } | null = null) {
   const maybeSingle = vi.fn().mockResolvedValue({ data: existingRow, error: null })
   const chain: Record<string, unknown> = {
     select: vi.fn(),
     eq: vi.fn(),
+    filter: vi.fn(),
+    is: vi.fn(),
+    gte: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
     maybeSingle,
   }
-  ;(chain.select as ReturnType<typeof vi.fn>).mockReturnValue(chain)
-  ;(chain.eq as ReturnType<typeof vi.fn>).mockReturnValue(chain)
+  for (const m of ['select', 'eq', 'filter', 'is', 'gte', 'order', 'limit']) {
+    ;(chain[m] as ReturnType<typeof vi.fn>).mockReturnValue(chain)
+  }
 
   const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
   const update = vi.fn().mockReturnValue({ eq: updateEq })
@@ -884,7 +890,10 @@ function makeMigrationGateBuilder(reviewRows: unknown[], resolvedRows: unknown[]
     return b
   }
   return {
-    mockFrom: (_table: string) => {
+    // Only count agent_events calls — outbound_notifications is from findMatchingRow
+    // and must be handled separately so it doesn't break the promote/abort call sequence.
+    mockFrom: (table: string) => {
+      if (table === 'outbound_notifications') return makeDefaultBuilder()
       callCount++
       if (callCount === 1) return { insert: logInsertFn } // entry insert
       if (callCount === 2) return { insert: logInsertFn } // callback insert
@@ -1173,5 +1182,159 @@ describe('POST /api/telegram/webhook — dg:abort: abort handler', () => {
 
     const res = await POST(makeRequest(makeCallbackUpdate(`dg:abort:${SHA_PREFIX}`)))
     expect(res.status).toBe(200)
+  })
+})
+
+// ── Dispatch order: outbound_notifications > thumbs > deploy-gate > no-match ──
+
+describe('POST /api/telegram/webhook — dispatch order', () => {
+  // Builder for outbound_notifications table: returns a match or null, and
+  // exposes _update so tests can assert the row was written.
+  function makeOutboundBuilder(matchedId: string | null) {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: matchedId ? { id: matchedId } : null,
+      error: null,
+    })
+    const chain: Record<string, unknown> = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      filter: vi.fn(),
+      is: vi.fn(),
+      gte: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle,
+    }
+    for (const m of ['select', 'eq', 'filter', 'is', 'gte', 'order', 'limit']) {
+      ;(chain[m] as ReturnType<typeof vi.fn>).mockReturnValue(chain)
+    }
+    const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
+    const update = vi.fn().mockReturnValue({ eq: updateEq })
+    return { ...chain, update, _update: update, _updateEq: updateEq }
+  }
+
+  it('callback_query with JSON {correlation_id} routes to outbound_notifications, not legacy thumbs', async () => {
+    // parseCallbackData default mock returns a thumbs parse — must NOT be used
+    const outbound = makeOutboundBuilder('matched-row-id')
+    const fbBuilder = makeDefaultBuilder(null)
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      if (table === 'task_feedback') return fbBuilder
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    const req = makeRequest(makeCallbackUpdate(JSON.stringify({ correlation_id: 'corr-abc' })))
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(outbound._update).toHaveBeenCalledOnce()
+    const updateArg = (outbound._update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(updateArg.status).toBe('response_received')
+    expect(updateArg.response.type).toBe('callback')
+    // Legacy thumbs path must NOT have run
+    expect(fbBuilder._insert).not.toHaveBeenCalled()
+    expect(fbBuilder._update).not.toHaveBeenCalled()
+  })
+
+  it('callback_query with legacy thumbs pattern routes to thumbs when no outbound match', async () => {
+    // outbound_notifications returns no match
+    const outbound = makeOutboundBuilder(null)
+    const fbBuilder = makeDefaultBuilder(null)
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      if (table === 'task_feedback') return fbBuilder
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+    // parseCallbackData default mock returns thumbs parse (set in beforeEach)
+
+    const req = makeRequest(makeCallbackUpdate(`tf:up:${VALID_UUID}`))
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(outbound._update).not.toHaveBeenCalled()
+    expect(fbBuilder._insert).toHaveBeenCalledOnce()
+    const row = (fbBuilder._insert as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(row.feedback_type).toBe('thumbs_up')
+  })
+
+  it('callback_query with deploy-gate pattern routes to deploy-gate when no outbound match', async () => {
+    mockParseCallbackData.mockReturnValue(null)
+    mockParseGateCallbackData.mockReturnValue({ action: 'rollback', mergeShaPrefix: 'abcdef12' })
+
+    const outbound = makeOutboundBuilder(null)
+    // Use makeRollbackBuilder to satisfy the agent_events call sequence
+    const promotedRow = {
+      id: 'evt-promo-1',
+      meta: { merge_sha: 'abcdef1234567890', task_id: 'task-uuid', commit_sha: 'commit1' },
+    }
+    const { mockFrom: rbMockFrom } = makeRollbackBuilder([promotedRow])
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      return rbMockFrom(table)
+    })
+
+    const req = makeRequest(makeCallbackUpdate('dg:rb:abcdef12'))
+    await POST(req)
+
+    expect(outbound._update).not.toHaveBeenCalled()
+    expect(mockRollbackDeployment).toHaveBeenCalledOnce()
+  })
+
+  it('message with reply_to_message matching a pending row routes to outbound_notifications', async () => {
+    const REPLY_TO_ID = 9999
+    const outbound = makeOutboundBuilder('matched-reply-row')
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+    })
+
+    const req = makeRequest({
+      update_id: 42,
+      message: {
+        message_id: 1000,
+        chat: { id: 111 },
+        from: { id: VALID_USER_ID, username: 'colinl' },
+        text: 'my reply',
+        reply_to_message: { message_id: REPLY_TO_ID },
+      },
+    })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    expect(outbound._update).toHaveBeenCalledOnce()
+    const updateArg = (outbound._update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(updateArg.status).toBe('response_received')
+    expect(updateArg.response.type).toBe('message')
+    expect(updateArg.response.text).toBe('my reply')
+  })
+
+  it('message with no outbound match logs webhook_no_match and returns 200', async () => {
+    const outbound = makeOutboundBuilder(null)
+    const agentInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'outbound_notifications') return outbound
+      if (table === 'agent_events') return { insert: agentInsert }
+      return makeDefaultBuilder()
+    })
+
+    const req = makeRequest({
+      update_id: 99,
+      message: {
+        message_id: 500,
+        chat: { id: 111 },
+        from: { id: VALID_USER_ID, username: 'colinl' },
+        text: 'hello no match',
+      },
+    })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    const noMatchCall = agentInsert.mock.calls.find((c) => c[0].task_type === 'webhook_no_match')
+    expect(noMatchCall).toBeDefined()
+    expect(noMatchCall![0].status).toBe('warning')
+    expect(noMatchCall![0].meta.is_callback).toBe(false)
+    // Legacy thumbs/gate must NOT have run
+    expect(mockRollbackDeployment).not.toHaveBeenCalled()
+    expect(mockMergeToMain).not.toHaveBeenCalled()
   })
 })

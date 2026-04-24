@@ -1,7 +1,8 @@
 # Telegram Inbound Webhook Setup
 
-Route: `POST /api/harness/telegram-webhook`
-Handles: `outbound_notifications` response correlation (requires_response flows)
+Route: `POST /api/telegram/webhook`
+Handles: unified inbound webhook — `outbound_notifications` correlation (requires_response flows),
+👍/👎 feedback taps, and deploy-gate promote/abort/rollback callbacks
 
 ---
 
@@ -45,7 +46,8 @@ curl -s "https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo" | jq .
 ```
 
 Confirm:
-- `url` matches `https://lepios-one.vercel.app/api/harness/telegram-webhook`
+
+- `url` matches `https://lepios-one.vercel.app/api/telegram/webhook`
 - `has_custom_certificate` is `false`
 - `pending_update_count` is `0` (or low)
 - `last_error_message` is absent or empty
