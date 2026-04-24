@@ -27,10 +27,6 @@
     {
       "path": "/api/cron/deploy-gate-timeout",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/harness/notifications-drain",
-      "schedule": "* * * * *"
     }
   ]
 }
