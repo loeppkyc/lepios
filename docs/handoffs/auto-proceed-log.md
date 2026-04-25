@@ -97,6 +97,29 @@ escalation_reasons:
 
 ---
 
+2026-04-25T23:07:00Z sprint=5 chunk=stall-alert phase=1d doc=docs/sprint-5/stall-alert-acceptance.md
+cited_principles: [F17, F18, META-C, cache_match_enabled: false]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason:
+  "Sprint 4 baseline carries forward"). Phase 0 rule 4: explicit sprint-state.md override
+  honored regardless of audit-log date. META-C not applied — cache-match is disabled sprint-wide.
+  Chunk is greenfield (no Streamlit predecessor) — Phase 1a skipped per coordinator.md rule.
+  Phase 1b: twin endpoint unreachable from coordinator sandbox (host not in allowlist).
+  All 2 twin questions routed to Colin as pending_colin_qs per coordinator.md Phase 1b rules.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  sprint-state.md update: document only, no code/schema effect.
+  No code written, no schema changed, no external calls made.
+  No decisions with irreversible effects in this doc.
+confidence: high (escalation is correct and unambiguous)
+outcome: escalated
+escalation_reasons:
+- cache_match_disabled_sprint_override
+- twin_q1_q2_unreachable (twin endpoint not reachable from coordinator sandbox)
+- open_question_Q1 (integration point: pickup-runner vs morning-digest; recommendation included)
+
+---
+
 2026-04-24T22:00:00-06:00 sprint=5 chunk=20-percent-better-engine phase=1a-1d doc=docs/sprint-5/20-percent-better-engine-acceptance.md
 cited_principles: [2, 4, 6, 11, 14, 15, 17, META-C]
 trigger_match_evidence: |

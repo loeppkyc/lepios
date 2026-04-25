@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T19:36:00Z"
+last_updated_at: "2026-04-25T23:07:00Z"
 
 chunks_planned:
 
@@ -121,6 +121,7 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "stall-alert"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -133,6 +134,8 @@ chunks_awaiting_grounding:
 - "purpose-review"
   chunks_awaiting_grounding_correctness:
 - "purpose-review-correctness"
+  chunks_awaiting_acceptance_approval:
+- "stall-alert"
   chunks_not_started:
 - "task-pickup-100"
 
@@ -143,6 +146,11 @@ active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
 active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
 active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+
+# stall-alert chunk (added 2026-04-25, coordinator task 40b1aa4b)
+# Acceptance doc written: docs/sprint-5/stall-alert-acceptance.md
+# Status: awaiting-acceptance-approval — cannot cache-match (cache_match_enabled: false)
+# Colin must approve before builder runs.
 
 # Grounding checkpoints still pending for completed-build chunks
 
