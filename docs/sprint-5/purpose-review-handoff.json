@@ -1,0 +1,38 @@
+{
+  "chunk_id": "sprint-5-purpose-review",
+  "acceptance_doc_path": "docs/sprint-5/purpose-review-acceptance.md",
+  "files_changed": [
+    "CLAUDE.md",
+    "app/api/telegram/webhook/route.ts",
+    "lib/purpose-review/handler.ts",
+    "lib/purpose-review/summary.ts",
+    "lib/purpose-review/timeout.ts",
+    "supabase/migrations/0026_task_queue_review_statuses.sql",
+    "tests/design-system.test.ts",
+    "tests/purpose-review.test.ts"
+  ],
+  "tests": {
+    "passing": 913,
+    "failing": 0,
+    "new": 13
+  },
+  "migrations_applied": [
+    "supabase/migrations/0026_task_queue_review_statuses.sql"
+  ],
+  "deploy_url": "https://lepios-one.vercel.app (Vercel auto-deploy from main, commit 878d107)",
+  "grounding_checkpoint_required": [
+    "Apply migration 0026 to production Supabase (project xpanlbcjueimeofgsara) — was NOT applied by builder, only written. Use Supabase MCP or dashboard SQL editor.",
+    "Trigger a test purpose_review callback from Telegram (tap 👍/✏️/🗑️ on a synthetic message) and verify agent_events row is created with domain=purpose_review and correct action value.",
+    "Set status=awaiting_review on a real task_queue row, wait for checkPurposeReviewTimeouts to run, verify status flips to review_timeout and loeppky_alerts_bot fires the alert."
+  ],
+  "unknowns": [
+    "ActorType enum in lib/attribution/types.ts does not include 'colin' — used actor_type='human' with actor_id='telegram' instead, which is consistent with what the type allows. Coordinator should decide whether to add 'colin' to ActorType or keep 'human'.",
+    "Text-reply routing in the !callbackQuery branch uses a DB query for the most recent awaiting_review task (ordered by last_heartbeat_at DESC). If multiple modules are awaiting_review simultaneously and Colin replies without a reply_to_message reference, the match is best-effort. Coordinator should note this limitation and consider whether to add review_message_id to task_queue.metadata when sending the purpose review message."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0026 must be applied before any task_queue row can be set to status=awaiting_review or review_timeout — any port chunk that triggers purpose_review will fail until the migration is applied."
+  ],
+  "commit_sha": "878d107",
+  "tokens_used": 18500,
+  "timestamp": "2026-04-25T08:00:00Z"
+}
