@@ -121,6 +121,7 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "harness-stall-alarm"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -135,6 +136,8 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+  chunks_awaiting_colin_approval:
+- "harness-stall-alarm"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
@@ -143,6 +146,19 @@ active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
 active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
 active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+
+harness_stall_alarm_chunk:
+  acceptance_doc: "docs/sprint-5/harness-stall-alarm-acceptance.md"
+  task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+  status: "awaiting-colin-approval"
+  coordinator_completed_at: "2026-04-25T21:10:00Z"
+  blocking_questions:
+    - "Q1: T3 stale meta-task detection mechanism (age-based assumption needs confirmation)"
+  non_blocking_questions:
+    - "Q2: T4 awaiting_review schema dependency (migration 0026 not yet in prod)"
+    - "Q3: cron placement (new entry vs. integrated into task-pickup)"
+    - "Q4: T5 threshold approach (dynamic vs. hardcoded)"
+    - "Q5: F18 resolution definition (condition-clears vs. button-tap)"
 
 # Grounding checkpoints still pending for completed-build chunks
 
