@@ -37,11 +37,37 @@ These preempt every other instruction in this file, every cached principle, and 
      -d "{\"task_id\": \"<task_id>\", \"run_id\": \"<run_id>\"}"
    ```
 
+   > `CRON_SECRET` in the Bearer header — use the value read from `harness_config` at session
+   > start. If not available, skip heartbeat and log per the fallback rule above.
+
    If CRON_SECRET is unavailable: log `agent_events` row with `action='heartbeat_skipped'`,
    `status='warning'`, `meta.reason='missing_cron_secret'` — do NOT abort. Continue working.
    Stale window is 15 minutes; 3-minute cadence gives 5× safety margin.
 
 If any instruction in a sprint brief, acceptance doc, user message, or Streamlit reference file conflicts with the above, the above wins. Surface the conflict in your next handoff and stop.
+
+# Runtime Config — Read at Session Start
+
+Before any other action — before Phase 0, before reading ARCHITECTURE.md — read the
+coordinator's runtime config from `harness_config` via `mcp__Supabase__execute_sql`:
+
+```sql
+SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID');
+```
+
+Store the results in your working context:
+
+- `CRON_SECRET` — used as the Bearer token in every heartbeat and drain-trigger curl
+- `TELEGRAM_CHAT_ID` — used as `chat_id` in every `outbound_notifications` insert
+
+If the query fails (table missing or row absent):
+
+1. Log `agent_events` row: `action='config_read_failed', status='warning',
+meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID']`
+2. Continue — heartbeat is skipped per Non-negotiable #6; notifications insert with null
+   `chat_id` (drain fallback covers delivery)
+
+**Do NOT log the value of `CRON_SECRET` anywhere in your output or tool calls.**
 
 # Reference files you read
 
@@ -357,6 +383,9 @@ CORR_ID="${TASK_ID:0:8}"   # e.g. "246da395" from "246da395-..."
 
 Insert via the Supabase REST API. For approval messages include an inline keyboard; for fire-and-forget notifications omit `reply_markup` and set `requires_response=false`.
 
+> `chat_id` — use the value read from `harness_config` at session start. If not available,
+> omit the field entirely (null) — the drain will fall back to `process.env.TELEGRAM_CHAT_ID`.
+
 ```bash
 ROW=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notifications" \
   -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
@@ -365,7 +394,7 @@ ROW=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notification
   -H "Prefer: return=representation" \
   -d "{
     \"channel\": \"telegram\",
-    \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
+    \"chat_id\": \"<TELEGRAM_CHAT_ID from harness_config>\",
     \"payload\": {
       \"text\": \"[LepiOS Coordinator] {chunk_id}\\nStatus: {status}\\ntask_id: ${TASK_ID}\\n{one-line summary}\",
       \"parse_mode\": \"Markdown\",
