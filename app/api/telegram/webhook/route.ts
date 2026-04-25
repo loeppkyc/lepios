@@ -12,6 +12,11 @@ import {
   deleteBranch,
   sendPromotionNotification,
 } from '@/lib/harness/deploy-gate'
+import {
+  parsePurposeReviewCallback,
+  handlePurposeReviewCallback,
+  handlePurposeReviewTextReply,
+} from '@/lib/purpose-review/handler'
 
 export const dynamic = 'force-dynamic'
 
@@ -763,7 +768,11 @@ async function handleImproveReview(chunkId: string, chatId: number): Promise<voi
 
   if (!proposals || proposals.length === 0) return
 
-  for (const p of proposals as { id: string; description: string | null; metadata: Record<string, unknown> }[]) {
+  for (const p of proposals as {
+    id: string
+    description: string | null
+    metadata: Record<string, unknown>
+  }[]) {
     const category = (p.metadata?.category as string) ?? 'unknown'
     const severity = (p.metadata?.severity as string) ?? 'unknown'
     const text = `[${category}] Severity: ${severity}\n${(p.description ?? '').slice(0, 200)}`
@@ -775,10 +784,12 @@ async function handleImproveReview(chunkId: string, chatId: number): Promise<voi
         chat_id: chatId,
         text,
         reply_markup: {
-          inline_keyboard: [[
-            { text: 'Approve', callback_data: `improve_approve_all:${chunkId}` },
-            { text: 'Dismiss', callback_data: `improve_dismiss:${chunkId}` },
-          ]],
+          inline_keyboard: [
+            [
+              { text: 'Approve', callback_data: `improve_approve_all:${chunkId}` },
+              { text: 'Dismiss', callback_data: `improve_dismiss:${chunkId}` },
+            ],
+          ],
         },
       }),
     }).catch(() => {})
@@ -894,6 +905,50 @@ export async function POST(request: Request): Promise<NextResponse> {
   // ── Dispatch ii–iii: legacy thumbs + deploy-gate (callback_query only) ────────
 
   if (!callbackQuery) {
+    // Check for purpose_review text reply: look for an awaiting_review task for this chat
+    if (message?.text) {
+      try {
+        const { data: reviewTask } = await db
+          .from('task_queue')
+          .select('id, metadata')
+          .eq('status', 'awaiting_review')
+          .order('last_heartbeat_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (reviewTask) {
+          const taskMeta =
+            (reviewTask as { id: string; metadata: Record<string, unknown> }).metadata ?? {}
+          const replyToMsgId = message.reply_to_message?.message_id
+          const storedMsgId = taskMeta.review_message_id as number | undefined
+
+          // Accept if: reply_to matches, OR no stored message_id (best-effort fallback)
+          const isMatch = storedMsgId == null || replyToMsgId === storedMsgId
+
+          if (isMatch) {
+            void handlePurposeReviewTextReply({
+              taskQueueId: (reviewTask as { id: string }).id,
+              text: message.text,
+              chatId,
+              messageId: message.message_id,
+              originalText: message.text,
+              db,
+            }).catch((err: unknown) => {
+              void logEvent({
+                task_type: 'purpose_review_text_reply_fail',
+                status: 'error',
+                output_summary: `handlePurposeReviewTextReply failed: ${String(err)}`,
+                meta: { task_queue_id: (reviewTask as { id: string }).id, error: String(err) },
+              })
+            })
+            return NextResponse.json({ ok: true })
+          }
+        }
+      } catch {
+        // DB error — fall through to no-match log
+      }
+    }
+
     // Plain message with no correlation match
     try {
       await db.from('agent_events').insert({
@@ -920,12 +975,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsed = parseCallbackData(callbackQuery.data ?? '')
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
   const parsedImprove = parseImproveCallbackData(callbackQuery.data ?? '')
+  const parsedPurposeReview = parsePurposeReviewCallback(callbackQuery.data ?? '')
 
   await logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate || parsedImprove ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove || parsedPurposeReview ? 'success' : 'warning'
   )
 
   if (parsed) {
@@ -1015,6 +1071,22 @@ export async function POST(request: Request): Promise<NextResponse> {
         })
       }
     )
+  } else if (parsedPurposeReview) {
+    void handlePurposeReviewCallback({
+      action: parsedPurposeReview.action,
+      taskQueueId: parsedPurposeReview.taskQueueId,
+      chatId: callbackQuery.message.chat.id,
+      messageId: callbackQuery.message.message_id,
+      originalText: callbackQuery.message.text ?? '',
+      db,
+    }).catch((err: unknown) => {
+      void logEvent({
+        task_type: 'purpose_review_callback_fail',
+        status: 'error',
+        output_summary: `handlePurposeReviewCallback failed: ${String(err)}`,
+        meta: { task_queue_id: parsedPurposeReview.taskQueueId, error: String(err) },
+      })
+    })
   }
 
   return NextResponse.json({ ok: true })
