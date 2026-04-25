@@ -146,12 +146,16 @@ active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
 active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
 
 coordinator_env_chunk:
-  status: "in-build"
-  acceptance_doc: "docs/sprint-5/coordinator-env-acceptance.md"
-  study_doc: "docs/sprint-5/coordinator-env-study.md"
-  colin_approved_at: "2026-04-25T23:05:19Z"
-  task_id: "87bc8578-6eb8-4f84-b522-00c4804a2398"
-  delegated_to_builder_at: "2026-04-25T23:25:00Z"
+status: "awaiting-grounding"
+acceptance_doc: "docs/sprint-5/coordinator-env-acceptance.md"
+study_doc: "docs/sprint-5/coordinator-env-study.md"
+colin_approved_at: "2026-04-25T23:05:19Z"
+task_id: "87bc8578-6eb8-4f84-b522-00c4804a2398"
+delegated_to_builder_at: "2026-04-25T23:25:00Z"
+build_complete_at: "2026-04-25T23:35:34Z"
+commit: "b7ecf50"
+tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+grounding_checkpoints: - "Apply migration 0029_harness_config.sql to production Supabase" - "UPDATE harness_config SET value = '<actual-cron-secret>' WHERE key = 'CRON_SECRET'" - "UPDATE harness_config SET value = '<actual-chat-id>' WHERE key = 'TELEGRAM_CHAT_ID'" - "Verify: agent_events heartbeat row with status='success' on next coordinator run" - "Verify: outbound_notifications chat_id non-null on coordinator-generated rows"
 
 # Grounding checkpoints still pending for completed-build chunks
 
