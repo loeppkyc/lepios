@@ -1,5 +1,14 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# secrets — never commit
+webhook.json
+
+# scratch / temp files
+.emb_q*.txt
+.smoke_embeddings.json
+_scratch_*.log
+logs/
+
 # dependencies
 /node_modules
 /.pnp

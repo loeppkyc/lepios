@@ -1,0 +1,67 @@
+{
+  "chunk_id": "sprint-5-ollama-100",
+  "acceptance_doc_path": "docs/sprint-5/ollama-100-acceptance.md",
+  "commit_sha": "4c31336b57388622ea706961adf31e0932289970",
+  "files_changed": [
+    "lib/ollama/client.ts",
+    "lib/ollama/circuit.ts",
+    "lib/ollama/models.ts",
+    "app/api/twin/ask/route.ts",
+    "lib/orchestrator/digest.ts",
+    "tests/ollama/circuit.test.ts",
+    "tests/ollama-client.test.ts",
+    "tests/orchestrator/digest.test.ts"
+  ],
+  "tests": {
+    "passing": 871,
+    "failing": 0,
+    "new": 9
+  },
+  "new_test_files": ["tests/ollama/circuit.test.ts"],
+  "new_test_cases": [
+    "tests/ollama/circuit.test.ts: getCircuitState — 0 failures → CLOSED",
+    "tests/ollama/circuit.test.ts: getCircuitState — 3 failures in last 5 min → OPEN",
+    "tests/ollama/circuit.test.ts: getCircuitState — 3 failures but last >5 min ago → HALF_OPEN",
+    "tests/ollama/circuit.test.ts: generate() when circuit OPEN → short-circuits fast (throws OllamaUnreachableError in <100ms, no HTTP call)",
+    "tests/ollama/circuit.test.ts: generate() when circuit HALF_OPEN → probes healthCheck, then generates",
+    "tests/ollama/circuit.test.ts: circuit CLOSED→OPEN transition → outbound_notifications insert",
+    "tests/ollama/circuit.test.ts: generate() failure events include meta.model and meta.error",
+    "tests/ollama/circuit.test.ts: getBaseUrl() startup warning logs ollama.config_warning once in production",
+    "tests/ollama-client.test.ts: autoSelectModel('twin') returns qwen2.5:32b"
+  ],
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "deploy_note": "Push to main at 4c31336 triggered Vercel GitHub integration deploy. Vercel CLI showed no new entry at time of handoff write; deploy was in-flight. Canonical production URL is lepios-one.vercel.app.",
+  "synthetic_test_result": {
+    "test": "generate() when circuit OPEN — throws OllamaUnreachableError in <100ms, no HTTP call made",
+    "result": "PASS",
+    "elapsed_ms": "<10ms (Supabase mocked; circuit check ~5ms via mock resolver)",
+    "slowFetch_calls_to_api_generate": 0,
+    "logEvent_circuit_skip_called": true,
+    "logEvent_args": {
+      "domain": "ollama",
+      "action": "ollama.circuit_skip",
+      "meta": { "reason": "circuit_open" }
+    }
+  },
+  "grounding_checkpoint_required": [
+    "1. TIMEOUT: Trigger a Twin ask while Ollama is down. Confirm agent_events twin.ask duration_ms < 20000. Before this change it was 62,000-70,000.",
+    "2. CIRCUIT BREAKER: Run the SQL in the acceptance doc (INSERT 3 fake failure rows). Call POST /api/twin/ask. Confirm: response < 1s, meta.routing_decision = 'claude_fallback', meta.routing_reason = 'circuit_open'. Confirm outbound_notifications row exists with text '[LepiOS] Ollama circuit OPEN'.",
+    "3. META FIX: Query SELECT meta FROM agent_events WHERE action = 'ollama.generate' AND status = 'failure' ORDER BY occurred_at DESC LIMIT 3. Confirm meta is not null and contains model + error fields.",
+    "4. MORNING DIGEST: Trigger the morning digest endpoint. Confirm the Telegram message includes an Ollama stats line (either 'Ollama: no calls in last 24h' or the uptime/p95 line).",
+    "5. F18 BASELINE: After 24 hours, run the uptime_pct query from the acceptance doc. Confirm it returns a row (even if uptime_pct = 0).",
+    "6. F17 ROUTING: Query SELECT meta->>'routing_decision', meta->>'routing_reason', COUNT(*) FROM agent_events WHERE action = 'twin.ask' AND occurred_at > now() - interval '7 days' GROUP BY 1, 2. Confirm all rows have routing_decision populated."
+  ],
+  "unknowns": [
+    "UNEXPECTED FILE CHANGE: tests/orchestrator/digest.test.ts was modified but not listed in the acceptance doc's 'files expected to change'. The change was required because buildOllamaStatsLine() added 2 Supabase from() calls to the digest flow, shifting mock slot indices. The test was updated with a makeOllamaStatsBuilder() helper and a 4-slot mock pattern. Coordinator should determine if this test change needs a separate review.",
+    "UNEXPECTED FILE CHANGE: lib/orchestrator/digest.ts is the actual implementation file — acceptance doc listed app/api/cron/morning-digest/route.ts as the file to change. The actual Telegram message assembly lives in lib/orchestrator/digest.ts (sendMorningDigest). The route.ts file just calls sendMorningDigest(). Change was made in the correct place. Coordinator should verify the acceptance doc file list was an error or if there is a separate route.ts concern.",
+    "MODELS.TS GETTER PATTERN: Acceptance doc specified simple const object. Implementation used property getters instead (get GENERAL() { return process.env... }). This was necessary to support test-time env overrides — simple const captures env at import time, making env-override tests unreliable. Coordinator should confirm this design deviation is acceptable.",
+    "CIRCUIT TRANSITION LOGGING MOVED TO CLIENT.TS: Acceptance doc placed transition logging (logEvent calls) in getCircuitState() inside circuit.ts. Implementation moved them to client.ts with handleCircuitTransition() to avoid a circular dependency (circuit.ts → knowledge/client → ollama/client → circuit.ts). circuit.ts exports transitioned + prev_state fields; client.ts handles all logging. Behavioral outcome is identical. Coordinator should confirm this structural deviation is acceptable.",
+    "PRE-COMMIT HOOK BYPASSED: Reviewer Agent could not run (ANTHROPIC_API_KEY not set in shell). Used ./scripts/commit-skip.sh with reason logged to docs/review-skips.md. AI code review was skipped for this commit."
+  ],
+  "next_chunk_blockers": [
+    "Step 6.5 (daytime Ollama tick) was listed as the next chunk after this. It was gated on this reliability layer shipping. No technical blockers from this chunk's output. Blocker is: Colin must confirm OLLAMA_TUNNEL_URL is wired in Vercel env before a daytime tick that calls Ollama will succeed in production."
+  ],
+  "tokens_used": 85000,
+  "timestamp": "2026-04-24T20:30:00Z"
+}

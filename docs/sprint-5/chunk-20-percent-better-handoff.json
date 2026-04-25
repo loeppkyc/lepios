@@ -1,0 +1,49 @@
+{
+  "chunk_id": "20-percent-better-engine",
+  "acceptance_doc_path": "docs/sprint-5/20-percent-better-engine-acceptance.md",
+  "files_changed": [
+    "supabase/migrations/0018_add_auto_proceed_patterns.sql",
+    "lib/harness/improvement-engine.ts",
+    "lib/harness/telegram-buttons.ts",
+    "app/api/harness/notifications-drain/route.ts",
+    "app/api/telegram/webhook/route.ts",
+    "tests/harness/improvement-engine.test.ts",
+    "tests/harness/notifications-drain.test.ts",
+    "tests/api/telegram-webhook.test.ts"
+  ],
+  "tests": {
+    "passing": 844,
+    "failing": 0,
+    "new": 19
+  },
+  "migrations_applied": ["supabase/migrations/0018_add_auto_proceed_patterns.sql"],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "grounding_checkpoint_required": [
+    "After the first 3 chunks run through the engine: open task_queue in Supabase, filter metadata->>'task_type_label' = 'improvement_proposal', confirm at least 1 row per chunk that had a documented mismatch or escalation (baseline: Chunks A, C, D all had documented issues).",
+    "Run the engine twice on the same chunk_id — confirm task_queue row count does not increase on second run and recurrence_count increments by 1.",
+    "Check outbound_notifications — confirm exactly one row per chunk (not per proposal). Colin should receive one Telegram message per imperfect chunk.",
+    "Check agent_events for action='improvement_engine.triggered' and action='improvement_engine.audit_complete'. Confirm timestamps show trigger fired within 60 seconds of task_queue.completed_at.",
+    "Spot-check one proposal's task_queue row: read metadata.concrete_action. Apply the bar: 'Can coordinator act on this by editing a named file or doc section?' If yes, proposal passes quality gate.",
+    "BLOCKER — MUST BE RESOLVED BEFORE LIVE INSERTS WORK: Apply the task_queue constraint migration described in the migration note section of 0018_add_auto_proceed_patterns.sql. Until applied, any INSERT with source='improvement_engine' will fail the source CHECK constraint, and any UPDATE with status='auto_proceeded', status='approved', or status='dismissed' will fail the status CHECK constraint."
+  ],
+  "unknowns": [
+    "SCHEMA BLOCKER (source constraint): task_queue.source CHECK only allows ('manual','handoff-file','colin-telegram','cron'). The engine inserts with source='improvement_engine' which will fail this constraint. A migration is needed to add 'improvement_engine' to the allowed set. SQL: ALTER TABLE public.task_queue DROP CONSTRAINT task_queue_source_check, ADD CONSTRAINT task_queue_source_check CHECK (source IN ('manual','handoff-file','colin-telegram','cron','improvement_engine')). This requires explicit Colin approval per ARCHITECTURE.md §3 rule 3.",
+    "SCHEMA BLOCKER (status constraint): task_queue.status CHECK only allows ('queued','claimed','running','completed','failed','cancelled'). The engine and webhook handlers use 'auto_proceeded', 'approved', and 'dismissed' as status values — all three fail the constraint. A migration is needed to add all three. SQL: ALTER TABLE public.task_queue DROP CONSTRAINT task_queue_status_check, ADD CONSTRAINT task_queue_status_check CHECK (status IN ('queued','claimed','running','completed','failed','cancelled','auto_proceeded','approved','dismissed')). This requires explicit Colin approval per ARCHITECTURE.md §3 rule 3.",
+    "Notifier file not created separately: The acceptance doc listed lib/harness/improvement-engine-notifier.ts as an optional separate file 'or inline in improvement-engine.ts if small'. The notifier logic is small and was inlined. No separate notifier file was created.",
+    "Files not in acceptance doc 'files expected to change': lib/harness/telegram-buttons.ts was changed (parseImproveCallbackData added — required by Component 6 callback routing); tests/harness/notifications-drain.test.ts and tests/api/telegram-webhook.test.ts were updated to accommodate the drain route extension and new telegram-buttons export respectively. All three changes are directly caused by items that ARE in the acceptance doc's scope.",
+    "analyzeChunk falls back to event count signals (grounding_mismatches, escalations_to_colin, etc.) rather than reading the acceptance doc full text — the doc full-text read was omitted since the acceptance doc path field in task_queue metadata is typically the docs/ path which is not accessible at Vercel runtime. A follow-up improvement: store the doc contents in knowledge store at time of acceptance-doc creation so the analyzer can retrieve them via Supabase.",
+    "Auto-proceed criterion 4 (CI test gate) is hardcoded to 'assume pass' with a TODO comment. Full CI gate requires Sprint 6+ wiring.",
+    "The trigger (Component 1) fires runImprovementEngine as void/fire-and-forget inside the drain cron. If the engine throws, the error is caught and logged to console but the drain returns 200. If the engine takes >30s, the drain cron may time out. Both are acceptable for v1."
+  ],
+  "next_chunk_blockers": [
+    "The two task_queue schema blockers (source CHECK + status CHECK) must be resolved via a Colin-approved migration before the engine's inserts and status updates will work in the live database. The engine code is complete and tested against mocks — only the DB constraints block live operation.",
+    "No completed task_queue rows with status='completed' or 'grounded' currently exist with the improvement_engine.triggered agent_events marker — the grounding checkpoint requires running at least 3 real chunks through the full harness pipeline after the schema migration is applied."
+  ],
+  "commit_shas": {
+    "migration": "45b0274",
+    "engine_and_tests": "1793cc9"
+  },
+  "trigger_option_chosen": "Option A — extended notifications-drain route. No new cron added to vercel.json. Decision: minimizes Vercel Hobby plan cron count as preferred by acceptance doc.",
+  "tokens_used": 28000,
+  "timestamp": "2026-04-24T22:13:45Z"
+}

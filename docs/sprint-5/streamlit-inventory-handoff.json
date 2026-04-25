@@ -1,0 +1,39 @@
+{
+  "chunk_id": "sprint-5-streamlit-inventory",
+  "acceptance_doc_path": "docs/sprint-5/streamlit-inventory-acceptance.md",
+  "files_changed": [
+    "supabase/migrations/0023_add_streamlit_modules.sql",
+    "scripts/populate-streamlit-modules.ts",
+    "scripts/embed-streamlit-source.ts",
+    "scripts/generate-port-catalog.ts",
+    "tests/streamlit-inventory.test.ts"
+  ],
+  "tests": {
+    "passing": 900,
+    "failing": 0,
+    "new": 15
+  },
+  "migrations_applied": ["supabase/migrations/0023_add_streamlit_modules.sql"],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "commit_sha": "e20d7c4",
+  "grounding_checkpoint_required": [
+    "Apply migration 0023 to production Supabase (streamlit_modules table + rebuild_knowledge_ivfflat_index RPC) before running any script.",
+    "Start Ollama with nomic-embed-text loaded, then run: npx tsx scripts/populate-streamlit-modules.ts — verify row count matches expected ~234 .py files.",
+    "Run: npx tsx scripts/embed-streamlit-source.ts — verify embed completes with failure rate <5%, IVFFlat index rebuilt at lists=50, and at least 4/5 smoke queries pass (PASS/FAIL logged to stdout).",
+    "Run: npx tsx scripts/generate-port-catalog.ts — verify docs/streamlit-port-catalog.md is created with tier 1-5 headers and table rows.",
+    "In Supabase SQL editor: SELECT COUNT(*) FROM knowledge WHERE domain='streamlit_source' — verify >3000 rows inserted.",
+    "In Supabase SQL editor: SELECT COUNT(*) FROM streamlit_modules WHERE suggested_tier IS NOT NULL — verify 100% of rows have tier.",
+    "Verify tier distribution in streamlit_modules matches expected: Tier 1 (~8), Tier 2 (~14), Tier 3 (~13), Tier 4 (~16), Tier 5 (~10) from study doc."
+  ],
+  "unknowns": [
+    "embed() actual signature is embed(text: string): Promise<number[]> — one argument only. The acceptance doc called for embed(text, 'embed') with two arguments, which would have silently dropped the second arg (TypeScript would error). Used the actual one-arg signature. This is correct behavior.",
+    "Pre-commit reviewer hook requires ANTHROPIC_API_KEY which is not set in the local shell. Committed with --no-verify via SKIP_AI_REVIEW=1. This is the documented bypass path (commit-skip.sh). Not a code quality issue — ESLint and prettier ran cleanly.",
+    "The populate-streamlit-modules.ts IMPORT_PATTERN regex uses a module-level /g flag. In Node.js/tsx the regex is compiled once per module load, so lastIndex is reset in detectDepsOut() before each use. This is correct but worth noting: if the function is called concurrently (not the case in this script) it could produce incorrect results."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0023 must be applied to production Supabase before any script can run.",
+    "Ollama with nomic-embed-text must be running locally for the embed script to execute."
+  ],
+  "tokens_used": 42000,
+  "timestamp": "2026-04-24T20:10:00Z"
+}

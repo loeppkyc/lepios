@@ -42,6 +42,36 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { embed, healthCheck, OllamaUnreachableError } from '../lib/ollama/client'
 import { recordAttribution } from '../lib/attribution/writer'
 
+// ── Embed limit ───────────────────────────────────────────────────────────────
+// nomic-embed-text context: 2048 tokens. Files with dense emoji tokenize at ~4 chars/token,
+// not the usual 4+ for ASCII code. 4500 chars stays well under the limit across all file types.
+// Promoted from embed-streamlit-gaps.ts where it fixed HTTP 500 context-length failures
+// on emoji-dense Streamlit pages during the overnight corpus pass.
+export const MAX_EMBED_CHARS = 4_500
+
+export async function embedWithRetry(text: string, maxRetries = 3): Promise<number[] | null> {
+  // Truncate at last newline before limit to avoid mid-line cuts
+  const safe =
+    text.length > MAX_EMBED_CHARS ? text.slice(0, MAX_EMBED_CHARS).replace(/\n[^\n]*$/, '') : text
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await embed(safe)
+    } catch (err) {
+      const isRetryable =
+        (err instanceof Error && err.message.includes('500')) ||
+        err instanceof OllamaUnreachableError
+      if (isRetryable && attempt < maxRetries) {
+        console.log(`    HTTP 500 on attempt ${attempt}, retrying in 2s...`)
+        await new Promise((r) => setTimeout(r, 2000))
+        continue
+      }
+      return null
+    }
+  }
+  return null
+}
+
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
 const STREAMLIT_ROOT = resolve(process.cwd(), '..', 'streamlit_app')
@@ -178,7 +208,7 @@ function chunkMdFile(content: string, filename: string): MdChunk[] {
 
 // ── File walker ───────────────────────────────────────────────────────────────
 
-function walkDir(dir: string, results: string[] = []): string[] {
+export function walkDir(dir: string, results: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const fullPath = join(dir, entry)
     const stat = statSync(fullPath)
@@ -197,7 +227,7 @@ function walkDir(dir: string, results: string[] = []): string[] {
 
 // ── Classification lookup (for tags) ─────────────────────────────────────────
 
-function classifyForTags(relPath: string, content: string): string {
+export function classifyForTags(relPath: string, content: string): string {
   const base = basename(relPath)
   const rel = relPath.replace(/\\/g, '/')
   if (base.startsWith('test_') || rel.includes('/tests/')) return 'test'
@@ -219,7 +249,7 @@ function classifyForTags(relPath: string, content: string): string {
   return 'util'
 }
 
-function detectExternalDepsForTags(content: string): string[] {
+export function detectExternalDepsForTags(content: string): string[] {
   const patterns: [RegExp, string][] = [
     [/sp_api|amazon_sp/, 'sp_api'],
     [/keepa/, 'keepa'],
@@ -242,7 +272,7 @@ function detectExternalDepsForTags(content: string): string[] {
 
 // ── Upsert helper (SELECT + INSERT or UPDATE) ─────────────────────────────────
 
-async function upsertKnowledgeChunk(
+export async function upsertKnowledgeChunk(
   db: SupabaseClient,
   params: {
     relativePath: string
@@ -323,12 +353,16 @@ const SMOKE_QUERIES = [
     expect_entity_contains: ['gmail', 'email_invoices'],
   },
   {
-    query: 'offline-first SQLite sync Google Sheets',
-    expect_entity_contains: ['data_layer', 'sync_engine'],
+    // Q5 replaced: "offline-first SQLite sync" targeted data_layer.py / sync_engine.py,
+    // which are LepiOS architecture files not present in the Streamlit source corpus.
+    // Those queries returned 0 relevant results (top similarity ~0.509, noise level).
+    // Replaced with a query anchored to real Streamlit content: FBA pricing in inventory page.
+    query: 'how does the inventory page load FBA pricing',
+    expect_entity_contains: ['7_inventory', 'inventory'],
   },
 ]
 
-async function runSmokeTests(db: SupabaseClient): Promise<number> {
+export async function runSmokeTests(db: SupabaseClient): Promise<number> {
   console.log('\n── Recall@5 smoke test ─────────────────────────────────────────')
   let passed = 0
 
@@ -396,6 +430,14 @@ async function main() {
   console.log(
     `\nOllama reachable — ${health.models.length} model(s), latency ${health.latency_ms}ms`
   )
+
+  // --smoke-only: skip the embed pass and just run smoke tests
+  if (process.argv.includes('--smoke-only')) {
+    console.log('\n[--smoke-only] Skipping embed pass.')
+    const smokePassed = await runSmokeTests(db)
+    console.log(`\nSmoke tests: ${smokePassed}/${SMOKE_QUERIES.length} passed`)
+    process.exit(smokePassed < 4 ? 1 : 0)
+  }
 
   // Collect files
   let pyFiles: string[]
@@ -488,17 +530,11 @@ async function main() {
       console.log(`Embedded ${i}/${totalChunks} chunks (${pct}%)...`)
     }
 
-    // Generate embedding
-    let vec: number[]
-    try {
-      vec = await embed(job.chunkText)
-    } catch (err) {
-      if (err instanceof OllamaUnreachableError) {
-        embedFailures++
-        process.stdout.write('.')
-        continue
-      }
+    // Generate embedding (truncates at MAX_EMBED_CHARS, retries 3x on HTTP 500)
+    const vec = await embedWithRetry(job.chunkText)
+    if (!vec) {
       embedFailures++
+      process.stdout.write('.')
       continue
     }
 
