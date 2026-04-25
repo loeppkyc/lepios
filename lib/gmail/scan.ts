@@ -45,7 +45,7 @@ export async function scanMessages(
     let pageToken: string | undefined = undefined
 
     do {
-      const resp = await service.users.messages.list({
+      const resp: { data: gmail_v1.Schema$ListMessagesResponse } = await service.users.messages.list({
         userId: 'me',
         q: query,
         maxResults: 100,

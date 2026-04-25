@@ -86,7 +86,6 @@ export async function checkPurposeReviewTimeouts(db?: SupabaseClient): Promise<n
         },
         tags: ['purpose_review', 'harness', 'timeout'],
       })
-      .catch(() => {})
 
     // Fire Telegram alert regardless of update outcome
     await fireTimeoutAlert(modulePath, row.id)
