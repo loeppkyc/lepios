@@ -1,0 +1,43 @@
+{
+  "chunk_id": "concurrent_purpose_review_correctness",
+  "acceptance_doc_path": "docs/sprint-5/purpose-review-correctness-acceptance.md",
+  "task_id": "fdf5a51e-28ca-4584-88f2-e922046ee276",
+  "parent_task_id": "9778dee9-275e-4b95-a556-7122c6db571a",
+  "files_changed": [
+    "lib/attribution/types.ts",
+    "lib/purpose-review/handler.ts",
+    "supabase/migrations/0028_attribution_actor_type_colin.sql",
+    "tests/purpose-review.test.ts",
+    "docs/sprint-5/purpose-review-correctness-acceptance.md",
+    "docs/sprint-state.md"
+  ],
+  "tests": {
+    "passing": 935,
+    "failing": 1,
+    "new": 22,
+    "failing_note": "1 pre-existing failure: tests/harness/task-pickup-100.test.ts cron schedule (Hobby plan downgrade, commit 6689312, unrelated to this chunk)"
+  },
+  "migrations_applied": [
+    "supabase/migrations/0028_attribution_actor_type_colin.sql — WRITTEN ONLY, not applied to production"
+  ],
+  "deploy_url": "https://lepios-one.vercel.app (Vercel auto-deploy from main pending push from claude/vibrant-heisenberg-0nFkn)",
+  "commit_sha": "1efef0f5985c12bd13bdf6476028be4e1f8af3a0",
+  "grounding_checkpoint_required": [
+    "Apply migration 0028 to production Supabase (project xpanlbcjueimeofgsara). SQL: UPDATE entity_attribution SET actor_type='colin' WHERE actor_type='human' AND actor_id='telegram';",
+    "Verify: SELECT COUNT(*) AS unmigrated FROM entity_attribution WHERE actor_type='human' AND actor_id='telegram'; Expected: 0.",
+    "After grounding passes: cancel task 9d7f2af7 (AddColinToActorType) — it was folded into this build."
+  ],
+  "unknowns": [],
+  "next_chunk_blockers": [
+    "Migration 0028 must be applied before entity_attribution data is correct for any post-purpose-review attribution reads."
+  ],
+  "fixes_applied": {
+    "F1": "review_message_id stored in metadata on revise path (handler.ts line 121)",
+    "F2": "ActorType union extended with 'colin' (types.ts); all 3 recordAttribution calls updated from actor_type:'human' to actor_type:'colin' (handler.ts); migration 0028 written",
+    "F3": "Skip-flow recordAttribution assertion added to Test 5 (purpose-review.test.ts lines 336-344)",
+    "F2_implicit": "Test 4 actor_type assertion updated from 'human' to 'colin' (purpose-review.test.ts line 296)"
+  },
+  "folded_task_cancelled": "9d7f2af7 — AddColinToActorType (post-grounding action)",
+  "tokens_used": 8200,
+  "timestamp": "2026-04-25T19:43:00Z"
+}

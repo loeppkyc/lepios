@@ -112,39 +112,50 @@ opened_at: "2026-04-24T00:00:00Z"
 last_updated_at: "2026-04-25T19:36:00Z"
 
 chunks_planned:
-  - "attribution"
-  - "20-percent-better-engine"
-  - "gmail-scanner"
-  - "ollama-100"
-  - "streamlit-inventory"
-  - "task-pickup-100"
-  - "purpose-review"
-  - "purpose-review-correctness"
+
+- "attribution"
+- "20-percent-better-engine"
+- "gmail-scanner"
+- "ollama-100"
+- "streamlit-inventory"
+- "task-pickup-100"
+- "purpose-review"
+- "purpose-review-correctness"
 
 chunks_complete: []
 chunks_awaiting_grounding:
-  - "attribution"
-  - "20-percent-better-engine"
-  - "gmail-scanner"
-  - "ollama-100"
-  - "streamlit-inventory"
-  - "purpose-review"
-chunks_in_build:
-  - "purpose-review-correctness"
-chunks_not_started:
-  - "task-pickup-100"
+
+- "attribution"
+- "20-percent-better-engine"
+- "gmail-scanner"
+- "ollama-100"
+- "streamlit-inventory"
+- "purpose-review"
+  chunks_awaiting_grounding_correctness:
+- "purpose-review-correctness"
+  chunks_not_started:
+- "task-pickup-100"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
 active_chunk_task_id: "fdf5a51e-28ca-4584-88f2-e922046ee276"
-active_chunk_status: "in-build"
+active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
+active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
+active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
 
 # Grounding checkpoints still pending for completed-build chunks
+
 # (all require Colin to apply migrations and verify live behaviour):
+
 # - attribution: migration 0020 + live entity_attribution rows
+
 # - 20-percent-better-engine: task_queue constraint migration + live improvement proposals
-# - gmail-scanner: env vars (GOOGLE_*) + migration 0022 + manual cron trigger
+
+# - gmail-scanner: env vars (GOOGLE\_\*) + migration 0022 + manual cron trigger
+
 # - ollama-100: timeout/circuit-breaker verification + morning digest Ollama line
+
 # - streamlit-inventory: migration 0023 + populate/embed scripts + smoke query pass rate
+
 # - purpose-review: migration 0026 (NOT yet applied to prod) + live Telegram callback test
