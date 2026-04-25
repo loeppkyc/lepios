@@ -52,7 +52,7 @@ last_chunk_limitation: "SP-API Orders strips ItemPrice and OrderTotal from Pendi
 chunk_d_approval: "colin-explicit — task_queue 9bf44f91-1fcf-4ca4-b050-ed2f5f0bce56 created with status=ready-for-builder and prerequisites_verified_at=2026-04-23T20:00:00Z"
 kill_criterion_answer: null
 opened_at: "2026-04-19T10:00:00-06:00"
-last_updated_at: "2026-04-23T21:25:00-06:00"
+last_updated_at: "2026-04-25T18:52:00Z"
 resumed_at: "2026-04-23T15:00:00-06:00"
 resume_reason: "Component #3 Remote Invocation shipped (commit bebac8e). Clean unattended run verified: task 90f952dc claimed autonomously, session session_01Y4Ca2VMWjFF9WYhrkqxFYV spawned without human step. Resume trigger met."
 plan_written_at: "2026-04-19T12:00:00-06:00"
@@ -73,6 +73,14 @@ kill_criterion: "Every visible number on LepiOS Business Review matches its sour
 chunks_planned: ["A", "B", "C", "D", "E"]
 chunks_complete: ["A", "B", "C"]
 chunks_escalated: []
+
+# Sprint 5 — harness correctness (parallel track, task fdf5a51e)
+sprint_5_correctness_chunk: "concurrent_purpose_review_correctness"
+sprint_5_correctness_status: "awaiting-colin-approval"
+sprint_5_correctness_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
+sprint_5_correctness_study_doc: "docs/sprint-5/purpose-review-correctness-study.md"
+sprint_5_correctness_task_id: "fdf5a51e-28ca-4584-88f2-e922046ee276"
+sprint_5_correctness_updated_at: "2026-04-25T18:52:00Z"
 chunks_rolled_back: []
 
 # Resume trigger: harness components #5 (task pickup) and #2

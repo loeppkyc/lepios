@@ -93,3 +93,31 @@ outcome: escalated
 escalation_reasons:
   - cache_match_disabled_sprint_override
   - open_question_Q1 (fee/payout column display requires Colin decision before builder starts)
+
+---
+
+2026-04-25T18:52:00Z sprint=5 chunk=concurrent_purpose_review_correctness doc=docs/sprint-5/purpose-review-correctness-acceptance.md
+phase: 2 (per-chunk acceptance doc, Phase 1c complete)
+cited_principles: [cache_match_enabled: false — sprint-state.md explicit override, applies to all sprint-N acceptance docs]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+  META-C not applied — cache-match is disabled. No trigger-match attempted.
+  Additionally, this doc folds in a queued task (9d7f2af7) and includes a SQL migration
+  targeting entity_attribution data — each independently requires Colin eyes before builder.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  lib/attribution/types.ts change: TypeScript type-only, no runtime schema change.
+    Reversible: change | 'colin' back to absent. Grep for all call sites first.
+  lib/purpose-review/handler.ts change: actor_type string value.
+    Reversible: change 'colin' back to 'human'. One-line grep find.
+  Migration 0028 data update: UPDATE entity_attribution SET actor_type='colin' ...
+    Reversible: UPDATE back to 'human'. Low risk (TEXT field, no FK, no cascade).
+  Test file changes: assertion string updates. Fully reversible.
+  No DROP, no FK changes, no irreversible operations.
+confidence: high (escalation is correct; migration requires Colin eyes; cache-match disabled)
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - sql_migration_requires_colin_approval (entity_attribution data update)
+  - queued_task_9d7f2af7_folded_in (confirmed by Colin in F2 answer, doc verifying)
