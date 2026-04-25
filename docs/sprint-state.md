@@ -96,3 +96,33 @@ chunks_rolled_back: []
 # build more harness for its own sake. LepiOS shipping bigger
 
 # and better is the success metric.
+
+# ============================================================
+
+# Sprint 5 — purpose_review gate (parallel harness track)
+
+# Blocks all Streamlit port chunks not yet past Phase 1a.
+
+# Builder shipped commit 878d107. Awaiting grounding checkpoints.
+
+# ============================================================
+
+sprint_5_purpose_review:
+  sprint_id: "5"
+  chunk_id: "purpose-review"
+  task_queue_id: "9778dee9-275e-4b95-a556-7122c6db571a"
+  status: "awaiting-grounding"
+  commit_sha: "878d107"
+  tests: "913 passing, 0 failing, 13 new"
+  migration_0026: "applied-to-production"
+  grounding_checkpoints_pending:
+    - gc2: "Telegram callback test — tap 👍/✏️/🗑️ on synthetic message, verify agent_events domain=purpose_review"
+    - gc3: "Timeout test — set status=awaiting_review on a row, verify review_timeout fires + loeppky_alerts_bot alert"
+  colin_decisions_pending:
+    - u1: "ActorType enum — add 'colin' or keep 'human' with actor_id='telegram'? (child task 9d7f2af7)"
+    - u2: "Add review_message_id to task_queue.metadata to fix best-effort text-reply routing? (child task fdf5a51e)"
+  cache_match_enabled: false
+  cache_match_reason: "Sprint 5 has no ratified plan in sprint-state; every acceptance doc escalates to Colin"
+  last_updated_at: "2026-04-25T16:22:00Z"
+  acceptance_doc_path: "docs/sprint-5/purpose-review-acceptance.md"
+  handoff_path: "docs/sprint-5/purpose-review-handoff.json"

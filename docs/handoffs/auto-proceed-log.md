@@ -93,3 +93,31 @@ outcome: escalated
 escalation_reasons:
   - cache_match_disabled_sprint_override
   - open_question_Q1 (fee/payout column display requires Colin decision before builder starts)
+
+---
+
+2026-04-25T16:22:00Z sprint=5 chunk=purpose-review doc=docs/sprint-5/purpose-review-acceptance.md
+phase: 4 (builder handoff review)
+cited_principles: [coordinator.md Phase 4 rule 3 (grounding checkpoints non-empty → stop and escalate)]
+trigger_match_evidence: |
+  Phase 4 handoff review for sprint-5-purpose-review (commit 878d107, 913/913 tests pass).
+  grounding_checkpoint_required is non-empty (3 items):
+    gc1: Migration 0026 — ALREADY APPLIED to production (awaiting_review + review_timeout live).
+    gc2: Telegram callback test (tap 👍/✏️/🗑️ on synthetic message, verify agent_events row).
+    gc3: Timeout test (set status=awaiting_review, verify review_timeout fires + alert sent).
+  unknowns non-empty (2 items requiring Colin decisions):
+    u1: ActorType enum — builder used actor_type='human' (no 'colin' in enum). Add 'colin'?
+    u2: review_message_id in metadata — text-reply routing is best-effort without it. Add it?
+  Per coordinator.md Phase 4 rule 3: post checkpoint list, update to awaiting-grounding, stop.
+  Cache-match is not relevant to Phase 4 grounding decisions.
+reversibility_check: |
+  Builder commit 878d107: reversible via revert (files only, no schema change by builder).
+  Migration 0026: applied to production; reversible but requires clearing any awaiting_review
+    rows first — treat as low-risk since no rows are in that status yet.
+  task_queue status → awaiting-grounding: document state, fully reversible.
+  auto-proceed-log entry: append-only log, reversible via git.
+confidence: high (escalation is unambiguous per Phase 4 rule 3)
+outcome: escalated
+escalation_reasons:
+  - grounding_checkpoint_required_non_empty (gc2 + gc3 pending)
+  - unknowns_requiring_colin_decision (u1 + u2)
