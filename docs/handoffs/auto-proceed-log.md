@@ -9,6 +9,22 @@ last_reviewed_by_colin_at: 2026-04-22
 
 ---
 
+2026-04-25T23:45:00Z sprint=5 chunk=notification-drain-routing doc=docs/sprint-5/notification-drain-routing-acceptance.md
+cited_principles: [META-C, cache_match_enabled: false sprint-wide]
+trigger_match_evidence: |
+  cache_match_enabled: false (sprint-state.md sprint_5.cache_match_reason: "Sprint 4 baseline carries forward").
+  Phase 0 rule 4 applies: explicit override in sprint-state.md honors regardless of audit date.
+  No pattern-match attempted — all decisions escalated to Colin.
+reversibility_check: |
+  F1 (vercel.json cron entry): reversible — delete the entry.
+  F2 (findMatchingRow Strategy A'): reversible — revert the ~10-line addition.
+  F3 (agent_events instrumentation): reversible — remove insert calls in drain and webhook.
+  No schema migrations. No destructive changes. All reversible with grep.
+confidence: high (for reversibility assessment) — but escalated because cache_match is explicitly disabled sprint-wide.
+outcome: escalated — awaiting Colin approval via Telegram (outbound_notifications row inserted)
+
+---
+
 2026-04-22T15:30:00-06:00 sprint=harness-e2e chunk=v0-test doc=docs/harness-e2e/chunk-v0-test-acceptance.md
 phase: 6 (sprint close)
 cited_principles: [cache_match_enabled: false — Phase 0 result honored throughout]

@@ -121,6 +121,7 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "notification-drain-routing"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -135,6 +136,8 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+  chunks_awaiting_colin_approval:
+- "notification-drain-routing"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
@@ -143,6 +146,14 @@ active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
 active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
 active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+
+notification_drain_routing:
+  chunk_id: "notification-drain-routing"
+  status: "awaiting-colin-approval"
+  task_id: "7c73784d-ca3a-4e27-b1b9-25fa9cc7746a"
+  acceptance_doc: "docs/sprint-5/notification-drain-routing-acceptance.md"
+  study_doc: "docs/sprint-5/notification-drain-routing-study.md"
+  last_updated_at: "2026-04-25T23:45:00Z"
 
 # Grounding checkpoints still pending for completed-build chunks
 
