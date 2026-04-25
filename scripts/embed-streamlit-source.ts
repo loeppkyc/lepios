@@ -337,15 +337,58 @@ export async function upsertKnowledgeChunk(
 }
 
 // ── Smoke test queries ────────────────────────────────────────────────────────
+//
+// SMOKE QUERY DESIGN RULE: queries must use vocabulary present in chunk content,
+// not natural-language meta-questions about code structure.
+//
+// nomic-embed-text embeds code chunks whose text starts with a header like:
+//   "# File: pages/60_Amazon_Orders.py — _sync_orders_sp_api"
+// followed by the raw function body. The embedding space is anchored to that
+// vocabulary — function names, import paths, docstring terms, variable names.
+//
+// Natural-language concept questions ("how does X work", "where is Y calculated")
+// embed into a different region of the space and miss the target chunks entirely.
+//
+// BEFORE / AFTER examples from the 2026-04-25 calibration pass:
+//
+//   Q1 BEFORE: 'how does SP-API pagination work'
+//              → top-5: command_centre.py, ingest_knowledge_base.py (unrelated)
+//   Q1 AFTER:  '_sync_orders_sp_api sp_api Orders pull orders SP-API'
+//              → targets pages/60_Amazon_Orders.py — _sync_orders_sp_api
+//
+//   Q2 BEFORE: 'where is GST rate calculated'
+//              → wrong expected entities ['amazon_fees', '__init__', 'sourcing']
+//                 AND top-5: trading_predictions.py, keepa_api.py (unrelated)
+//   Q2 AFTER:  'render_gst_filing GST HST return collected tax centre'
+//              → targets pages/tax_centre/colin_tax.py — render_gst_filing
+//
+// When adding a new smoke query: (1) find the target chunk in the knowledge table,
+// (2) copy exact function name from the chunk title, (3) add 2–3 terms from the
+// chunk body, (4) set expect_entity_contains to a substring of the entity path.
 
 const SMOKE_QUERIES = [
-  { query: 'how does SP-API pagination work', expect_entity_contains: ['amazon'] },
   {
-    query: 'where is GST rate calculated',
-    expect_entity_contains: ['amazon_fees', '__init__', 'sourcing'],
+    // Q1 recalibrated 2026-04-25: "how does SP-API pagination work" is a meta-question
+    // that doesn't match chunk header vocabulary. Target chunk is
+    // pages/60_Amazon_Orders.py — _sync_orders_sp_api (docstring: "Pull orders from SP-API").
+    // New query uses exact function name + import terms present in chunk content.
+    query: '_sync_orders_sp_api sp_api Orders pull orders SP-API',
+    expect_entity_contains: ['amazon'],
   },
   {
-    query: 'circuit breaker pattern prevent cascading failures',
+    // Q2 recalibrated 2026-04-25: original query "where is GST rate calculated" +
+    // expected entities ['amazon_fees', '__init__', 'sourcing'] were both wrong —
+    // GST logic lives in pages/tax_centre/colin_tax.py — render_gst_filing, not amazon_fees.
+    // New query uses vocabulary present in chunk headers and body text.
+    query: 'render_gst_filing GST HST return collected tax centre',
+    expect_entity_contains: ['colin_tax', 'tax_centre'],
+  },
+  {
+    // Q3 recalibrated 2026-04-25: "circuit breaker pattern prevent cascading failures"
+    // is a meta-description that doesn't embed close to code chunk headers.
+    // Target: utils/circuit_breaker.py — 14 chunks including CircuitBreaker.__init__,
+    // _record_failure, _transition. New query uses exact class/param names from chunk content.
+    query: 'CircuitBreaker failure_threshold timeout_seconds _record_failure open half_open',
     expect_entity_contains: ['circuit_breaker'],
   },
   {
@@ -379,10 +422,22 @@ export async function runSmokeTests(db: SupabaseClient): Promise<number> {
       query_embedding: vec,
       match_count: 5,
       min_confidence: 0,
+      filter_domain: 'streamlit_source',
     })
 
-    if (error || !data || !Array.isArray(data) || data.length === 0) {
-      console.log(`  [FAIL] "${sq.query}" — no results or RPC error`)
+    if (error) {
+      console.log(
+        `  [FAIL] "${sq.query}" — RPC error: ${error.message}` +
+          ` (code: ${(error as { code?: string }).code ?? 'none'},` +
+          ` hint: ${(error as { hint?: string }).hint ?? 'none'})`
+      )
+      continue
+    }
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log(
+        `  [FAIL] "${sq.query}" — 0 rows returned` +
+          ` (LIMIT 5 min_confidence=0 should always return rows — check corpus embeddings)`
+      )
       continue
     }
 
