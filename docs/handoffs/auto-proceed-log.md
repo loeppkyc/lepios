@@ -121,4 +121,28 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - principle_15_new_terrain (no improvement loop precedent in codebase)
+
+---
+
+2026-04-25T22:00:00Z sprint=5 chunk=harness-stall-alarm doc=docs/sprint-5/harness-stall-alarm-acceptance.md
+phase: 2 (per-chunk acceptance doc)
+cited_principles: [4, 17, META-C]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline carries forward").
+  Phase 0 rule 4: explicit sprint-state.md override honored. META-C not applied — cache-match disabled sprint-wide.
+  Additionally, Principle 15 (new terrain) independently requires escalation:
+  Principle 15 trigger: "We've never done this before."
+  Situation: First harness monitoring check in LepiOS. No prior stall alarm logic exists in the codebase.
+  Principle 4 (ship only enum values with live write paths): T5 tier deferred (no confirmed write path).
+  Principle 17 (scope): T5, real-time polling, auto-remediation explicitly deferred.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  No code written, no schema changes, no external calls, no migrations.
+  sprint-state.md update: document only, reversible via git.
+  auto-proceed-log.md append: this entry — append-only, reversible via git.
+confidence: high
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - principle_15_new_terrain (first harness monitoring check in codebase)
 - twin_q1_through_q5_insufficient_context (all 5 Phase 1b questions batched to Colin)

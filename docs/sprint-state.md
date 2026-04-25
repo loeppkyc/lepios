@@ -121,6 +121,7 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "harness-stall-alarm"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -135,6 +136,11 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+- "harness-stall-alarm"
+
+chunk_harness_stall_alarm_status: "awaiting-colin-approval"
+chunk_harness_stall_alarm_acceptance_doc: "docs/sprint-5/harness-stall-alarm-acceptance.md"
+chunk_harness_stall_alarm_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
