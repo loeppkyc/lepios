@@ -101,7 +101,7 @@ export async function handlePurposeReviewCallback(params: {
     })
 
     void recordAttribution(
-      { actor_type: 'human', actor_id: 'telegram' },
+      { actor_type: 'colin', actor_id: 'telegram' },
       { type: 'task_queue', id: taskQueueId },
       'purpose_reviewed',
       { action: 'approve', module_path: modulePath }
@@ -118,7 +118,7 @@ export async function handlePurposeReviewCallback(params: {
       .from('task_queue')
       .update({
         status: 'awaiting_review',
-        metadata: { ...meta, purpose_review: 'pending_notes' },
+        metadata: { ...meta, purpose_review: 'pending_notes', review_message_id: messageId },
         last_heartbeat_at: new Date().toISOString(),
       })
       .eq('id', taskQueueId)
@@ -171,7 +171,7 @@ export async function handlePurposeReviewCallback(params: {
     })
 
     void recordAttribution(
-      { actor_type: 'human', actor_id: 'telegram' },
+      { actor_type: 'colin', actor_id: 'telegram' },
       { type: 'task_queue', id: taskQueueId },
       'purpose_reviewed',
       { action: 'skip', module_path: modulePath }
@@ -243,7 +243,7 @@ export async function handlePurposeReviewTextReply(params: {
   })
 
   void recordAttribution(
-    { actor_type: 'human', actor_id: 'telegram' },
+    { actor_type: 'colin', actor_id: 'telegram' },
     { type: 'task_queue', id: taskQueueId },
     'purpose_reviewed',
     { action: 'approved_with_notes', module_path: modulePath, purpose_notes: text }

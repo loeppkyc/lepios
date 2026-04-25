@@ -2,7 +2,13 @@
 // ActorType enum and AttributionContext are the single contract between
 // all write sites and the attribution writer.
 
-export type ActorType = 'improvement_engine' | 'coordinator' | 'task_pickup_cron' | 'cron' | 'human'
+export type ActorType =
+  | 'improvement_engine'
+  | 'coordinator'
+  | 'task_pickup_cron'
+  | 'cron'
+  | 'human'
+  | 'colin'
 
 export interface AttributionContext {
   actor_type: ActorType
