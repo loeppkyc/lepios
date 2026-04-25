@@ -86,6 +86,17 @@ function makeInsertBuilder() {
   return { insert }
 }
 
+// Returns a query chain that resolves to empty data — used for the F18 Ollama stats queries
+// (buildOllamaStatsLine calls from() twice: once for ollama.generate, once for twin.ask)
+function makeOllamaStatsBuilder(data: unknown[] = []) {
+  const result = { data, error: null }
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockResolvedValue(result),
+  }
+}
+
 const MOCK_QUALITY_SCORE = {
   aggregate: 75.0,
   capacity_tier: 'tier_1_laptop_ollama',
@@ -282,7 +293,12 @@ describe('sendMorningDigest — status paths', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     const status = await sendMorningDigest()
     expect(status).toBe('sent')
@@ -292,7 +308,12 @@ describe('sendMorningDigest — status paths', () => {
   it('returns no_tick_found when no tick row exists', async () => {
     const qb = makeQueryBuilder({ data: null, error: { message: 'no rows' } })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     const status = await sendMorningDigest()
     expect(status).toBe('no_tick_found')
@@ -303,7 +324,12 @@ describe('sendMorningDigest — status paths', () => {
     mockPostMessage.mockRejectedValue(new MissingTelegramConfigError())
     const qb = makeQueryBuilder({ data: null, error: null })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     const status = await sendMorningDigest()
     expect(status).toBe('telegram_failed')
@@ -316,7 +342,12 @@ describe('sendMorningDigest — status paths', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     const status = await sendMorningDigest()
     expect(status).toBe('telegram_failed')
@@ -330,7 +361,12 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     const row = ib.insert.mock.calls[0][0]
@@ -341,7 +377,12 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
   it('writes column=warning + meta.digest_status=no_tick_found', async () => {
     const qb = makeQueryBuilder({ data: null, error: null })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     const row = ib.insert.mock.calls[0][0]
@@ -353,7 +394,12 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
     mockPostMessage.mockRejectedValue(new MissingTelegramConfigError())
     const qb = makeQueryBuilder({ data: null, error: null })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     const row = ib.insert.mock.calls[0][0]
@@ -367,7 +413,12 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     expect(ib.insert).toHaveBeenCalledTimes(1)
@@ -383,7 +434,12 @@ describe('sendMorningDigest — agent_events row (dual status assertions)', () =
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     expect(ib.insert.mock.calls[0][0].meta.mapped_from).toBe('spec_v1')
@@ -397,7 +453,12 @@ describe('sendMorningDigest — quality scoring', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     expect(ib.insert.mock.calls[0][0].task_type).toBe('morning_digest')
@@ -409,7 +470,12 @@ describe('sendMorningDigest — quality scoring', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     const qs = ib.insert.mock.calls[0][0].quality_score
@@ -425,7 +491,12 @@ describe('sendMorningDigest — quality scoring', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     expect(mockFetchHistory).toHaveBeenCalledWith(
@@ -442,7 +513,12 @@ describe('sendMorningDigest — quality scoring', () => {
       error: null,
     })
     const ib = makeInsertBuilder()
-    mockFrom.mockReturnValueOnce(qb).mockReturnValueOnce(ib)
+    // Slot 1: night_tick query | Slots 2-3: F18 Ollama stats (generate + twin.ask) | Slot 4+: writeDigestEvent (scoring + insert)
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
 
     await sendMorningDigest()
     expect(ib.insert).toHaveBeenCalledTimes(1)

@@ -3,7 +3,6 @@ import { postMessage, MissingTelegramConfigError } from './telegram'
 import { fetchHistoricalContext, scoreMorningDigest } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { DigestResult, DigestStatus, QualityScore, TickResult } from './types'
-
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -39,6 +38,63 @@ export function composeMorningDigest(tick: TickResult): string {
   }
 
   return lines.join('\n')
+}
+
+// ── F18: Ollama stats line ────────────────────────────────────────────────────
+
+/**
+ * Build one Telegram message line summarising Ollama activity in the last 24h.
+ * Never throws — on any error returns "Ollama: stats unavailable".
+ */
+export async function buildOllamaStatsLine(): Promise<string> {
+  try {
+    const db = createServiceClient()
+    const since = new Date(Date.now() - 86_400_000).toISOString()
+
+    // Both queries always run (consistent slot count for test mocking)
+    const [generateResult, twinResult] = await Promise.all([
+      db
+        .from('agent_events')
+        .select('status, duration_ms')
+        .eq('action', 'ollama.generate')
+        .gte('occurred_at', since),
+      db.from('agent_events').select('meta').eq('action', 'twin.ask').gte('occurred_at', since),
+    ])
+
+    const generateRows = generateResult.data
+    const twinRows = twinResult.data
+
+    const total = generateRows?.length ?? 0
+    if (total === 0) return 'Ollama: no calls in last 24h'
+
+    const successes = (generateRows ?? []).filter((r) => r.status === 'success').length
+    const uptimePct = Math.round((successes / total) * 100)
+
+    const latencies = (generateRows ?? [])
+      .filter((r) => r.status === 'success' && r.duration_ms != null)
+      .map((r) => r.duration_ms as number)
+      .sort((a, b) => a - b)
+    const p95 = latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.95)] : null
+
+    const twinTotal = (twinRows ?? []).length
+    const localServed = (twinRows ?? []).filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (r: any) => r.meta?.routing_decision === 'ollama'
+    ).length
+    const fallbackPct =
+      twinTotal > 0 ? Math.round(((twinTotal - localServed) / twinTotal) * 100) : null
+
+    const parts: string[] = [
+      `Ollama: ${uptimePct}% uptime`,
+      `${successes}/${total} calls served locally`,
+    ]
+    if (fallbackPct !== null) parts.push(`${fallbackPct}% fell back to Claude`)
+    if (p95 !== null) parts.push(`p95 ${p95}ms`)
+
+    return parts.join(' | ')
+  } catch {
+    return 'Ollama: stats unavailable'
+  }
 }
 
 // agent_events.status CHECK constraint mapping for digest rows (spec_v1)
@@ -128,6 +184,11 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
       digestStatus = 'no_tick_found'
     }
   }
+
+  // ── F18: Append Ollama stats line — always added, never breaks digest ────────
+  const ollamaStatsLine = await buildOllamaStatsLine()
+  messageToSend = `${messageToSend}\n${ollamaStatsLine}`
+  characterCount = messageToSend.length
 
   // Attempt send — measure Telegram latency, override status on failure
   let telegramLatencyMs: number | null = null

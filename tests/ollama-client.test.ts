@@ -14,6 +14,18 @@ vi.mock('@/lib/knowledge/client', () => ({
   logEvent: vi.fn().mockResolvedValue('mock-event-id'),
 }))
 
+// ── Mock circuit breaker — always CLOSED so existing tests are unaffected ─────
+
+vi.mock('@/lib/ollama/circuit', () => ({
+  getCircuitState: vi.fn().mockResolvedValue({
+    state: 'CLOSED',
+    open_reason: null,
+    recent_failures: 0,
+    last_failure_at: null,
+    last_success_at: null,
+  }),
+}))
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 import {
@@ -100,6 +112,10 @@ describe('autoSelectModel', () => {
     process.env.OLLAMA_EMBED_MODEL = 'mxbai-embed-large'
     expect(autoSelectModel('embed')).toBe('mxbai-embed-large')
   })
+
+  it('returns qwen2.5:32b for twin tasks by default', () => {
+    expect(autoSelectModel('twin')).toBe('qwen2.5:32b')
+  })
 })
 
 // ── extractConfidence ─────────────────────────────────────────────────────────
@@ -110,21 +126,21 @@ describe('extractConfidence', () => {
   })
 
   it('returns 0.60 for one uncertainty phrase', () => {
-    expect(extractConfidence("I think the answer is 42.")).toBe(0.60)
+    expect(extractConfidence('I think the answer is 42.')).toBe(0.6)
   })
 
   it('returns 0.40 for two uncertainty phrases', () => {
-    expect(extractConfidence("I think maybe the answer is 42.")).toBe(0.40)
+    expect(extractConfidence('I think maybe the answer is 42.')).toBe(0.4)
   })
 
   it('returns 0.20 for three or more uncertainty phrases', () => {
-    expect(extractConfidence("I'm not sure, maybe possibly this is right.")).toBe(0.20)
+    expect(extractConfidence("I'm not sure, maybe possibly this is right.")).toBe(0.2)
   })
 
   it('is case-insensitive (detects uppercase uncertainty phrase)', () => {
     // "PERHAPS" → "perhaps" after lowercase → 1 match → 0.60
     // ("perhaps" has no overlapping sub-phrases in the list)
-    expect(extractConfidence('PERHAPS this is correct.')).toBe(0.60)
+    expect(extractConfidence('PERHAPS this is correct.')).toBe(0.6)
   })
 
   it('returns 0.85 for empty string', () => {
@@ -136,9 +152,12 @@ describe('extractConfidence', () => {
 
 describe('healthCheck', () => {
   it('returns reachable=true with model list on success', async () => {
-    vi.stubGlobal('fetch', mockFetch({
-      models: [{ name: 'qwen2.5:7b' }, { name: 'nomic-embed-text' }],
-    }))
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        models: [{ name: 'qwen2.5:7b' }, { name: 'nomic-embed-text' }],
+      })
+    )
 
     const result = await healthCheck()
 
@@ -188,11 +207,14 @@ describe('healthCheck', () => {
 
 describe('generate', () => {
   it('returns text and confidence on success', async () => {
-    vi.stubGlobal('fetch', mockFetch({
-      response: 'The SP-API rate limit is 1 request per second.',
-      prompt_eval_count: 10,
-      eval_count: 20,
-    }))
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        response: 'The SP-API rate limit is 1 request per second.',
+        prompt_eval_count: 10,
+        eval_count: 20,
+      })
+    )
 
     const result = await generate('What is the SP-API rate limit?')
 
@@ -203,9 +225,12 @@ describe('generate', () => {
   })
 
   it('returns low confidence when response contains uncertainty phrases', async () => {
-    vi.stubGlobal('fetch', mockFetch({
-      response: "I'm not sure, but maybe it's 1 request per second.",
-    }))
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        response: "I'm not sure, but maybe it's 1 request per second.",
+      })
+    )
 
     const result = await generate('What is the SP-API rate limit?')
 

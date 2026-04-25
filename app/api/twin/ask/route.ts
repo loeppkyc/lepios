@@ -38,7 +38,7 @@ const PERSONAL_CATEGORIES = ['personal_correspondence', 'personal_knowledge_base
 
 const SYSTEM_PROMPT =
   "You are a Q&A interface to Colin's personal knowledge. " +
-  'Answer ONLY from retrieved context. If insufficient, say \'insufficient_context\' and nothing else. ' +
+  "Answer ONLY from retrieved context. If insufficient, say 'insufficient_context' and nothing else. " +
   "For questions about Colin's personal values, life decisions, or subjective preferences, " +
   "say 'personal_escalation' and nothing else."
 
@@ -87,7 +87,7 @@ function buildContextString(chunks: PersonalChunk[]): string {
 function computeConfidence(answer: string, topSimilarity: number): number {
   if (isUncertain(answer)) return 0.55
   if (topSimilarity > 0.6) return 0.85
-  if (topSimilarity > 0.4) return 0.70
+  if (topSimilarity > 0.4) return 0.7
   return 0.45
 }
 
@@ -95,7 +95,7 @@ function computeConfidence(answer: string, topSimilarity: number): number {
 
 async function claudeFallback(
   question: string,
-  contextStr: string,
+  contextStr: string
 ): Promise<{ answer: string; confidence: number }> {
   const client = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? '').trim() })
 
@@ -113,7 +113,9 @@ async function claudeFallback(
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse | { error: string }>> {
+export async function POST(
+  req: NextRequest
+): Promise<NextResponse<TwinResponse | { error: string }>> {
   const body = (await req.json()) as { question?: string; context?: string; chunk_id?: string }
   const question = (body.question ?? '').trim()
 
@@ -139,17 +141,35 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
   let escalate_reason: EscalateReason = null
   let finalModel = ollamaModel
 
+  // ── F17: routing tracking variables ─────────────────────────────────────────
+  let ollamaUsed = false
+  let ollamaCircuitOpen = false
+  let ollamaTimedOut = false
+
   // ── Ollama first ────────────────────────────────────────────────────────────
 
   try {
     const result = await generate(ollamaPrompt, {
       model: ollamaModel,
       systemPrompt: SYSTEM_PROMPT,
-      timeoutMs: 60_000,
+      timeoutMs: 15_000,
     })
     answer = result.text.trim()
+    ollamaUsed = true
   } catch (err) {
     if (!(err instanceof OllamaUnreachableError)) throw err
+
+    // Detect circuit open vs timeout vs other
+    const errMsg = err instanceof Error ? err.message : ''
+    if (errMsg.includes('circuit open')) {
+      ollamaCircuitOpen = true
+    } else if (
+      errMsg.includes('aborted') ||
+      errMsg.includes('timeout') ||
+      errMsg.includes('abort')
+    ) {
+      ollamaTimedOut = true
+    }
 
     // Ollama down — fall straight to Claude
     finalModel = 'claude-sonnet-4-6'
@@ -167,7 +187,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
         outputSummary: 'ollama_unreachable + no_context',
         confidence: 0,
         durationMs: Date.now() - start,
-        meta: { escalate: true, escalate_reason: 'insufficient_context', model: finalModel },
+        meta: {
+          escalate: true,
+          escalate_reason: 'insufficient_context',
+          model: finalModel,
+          routing_decision: 'claude_fallback',
+          routing_reason: ollamaCircuitOpen
+            ? 'circuit_open'
+            : ollamaTimedOut
+              ? 'ollama_timeout'
+              : 'low_confidence',
+        },
       })
       return NextResponse.json(resp)
     }
@@ -190,18 +220,33 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
         outputSummary: 'ollama_unreachable + claude_failed',
         confidence: 0,
         durationMs: Date.now() - start,
-        meta: { escalate: true, escalate_reason: 'below_threshold', model: finalModel },
+        meta: {
+          escalate: true,
+          escalate_reason: 'below_threshold',
+          model: finalModel,
+          routing_decision: 'claude_fallback',
+          routing_reason: ollamaCircuitOpen
+            ? 'circuit_open'
+            : ollamaTimedOut
+              ? 'ollama_timeout'
+              : 'low_confidence',
+        },
       })
       return NextResponse.json(resp)
     }
 
     // Normalise Claude response through the same special-token check
     if (answer === 'insufficient_context') {
-      escalate = true; escalate_reason = 'insufficient_context'; confidence = 0
+      escalate = true
+      escalate_reason = 'insufficient_context'
+      confidence = 0
     } else if (answer === 'personal_escalation') {
-      escalate = true; escalate_reason = 'personal_escalation'; confidence = 0
+      escalate = true
+      escalate_reason = 'personal_escalation'
+      confidence = 0
     } else if (confidence < confidenceThreshold) {
-      escalate = true; escalate_reason = 'below_threshold'
+      escalate = true
+      escalate_reason = 'below_threshold'
     }
 
     void logEvent('twin', 'twin.ask', {
@@ -210,9 +255,26 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
       outputSummary: answer.slice(0, 200),
       confidence,
       durationMs: Date.now() - start,
-      meta: { sources_count: sources.length, escalate, escalate_reason, model: finalModel, ollama_unreachable: true },
+      meta: {
+        sources_count: sources.length,
+        escalate,
+        escalate_reason,
+        model: finalModel,
+        routing_decision: 'claude_fallback',
+        routing_reason: ollamaCircuitOpen
+          ? 'circuit_open'
+          : ollamaTimedOut
+            ? 'ollama_timeout'
+            : 'low_confidence',
+      },
     })
-    return NextResponse.json<TwinResponse>({ answer, confidence, sources, escalate, escalate_reason })
+    return NextResponse.json<TwinResponse>({
+      answer,
+      confidence,
+      sources,
+      escalate,
+      escalate_reason,
+    })
   }
 
   // ── Check special tokens ────────────────────────────────────────────────────
@@ -233,6 +295,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
 
   if (!escalate && confidence < confidenceThreshold) {
     finalModel = 'claude-sonnet-4-6'
+    ollamaUsed = false
     if (contextStr) {
       try {
         const fallback = await claudeFallback(question, contextStr)
@@ -240,11 +303,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
         confidence = fallback.confidence
 
         if (answer === 'insufficient_context') {
-          escalate = true; escalate_reason = 'insufficient_context'; confidence = 0
+          escalate = true
+          escalate_reason = 'insufficient_context'
+          confidence = 0
         } else if (answer === 'personal_escalation') {
-          escalate = true; escalate_reason = 'personal_escalation'; confidence = 0
+          escalate = true
+          escalate_reason = 'personal_escalation'
+          confidence = 0
         } else if (confidence < confidenceThreshold) {
-          escalate = true; escalate_reason = 'below_threshold'
+          escalate = true
+          escalate_reason = 'below_threshold'
         }
       } catch {
         escalate = true
@@ -268,6 +336,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<TwinResponse 
       escalate,
       escalate_reason,
       model: finalModel,
+      routing_decision: ollamaUsed ? 'ollama' : 'claude_fallback',
+      routing_reason: ollamaUsed
+        ? 'primary'
+        : ollamaCircuitOpen
+          ? 'circuit_open'
+          : ollamaTimedOut
+            ? 'ollama_timeout'
+            : 'low_confidence',
     },
   })
 

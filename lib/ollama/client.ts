@@ -20,19 +20,34 @@
  */
 
 import { logEvent } from '@/lib/knowledge/client'
+import { createServiceClient } from '@/lib/supabase/service'
+import { OLLAMA_MODELS } from '@/lib/ollama/models'
+import { getCircuitState, CircuitStatus } from '@/lib/ollama/circuit'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+let _startupWarned = false
+
 export function getBaseUrl(): string {
-  return (process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434').replace(/\/$/, '')
+  const url = (process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434').replace(/\/$/, '')
+  if (!_startupWarned && process.env.NODE_ENV === 'production' && url.includes('localhost')) {
+    _startupWarned = true
+    void logEvent('ollama', 'ollama.config_warning', {
+      actor: 'system',
+      status: 'warning',
+      meta: { reason: 'OLLAMA_TUNNEL_URL not set; using localhost fallback in production' },
+    })
+  }
+  return url
 }
 
-export function autoSelectModel(task: 'code' | 'analysis' | 'general' | 'embed'): string {
+export function autoSelectModel(task: 'code' | 'analysis' | 'general' | 'embed' | 'twin'): string {
   const map: Record<typeof task, string> = {
-    code:     process.env.OLLAMA_CODE_MODEL     ?? 'qwen2.5-coder:7b',
-    analysis: process.env.OLLAMA_ANALYSIS_MODEL ?? 'qwen2.5:32b',
-    general:  process.env.OLLAMA_GENERAL_MODEL  ?? 'qwen2.5:7b',
-    embed:    process.env.OLLAMA_EMBED_MODEL     ?? 'nomic-embed-text',
+    code: OLLAMA_MODELS.CODE,
+    analysis: OLLAMA_MODELS.ANALYSIS,
+    general: OLLAMA_MODELS.GENERAL,
+    embed: OLLAMA_MODELS.EMBED,
+    twin: OLLAMA_MODELS.TWIN,
   }
   return map[task]
 }
@@ -46,37 +61,111 @@ export class OllamaUnreachableError extends Error {
   }
 }
 
+// ── Circuit transition helpers ────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget: insert a circuit transition alert into outbound_notifications.
+ * Never throws.
+ */
+async function insertCircuitAlert(text: string, correlationId: string): Promise<void> {
+  try {
+    const db = createServiceClient()
+    await db.from('outbound_notifications').insert({
+      channel: 'telegram',
+      payload: { text, parse_mode: 'Markdown' },
+      correlation_id: correlationId,
+      requires_response: false,
+    })
+  } catch {
+    // Non-critical — alert failure must never block inference
+  }
+}
+
+/**
+ * Log circuit transition events and send Telegram alerts.
+ * Called from generate() when circuit.transitioned is true.
+ */
+function handleCircuitTransition(circuit: CircuitStatus, model: string): void {
+  if (!circuit.transitioned) return
+
+  if (circuit.state === 'OPEN' && circuit.prev_state === 'CLOSED') {
+    const openReason = circuit.open_reason ?? 'server_unreachable'
+    void logEvent('ollama', 'ollama.circuit_open', {
+      actor: 'system',
+      status: 'warning',
+      meta: {
+        recent_failures: circuit.recent_failures,
+        last_failure_at: circuit.last_failure_at,
+        open_reason: openReason,
+      },
+    })
+    void insertCircuitAlert(
+      `[LepiOS] Ollama circuit OPEN\n${circuit.recent_failures} failures in 5 min\nReason: ${openReason === 'model_not_loaded' ? 'server reachable but model not loaded' : 'server unreachable'}\nFalling back to Claude until Ollama recovers.`,
+      'ollama_circuit_open'
+    )
+  } else if (
+    circuit.state === 'CLOSED' &&
+    (circuit.prev_state === 'OPEN' || circuit.prev_state === 'HALF_OPEN')
+  ) {
+    void logEvent('ollama', 'ollama.circuit_closed', {
+      actor: 'system',
+      status: 'success',
+      meta: { was_open_since: circuit.last_failure_at, model },
+    })
+    void insertCircuitAlert(
+      '[LepiOS] Ollama circuit CLOSED\nOllama is back online. Routing generate calls locally.',
+      'ollama_circuit_closed'
+    )
+  }
+}
+
 // ── Uncertainty detection (port of Streamlit utils/local_ai.py) ───────────────
 // Hedging phrases → reduce confidence. Each additional phrase lowers it further.
 
 const UNCERTAINTY_PHRASES = [
-  "i'm not sure", "i am not sure",
-  "i don't know", "i do not know",
-  "i'm uncertain", "i am uncertain",
-  "i'm not certain", "i am not certain",
-  "i cannot say", "i can't say",
-  "not sure", "uncertain",
-  "i don't have enough", "i do not have enough",
-  "it's possible", "it is possible",
-  "possibly", "perhaps",
-  "might be", "could be", "may be", "maybe",
-  "i think", "i believe", "i suspect",
-  "i'm guessing", "i am guessing",
-  "approximately", "roughly",
+  "i'm not sure",
+  'i am not sure',
+  "i don't know",
+  'i do not know',
+  "i'm uncertain",
+  'i am uncertain',
+  "i'm not certain",
+  'i am not certain',
+  'i cannot say',
+  "i can't say",
+  'not sure',
+  'uncertain',
+  "i don't have enough",
+  'i do not have enough',
+  "it's possible",
+  'it is possible',
+  'possibly',
+  'perhaps',
+  'might be',
+  'could be',
+  'may be',
+  'maybe',
+  'i think',
+  'i believe',
+  'i suspect',
+  "i'm guessing",
+  'i am guessing',
+  'approximately',
+  'roughly',
 ]
 
 export function extractConfidence(text: string): number {
   const lower = text.toLowerCase()
   const hits = UNCERTAINTY_PHRASES.filter((p) => lower.includes(p)).length
   if (hits === 0) return 0.85
-  if (hits === 1) return 0.60
-  if (hits === 2) return 0.40
-  return 0.20
+  if (hits === 1) return 0.6
+  if (hits === 2) return 0.4
+  return 0.2
 }
 
 // ── Shared fetch helper ───────────────────────────────────────────────────────
 
-async function ollamaFetch(path: string, body: unknown, timeoutMs = 30_000): Promise<Response> {
+async function ollamaFetch(path: string, body: unknown, timeoutMs = 15_000): Promise<Response> {
   const url = `${getBaseUrl()}${path}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -107,7 +196,8 @@ export interface OllamaHealthResult {
 export async function healthCheck(): Promise<OllamaHealthResult> {
   const start = Date.now()
   const baseUrl = getBaseUrl()
-  const tunnelUsed = !!process.env.OLLAMA_TUNNEL_URL && process.env.OLLAMA_TUNNEL_URL !== 'http://localhost:11434'
+  const tunnelUsed =
+    !!process.env.OLLAMA_TUNNEL_URL && process.env.OLLAMA_TUNNEL_URL !== 'http://localhost:11434'
 
   try {
     const res = await fetch(`${baseUrl}/api/tags`, {
@@ -118,8 +208,10 @@ export async function healthCheck(): Promise<OllamaHealthResult> {
 
     if (!res.ok) {
       void logEvent('ollama', 'ollama.health', {
-        actor: 'system', status: 'failure',
-        outputSummary: `HTTP ${res.status}`, durationMs: latency_ms,
+        actor: 'system',
+        status: 'failure',
+        outputSummary: `HTTP ${res.status}`,
+        durationMs: latency_ms,
       })
       return { reachable: false, models: [], latency_ms, tunnel_used: tunnelUsed }
     }
@@ -128,8 +220,10 @@ export async function healthCheck(): Promise<OllamaHealthResult> {
     const models = (data.models ?? []).map((m) => m.name)
 
     void logEvent('ollama', 'ollama.health', {
-      actor: 'system', status: 'success',
-      outputSummary: `${models.length} model(s) available`, durationMs: latency_ms,
+      actor: 'system',
+      status: 'success',
+      outputSummary: `${models.length} model(s) available`,
+      durationMs: latency_ms,
       meta: { models, tunnel_used: tunnelUsed },
     })
 
@@ -137,8 +231,10 @@ export async function healthCheck(): Promise<OllamaHealthResult> {
   } catch {
     const latency_ms = Date.now() - start
     void logEvent('ollama', 'ollama.health', {
-      actor: 'system', status: 'failure',
-      outputSummary: 'unreachable', durationMs: latency_ms,
+      actor: 'system',
+      status: 'failure',
+      outputSummary: 'unreachable',
+      durationMs: latency_ms,
     })
     return { reachable: false, models: [], latency_ms, tunnel_used: tunnelUsed }
   }
@@ -162,24 +258,93 @@ export interface GenerateResult {
 
 export async function generate(
   prompt: string,
-  opts: GenerateOptions = {},
+  opts: GenerateOptions = {}
 ): Promise<GenerateResult> {
   const task = opts.task ?? 'general'
   const model = opts.model ?? autoSelectModel(task)
   const start = Date.now()
+
+  // ── Circuit breaker check ──────────────────────────────────────────────────
+  // Adds ~15ms but saves 15s+ when circuit is OPEN.
+  // On Supabase query failure inside getCircuitState(), it defaults to CLOSED.
+  let circuit: CircuitStatus
+  try {
+    circuit = await getCircuitState()
+  } catch {
+    // Should never reach here (getCircuitState never throws), but be safe
+    circuit = {
+      state: 'CLOSED',
+      open_reason: null,
+      recent_failures: 0,
+      last_failure_at: null,
+      last_success_at: null,
+      transitioned: false,
+      prev_state: 'CLOSED',
+    }
+  }
+
+  // Handle state transitions (log + Telegram alert)
+  handleCircuitTransition(circuit, model)
+
+  if (circuit.state === 'OPEN') {
+    void logEvent('ollama', 'ollama.circuit_skip', {
+      actor: 'system',
+      status: 'warning',
+      meta: { reason: 'circuit_open', recent_failures: circuit.recent_failures },
+    })
+    throw new OllamaUnreachableError('circuit open — skipping Ollama')
+  }
+
+  if (circuit.state === 'HALF_OPEN') {
+    // Probe: GET /api/tags, verify target model is loaded
+    const health = await healthCheck()
+    const modelLoaded = health.reachable && health.models.includes(model)
+
+    if (!health.reachable) {
+      void logEvent('ollama', 'ollama.circuit_probe_failed', {
+        actor: 'system',
+        status: 'failure',
+        meta: { state: 'HALF_OPEN', reason: 'server_unreachable', model },
+      })
+      throw new OllamaUnreachableError('half-open probe failed: server unreachable')
+    }
+    if (!modelLoaded) {
+      // Update open_reason for the transition log if we detect model_not_loaded
+      void logEvent('ollama', 'ollama.circuit_probe_failed', {
+        actor: 'system',
+        status: 'failure',
+        meta: {
+          state: 'HALF_OPEN',
+          reason: 'model_not_loaded',
+          model,
+          available_models: health.models,
+        },
+      })
+      throw new OllamaUnreachableError(`half-open probe failed: model ${model} not loaded`)
+    }
+    // Probe succeeded — fall through to generate
+  }
 
   let res: Response
   try {
     res = await ollamaFetch(
       '/api/generate',
       { model, prompt, system: opts.systemPrompt, stream: false },
-      opts.timeoutMs ?? 30_000,
+      opts.timeoutMs ?? 15_000
     )
   } catch (err) {
     void logEvent('ollama', 'ollama.generate', {
-      actor: 'system', status: 'failure',
-      errorMessage: 'Ollama unreachable', errorType: 'OllamaUnreachableError',
+      actor: 'system',
+      status: 'failure',
+      errorMessage: 'Ollama unreachable',
+      errorType: 'OllamaUnreachableError',
       durationMs: Date.now() - start,
+      meta: {
+        model,
+        task,
+        actor_type: 'ollama_client',
+        error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+      },
     })
     throw new OllamaUnreachableError(err)
   }
@@ -187,8 +352,16 @@ export async function generate(
   if (!res.ok) {
     const msg = `Ollama /api/generate returned HTTP ${res.status}`
     void logEvent('ollama', 'ollama.generate', {
-      actor: 'system', status: 'failure',
-      errorMessage: msg, durationMs: Date.now() - start,
+      actor: 'system',
+      status: 'failure',
+      errorMessage: msg,
+      durationMs: Date.now() - start,
+      meta: {
+        model,
+        task,
+        actor_type: 'ollama_client',
+        error: msg,
+      },
     })
     throw new OllamaUnreachableError(msg)
   }
@@ -208,11 +381,14 @@ export async function generate(
   const durationMs = Date.now() - start
 
   void logEvent('ollama', 'ollama.generate', {
-    actor: 'system', status: 'success',
+    actor: 'system',
+    status: 'success',
     inputSummary: prompt.slice(0, 200),
     outputSummary: text.slice(0, 200),
-    durationMs, tokensUsed: tokens_used ?? undefined, confidence,
-    meta: { model, task },
+    durationMs,
+    tokensUsed: tokens_used ?? undefined,
+    confidence,
+    meta: { model, task, actor_type: 'ollama_client' },
   })
 
   return { text, confidence, model, tokens_used }
@@ -221,17 +397,23 @@ export async function generate(
 // ── embed ─────────────────────────────────────────────────────────────────────
 
 export async function embed(text: string): Promise<number[]> {
-  const model = autoSelectModel('embed')
+  const modelName = autoSelectModel('embed')
   const start = Date.now()
-
   let res: Response
   try {
-    res = await ollamaFetch('/api/embeddings', { model, prompt: text }, 15_000)
+    res = await ollamaFetch('/api/embeddings', { model: modelName, prompt: text }, 15_000)
   } catch (err) {
     void logEvent('ollama', 'ollama.embed', {
-      actor: 'system', status: 'failure',
-      errorMessage: 'Ollama unreachable', errorType: 'OllamaUnreachableError',
+      actor: 'system',
+      status: 'failure',
+      errorMessage: 'Ollama unreachable',
+      errorType: 'OllamaUnreachableError',
       durationMs: Date.now() - start,
+      meta: {
+        model: modelName,
+        actor_type: 'ollama_client',
+        error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+      },
     })
     throw new OllamaUnreachableError(err)
   }
@@ -239,8 +421,15 @@ export async function embed(text: string): Promise<number[]> {
   if (!res.ok) {
     const msg = `Ollama /api/embeddings returned HTTP ${res.status}`
     void logEvent('ollama', 'ollama.embed', {
-      actor: 'system', status: 'failure',
-      errorMessage: msg, durationMs: Date.now() - start,
+      actor: 'system',
+      status: 'failure',
+      errorMessage: msg,
+      durationMs: Date.now() - start,
+      meta: {
+        model: modelName,
+        actor_type: 'ollama_client',
+        error: msg,
+      },
     })
     throw new OllamaUnreachableError(msg)
   }
@@ -249,11 +438,12 @@ export async function embed(text: string): Promise<number[]> {
   const embedding = data.embedding
 
   void logEvent('ollama', 'ollama.embed', {
-    actor: 'system', status: 'success',
+    actor: 'system',
+    status: 'success',
     inputSummary: text.slice(0, 200),
     outputSummary: `${embedding.length}-dim vector`,
     durationMs: Date.now() - start,
-    meta: { model, dims: embedding.length },
+    meta: { model: modelName, dims: embedding.length, actor_type: 'ollama_client' },
   })
 
   return embedding
