@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T19:36:00Z"
+last_updated_at: "2026-04-25T21:35:00Z"
 
 chunks_planned:
 
@@ -121,6 +121,8 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "coordinator-env"
+- "work-budget"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -135,6 +137,16 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+- "coordinator-env"
+- "work-budget"
+
+# coordinator-env: study + acceptance doc written 2026-04-25. Awaiting Colin approval
+# on 4 blocking questions (Q1 factual, Q2 TELEGRAM_CHAT_ID in DB, Q3 drain strategy,
+# Q4 task-pickup-100 coordination). Acceptance doc: docs/sprint-5/coordinator-env-acceptance.md
+# Study doc: docs/sprint-5/coordinator-env-study.md. Task: 87bc8578-6eb8-4f84-b522-00c4804a2398
+
+# work-budget: study + acceptance doc written prior to this invocation. Status unknown —
+# not tracked in chunks_not_started previously.
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
