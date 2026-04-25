@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/gmail-scan",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/budget-calibrate",
+      "schedule": "0 9 * * 0"
     }
   ]
 }

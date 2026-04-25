@@ -17,6 +17,7 @@ import {
   handlePurposeReviewCallback,
   handlePurposeReviewTextReply,
 } from '@/lib/purpose-review/handler'
+import { handleBudgetCommand } from '@/lib/work-budget/parser'
 
 export const dynamic = 'force-dynamic'
 
@@ -905,6 +906,23 @@ export async function POST(request: Request): Promise<NextResponse> {
   // ── Dispatch ii–iii: legacy thumbs + deploy-gate (callback_query only) ────────
 
   if (!callbackQuery) {
+    // /budget command dispatch — must come before purpose-review text handler
+    if (message?.text?.startsWith('/budget')) {
+      void handleBudgetCommand(message, db).catch((err: unknown) => {
+        void logEvent({
+          task_type: 'budget_command_fail',
+          status: 'error',
+          output_summary: `handleBudgetCommand failed: ${String(err)}`,
+          meta: {
+            chat_id: chatId,
+            text_preview: message.text?.slice(0, 100) ?? null,
+            error: String(err),
+          },
+        })
+      })
+      return NextResponse.json({ ok: true })
+    }
+
     // Check for purpose_review text reply: look for an awaiting_review task for this chat
     if (message?.text) {
       try {

@@ -6,6 +6,17 @@ import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 import { recordAttribution } from '@/lib/attribution/writer'
+import {
+  getActiveSession,
+  canClaimNextTask,
+  incrementBudgetUsedMinutes,
+  drainSession,
+  sendDrainSummary,
+  MIN_CLAIMABLE_MINUTES,
+} from '@/lib/work-budget/tracker'
+import { estimateTask } from '@/lib/work-budget/estimator'
+import { runCalibration } from '@/lib/work-budget/calibrator'
+import { logEvent as logKnowledgeEvent } from '@/lib/knowledge/client'
 
 export type PickupResult = {
   ok: boolean
@@ -125,6 +136,120 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     )
   }
 
+  // Budget-aware pre-claim check
+  // Zero-change path when no active session exists.
+  const budgetSession = await getActiveSession()
+  if (budgetSession) {
+    // Estimate cost of the next task before claiming
+    let estimatedMinutes = MIN_CLAIMABLE_MINUTES
+    try {
+      const db = createServiceClient()
+      // Peek at top task to estimate (without claiming)
+      const { data: nextTask } = await db
+        .from('task_queue')
+        .select('id, task, description, metadata, status')
+        .eq('status', 'queued')
+        .order('priority', { ascending: true })
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!nextTask) {
+        // Queue empty — drain
+        const drained = await drainSession(budgetSession.id, 'queue_empty')
+        if (drained) {
+          void sendDrainSummary(drained)
+          void recordAttribution(
+            { actor_type: 'cron', actor_id: 'harness' },
+            { type: 'work_budget_sessions', id: budgetSession.id },
+            'budget_session_closed',
+            {
+              used_minutes: drained.used_minutes,
+              completed_count: drained.completed_count,
+              close_reason: 'drained',
+            }
+          )
+        }
+        const duration_ms = Date.now() - start
+        await logEvent(runId, 'success', null, 'queue-empty', duration_ms)
+        return {
+          ok: true,
+          claimed: null,
+          reason: 'queue-empty',
+          run_id: runId,
+          duration_ms,
+          ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+        }
+      }
+
+      const taskRow = nextTask as {
+        id: string
+        task: string
+        description: string | null
+        metadata: Record<string, unknown>
+        status: string
+      }
+
+      // Skip awaiting_review tasks — escalation isolation (§6)
+      if (taskRow.status === 'awaiting_review') {
+        const duration_ms = Date.now() - start
+        await logEvent(runId, 'success', taskRow.id, 'skipped-awaiting-review', duration_ms)
+        return {
+          ok: true,
+          claimed: null,
+          reason: 'skipped-awaiting-review',
+          run_id: runId,
+          duration_ms,
+          ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+        }
+      }
+
+      const estimate = await estimateTask({
+        task: taskRow.task,
+        description: taskRow.description,
+        metadata: taskRow.metadata,
+      })
+      estimatedMinutes = estimate.estimated_minutes
+
+      // Write estimated_minutes to task_queue
+      const db2 = createServiceClient()
+      void db2
+        .from('task_queue')
+        .update({ estimated_minutes: estimate.estimated_minutes })
+        .eq('id', taskRow.id)
+    } catch {
+      // Estimation failure is non-fatal — proceed with MIN_CLAIMABLE_MINUTES fallback
+    }
+
+    if (!canClaimNextTask(budgetSession, estimatedMinutes)) {
+      // Budget exhausted — drain (soft stop: no new claims)
+      const drained = await drainSession(budgetSession.id, 'budget_exhausted')
+      if (drained) {
+        void sendDrainSummary(drained)
+        void recordAttribution(
+          { actor_type: 'cron', actor_id: 'harness' },
+          { type: 'work_budget_sessions', id: budgetSession.id },
+          'budget_session_closed',
+          {
+            used_minutes: drained.used_minutes,
+            completed_count: drained.completed_count,
+            close_reason: 'drained',
+          }
+        )
+      }
+      const duration_ms = Date.now() - start
+      await logEvent(runId, 'success', null, 'budget-exhausted', duration_ms)
+      return {
+        ok: true,
+        claimed: null,
+        reason: 'budget-exhausted',
+        run_id: runId,
+        duration_ms,
+        ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+      }
+    }
+  }
+
   // Step 2: claim the top-priority queued task
   const task = await claimTask(runId)
 
@@ -228,5 +353,128 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     run_id: runId,
     duration_ms,
     ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+  }
+}
+
+// ── Completion hook (called by coordinator after task completes) ──────────────
+// Writes actual_minutes + estimation_error_pct to task_queue.
+// Logs estimation.complete to agent_events.
+// Triggers calibration after every 10 completions.
+
+// Module-level counter for calibration trigger
+let _completionCounter = 0
+
+export async function onTaskComplete(params: {
+  taskId: string
+  claimedAt: string | null
+  completedAt: string
+  estimatedMinutes: number | null
+  bucket: string | null
+  keywordsHit: string[]
+  method: string | null
+}): Promise<void> {
+  const { taskId, claimedAt, completedAt, estimatedMinutes, bucket, keywordsHit, method } = params
+
+  // Compute actual_minutes
+  let actualMinutes: number | null = null
+  if (claimedAt) {
+    const claimedMs = new Date(claimedAt).getTime()
+    const completedMs = new Date(completedAt).getTime()
+    actualMinutes = Math.round((completedMs - claimedMs) / 60_000)
+  }
+
+  // Compute estimation_error_pct
+  let estimationErrorPct: number | null = null
+  if (estimatedMinutes != null && actualMinutes != null && estimatedMinutes > 0) {
+    estimationErrorPct = Math.round(((actualMinutes - estimatedMinutes) / estimatedMinutes) * 100)
+  }
+
+  // Write to task_queue
+  try {
+    const db = createServiceClient()
+    const updatePayload: Record<string, unknown> = {}
+    if (actualMinutes !== null) updatePayload.actual_minutes = actualMinutes
+    if (estimationErrorPct !== null) updatePayload.estimation_error_pct = estimationErrorPct
+
+    if (Object.keys(updatePayload).length > 0) {
+      await db.from('task_queue').update(updatePayload).eq('id', taskId)
+    }
+  } catch {
+    // Non-fatal
+  }
+
+  // Log estimation.complete to agent_events
+  try {
+    const db = createServiceClient()
+    await db.from('agent_events').insert({
+      domain: 'work_budget',
+      action: 'estimation.complete',
+      actor: 'system',
+      status: 'success',
+      task_type: 'estimation_complete',
+      output_summary: `estimation complete: estimated=${estimatedMinutes ?? 'n/a'} actual=${actualMinutes ?? 'n/a'} error=${estimationErrorPct ?? 'n/a'}%`,
+      meta: {
+        estimated_minutes: estimatedMinutes,
+        actual_minutes: actualMinutes,
+        estimation_error_pct: estimationErrorPct,
+        bucket,
+        keywords_hit: keywordsHit,
+        method,
+        task_id: taskId,
+      },
+      tags: ['work_budget', 'calibration'],
+    })
+  } catch {
+    // Non-fatal
+  }
+
+  // Budget session: update used_minutes
+  try {
+    const session = await getActiveSession()
+    if (session && actualMinutes !== null) {
+      const updated = await incrementBudgetUsedMinutes(session, actualMinutes)
+
+      // Check if budget is now exhausted
+      if (updated) {
+        const remaining = updated.budget_minutes - updated.used_minutes
+        if (remaining < MIN_CLAIMABLE_MINUTES) {
+          const drained = await drainSession(session.id, 'budget_exhausted')
+          if (drained) {
+            void sendDrainSummary(drained)
+            void recordAttribution(
+              { actor_type: 'cron', actor_id: 'harness' },
+              { type: 'work_budget_sessions', id: session.id },
+              'budget_session_closed',
+              {
+                used_minutes: drained.used_minutes,
+                completed_count: drained.completed_count,
+                close_reason: 'drained',
+              }
+            )
+          }
+        } else {
+          // F17: log task_completed event
+          void logKnowledgeEvent('work_budget', 'work_budget.task_completed', {
+            actor: 'system',
+            status: 'success',
+            meta: {
+              session_id: session.id,
+              budget_minutes: session.budget_minutes,
+              used_minutes: updated.used_minutes,
+              completed_count: updated.completed_count,
+              task_id: taskId,
+            },
+          })
+        }
+      }
+    }
+  } catch {
+    // Non-fatal
+  }
+
+  // Trigger calibration after every 10 completions
+  _completionCounter += 1
+  if (_completionCounter % 10 === 0) {
+    void runCalibration().catch(() => {})
   }
 }
