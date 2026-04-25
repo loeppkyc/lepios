@@ -122,3 +122,28 @@ escalation_reasons:
 - cache_match_disabled_sprint_override
 - principle_15_new_terrain (no improvement loop precedent in codebase)
 - twin_q1_through_q5_insufficient_context (all 5 Phase 1b questions batched to Colin)
+
+---
+
+2026-04-25T23:24:00Z sprint=5 chunk=coordinator-env doc=docs/sprint-5/coordinator-env-acceptance.md
+cited_principles: ["19 (destructive ops — not applicable, migration is additive)", "3 (FK over copy)", "17 (no speculative infrastructure)", "META-C"]
+trigger_match_evidence: |
+  META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
+  Therefore META-C does NOT apply. This entry is logged per the schema requirement that
+  escalations are also logged with the same schema.
+  
+  The doc proceeds NOT via cache-match but via direct Colin ratification:
+  task_queue row 87bc8578-6eb8-4f84-b522-00c4804a2398, review_action="approved",
+  review_received_at="2026-04-25T23:05:19Z". This is the equivalent of Phase 2 step 5
+  "escalate to Colin" — Colin has already responded.
+reversibility_check: |
+  Migration 0029 (CREATE TABLE harness_config): reversible — DROP TABLE harness_config is a
+  clean rollback. Table has no FKs to other tables and no other tables FK to it.
+  Seeds (two INSERT rows): reversible — DELETE FROM harness_config is the rollback.
+  coordinator.md startup block: reversible — remove the added section to revert.
+  coordinator.md notification template update: reversible — restore original ${TELEGRAM_CHAT_ID} line.
+  sprint-state.md update: reversible via git.
+  All decisions: LOW cost to reverse.
+confidence: high (direct Colin ratification, not cache-match; escalation is procedurally correct)
+outcome: proceeding_to_builder_on_colin_direct_ratification
+proceed_reason: "Colin approved via callback at 2026-04-25T23:05:19Z — direct ratification, not cache-match"
