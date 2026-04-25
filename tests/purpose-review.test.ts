@@ -293,7 +293,7 @@ describe('purpose-review: revise flow (text reply)', () => {
 
     // recordAttribution was called
     expect(recordAttribution).toHaveBeenCalledWith(
-      expect.objectContaining({ actor_type: 'human', actor_id: 'telegram' }),
+      expect.objectContaining({ actor_type: 'colin', actor_id: 'telegram' }),
       expect.objectContaining({ type: 'task_queue', id: VALID_UUID }),
       'purpose_reviewed',
       expect.objectContaining({ action: 'approved_with_notes' })
@@ -332,6 +332,15 @@ describe('purpose-review: skip flow', () => {
       return arg.action === 'purpose_review.skipped'
     })
     expect(eventCall).toBeDefined()
+
+    // recordAttribution called with actor_type='colin' and action='skip'
+    const recordAttr = recordAttribution as ReturnType<typeof vi.fn>
+    const attrCall = recordAttr.mock.calls.find((c: unknown[]) => {
+      const ctx = c[0] as { actor_type: string }
+      const details = c[3] as { action: string }
+      return ctx.actor_type === 'colin' && details.action === 'skip'
+    })
+    expect(attrCall).toBeDefined()
 
     vi.unstubAllGlobals()
   })
