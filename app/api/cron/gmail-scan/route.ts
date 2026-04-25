@@ -7,6 +7,7 @@ import { scanMessages, filterNewMessages, insertMessages } from '@/lib/gmail/sca
 import {
   classifyStatementArrival,
   insertStatementArrivals,
+  type StatementArrivalResult,
 } from '@/lib/gmail/classifiers/statement-arrivals'
 import { recordAttribution } from '@/lib/attribution/writer'
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
 
   let rawMessages: Awaited<ReturnType<typeof scanMessages>> = []
   let newMessages: typeof rawMessages = []
-  let statementResults: Awaited<ReturnType<typeof classifyStatementArrival>>[] = []
+  let statementResults: StatementArrivalResult[] = []
 
   try {
     // Step 3: Scan Gmail for messages in the 25h window
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
     // Step 6–7: Classify each new message and collect statement arrivals
     statementResults = newMessages
       .map((msg) => classifyStatementArrival(msg, knownSendersSet))
-      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .filter((r): r is StatementArrivalResult => r !== null)
 
     await insertStatementArrivals(statementResults, db)
   } catch (err) {
