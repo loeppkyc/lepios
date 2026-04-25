@@ -1,0 +1,37 @@
+{
+  "chunk_id": "sprint-5-work-budget",
+  "acceptance_doc_path": "docs/sprint-5/work-budget-acceptance.md",
+  "files_changed": [
+    "supabase/migrations/0027_work_budget.sql",
+    "lib/work-budget/estimator.ts",
+    "lib/work-budget/tracker.ts",
+    "lib/work-budget/parser.ts",
+    "lib/work-budget/index.ts",
+    "lib/work-budget/calibrator.ts",
+    "app/api/telegram/webhook/route.ts",
+    "lib/harness/pickup-runner.ts",
+    "app/api/cron/budget-calibrate/route.ts",
+    "tests/work-budget.test.ts",
+    "vercel.json"
+  ],
+  "tests": { "passing": 936, "failing": 0, "new": 23 },
+  "migrations_applied": ["supabase/migrations/0027_work_budget.sql"],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "grounding_checkpoint_required": [
+    "Apply migration 0027 to production Supabase manually. Tables work_budget_sessions and work_budget_keyword_weights do not yet exist in production. The CLI requires interactive login (supabase login) or a Management API PAT. Neither was available in this session. Colin must run: supabase link --project-ref xpanlbcjueimeofgsara && supabase db push. OR copy the SQL from supabase/migrations/0027_work_budget.sql and run it in the Supabase dashboard SQL editor.",
+    "Send /budget 30m to the LepiOS Telegram bot. Verify: (1) Telegram replies 'Budget window open: 30m. Starting now.', (2) work_budget_sessions row inserted with status='active' and budget_minutes=30, (3) agent_events row with action='work_budget.opened' logged.",
+    "Verify the budget-calibrate cron appears in the Vercel project's cron job list after deploy (Sunday 9am UTC, path /api/cron/budget-calibrate)."
+  ],
+  "unknowns": [
+    "Migration 0027 was NOT applied to production Supabase. The CLI requires either interactive login or a Management API PAT — neither was available. This is a blocker for any budget session functionality in production. Migration SQL is at supabase/migrations/0027_work_budget.sql and can be pasted directly into the Supabase dashboard SQL editor.",
+    "ActorType in lib/attribution/types.ts does not include 'colin' or 'system'. Used 'human' for Colin-initiated actions and 'cron' for system-initiated actions as the closest valid substitutes. If the spec requires exact actor labels 'colin'/'system', the AttributionContext.ActorType needs to be extended.",
+    "The test file contains 23 tests (not 18 as spec'd). The spec lists 18 but the acceptance doc's test table maps to 18 scenarios. The extra 5 tests cover the same scenarios with slightly different coverage (e.g., both 'open session' and 'duplicate open' are each one test in spec but remain as two separate tests). All 18 spec scenarios are covered.",
+    "The peekTask in budget check (pickup-runner.ts) queries task_queue directly rather than using the existing peekTask() from task-pickup.ts. This is because the budget check needs to peek AND check status='awaiting_review' before claiming, which the existing peekTask() does not support. If peekTask() is extended later, this could be simplified."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0027 must be applied to production before /budget commands will work. Without it, all budget-aware paths in pickup-runner.ts will silently fall through to normal scheduling (getActiveSession returns null on DB error — safe fallback).",
+    "The task_queue.estimated_minutes, actual_minutes, and estimation_error_pct columns do not exist in production until migration 0027 is applied. onTaskComplete() writes to these columns — writes will fail silently until migration is applied."
+  ],
+  "tokens_used": 48000,
+  "timestamp": "2026-04-25T14:47:00Z"
+}
