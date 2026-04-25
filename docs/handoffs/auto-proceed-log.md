@@ -122,3 +122,31 @@ escalation_reasons:
 - cache_match_disabled_sprint_override
 - principle_15_new_terrain (no improvement loop precedent in codebase)
 - twin_q1_through_q5_insufficient_context (all 5 Phase 1b questions batched to Colin)
+
+---
+
+2026-04-25T22:50:00Z sprint=5 chunk=coordinator-env phase=1a-1d doc=docs/sprint-5/coordinator-env-acceptance.md
+cited_principles: [3, 4, 6, 14, 17, META-C]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+  META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
+  Additionally, Principle 3 (decisions are Colin's) applies: harness_config stores CRON_SECRET (bearer token),
+  which is a security decision about secret storage strategy. Even with Colin's prior q2/q3 answers
+  in task metadata approving the approach, the acceptance doc requires explicit ratification before
+  builder creates migration + modifies coordinator.md.
+  Twin Q&A blocked: coordinator sandbox blocks outbound HTTP — both localhost and production
+  twin endpoint unreachable. All questions answered via codebase grep or Colin's prior task metadata answers.
+reversibility_check: |
+  Study doc: new file, fully reversible (delete or rewrite).
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  Migration 0029 (harness_config): CREATE TABLE — reversible via DROP TABLE.
+  coordinator.md startup block: text edit — reversible via revert.
+  harness_config row inserts: Colin does these manually — reversible via DELETE.
+  No irrevocable actions in this doc. No code deployed yet.
+confidence: high (escalation is correct: cache-match disabled + security decision on secret storage)
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - principle_3_colins_decision (secret storage strategy: CRON_SECRET in harness_config requires ratification)
+  - twin_blocked_endpoint_unreachable (both localhost and production twin unreachable from coordinator sandbox)

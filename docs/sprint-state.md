@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T19:36:00Z"
+last_updated_at: "2026-04-25T22:50:00Z"
 
 chunks_planned:
 
@@ -121,6 +121,7 @@ chunks_planned:
 - "task-pickup-100"
 - "purpose-review"
 - "purpose-review-correctness"
+- "coordinator-env"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -135,6 +136,8 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+  chunks_awaiting_colin_approval:
+- "coordinator-env"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
@@ -143,6 +146,15 @@ active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
 active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
 active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+
+coordinator_env_chunk:
+status: "awaiting-colin-approval"
+study_doc: "docs/sprint-5/coordinator-env-study.md"
+acceptance_doc: "docs/sprint-5/coordinator-env-acceptance.md"
+task_id: "87bc8578-6eb8-4f84-b522-00c4804a2398"
+escalated_at: "2026-04-25T22:50:00Z"
+colin_prior_approval: "task metadata q2+q3 answered, review_action=approved"
+pending: "Colin ratify acceptance doc before builder starts"
 
 # Grounding checkpoints still pending for completed-build chunks
 
