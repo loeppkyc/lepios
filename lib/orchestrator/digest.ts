@@ -8,6 +8,7 @@ import { buildBranchGuardLine } from '@/lib/harness/branch-guard'
 import { buildProcessEfficiencyLines } from '@/lib/harness/process-efficiency'
 import { buildFtsFallbackLine } from '@/lib/twin/fts-fallback'
 import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/telegram-stats'
+import { buildQuotaCliffLine } from '@/lib/harness/quota-cliff'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -221,6 +222,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── 20% Better: Append process efficiency section ─────────────────────────────
   const processEfficiencyLines = await buildProcessEfficiencyLines()
   messageToSend = `${messageToSend}\n${processEfficiencyLines}`
+
+  // ── F18: Routines quota cliff signal ─────────────────────────────────────────
+  const quotaCliffLine = await buildQuotaCliffLine()
+  messageToSend = `${messageToSend}\n${quotaCliffLine}`
 
   // ── P6+P1: Drain stats + review timeout lines ─────────────────────────────────
   const drainStatsLine = await buildDrainStatsLine()
