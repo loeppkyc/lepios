@@ -492,7 +492,6 @@ ROW=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notification
     \"chat_id\": \"<TELEGRAM_CHAT_ID from harness_config>\",
     \"payload\": {
       \"text\": \"[LepiOS Coordinator] {chunk_id}\\nStatus: {status}\\ntask_id: ${TASK_ID}\\n{one-line summary}\",
-      \"parse_mode\": \"Markdown\",
       \"reply_markup\": {
         \"inline_keyboard\": [[
           {\"text\": \"👍 Approve\", \"callback_data\": \"{\\\"correlation_id\\\":\\\"${CORR_ID}\\\",\\\"action\\\":\\\"approve\\\"}\"},

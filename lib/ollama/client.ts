@@ -72,7 +72,7 @@ async function insertCircuitAlert(text: string, correlationId: string): Promise<
     const db = createServiceClient()
     await db.from('outbound_notifications').insert({
       channel: 'telegram',
-      payload: { text, parse_mode: 'Markdown' },
+      payload: { text },
       correlation_id: correlationId,
       requires_response: false,
     })
