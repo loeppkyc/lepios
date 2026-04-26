@@ -155,6 +155,26 @@ Newest-first. For global failures (Streamlit, BBV, general patterns), see `~/.cl
 
 ### FAILURES
 
+**F-L10: Manual rollup tracking — Colin asked twice (2026-04-26)**
+Autonomy percentage was computed by hand mid-session and Colin had to ask for it twice. No authoritative rollup in any dashboard.
+→ Auto-compute harness rollup from `task_queue` weights and surface in `morning_digest`. Colin should never need to ask for a number the system can compute. Queue task: morning_digest rollup widget.
+
+**F-L9: "What to paste" friction signal fired 3+ times (2026-04-26)**
+Multiple mid-session pauses for "what should I paste next?" signal. Indicates paste blocks weren't visually unmistakable — Colin had to re-read to find the right excerpt.
+→ Codify standardized paste block header banner pattern (already used informally today). Every agent output that requires a paste action gets a `=== PASTE THIS ===` / `=== END PASTE ===` delimiter. No scanning required.
+
+**F-L8: Rule numbering label collision — F19 assigned twice (2026-04-26)**
+F19 was assigned to "continuous improvement" and separately to "design system enforcement." Required a renumber commit (`344ca13`) mid-day. Root cause: no canonical authority for rule numbers — coordinators and sessions assign them independently.
+→ Rule registry as single source of truth. Options: dedicate a section of CLAUDE.md as the numbered rule table, or `lib/rules/index.ts`. Any new rule number must be claimed from the registry before use. Queue task: rule registry file.
+
+**F-L7: Coordinator quota cliff mid-day — 4h lockout (2026-04-26)**
+Routine quota exhausted mid-session. Coordinator locked out ~4 hours. Three pre-staged tasks sat idle. No warning before the cliff.
+→ Predictive quota tracking: at current burn rate, surface "you'll hit limit in ~90 min — pay overage now or checkpoint". Should appear in session briefing, not just as a surprise stop. Queue task: quota burn rate tracker surfaced in coordinator startup.
+
+**F-L6: Twin never verified functional in production — found via audit, not monitoring (2026-04-26)**
+Twin had 100% escalation rate since deployment. Discovered during Phase 3 kickoff audit — not via any automated check. No post-deploy smoke test existed for the module.
+→ Every module gets a post-deploy smoke test: one representative request, expected response shape, logs result to `agent_events`. Deploy gate should block if smoke test fails. Queue task: post-deploy smoke test framework per module.
+
 **F-L5: Sprint context lost mid-run without phase handoff (Sprint 5, 2026-04)**
 Coordinator hit context limit 2+ hours into a session. `sprint-state.md` reflected the session START state, not the last completed phase. New window re-ran Phase 1a.
 → Write `sprint-state.md` after EVERY phase completion — not at session end. Each phase boundary is a potential termination point. Heartbeat every ~3 min prevents stale-reclaim during long phases.
@@ -176,6 +196,26 @@ Coordinator pushed acceptance docs and code to `main`. Required manual history c
 → Branch guard enforced: every session verifies `harness/task-{task_id}` before any file write. Drift triggers `branch_guard_triggered` in `agent_events` and aborts. See `.claude/agents/coordinator.md` Branch Naming section.
 
 ### SUCCESSES
+
+**S-L10: Buffer slot discipline — 1 idle window prevents Colin-as-bottleneck (2026-04-26)**
+Holding one window idle when 3 are active meant stacked reports didn't pile up waiting on a free slot. Colin could review and redirect without the queue stalling.
+→ Optimal window count: 3 active + 1 buffer. At 4 active, Colin becomes the bottleneck when reports arrive faster than he can review. Cap active windows at 3 unless tasks are fully fire-and-forget.
+
+**S-L9: Defense-in-depth shipping — FTS fallback before Ollama tunnel landed (2026-04-26)**
+Twin P1 (FTS fallback) shipped today making the module functional in degraded-mode even though P0 (Ollama tunnel) isn't done. Module is live and useful now; infrastructure can follow.
+→ Ship the defensive layer first when a module depends on infrastructure not yet in place. FTS/keyword fallback → pgvector when Ollama arrives. Functional now > perfect later.
+
+**S-L8: Window-as-context-isolation — big audits in dedicated windows (2026-04-26)**
+Twin Phase 3 audit and pre-staged doc audit each ran in their own window. Deep context (schema details, file paths, gap analysis) didn't pollute windows doing surgical commits or doc fixes.
+→ Assign one window per major audit/module. Context isolation is not just about memory — it's about signal quality. A window doing 3 unrelated things gives worse answers than 3 focused windows.
+
+**S-L7: Audit-first rule caught spec drift in all 3 pre-staged tasks before build (2026-04-26)**
+All three pre-staged acceptance docs had material errors (migration number conflict, wrong file paths, non-existent table, wrong status enum values). Audit caught all 3 before coordinator handed them to builder. Cost: ~30 min. Savings: multiple builder rebuild cycles.
+→ Pre-staged docs are hypotheses, not ground truth. Always run the audit-first check (grep actual file paths, confirm table/column names, verify migration numbers) before handing a spec to builder. Saved at minimum 3–4 hours of rework today.
+
+**S-L6: Parallel Claude Code windows — 2.5–3x throughput vs serial (2026-04-26)**
+First full multi-window session: 14 commits, 5 PRs (#4–#8), 3 acceptance doc audits, Twin P1+P3, 54-chunk corpus ingest — all in one day. Equivalent serial sessions would span 2–3 days.
+→ Sweet spot: 3 concurrent windows + 1 buffer slot. Coordinator in one window, builders in separate windows, audit/research in a third. Never mix coordinator and builder context. Parallel windows are the single highest-leverage process improvement to date.
 
 **S-L5: Parallel context windows — coordinator + builder in separate sessions (Sprint 5)**
 Each role runs at full context depth without fighting the same window. Coordinator waits for `handoff.json`; builder never sees coordinator's sprint context.
