@@ -71,6 +71,8 @@ interface PendingRow {
   chat_id: string | null
   payload: Record<string, unknown>
   attempts: number
+  created_at: string
+  correlation_id: string | null
 }
 
 function isAuthorized(request: Request): boolean {
@@ -130,7 +132,7 @@ async function drain(request: Request): Promise<NextResponse> {
 
   const { data: rows, error: fetchError } = await db
     .from('outbound_notifications')
-    .select('id, channel, chat_id, payload, attempts')
+    .select('id, channel, chat_id, payload, attempts, created_at, correlation_id')
     .eq('status', 'pending')
     .lt('attempts', MAX_ATTEMPTS)
     .order('created_at', { ascending: true })
@@ -185,6 +187,26 @@ async function drain(request: Request): Promise<NextResponse> {
             : {}),
         })
         .eq('id', row.id)
+
+      // Best-effort: log delivery latency to agent_events for F18 observability.
+      // Failure here must NOT fail the drain.
+      try {
+        await db.from('agent_events').insert({
+          action: 'notification_delivered',
+          status: 'success',
+          domain: 'coordinator',
+          meta: {
+            notification_id: row.id,
+            correlation_id: row.correlation_id ?? null,
+            delivery_latency_ms: Date.now() - new Date(row.created_at).getTime(),
+            channel: row.channel,
+          },
+          occurred_at: new Date().toISOString(),
+        })
+      } catch (err) {
+        console.error('[notifications-drain] agent_events insert failed (best-effort):', err)
+      }
+
       drained++
     } else {
       const newAttempts = row.attempts + 1
