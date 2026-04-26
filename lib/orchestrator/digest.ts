@@ -11,6 +11,7 @@ import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/teleg
 import { buildQuotaCliffLine } from '@/lib/harness/quota-cliff'
 import { buildHarnessRollupLine } from '@/lib/harness/rollup'
 import { buildQuotaGuardLine } from '@/lib/harness/quota-guard'
+import { buildStartupForecastLine } from '@/lib/harness/quota-forecast'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -232,6 +233,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── Quota guard: pickup skips due to 429 backoff (prevention layer) ───────────
   const quotaGuardLine = await buildQuotaGuardLine()
   messageToSend = `${messageToSend}\n${quotaGuardLine}`
+
+  // ── Quota forecast: coordinator startup skips ────────────────────────────────
+  const startupForecastLine = await buildStartupForecastLine()
+  messageToSend = `${messageToSend}\n${startupForecastLine}`
 
   // ── Harness rollup — auto-computed from harness_components table ──────────────
   const harnessRollupLine = await buildHarnessRollupLine()
