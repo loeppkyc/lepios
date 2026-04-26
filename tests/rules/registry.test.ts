@@ -142,6 +142,13 @@ describe('rule registry — canonical F-rule invariants', () => {
     expect(rule?.scope).toBe('project')
   })
 
+  it('registry contains F21 (acceptance-tests-first)', () => {
+    const rule = RULES.find((r) => r.number === 21)
+    expect(rule).toBeDefined()
+    expect(rule?.name).toBe('acceptance-tests-first')
+    expect(rule?.scope).toBe('project')
+  })
+
   // ── getNextRuleNumber ──────────────────────────────────────────────────────
 
   it('getNextRuleNumber returns max(RULES numbers) + 1', () => {
