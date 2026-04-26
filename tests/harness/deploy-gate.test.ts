@@ -12,6 +12,7 @@ const {
   mockFrom,
   mockRunRouteHealthSmoke,
   mockRunCronRegistrationSmoke,
+  mockRunOllamaHealthSmoke,
   mockApplyBumps,
   mockParseBumpDirectives,
 } = vi.hoisted(() => {
@@ -19,6 +20,7 @@ const {
   const mockFrom = vi.fn()
   const mockRunRouteHealthSmoke = vi.fn()
   const mockRunCronRegistrationSmoke = vi.fn()
+  const mockRunOllamaHealthSmoke = vi.fn()
   const mockApplyBumps = vi.fn().mockResolvedValue([])
   const mockParseBumpDirectives = vi.fn().mockReturnValue([])
   return {
@@ -26,6 +28,7 @@ const {
     mockFrom,
     mockRunRouteHealthSmoke,
     mockRunCronRegistrationSmoke,
+    mockRunOllamaHealthSmoke,
     mockApplyBumps,
     mockParseBumpDirectives,
   }
@@ -41,6 +44,10 @@ vi.mock('@/lib/harness/smoke-tests/route-health', () => ({
 
 vi.mock('@/lib/harness/smoke-tests/cron-registration', () => ({
   runCronRegistrationSmoke: mockRunCronRegistrationSmoke,
+}))
+
+vi.mock('@/lib/harness/smoke-tests/ollama-health', () => ({
+  runOllamaHealthSmoke: mockRunOllamaHealthSmoke,
 }))
 
 vi.mock('@/lib/harness/component-bump', () => ({
@@ -145,6 +152,14 @@ beforeEach(() => {
     passed: true,
     reason: '10 crons registered, 0 hourly — Hobby plan compliant',
     details: { hourly_count: 0, schedules: [] },
+  })
+  // Default: Ollama smoke passes — non-critical, never blocks deploy
+  mockRunOllamaHealthSmoke.mockResolvedValue({
+    passed: true,
+    tunnel_url: 'https://ollama.loeppky.xyz',
+    latency_ms: 120,
+    models_found: ['nomic-embed-text:latest', 'qwen2.5:32b'],
+    has_nomic: true,
   })
   // Default: fetchMainCommits returns [] — keeps runBumpSweep a no-op in all baseline tests
   mockFetch.mockResolvedValue({ ok: false, status: 404 })
@@ -2080,7 +2095,9 @@ describe('GET /api/cron/deploy-gate-runner — bump sweep', () => {
     mockParseBumpDirectives.mockReturnValue([
       { id: 'harness:smoke_test_framework', pct: 90, raw: 'BUMP: harness:smoke_test_framework=90' },
     ])
-    mockApplyBumps.mockResolvedValue([{ id: 'harness:smoke_test_framework', pct: 90, success: true }])
+    mockApplyBumps.mockResolvedValue([
+      { id: 'harness:smoke_test_framework', pct: 90, success: true },
+    ])
   })
 
   it('returns bumps.checked=1 and bumps.applied=1 when commit has BUMP directives', async () => {
