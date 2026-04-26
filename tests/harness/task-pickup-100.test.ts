@@ -4,7 +4,7 @@
  *   2. Heartbeat prevents stale reclaim (15-min window)
  *   3. latency_ms recorded in agent_events meta
  *   4. queue_depth recorded in agent_events meta
- *   5. Hourly cron shape in vercel.json
+ *   5. Daily cron shape in vercel.json
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -383,16 +383,16 @@ describe('runPickup — F18 queue_depth in agent_events meta', () => {
   })
 })
 
-// ── Test 5: vercel.json hourly cron shape ─────────────────────────────────────
+// ── Test 5: vercel.json daily cron shape ──────────────────────────────────────
 
 describe('vercel.json — task-pickup cron schedule', () => {
-  it('task-pickup entry has schedule "0 * * * *" (hourly)', () => {
+  it('task-pickup entry has schedule "0 0 * * *" (daily)', () => {
     const vercelJsonPath = path.resolve(__dirname, '../../vercel.json')
     const raw = fs.readFileSync(vercelJsonPath, 'utf-8')
     const config = JSON.parse(raw) as { crons?: Array<{ path: string; schedule: string }> }
 
     const entry = config.crons?.find((c) => c.path === '/api/cron/task-pickup')
     expect(entry).toBeDefined()
-    expect(entry!.schedule).toBe('0 * * * *')
+    expect(entry!.schedule).toBe('0 0 * * *')
   })
 })
