@@ -4,6 +4,7 @@ import { fetchHistoricalContext, scoreMorningDigest } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { DigestResult, DigestStatus, QualityScore, TickResult } from './types'
 import { getDigestStallSummary } from '@/lib/harness/stall-check'
+import { buildBranchGuardLine } from '@/lib/harness/branch-guard'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -205,6 +206,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Append Ollama stats line — always added, never breaks digest ────────
   const ollamaStatsLine = await buildOllamaStatsLine()
   messageToSend = `${messageToSend}\n${ollamaStatsLine}`
+
+  // ── F18: Append branch guard line — always added, never breaks digest ────────
+  const branchGuardLine = await buildBranchGuardLine()
+  messageToSend = `${messageToSend}\n${branchGuardLine}`
   characterCount = messageToSend.length
 
   // Attempt send — measure Telegram latency, override status on failure

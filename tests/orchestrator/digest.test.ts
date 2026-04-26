@@ -8,12 +8,14 @@ const {
   mockFetchHistory,
   mockScoreMorningDigest,
   mockGetDigestStallSummary,
+  mockBuildBranchGuardLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
   mockFetchHistory: vi.fn(),
   mockScoreMorningDigest: vi.fn(),
   mockGetDigestStallSummary: vi.fn(),
+  mockBuildBranchGuardLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -39,6 +41,11 @@ vi.mock('@/lib/orchestrator/telegram', () => {
 // Individual tests can override this mock to test stall-summary line behaviour.
 vi.mock('@/lib/harness/stall-check', () => ({
   getDigestStallSummary: mockGetDigestStallSummary,
+}))
+
+// Mock branch-guard so buildBranchGuardLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/branch-guard', () => ({
+  buildBranchGuardLine: mockBuildBranchGuardLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -130,6 +137,8 @@ beforeEach(() => {
   mockScoreMorningDigest.mockReturnValue(MOCK_QUALITY_SCORE)
   // Default: no stalled tasks — stall summary line omitted
   mockGetDigestStallSummary.mockResolvedValue({ count: 0, descriptions: [] })
+  // Default: 0 branch guard fires — guard is working silently
+  mockBuildBranchGuardLine.mockResolvedValue('Branch guard fires (24h): 0 ✅')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
@@ -540,5 +549,53 @@ describe('sendMorningDigest — quality scoring', () => {
     const qs = ib.insert.mock.calls[0][0].quality_score
     expect(qs.scored_by).toBe('rule_based_v1_fallback')
     expect(qs.aggregate).toBeNull()
+  })
+})
+
+// ── sendMorningDigest — branch guard F18 line ─────────────────────────────────
+
+describe('sendMorningDigest — branch guard F18 line', () => {
+  function makeSlots() {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
+    return { ib }
+  }
+
+  it('includes "Branch guard fires" line when 0 events (guard silent)', async () => {
+    mockBuildBranchGuardLine.mockResolvedValue('Branch guard fires (24h): 0 ✅')
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Branch guard fires (24h): 0 ✅')
+    )
+  })
+
+  it('includes count and task_ids when guard has fired', async () => {
+    mockBuildBranchGuardLine.mockResolvedValue(
+      'Branch guard fires (24h): 2 — task_ids: [abc123, def456]'
+    )
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Branch guard fires (24h): 2 — task_ids: [abc123, def456]')
+    )
+  })
+
+  it('still sends digest when buildBranchGuardLine returns unavailable', async () => {
+    mockBuildBranchGuardLine.mockResolvedValue('Branch guard: status unavailable')
+    makeSlots()
+    const status = await sendMorningDigest()
+    expect(status).toBe('sent')
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Branch guard: status unavailable')
+    )
   })
 })

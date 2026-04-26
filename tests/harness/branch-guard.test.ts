@@ -6,6 +6,7 @@
  *   - Wrong branch → throws with actionable message, logs branch_guard_triggered
  *   - Missing task_id → throws explicit error (no silent fallback)
  *   - getExpectedBranch helper returns correct format
+ *   - buildBranchGuardLine: 0 events, N>0 events, older events excluded, DB error
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -30,12 +31,22 @@ import {
   getExpectedBranch,
   getCurrentBranch,
   assertCorrectBranch,
+  buildBranchGuardLine,
 } from '@/lib/harness/branch-guard'
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeInsertChain() {
   return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+}
+
+function makeSelectChain(result: { data: unknown; error: unknown }) {
+  const chain: Record<string, unknown> = {}
+  for (const m of ['select', 'eq', 'gte', 'limit']) {
+    chain[m] = vi.fn().mockReturnValue(chain)
+  }
+  chain['then'] = (fn: Parameters<Promise<unknown>['then']>[0]) => Promise.resolve(result).then(fn)
+  return chain
 }
 
 // ── getExpectedBranch ─────────────────────────────────────────────────────────
@@ -154,5 +165,74 @@ describe('assertCorrectBranch — wrong branch', () => {
     })
 
     await expect(assertCorrectBranch('abc123')).rejects.toThrow(/harness\/task-abc123/)
+  })
+})
+
+// ── buildBranchGuardLine ──────────────────────────────────────────────────────
+
+describe('buildBranchGuardLine', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns "0 ✅" line when no events in last 24h', async () => {
+    mockFrom.mockReturnValue(makeSelectChain({ data: [], error: null }))
+    const line = await buildBranchGuardLine()
+    expect(line).toBe('Branch guard fires (24h): 0 ✅')
+  })
+
+  it('returns count and task_ids when events exist', async () => {
+    mockFrom.mockReturnValue(
+      makeSelectChain({
+        data: [
+          { meta: { task_id: 'abc123', attempted_branch: 'main' } },
+          { meta: { task_id: 'def456', attempted_branch: 'main' } },
+          { meta: { task_id: 'abc123', attempted_branch: 'main' } }, // duplicate task_id
+        ],
+        error: null,
+      })
+    )
+    const line = await buildBranchGuardLine()
+    expect(line).toBe('Branch guard fires (24h): 3 — task_ids: [abc123, def456]')
+  })
+
+  it('deduplicates task_ids in the output', async () => {
+    mockFrom.mockReturnValue(
+      makeSelectChain({
+        data: [
+          { meta: { task_id: 'abc123' } },
+          { meta: { task_id: 'abc123' } },
+        ],
+        error: null,
+      })
+    )
+    const line = await buildBranchGuardLine()
+    // count is 2 (two events), but task_id appears only once
+    expect(line).toContain('Branch guard fires (24h): 2')
+    expect(line).toContain('task_ids: [abc123]')
+    expect(line.split('abc123').length - 1).toBe(1) // appears exactly once
+  })
+
+  it('events older than 24h are excluded (gte filter applied to occurred_at)', async () => {
+    // The query uses .gte('occurred_at', since) — mock returns empty simulating no recent rows
+    mockFrom.mockReturnValue(makeSelectChain({ data: [], error: null }))
+    const line = await buildBranchGuardLine()
+    expect(line).toBe('Branch guard fires (24h): 0 ✅')
+    // Verify the gte call was made (DB-level exclusion of old events)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chain = mockFrom.mock.results[0].value as any
+    expect(chain.gte).toHaveBeenCalledWith('occurred_at', expect.any(String))
+  })
+
+  it('returns "status unavailable" on DB error — never throws', async () => {
+    mockFrom.mockReturnValue(makeSelectChain({ data: null, error: { message: 'DB error' } }))
+    const line = await buildBranchGuardLine()
+    expect(line).toBe('Branch guard: status unavailable')
+  })
+
+  it('returns "status unavailable" on thrown exception — never throws', async () => {
+    mockFrom.mockImplementation(() => {
+      throw new Error('DB down')
+    })
+    const line = await buildBranchGuardLine()
+    expect(line).toBe('Branch guard: status unavailable')
   })
 })
