@@ -401,10 +401,10 @@ Log every budget event to `agent_events`:
 
 ---
 
-## 11. F19 — Design System Enforcement
+## 11. F20 — Design System Enforcement
 
-No new TSX UI for this feature (Telegram-only interface). F19 does not apply.
-If a status dashboard page is added later, apply F19 at that point.
+No new TSX UI for this feature (Telegram-only interface). F20 does not apply.
+If a status dashboard page is added later, apply F20 at that point.
 
 ---
 
@@ -479,7 +479,7 @@ All tests use mocks. No real Telegram API, Ollama, or git calls.
 - [ ] F18: estimation accuracy p50/p95, calibration drift, cycle-over-cycle improvement queryable
 - [ ] Attribution: session open + close recorded
 - [ ] All 18 tests pass
-- [ ] No inline `style=` in any new TSX (F19 — N/A here, but assert clean)
+- [ ] No inline `style=` in any new TSX (F20 — N/A here, but assert clean)
 
 ---
 

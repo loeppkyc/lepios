@@ -188,7 +188,7 @@ collects. Route to twin corpus ingestion pipeline (domain=`'personal'`) after re
 
 ---
 
-## 9. F19 — Design System Enforcement
+## 9. F20 — Design System Enforcement
 
 **Rule:** Every port chunk must use shadcn/ui components and Tailwind utility classes
 only. No inline `style={}` in TSX files. No ad-hoc CSS files. All shared components
@@ -201,8 +201,8 @@ in `app/components/` or `components/ui/`.
 git diff --name-only HEAD~1 | grep '\.tsx$' | xargs grep -l 'style=' && exit 1 || exit 0
 ```
 
-**Also add to CLAUDE.md as F19** (Architecture Rules §3, after F18):
-> F19 — Design system enforcement: all port chunk UI uses shadcn/ui + Tailwind utility
+**Also add to CLAUDE.md as F20** (Architecture Rules §3, after F19):
+> F20 — Design system enforcement: all port chunk UI uses shadcn/ui + Tailwind utility
 > classes only. No inline style attributes. No ad-hoc CSS files. Acceptance tests must
 > verify compliance on every TSX file in the chunk's diff. See
 > docs/sprint-5/purpose-review-acceptance.md §9.
@@ -251,8 +251,8 @@ All tests use mocks. No real Telegram API or Ollama calls.
 - [ ] Migration 0026: task_queue status constraint extended (awaiting_review, review_timeout)
 - [ ] F17: every review event logged to agent_events + routed to twin corpus
 - [ ] F18: review latency, distribution, iteration count, timeout rate queryable
-- [ ] F19: design-system acceptance test in every future port chunk acceptance doc
-- [ ] F19: rule added to CLAUDE.md as Architecture Rule §3 F19
+- [ ] F20: design-system acceptance test in every future port chunk acceptance doc
+- [ ] F20: rule added to CLAUDE.md as Architecture Rule §3 F20
 - [ ] All 7 test cases pass
 - [ ] Attribution recorded per review event
 - [ ] Existing port chunks (sprint-5 attribution, gmail, etc.) are grandfathered —

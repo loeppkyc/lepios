@@ -1,23 +1,23 @@
 /**
  * tests/design-system.test.ts
  *
- * F19 — Design system enforcement negative-control test.
+ * F20 — Design system enforcement negative-control test.
  *
- * Verifies that the grep logic used in the F19 acceptance check correctly
+ * Verifies that the grep logic used in the F20 acceptance check correctly
  * identifies inline `style=` attributes in TSX content.
  *
  * This is a negative-control: we create a synthetic TSX string containing
  * `style=`, run the detection logic against it, and assert it would fail.
- * If this test passes, the F19 compliance check is working correctly.
+ * If this test passes, the F20 compliance check is working correctly.
  */
 
 import { describe, it, expect } from 'vitest'
 
-// ── F19 grep logic (reproduced inline so test has no external deps) ───────────
+// ── F20 grep logic (reproduced inline so test has no external deps) ───────────
 
 /**
  * Returns true if the TSX content contains an inline style attribute.
- * Mirrors the grep used in the F19 acceptance check:
+ * Mirrors the grep used in the F20 acceptance check:
  *   grep -l 'style=' <tsx-files>
  */
 function hasInlineStyle(tsxContent: string): boolean {
@@ -26,7 +26,7 @@ function hasInlineStyle(tsxContent: string): boolean {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('F19 design-system enforcement — negative control', () => {
+describe('F20 design-system enforcement — negative control', () => {
   it('detects inline style= attribute in TSX content and would fail the gate', () => {
     // Synthetic TSX with a forbidden inline style
     const badTsx = `

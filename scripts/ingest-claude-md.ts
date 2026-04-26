@@ -671,15 +671,15 @@ const CHUNKS: Chunk[] = [
     confidence: 0.85,
   },
   {
-    entity: 'cmdingest:lepios:arch-F19-design-system',
+    entity: 'cmdingest:lepios:arch-F20-design-system',
     category: 'rule',
     domain: 'lepios',
-    title: 'F19: No inline style={} in TSX — shadcn/ui + Tailwind only',
+    title: 'F20: No inline style={} in TSX — shadcn/ui + Tailwind only',
     problem: 'Can I use inline style attributes or ad-hoc CSS in LepiOS TSX files?',
     solution:
       "No inline style={} attributes in TSX files. No ad-hoc CSS files. shadcn/ui components and Tailwind utility classes only. All shared components in app/components/ or components/ui/. Builder acceptance tests must grep new TSX files for 'style=' and fail if found.",
     context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F19. Keywords: inline style, TSX, shadcn, Tailwind, CSS',
+      'Source: lepios CLAUDE.md §3 Architecture Rules F20. Keywords: inline style, TSX, shadcn, Tailwind, CSS',
     confidence: 0.9,
   },
   {

@@ -164,12 +164,12 @@ template includes a `{{purpose_notes}}` slot.
 One revision round per module. If Colin needs more back-and-forth, that happens during
 Phase 1b twin Q&A escalation (which already has Colin as the escalation path).
 
-### Q5: Design system enforcement — F19?
+### Q5: Design system enforcement — F20?
 
-**Answer: Yes, add as F19. Lives in both CLAUDE.md and builder acceptance template.**
+**Answer: Yes, add as F20. Lives in both CLAUDE.md and builder acceptance template.**
 
 Rule text:
-> F19 — Design system enforcement: every port chunk must use shadcn/ui components and
+> F20 — Design system enforcement: every port chunk must use shadcn/ui components and
 > Tailwind utility classes only. No inline `style={}` attributes in TSX. No ad-hoc CSS
 > files. All shared components in `app/components/` or `components/ui/`. Builder
 > acceptance tests must grep new TSX files for `style=` and fail if found.
@@ -226,7 +226,7 @@ Compared to a hypothetical "just port the coordinator instructions as a text fil
 4. **Async pipeline** — review runs before study; study runs with notes. No blocking
    back-and-forth. Pipeline stays sequential without idle wait.
 
-5. **Design system gate** (F19) — catches inline styles at acceptance-test time, not
+5. **Design system gate** (F20) — catches inline styles at acceptance-test time, not
    at design review time. Prevents style debt accumulation across 200+ port chunks.
 
 6. **72h timeout with alert** — prevents a module from silently blocking the queue
