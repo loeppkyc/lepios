@@ -217,6 +217,7 @@ async function detectT3(): Promise<StallEvent[]> {
       .select('id, task, created_at')
       .eq('status', 'queued')
       .eq('retry_count', 0)
+      .lte('priority', 2)
       .lt('created_at', cutoff)
       .limit(5)
 
@@ -290,6 +291,7 @@ export async function getDigestStallSummary(): Promise<{
         .select('id, task, created_at')
         .eq('status', 'queued')
         .eq('retry_count', 0)
+        .lte('priority', 2)
         .lt('created_at', t3Cutoff)
         .limit(5),
       db

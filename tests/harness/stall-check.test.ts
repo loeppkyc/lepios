@@ -37,7 +37,7 @@ type QueryResult = { data: unknown; error: null | { message: string } }
 function makeQueryChain(result: QueryResult) {
   const chain: Record<string, unknown> = {}
   const self = () => chain
-  for (const m of ['select', 'eq', 'lt', 'gte', 'order', 'limit', 'filter', 'in']) {
+  for (const m of ['select', 'eq', 'lt', 'lte', 'gte', 'order', 'limit', 'filter', 'in']) {
     chain[m] = vi.fn().mockReturnValue(chain)
   }
   chain['maybeSingle'] = vi.fn().mockResolvedValue(result)
@@ -248,6 +248,32 @@ describe('runStallCheck — T3 detection', () => {
     expect(result.alerts_fired).toBe(1)
     expect(result.alerts_deduped).toBe(0)
     expect(result.errors).toHaveLength(0)
+  })
+
+  it('T3 query includes priority <= 2 filter — p3/p4/p5 backlog tasks excluded', async () => {
+    const recentPickup = new Date(Date.now() - 2 * 3_600_000).toISOString()
+    let taskQueueCallCount = 0
+    let t3Chain: ReturnType<typeof makeQueryChain> | null = null
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'task_queue') {
+        taskQueueCallCount++
+        const chain = makeQueryChain({ data: [], error: null })
+        if (taskQueueCallCount === 2) t3Chain = chain
+        return chain
+      }
+      if (table === 'work_budget_sessions') return makeQueryChain({ data: [], error: null })
+      if (table === 'agent_events')
+        return makeQueryChain({ data: { occurred_at: recentPickup }, error: null })
+      if (table === 'outbound_notifications') return makeInsertChain()
+      return makeQueryChain({ data: null, error: null })
+    })
+
+    await runStallCheck()
+
+    expect(t3Chain).not.toBeNull()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((t3Chain as any).lte).toHaveBeenCalledWith('priority', 2)
   })
 })
 
