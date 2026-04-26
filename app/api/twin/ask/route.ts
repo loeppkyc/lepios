@@ -20,6 +20,7 @@ export interface TwinResponse {
   sources: TwinSource[]
   escalate: boolean
   escalate_reason: EscalateReason
+  retrieval_path: 'vector' | 'fts' | 'none'
 }
 
 interface PersonalChunk {
@@ -30,6 +31,11 @@ interface PersonalChunk {
   solution: string | null
   context: string | null
   similarity: number
+}
+
+interface RetrievalResult {
+  chunks: PersonalChunk[]
+  retrieval_path: 'vector' | 'fts' | 'none'
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -58,26 +64,52 @@ function getTwinConfig() {
 
 // ── Retrieval ─────────────────────────────────────────────────────────────────
 
-async function retrievePersonalChunks(question: string, limit = 10): Promise<PersonalChunk[]> {
-  let vec: number[]
+async function retrievePersonalChunks(question: string, limit = 10): Promise<RetrievalResult> {
+  const supabase = createServiceClient()
+
+  // Vector path
+  let vectorChunks: PersonalChunk[] = []
   try {
-    vec = await embed(question)
+    const vec = await embed(question)
+    const { data, error } = await supabase.rpc('match_knowledge', {
+      query_embedding: vec,
+      match_count: limit * 3,
+      min_confidence: 0,
+    })
+    if (!error && data) {
+      vectorChunks = (data as PersonalChunk[])
+        .filter((r) => SEARCHABLE_CATEGORIES.includes(r.category))
+        .slice(0, limit)
+    }
   } catch {
-    return []
+    // embed failed or RPC failed — fall through to FTS
   }
 
-  const supabase = createServiceClient()
-  const { data, error } = await supabase.rpc('match_knowledge', {
-    query_embedding: vec,
-    match_count: limit * 3,
-    min_confidence: 0,
-  })
+  if (vectorChunks.length > 0) {
+    return { chunks: vectorChunks, retrieval_path: 'vector' }
+  }
 
-  if (error || !data) return []
+  // FTS fallback
+  try {
+    const { data, error } = await supabase
+      .from('knowledge')
+      .select('id, category, title, problem, solution, context')
+      .textSearch('fts', question, { type: 'websearch', config: 'english' })
+      .in('category', SEARCHABLE_CATEGORIES)
+      .limit(limit)
 
-  return (data as PersonalChunk[])
-    .filter((r) => SEARCHABLE_CATEGORIES.includes(r.category))
-    .slice(0, limit)
+    if (!error && data && (data as unknown[]).length > 0) {
+      const chunks = (data as Omit<PersonalChunk, 'similarity'>[]).map((r) => ({
+        ...r,
+        similarity: 0,
+      }))
+      return { chunks, retrieval_path: 'fts' }
+    }
+  } catch {
+    // FTS failed too
+  }
+
+  return { chunks: [], retrieval_path: 'none' }
 }
 
 function buildContextString(chunks: PersonalChunk[]): string {
@@ -133,7 +165,7 @@ export async function POST(
   const { ollamaModel, confidenceThreshold } = getTwinConfig()
   const start = Date.now()
 
-  const chunks = await retrievePersonalChunks(question)
+  const { chunks, retrieval_path } = await retrievePersonalChunks(question)
   const topSimilarity = (chunks[0] as PersonalChunk | undefined)?.similarity ?? 0
   const sources: TwinSource[] = chunks.map((c) => ({ chunk_id: c.id, similarity: c.similarity }))
   const contextStr = buildContextString(chunks)
@@ -187,6 +219,7 @@ export async function POST(
         sources,
         escalate: true,
         escalate_reason: 'insufficient_context',
+        retrieval_path,
       }
       void logEvent('twin', 'twin.ask', {
         actor: 'user',
@@ -197,6 +230,7 @@ export async function POST(
         meta: {
           escalate: true,
           escalate_reason: 'insufficient_context',
+          retrieval_path,
           model: finalModel,
           routing_decision: 'claude_fallback',
           routing_reason: ollamaCircuitOpen
@@ -220,6 +254,7 @@ export async function POST(
         sources,
         escalate: true,
         escalate_reason: 'below_threshold',
+        retrieval_path,
       }
       void logEvent('twin', 'twin.ask', {
         actor: 'user',
@@ -230,6 +265,7 @@ export async function POST(
         meta: {
           escalate: true,
           escalate_reason: 'below_threshold',
+          retrieval_path,
           model: finalModel,
           routing_decision: 'claude_fallback',
           routing_reason: ollamaCircuitOpen
@@ -266,6 +302,7 @@ export async function POST(
         sources_count: sources.length,
         escalate,
         escalate_reason,
+        retrieval_path,
         model: finalModel,
         routing_decision: 'claude_fallback',
         routing_reason: ollamaCircuitOpen
@@ -281,6 +318,7 @@ export async function POST(
       sources,
       escalate,
       escalate_reason,
+      retrieval_path,
     })
   }
 
@@ -342,6 +380,7 @@ export async function POST(
       top_similarity: topSimilarity,
       escalate,
       escalate_reason,
+      retrieval_path,
       model: finalModel,
       routing_decision: ollamaUsed ? 'ollama' : 'claude_fallback',
       routing_reason: ollamaUsed
@@ -354,5 +393,12 @@ export async function POST(
     },
   })
 
-  return NextResponse.json<TwinResponse>({ answer, confidence, sources, escalate, escalate_reason })
+  return NextResponse.json<TwinResponse>({
+    answer,
+    confidence,
+    sources,
+    escalate,
+    escalate_reason,
+    retrieval_path,
+  })
 }

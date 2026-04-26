@@ -36,10 +36,13 @@ function makeAuthorizedRequest(): Request {
 function makeSelectChain(rows: PendingRow[]) {
   const result = { data: rows, error: null }
   const chain: Record<string, unknown> = {
-    then: (fn: Parameters<Promise<unknown>['then']>[0], rej?: Parameters<Promise<unknown>['then']>[1]) =>
-      Promise.resolve(result).then(fn, rej),
+    then: (
+      fn: Parameters<Promise<unknown>['then']>[0],
+      rej?: Parameters<Promise<unknown>['then']>[1]
+    ) => Promise.resolve(result).then(fn, rej),
     catch: (fn: Parameters<Promise<unknown>['catch']>[0]) => Promise.resolve(result).catch(fn),
-    finally: (fn: Parameters<Promise<unknown>['finally']>[0]) => Promise.resolve(result).finally(fn),
+    finally: (fn: Parameters<Promise<unknown>['finally']>[0]) =>
+      Promise.resolve(result).finally(fn),
   }
   for (const m of ['select', 'eq', 'lt', 'order', 'limit']) {
     chain[m] = vi.fn().mockReturnValue(chain)
@@ -59,10 +62,14 @@ function setupDrainMock(rows: PendingRow[]) {
 
   // Chain for task_queue select in improvement engine trigger (returns no completed rows)
   const emptyTaskQueueChain: Record<string, unknown> = {
-    then: (fn: Parameters<Promise<unknown>['then']>[0], rej?: Parameters<Promise<unknown>['then']>[1]) =>
-      Promise.resolve({ data: [], error: null }).then(fn, rej),
-    catch: (fn: Parameters<Promise<unknown>['catch']>[0]) => Promise.resolve({ data: [], error: null }).catch(fn),
-    finally: (fn: Parameters<Promise<unknown>['finally']>[0]) => Promise.resolve({ data: [], error: null }).finally(fn),
+    then: (
+      fn: Parameters<Promise<unknown>['then']>[0],
+      rej?: Parameters<Promise<unknown>['then']>[1]
+    ) => Promise.resolve({ data: [], error: null }).then(fn, rej),
+    catch: (fn: Parameters<Promise<unknown>['catch']>[0]) =>
+      Promise.resolve({ data: [], error: null }).catch(fn),
+    finally: (fn: Parameters<Promise<unknown>['finally']>[0]) =>
+      Promise.resolve({ data: [], error: null }).finally(fn),
   }
   for (const m of ['select', 'in', 'gte', 'lt', 'eq', 'order', 'limit']) {
     emptyTaskQueueChain[m] = vi.fn().mockReturnValue(emptyTaskQueueChain)
@@ -73,8 +80,8 @@ function setupDrainMock(rows: PendingRow[]) {
     if (table === 'agent_events') return { insert: agentEventsInsert }
     fromCallCount++
     if (fromCallCount === 1) return { select: vi.fn().mockReturnValue(emptyTaskQueueChain) } // task_queue trigger
-    if (fromCallCount === 2) return selectChain  // outbound_notifications select
-    return { update }                            // outbound_notifications update
+    if (fromCallCount === 2) return selectChain // outbound_notifications select
+    return { update } // outbound_notifications update
   })
 
   return { update, updateEq, agentEventsInsert }
@@ -221,9 +228,9 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
 
     await GET(makeAuthorizedRequest())
 
-    const sendCall = vi.mocked(fetch).mock.calls.find(([url]) =>
-      (url as string).includes('sendMessage')
-    )
+    const sendCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => (url as string).includes('sendMessage'))
     expect(sendCall).toBeDefined()
     const sentBody = JSON.parse(sendCall![1]!.body as string)
     expect(sentBody.chat_id).toBe('111222333') // TELEGRAM_CHAT_ID env default
@@ -237,7 +244,9 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
       payload: {
         text: 'Approve or reject?',
         parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [[{ text: 'Yes', callback_data: '{"action":"approve"}' }]] },
+        reply_markup: {
+          inline_keyboard: [[{ text: 'Yes', callback_data: '{"action":"approve"}' }]],
+        },
       },
       attempts: 0,
     }
@@ -245,9 +254,9 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
 
     await GET(makeAuthorizedRequest())
 
-    const sendCall = vi.mocked(fetch).mock.calls.find(([url]) =>
-      (url as string).includes('sendMessage')
-    )
+    const sendCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => (url as string).includes('sendMessage'))
     expect(sendCall).toBeDefined()
     const sentBody = JSON.parse(sendCall![1]!.body as string)
     expect(sentBody.chat_id).toBe('999888777')
@@ -274,14 +283,63 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
 
     expect(body).toMatchObject({ ok: true, drained: 1, failed: 0 })
 
-    expect(agentEventsInsert).toHaveBeenCalledOnce()
-    const insertArg = agentEventsInsert.mock.calls[0][0] as Record<string, unknown>
-    expect(insertArg.action).toBe('notification_delivered')
-    const meta = insertArg.meta as Record<string, unknown>
+    // Called twice: notification_delivered (per-message) + drain_run (end-of-run summary)
+    expect(agentEventsInsert).toHaveBeenCalledTimes(2)
+    const deliveryCall = agentEventsInsert.mock.calls.find(
+      ([arg]: [Record<string, unknown>]) => arg.action === 'notification_delivered'
+    )![0] as Record<string, unknown>
+    expect(deliveryCall.action).toBe('notification_delivered')
+    const meta = deliveryCall.meta as Record<string, unknown>
     expect(typeof meta.delivery_latency_ms).toBe('number')
     expect(meta.delivery_latency_ms as number).toBeGreaterThanOrEqual(0)
     expect(meta.notification_id).toBe('row-6')
     expect(meta.correlation_id).toBe('corr-abc-123')
     expect(meta.channel).toBe('telegram')
+  })
+
+  it('logs drain_run event with correct drained and failed counts', async () => {
+    const row: PendingRow = {
+      id: 'row-7',
+      channel: 'telegram',
+      chat_id: '444555666',
+      payload: { text: 'Drain run log test' },
+      attempts: 0,
+    }
+    const { agentEventsInsert } = setupDrainMock([row])
+
+    const res = await GET(makeAuthorizedRequest())
+    const body = await res.json()
+
+    expect(body).toMatchObject({ ok: true, drained: 1, failed: 0 })
+
+    const drainRunCall = agentEventsInsert.mock.calls.find(
+      ([arg]: [Record<string, unknown>]) => arg.action === 'drain_run'
+    )
+    expect(drainRunCall).toBeDefined()
+    const drainArg = drainRunCall![0] as Record<string, unknown>
+    expect(drainArg.action).toBe('drain_run')
+    expect(drainArg.domain).toBe('coordinator')
+    const meta = drainArg.meta as Record<string, unknown>
+    expect(meta.drained).toBe(1)
+    expect(meta.failed).toBe(0)
+    expect(typeof meta.batch_queued).toBe('number')
+  })
+
+  it('logs drain_run with drained=0 on empty queue (idempotency proof)', async () => {
+    const { agentEventsInsert } = setupDrainMock([])
+
+    const res = await GET(makeAuthorizedRequest())
+    const body = await res.json()
+
+    expect(body).toMatchObject({ ok: true, drained: 0, failed: 0 })
+
+    const drainRunCall = agentEventsInsert.mock.calls.find(
+      ([arg]: [Record<string, unknown>]) => arg.action === 'drain_run'
+    )
+    expect(drainRunCall).toBeDefined()
+    const meta = (drainRunCall![0] as Record<string, unknown>).meta as Record<string, unknown>
+    expect(meta.drained).toBe(0)
+    expect(meta.failed).toBe(0)
+    expect(meta.batch_queued).toBe(0)
   })
 })

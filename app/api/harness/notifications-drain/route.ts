@@ -142,7 +142,23 @@ async function drain(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 })
   }
 
+  const batchQueued = rows?.length ?? 0
+  let drained = 0
+  let failed = 0
+
   if (!rows || rows.length === 0) {
+    // Log empty drain run — still a valid run for F18 observability
+    await db
+      .from('agent_events')
+      .insert({
+        action: 'drain_run',
+        status: 'success',
+        domain: 'coordinator',
+        actor: 'notifications-drain',
+        meta: { drained: 0, failed: 0, batch_queued: 0 },
+        occurred_at: new Date().toISOString(),
+      })
+      .catch(() => {})
     return NextResponse.json({
       ok: true,
       drained: 0,
@@ -150,9 +166,6 @@ async function drain(request: Request): Promise<NextResponse> {
       improvement_engine: engineResult,
     })
   }
-
-  let drained = 0
-  let failed = 0
 
   for (const row of rows as PendingRow[]) {
     if (row.channel !== 'telegram') continue
@@ -221,6 +234,19 @@ async function drain(request: Request): Promise<NextResponse> {
       failed++
     }
   }
+
+  // F18: log drain run summary for morning_digest surfacing
+  await db
+    .from('agent_events')
+    .insert({
+      action: 'drain_run',
+      status: 'success',
+      domain: 'coordinator',
+      actor: 'notifications-drain',
+      meta: { drained, failed, batch_queued: batchQueued },
+      occurred_at: new Date().toISOString(),
+    })
+    .catch(() => {})
 
   return NextResponse.json({ ok: true, drained, failed, improvement_engine: engineResult })
 }

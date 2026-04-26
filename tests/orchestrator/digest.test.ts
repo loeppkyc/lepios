@@ -9,6 +9,10 @@ const {
   mockScoreMorningDigest,
   mockGetDigestStallSummary,
   mockBuildBranchGuardLine,
+  mockBuildProcessEfficiencyLines,
+  mockBuildFtsFallbackLine,
+  mockBuildDrainStatsLine,
+  mockBuildReviewTimeoutLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -16,6 +20,10 @@ const {
   mockScoreMorningDigest: vi.fn(),
   mockGetDigestStallSummary: vi.fn(),
   mockBuildBranchGuardLine: vi.fn(),
+  mockBuildProcessEfficiencyLines: vi.fn(),
+  mockBuildFtsFallbackLine: vi.fn(),
+  mockBuildDrainStatsLine: vi.fn(),
+  mockBuildReviewTimeoutLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -46,6 +54,22 @@ vi.mock('@/lib/harness/stall-check', () => ({
 // Mock branch-guard so buildBranchGuardLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/branch-guard', () => ({
   buildBranchGuardLine: mockBuildBranchGuardLine,
+}))
+
+// Mock process-efficiency so buildProcessEfficiencyLines does not consume mockFrom slots.
+vi.mock('@/lib/harness/process-efficiency', () => ({
+  buildProcessEfficiencyLines: mockBuildProcessEfficiencyLines,
+}))
+
+// Mock fts-fallback so buildFtsFallbackLine does not consume mockFrom slots.
+vi.mock('@/lib/twin/fts-fallback', () => ({
+  buildFtsFallbackLine: mockBuildFtsFallbackLine,
+}))
+
+// Mock telegram-stats so drain/review-timeout lines do not consume mockFrom slots.
+vi.mock('@/lib/harness/telegram-stats', () => ({
+  buildDrainStatsLine: mockBuildDrainStatsLine,
+  buildReviewTimeoutLine: mockBuildReviewTimeoutLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -139,6 +163,15 @@ beforeEach(() => {
   mockGetDigestStallSummary.mockResolvedValue({ count: 0, descriptions: [] })
   // Default: 0 branch guard fires — guard is working silently
   mockBuildBranchGuardLine.mockResolvedValue('Branch guard fires (24h): 0 ✅')
+  // Default: 0 FTS fallback fires — vector path healthy
+  mockBuildFtsFallbackLine.mockResolvedValue('Twin FTS fallback (24h): 0 ✅')
+  // Default: healthy process efficiency
+  mockBuildProcessEfficiencyLines.mockResolvedValue(
+    'Process efficiency (24h):\n• Queue throughput: no tasks created\n• Pickup latency: no pickups in 24h | 💡 Check pickup cron is firing\n• Queue depth: 0 tasks waiting ✅\n• Friction: 0 grounding blocks / retries ✅'
+  )
+  // Default: drain ran 0 times (first run after deploy), no review timeouts
+  mockBuildDrainStatsLine.mockResolvedValue('Drain runs (24h): 0, messages: 0')
+  mockBuildReviewTimeoutLine.mockResolvedValue(null)
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
@@ -597,5 +630,128 @@ describe('sendMorningDigest — branch guard F18 line', () => {
     expect(mockPostMessage).toHaveBeenCalledWith(
       expect.stringContaining('Branch guard: status unavailable')
     )
+  })
+})
+
+// ── sendMorningDigest — FTS fallback F18 line ─────────────────────────────────
+
+describe('sendMorningDigest — FTS fallback F18 line', () => {
+  function makeSlots() {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
+    return { ib }
+  }
+
+  it('includes "Twin FTS fallback" line when 0 fires (vector path healthy)', async () => {
+    mockBuildFtsFallbackLine.mockResolvedValue('Twin FTS fallback (24h): 0 ✅')
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Twin FTS fallback (24h): 0 ✅')
+    )
+  })
+
+  it('includes count when FTS fallback has fired', async () => {
+    mockBuildFtsFallbackLine.mockResolvedValue('Twin FTS fallback (24h): 5')
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Twin FTS fallback (24h): 5')
+    )
+  })
+
+  it('still sends digest when buildFtsFallbackLine returns unavailable', async () => {
+    mockBuildFtsFallbackLine.mockResolvedValue('Twin FTS fallback: status unavailable')
+    makeSlots()
+    const status = await sendMorningDigest()
+    expect(status).toBe('sent')
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Twin FTS fallback: status unavailable')
+    )
+  })
+})
+
+// ── sendMorningDigest — drain stats + review timeout lines (P6+P1) ────────────
+
+describe('sendMorningDigest — drain stats line (P6)', () => {
+  function makeSlots() {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
+    return { ib }
+  }
+
+  it('includes drain stats line in sent message', async () => {
+    mockBuildDrainStatsLine.mockResolvedValue('Drain runs (24h): 24, messages: 3')
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Drain runs (24h): 24, messages: 3')
+    )
+  })
+
+  it('still sends when drain stats line returns "unavailable"', async () => {
+    mockBuildDrainStatsLine.mockResolvedValue('Drain runs (24h): unavailable')
+    makeSlots()
+    const status = await sendMorningDigest()
+    expect(status).toBe('sent')
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Drain runs (24h): unavailable')
+    )
+  })
+})
+
+describe('sendMorningDigest — review timeout line (P1)', () => {
+  function makeSlots() {
+    const qb = makeQueryBuilder({
+      data: { output_summary: JSON.stringify(makeTickResult()) },
+      error: null,
+    })
+    const ib = makeInsertBuilder()
+    mockFrom
+      .mockReturnValueOnce(qb)
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(makeOllamaStatsBuilder())
+      .mockReturnValueOnce(ib)
+    return { ib }
+  }
+
+  it('omits review timeout line when buildReviewTimeoutLine returns null (healthy)', async () => {
+    mockBuildReviewTimeoutLine.mockResolvedValue(null)
+    makeSlots()
+    await sendMorningDigest()
+    const sentMsg = mockPostMessage.mock.calls[0][0] as string
+    expect(sentMsg).not.toContain('Review timeouts swept')
+  })
+
+  it('includes review timeout line when N > 0', async () => {
+    mockBuildReviewTimeoutLine.mockResolvedValue('⚠️ Review timeouts swept (24h): 2')
+    makeSlots()
+    await sendMorningDigest()
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.stringContaining('⚠️ Review timeouts swept (24h): 2')
+    )
+  })
+
+  it('still sends digest when review timeout line returns null', async () => {
+    mockBuildReviewTimeoutLine.mockResolvedValue(null)
+    makeSlots()
+    const status = await sendMorningDigest()
+    expect(status).toBe('sent')
   })
 })

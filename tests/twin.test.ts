@@ -10,24 +10,32 @@ import { isUncertain } from '@/lib/twin/uncertainty'
 
 // ── Hoisted mock handles ──────────────────────────────────────────────────────
 
-const { mockEmbed, mockGenerate, MockOllamaUnreachableError, mockRpc, mockLogEvent, mockClaudeCreate } =
-  vi.hoisted(() => {
-    class MockOllamaUnreachableError extends Error {
-      override readonly name = 'OllamaUnreachableError'
-      constructor(cause?: unknown) {
-        super('Ollama is unreachable')
-        void cause
-      }
+const {
+  mockEmbed,
+  mockGenerate,
+  MockOllamaUnreachableError,
+  mockRpc,
+  mockFrom,
+  mockLogEvent,
+  mockClaudeCreate,
+} = vi.hoisted(() => {
+  class MockOllamaUnreachableError extends Error {
+    override readonly name = 'OllamaUnreachableError'
+    constructor(cause?: unknown) {
+      super('Ollama is unreachable')
+      void cause
     }
-    return {
-      mockEmbed: vi.fn(),
-      mockGenerate: vi.fn(),
-      MockOllamaUnreachableError,
-      mockRpc: vi.fn(),
-      mockLogEvent: vi.fn().mockResolvedValue('mock-event-id'),
-      mockClaudeCreate: vi.fn(),
-    }
-  })
+  }
+  return {
+    mockEmbed: vi.fn(),
+    mockGenerate: vi.fn(),
+    MockOllamaUnreachableError,
+    mockRpc: vi.fn(),
+    mockFrom: vi.fn(),
+    mockLogEvent: vi.fn().mockResolvedValue('mock-event-id'),
+    mockClaudeCreate: vi.fn(),
+  }
+})
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -38,7 +46,7 @@ vi.mock('@/lib/ollama/client', () => ({
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
-  createServiceClient: vi.fn(() => ({ rpc: mockRpc })),
+  createServiceClient: vi.fn(() => ({ rpc: mockRpc, from: mockFrom })),
 }))
 
 vi.mock('@/lib/knowledge/client', () => ({
@@ -61,11 +69,17 @@ import { NextRequest } from 'next/server'
 
 const FAKE_EMBEDDING = new Array(768).fill(0.1)
 
-function makePersonalChunk(overrides: Partial<{
-  id: string; category: string; title: string;
-  problem: string | null; solution: string | null;
-  context: string | null; similarity: number
-}> = {}) {
+function makePersonalChunk(
+  overrides: Partial<{
+    id: string
+    category: string
+    title: string
+    problem: string | null
+    solution: string | null
+    context: string | null
+    similarity: number
+  }> = {}
+) {
   return {
     id: 'chunk-abc',
     category: 'personal_correspondence',
@@ -86,12 +100,43 @@ function makeRequest(body: Record<string, unknown>): NextRequest {
   })
 }
 
+function makeFtsChain(result: { data: unknown; error: unknown }) {
+  const chain: Record<string, unknown> = {}
+  for (const m of ['select', 'textSearch', 'in', 'limit']) {
+    chain[m] = vi.fn().mockReturnValue(chain)
+  }
+  chain['then'] = (fn: Parameters<Promise<unknown>['then']>[0]) => Promise.resolve(result).then(fn)
+  return chain
+}
+
+function makeFtsChunk(
+  overrides: Partial<{
+    id: string
+    category: string
+    title: string
+    problem: string | null
+    solution: string | null
+    context: string | null
+  }> = {}
+) {
+  return {
+    id: 'fts-chunk-xyz',
+    category: 'personal_correspondence',
+    title: 'Colin on living in Alberta',
+    problem: null,
+    solution: null,
+    context: 'Colin prefers living in Alberta.',
+    ...overrides,
+  }
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.OLLAMA_TWIN_MODEL
   delete process.env.TWIN_CONFIDENCE_THRESHOLD
+  mockFrom.mockReturnValue(makeFtsChain({ data: [], error: null }))
 })
 
 afterEach(() => {
@@ -136,7 +181,7 @@ describe('POST /api/twin/ask', () => {
   it('returns 400 when question is missing', async () => {
     const res = await POST(makeRequest({}))
     expect(res.status).toBe(400)
-    const body = await res.json() as { error: string }
+    const body = (await res.json()) as { error: string }
     expect(body.error).toMatch(/question/i)
   })
 
@@ -151,11 +196,16 @@ describe('POST /api/twin/ask', () => {
     })
 
     const res = await POST(makeRequest({ question: 'Where does Colin live?' }))
-    const body = await res.json() as { answer: string; confidence: number; escalate: boolean; sources: unknown[] }
+    const body = (await res.json()) as {
+      answer: string
+      confidence: number
+      escalate: boolean
+      sources: unknown[]
+    }
 
     expect(res.status).toBe(200)
     expect(body.escalate).toBe(false)
-    expect(body.confidence).toBeGreaterThanOrEqual(0.80)
+    expect(body.confidence).toBeGreaterThanOrEqual(0.8)
     expect(body.sources).toHaveLength(1)
     expect(body.answer).toContain('Edmonton')
   })
@@ -174,8 +224,8 @@ describe('POST /api/twin/ask', () => {
       tokens_used: 5,
     })
 
-    const res = await POST(makeRequest({ question: 'What is Colin\'s credit score?' }))
-    const body = await res.json() as { escalate: boolean; escalate_reason: string }
+    const res = await POST(makeRequest({ question: "What is Colin's credit score?" }))
+    const body = (await res.json()) as { escalate: boolean; escalate_reason: string }
 
     expect(body.escalate).toBe(true)
     expect(body.escalate_reason).toBe('insufficient_context')
@@ -192,7 +242,11 @@ describe('POST /api/twin/ask', () => {
     })
 
     const res = await POST(makeRequest({ question: 'Should Colin move to the USA?' }))
-    const body = await res.json() as { escalate: boolean; escalate_reason: string; answer: string }
+    const body = (await res.json()) as {
+      escalate: boolean
+      escalate_reason: string
+      answer: string
+    }
 
     expect(body.escalate).toBe(true)
     expect(body.escalate_reason).toBe('personal_escalation')
@@ -206,7 +260,7 @@ describe('POST /api/twin/ask', () => {
     mockRpc.mockResolvedValue({ data: [makePersonalChunk({ similarity: 0.5 })], error: null })
     mockGenerate.mockResolvedValue({
       text: 'Colin might have mentioned something about this.',
-      confidence: 0.70,
+      confidence: 0.7,
       model: 'qwen2.5:32b',
       tokens_used: 20,
     })
@@ -215,7 +269,12 @@ describe('POST /api/twin/ask', () => {
     })
 
     const res = await POST(makeRequest({ question: 'Where does Colin prefer to live?' }))
-    const body = await res.json() as { escalate: boolean; escalate_reason: string | null; confidence: number; answer: string }
+    const body = (await res.json()) as {
+      escalate: boolean
+      escalate_reason: string | null
+      confidence: number
+      answer: string
+    }
 
     // Claude returns 0.75 confidence — still below 0.80 → escalates with 'below_threshold'
     expect(body.escalate).toBe(true)
@@ -254,8 +313,85 @@ describe('POST /api/twin/ask', () => {
 
     const res = await POST(makeRequest({ question: 'Where does Colin live?' }))
     expect(res.status).toBe(200)
-    const body = await res.json() as { answer: string }
+    const body = (await res.json()) as { answer: string }
     expect(body.answer).toContain('Edmonton')
     expect(mockClaudeCreate).toHaveBeenCalledOnce()
+  })
+})
+
+// ── FTS fallback path (Phase 3) ───────────────────────────────────────────────
+
+describe('POST /api/twin/ask — FTS fallback', () => {
+  it('embed fails → FTS fallback runs → retrieval_path is fts', async () => {
+    vi.stubEnv('TWIN_CONFIDENCE_THRESHOLD', '0.40')
+    mockEmbed.mockRejectedValue(new Error('embed unavailable'))
+    mockFrom.mockReturnValue(makeFtsChain({ data: [makeFtsChunk()], error: null }))
+    mockGenerate.mockResolvedValue({
+      text: 'Colin lives in Alberta.',
+      confidence: 0.85,
+      model: 'qwen2.5:32b',
+      tokens_used: 20,
+    })
+
+    const res = await POST(makeRequest({ question: 'Where does Colin live?' }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { retrieval_path: string; sources: { similarity: number }[] }
+    expect(body.retrieval_path).toBe('fts')
+    expect(body.sources).toHaveLength(1)
+    expect(body.sources[0].similarity).toBe(0)
+  })
+
+  it('embed succeeds → vector path used → retrieval_path is vector, FTS not called', async () => {
+    mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
+    mockRpc.mockResolvedValue({ data: [makePersonalChunk({ similarity: 0.75 })], error: null })
+    mockGenerate.mockResolvedValue({
+      text: 'Colin lives in Edmonton.',
+      confidence: 0.85,
+      model: 'qwen2.5:32b',
+      tokens_used: 20,
+    })
+
+    const res = await POST(makeRequest({ question: 'Where does Colin live?' }))
+    const body = (await res.json()) as { retrieval_path: string }
+    expect(body.retrieval_path).toBe('vector')
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('embed fails + FTS empty → retrieval_path none, escalates', async () => {
+    mockEmbed.mockRejectedValue(new Error('embed unavailable'))
+    // default mockFrom returns empty FTS chain
+    mockGenerate.mockResolvedValue({
+      text: 'insufficient_context',
+      confidence: 0,
+      model: 'qwen2.5:32b',
+      tokens_used: 5,
+    })
+
+    const res = await POST(makeRequest({ question: "What is Colin's credit score?" }))
+    const body = (await res.json()) as {
+      retrieval_path: string
+      escalate: boolean
+      sources: unknown[]
+    }
+    expect(res.status).toBe(200)
+    expect(body.retrieval_path).toBe('none')
+    expect(body.escalate).toBe(true)
+    expect(body.sources).toHaveLength(0)
+  })
+
+  it('embed fails + FTS DB error → retrieval_path none, never throws', async () => {
+    mockEmbed.mockRejectedValue(new Error('embed unavailable'))
+    mockFrom.mockReturnValue(makeFtsChain({ data: null, error: { message: 'DB error' } }))
+    mockGenerate.mockResolvedValue({
+      text: 'insufficient_context',
+      confidence: 0,
+      model: 'qwen2.5:32b',
+      tokens_used: 5,
+    })
+
+    const res = await POST(makeRequest({ question: 'test?' }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { retrieval_path: string }
+    expect(body.retrieval_path).toBe('none')
   })
 })

@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { runPickup } from '@/lib/harness/pickup-runner'
 import { runStallCheck } from '@/lib/harness/stall-check'
+import { checkPurposeReviewTimeouts } from '@/lib/purpose-review/timeout'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,13 +33,21 @@ export async function GET(request: Request) {
       errors: [String(err)],
     }))
 
+    // P1 — G2: wire purpose review timeout sweep (was dead code before this commit)
+    // Non-fatal: a timeout-check failure must not block task pickup.
+    const purposeReviewTimeouts = await checkPurposeReviewTimeouts().catch(() => 0)
+
     const result = await Promise.race([
       runPickup(runId),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('task pickup exceeded 60s timeout')), 60_000)
       ),
     ])
-    return NextResponse.json({ ...result, stall_check: stallCheckResult })
+    return NextResponse.json({
+      ...result,
+      stall_check: stallCheckResult,
+      purpose_review_timeouts: purposeReviewTimeouts,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown error'
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })

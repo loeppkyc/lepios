@@ -5,6 +5,9 @@ import { CURRENT_CAPACITY_TIER } from './config'
 import type { DigestResult, DigestStatus, QualityScore, TickResult } from './types'
 import { getDigestStallSummary } from '@/lib/harness/stall-check'
 import { buildBranchGuardLine } from '@/lib/harness/branch-guard'
+import { buildProcessEfficiencyLines } from '@/lib/harness/process-efficiency'
+import { buildFtsFallbackLine } from '@/lib/twin/fts-fallback'
+import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/telegram-stats'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -210,6 +213,22 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Append branch guard line — always added, never breaks digest ────────
   const branchGuardLine = await buildBranchGuardLine()
   messageToSend = `${messageToSend}\n${branchGuardLine}`
+
+  // ── F18: Append FTS fallback line — always added, never breaks digest ─────────
+  const ftsFallbackLine = await buildFtsFallbackLine()
+  messageToSend = `${messageToSend}\n${ftsFallbackLine}`
+
+  // ── 20% Better: Append process efficiency section ─────────────────────────────
+  const processEfficiencyLines = await buildProcessEfficiencyLines()
+  messageToSend = `${messageToSend}\n${processEfficiencyLines}`
+
+  // ── P6+P1: Drain stats + review timeout lines ─────────────────────────────────
+  const drainStatsLine = await buildDrainStatsLine()
+  messageToSend = `${messageToSend}\n${drainStatsLine}`
+  const reviewTimeoutLine = await buildReviewTimeoutLine()
+  if (reviewTimeoutLine !== null) {
+    messageToSend = `${messageToSend}\n${reviewTimeoutLine}`
+  }
   characterCount = messageToSend.length
 
   // Attempt send — measure Telegram latency, override status on failure
