@@ -122,6 +122,7 @@ chunks_planned:
 - "purpose-review"
 - "purpose-review-correctness"
 - "coordinator-env"
+- "stall-alert"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -134,16 +135,41 @@ chunks_awaiting_grounding:
 - "purpose-review"
   chunks_awaiting_grounding_correctness:
 - "purpose-review-correctness"
+  chunks_awaiting_grounding_coordinator_env:
+- "coordinator-env"
   chunks_not_started:
 - "task-pickup-100"
+  chunks_awaiting_grounding_stall_alert:
+- "stall-alert"
 
-active_chunk: "purpose-review-correctness"
-active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
-active_chunk_task_id: "fdf5a51e-28ca-4584-88f2-e922046ee276"
+active_chunk: "stall-alert"
+active_chunk_acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
+active_chunk_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
 active_chunk_status: "awaiting-grounding"
-active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
-active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
-active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+active_chunk_colin_approved_at: "2026-04-25T23:21:57Z"
+active_chunk_delegated_to_builder_at: "2026-04-26T00:40:00Z"
+active_chunk_build_complete_at: "2026-04-26T00:50:00Z"
+active_chunk_commit: "59e43fe0"
+active_chunk_tests: "946 passing, 1 pre-existing failing (task-pickup cron schedule)"
+last_updated_at: "2026-04-26T00:50:00Z"
+
+stall_alert_chunk:
+status: "awaiting-grounding"
+acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
+colin_approved_at: "2026-04-25T23:21:57Z"
+coordinator_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+delegated_to_builder_at: "2026-04-26T00:40:00Z"
+build_complete_at: "2026-04-26T00:50:00Z"
+commit: "59e43fe0"
+tests: "946 passing, 1 pre-existing failing (task-pickup cron schedule)"
+file_path_note: "builder used lib/orchestrator/digest.ts (not app/api/cron/morning-digest/route.ts) — route delegates to lib, verify at grounding"
+grounding_checkpoints:
+
+- "UPDATE task_queue SET last_heartbeat_at = now() - interval '35 minutes' WHERE status = 'running' LIMIT 1"
+- "curl -s GET https://lepios-one.vercel.app/api/cron/task-pickup -H 'Authorization: Bearer {CRON_SECRET}'"
+- "SELECT id, status, payload->>'text' FROM outbound_notifications ORDER BY created_at DESC LIMIT 3 — expect T1 alert row"
+- "SELECT meta FROM agent_events WHERE action='stall_alert_sent' ORDER BY occurred_at DESC LIMIT 1 — expect trigger+correlation_id"
+- "Trigger pickup again immediately — confirm no second notification row for same task_id (dedup)"
 
 coordinator_env_chunk:
 status: "awaiting-grounding"
