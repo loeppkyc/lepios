@@ -12,6 +12,8 @@ import { buildQuotaCliffLine } from '@/lib/harness/quota-cliff'
 import { buildHarnessRollupLine } from '@/lib/harness/rollup'
 import { buildQuotaGuardLine } from '@/lib/harness/quota-guard'
 import { buildStartupForecastLine } from '@/lib/harness/quota-forecast'
+import { buildTaxSanityLine } from '@/lib/harness/tax-sanity'
+import { buildAmazonOrdersSyncLine } from '@/lib/amazon/orders-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -249,6 +251,15 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   if (reviewTimeoutLine !== null) {
     messageToSend = `${messageToSend}\n${reviewTimeoutLine}`
   }
+
+  // ── F18: Tax projection sanity-check guard-rails ──────────────────────────
+  const taxSanityLine = await buildTaxSanityLine()
+  messageToSend = `${messageToSend}\n${taxSanityLine}`
+
+  // ── F18: Amazon orders sync — daily row count vs. baseline ───────────────
+  const amazonOrdersSyncLine = await buildAmazonOrdersSyncLine()
+  messageToSend = `${messageToSend}\n${amazonOrdersSyncLine}`
+
   characterCount = messageToSend.length
 
   // Attempt send — measure Telegram latency, override status on failure

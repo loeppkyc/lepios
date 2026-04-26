@@ -17,6 +17,8 @@ const {
   mockBuildHarnessRollupLine,
   mockBuildQuotaGuardLine,
   mockBuildStartupForecastLine,
+  mockBuildTaxSanityLine,
+  mockBuildAmazonOrdersSyncLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -32,6 +34,8 @@ const {
   mockBuildHarnessRollupLine: vi.fn(),
   mockBuildQuotaGuardLine: vi.fn(),
   mockBuildStartupForecastLine: vi.fn(),
+  mockBuildTaxSanityLine: vi.fn(),
+  mockBuildAmazonOrdersSyncLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -98,6 +102,16 @@ vi.mock('@/lib/harness/quota-guard', () => ({
 // Mock quota-forecast so buildStartupForecastLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/quota-forecast', () => ({
   buildStartupForecastLine: mockBuildStartupForecastLine,
+}))
+
+// Mock tax-sanity so buildTaxSanityLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/tax-sanity', () => ({
+  buildTaxSanityLine: mockBuildTaxSanityLine,
+}))
+
+// Mock orders-digest so buildAmazonOrdersSyncLine does not consume mockFrom slots.
+vi.mock('@/lib/amazon/orders-digest', () => ({
+  buildAmazonOrdersSyncLine: mockBuildAmazonOrdersSyncLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -208,6 +222,10 @@ beforeEach(() => {
   mockBuildQuotaGuardLine.mockResolvedValue('Quota guard skips (24h): 0 ✅')
   // Default: no coordinator startup skips in 24h
   mockBuildStartupForecastLine.mockResolvedValue('Coordinator startup skips (24h): 0 ✅')
+  // Default: tax sanity clean — no snapshot yet (table empty on first run)
+  mockBuildTaxSanityLine.mockResolvedValue('Tax sanity: no snapshot yet')
+  // Default: Amazon sync not yet calibrated (baseline null on first run)
+  mockBuildAmazonOrdersSyncLine.mockResolvedValue('Amazon sync: no run in last 24h')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
