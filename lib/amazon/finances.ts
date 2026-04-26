@@ -2,7 +2,7 @@ import { spFetch } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface FinancialEventGroup {
+export interface FinancialEventGroup {
   FinancialEventGroupId: string
   /**
    * Absent on open (not-yet-transferred) groups.
@@ -10,6 +10,8 @@ interface FinancialEventGroup {
    * Constraint B-1: check field presence, not value.
    */
   FundTransferStatus?: string
+  FinancialEventGroupStart?: string
+  FinancialEventGroupEnd?: string
   OriginalTotal?: {
     CurrencyCode: string
     CurrencyAmount: number
@@ -35,24 +37,20 @@ export interface SettlementBalance {
 // ── Core fetch ────────────────────────────────────────────────────────────────
 
 /**
- * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
- * for open CAD groups.
- *
- * "Open" = FundTransferStatus field is absent (Constraint B-1).
- * CAD filter required (Constraint B-2): at least one open group has MXN $0.
- * Constraint B-9: no caching — caller's route uses force-dynamic.
+ * Fetch all financial event groups for the last `daysBack` days.
+ * Returns every group regardless of currency or status — callers filter.
+ * SP-API requires FinancialEventGroupStartedAfter — omitting it returns 400.
  */
-export async function fetchSettlementBalance(): Promise<SettlementBalance> {
+export async function fetchAllFinancialEventGroups(
+  daysBack: number
+): Promise<FinancialEventGroup[]> {
   const groups: FinancialEventGroup[] = []
-
-  // SP-API requires FinancialEventGroupStartedAfter — returns 400 "Date range not valid" without it
-  const startedAfter = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()
+  const startedAfter = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
   let currentParams: Record<string, string> = {
     MaxResultsPerPage: '100',
     FinancialEventGroupStartedAfter: startedAfter,
   }
 
-  // Paginate until no NextToken
   while (true) {
     const data = await spFetch<FinancialEventGroupsResponse>(
       '/finances/v0/financialEventGroups',
@@ -66,6 +64,20 @@ export async function fetchSettlementBalance(): Promise<SettlementBalance> {
     if (!nextToken) break
     currentParams = { NextToken: nextToken }
   }
+
+  return groups
+}
+
+/**
+ * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
+ * for open CAD groups.
+ *
+ * "Open" = FundTransferStatus field is absent (Constraint B-1).
+ * CAD filter required (Constraint B-2): at least one open group has MXN $0.
+ * Constraint B-9: no caching — caller's route uses force-dynamic.
+ */
+export async function fetchSettlementBalance(): Promise<SettlementBalance> {
+  const groups = await fetchAllFinancialEventGroups(180)
 
   // Filter: open (no FundTransferStatus) AND CAD (Constraint B-1, B-2)
   let total = 0
