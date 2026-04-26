@@ -1,0 +1,34 @@
+{
+  "chunk_id": "sprint-5-stall-alert",
+  "acceptance_doc_path": "docs/sprint-5/stall-alert-acceptance.md",
+  "files_changed": [
+    "lib/harness/stall-check.ts",
+    "app/api/cron/task-pickup/route.ts",
+    "lib/orchestrator/digest.ts",
+    "tests/harness/stall-check.test.ts",
+    "tests/orchestrator/digest.test.ts"
+  ],
+  "tests": {
+    "passing": 946,
+    "failing": 1,
+    "new": 11,
+    "failing_details": [
+      "tests/harness/task-pickup-100.test.ts — 'task-pickup entry has schedule \"0 * * * *\" (hourly)' — pre-existing failure, not caused by this chunk. vercel.json has '0 0 * * *' (daily), test expects '0 * * * *' (hourly). No relation to stall-check work."
+    ]
+  },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "grounding_checkpoint_required": [
+    "Synthetic stuck task: UPDATE task_queue SET last_heartbeat_at = now() - interval '35 minutes' WHERE status = 'running' LIMIT 1",
+    "Trigger pickup: curl -s GET https://lepios-one.vercel.app/api/cron/task-pickup -H 'Authorization: Bearer {CRON_SECRET}'",
+    "Confirm alert inserted: SELECT id, status, payload->>'text' as text FROM outbound_notifications ORDER BY created_at DESC LIMIT 3 — expect new row with T1 alert text",
+    "Confirm stall_alert_sent event logged: SELECT meta FROM agent_events WHERE action='stall_alert_sent' ORDER BY occurred_at DESC LIMIT 1 — expect correct trigger + correlation_id",
+    "Confirm dedup fires: trigger pickup again immediately — no second outbound_notifications row for same task_id"
+  ],
+  "unknowns": [
+    "Pre-existing test failure in tests/harness/task-pickup-100.test.ts ('0 * * * *' vs '0 0 * * *') is not caused by this chunk. Noted for coordinator triage."
+  ],
+  "next_chunk_blockers": [],
+  "tokens_used": 42000,
+  "timestamp": "2026-04-26T00:48:00Z"
+}
