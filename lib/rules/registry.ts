@@ -86,7 +86,12 @@ export const RULES: readonly Rule[] = [
     summary:
       'Every port chunk must use shadcn/ui components and Tailwind utility classes only. No inline style={} attributes in TSX files. No ad-hoc CSS files. All shared components in app/components/ or components/ui/. Builder acceptance tests must grep new TSX files for style= and fail if found.',
     defined_at: 'CLAUDE.md:73',
-    references: ['tests/design-system.test.ts', 'docs/sprint-5/purpose-review-acceptance.md'],
+    references: [
+      'tests/design-system.test.ts',
+      'docs/sprint-5/purpose-review-acceptance.md',
+      'docs/sprint-5/purpose-review-study.md',
+      'docs/sprint-5/work-budget-acceptance.md',
+    ],
   },
   {
     // F21 was previously unlabeled (CLAUDE.md §3 rule 6, list position only).
