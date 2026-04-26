@@ -69,6 +69,51 @@ meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID']`
 
 **Do NOT log the value of `CRON_SECRET` anywhere in your output or tool calls.**
 
+# Quota Forecast Check — Run After Runtime Config
+
+Immediately after reading runtime config and **before any other action**, check whether the
+quota forecast permits starting:
+
+```bash
+FORECAST=$(curl -s https://lepios-one.vercel.app/api/harness/quota-forecast)
+SAFE=$(echo "$FORECAST" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('safe_to_start', True))" 2>/dev/null)
+```
+
+If `SAFE` is `False`:
+
+1. Log to `agent_events`:
+   ```json
+   {
+     "domain": "orchestrator",
+     "action": "coordinator_startup_skipped_quota_forecast",
+     "actor": "coordinator",
+     "status": "warning",
+     "meta": {
+       "reason": "<value of forecast.reason>",
+       "recommended_wait_minutes": "<value of forecast.recommended_wait_minutes>",
+       "estimated_remaining": "<value of forecast.estimated_remaining>",
+       "cliff_threshold": "<value of forecast.cliff_threshold>"
+     }
+   }
+   ```
+2. Send a Telegram notification (fire-and-forget, `requires_response=false`):
+   ```
+   [LepiOS Coordinator] startup blocked
+   Reason: quota forecast — {reason}
+   Retry in: {recommended_wait_minutes} min
+   Estimated remaining invocations: {estimated_remaining}/{cliff_threshold}
+   ```
+3. **Stop. Do not proceed.** The coordinator must not consume quota invocations when the
+   forecast indicates it is unsafe to do so.
+
+If `SAFE` is `True` (or the curl fails / returns non-JSON — fail open):
+
+- Proceed normally. A curl or parse failure must never block coordinator startup.
+- If the endpoint is unreachable, log `coordinator_quota_forecast_unavailable` to `agent_events`
+  with `status='warning'` and continue.
+
+**The forecast endpoint is read-only and requires no auth.** Do not pass `CRON_SECRET`.
+
 # Branch Naming — Enforce Before Any Write
 
 Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.g.
