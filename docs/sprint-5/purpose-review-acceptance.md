@@ -201,7 +201,7 @@ in `app/components/` or `components/ui/`.
 git diff --name-only HEAD~1 | grep '\.tsx$' | xargs grep -l 'style=' && exit 1 || exit 0
 ```
 
-**Also add to CLAUDE.md as F20** (Architecture Rules §3, after F19):
+**Also add to CLAUDE.md as F20** (Architecture Rules §3, after F19) — Done: landed in CLAUDE.md:73.
 > F20 — Design system enforcement: all port chunk UI uses shadcn/ui + Tailwind utility
 > classes only. No inline style attributes. No ad-hoc CSS files. Acceptance tests must
 > verify compliance on every TSX file in the chunk's diff. See
@@ -251,8 +251,8 @@ All tests use mocks. No real Telegram API or Ollama calls.
 - [ ] Migration 0026: task_queue status constraint extended (awaiting_review, review_timeout)
 - [ ] F17: every review event logged to agent_events + routed to twin corpus
 - [ ] F18: review latency, distribution, iteration count, timeout rate queryable
-- [ ] F20: design-system acceptance test in every future port chunk acceptance doc
-- [ ] F20: rule added to CLAUDE.md as Architecture Rule §3 F20
+- [x] F20: design-system acceptance test in every future port chunk acceptance doc
+- [x] F20: rule added to CLAUDE.md as Architecture Rule §3 F20
 - [ ] All 7 test cases pass
 - [ ] Attribution recorded per review event
 - [ ] Existing port chunks (sprint-5 attribution, gmail, etc.) are grandfathered —
