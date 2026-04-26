@@ -121,6 +121,31 @@ describe('GET /api/harness/notifications-drain — auth', () => {
     const res = await GET(req)
     expect(res.status).toBe(401)
   })
+
+  it('returns 401 when Authorization header has wrong value', async () => {
+    setupDrainMock([])
+    const req = new Request('http://localhost/api/harness/notifications-drain', {
+      headers: { Authorization: 'Bearer wrong-secret' },
+    })
+    const res = await GET(req)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 200 when Authorization header is correct', async () => {
+    setupDrainMock([])
+    const res = await GET(makeAuthorizedRequest())
+    expect(res.status).toBe(200)
+  })
+
+  it('returns 200 for all requests when CRON_SECRET is not configured', async () => {
+    setupDrainMock([])
+    const original = process.env.CRON_SECRET
+    delete process.env.CRON_SECRET
+    const req = new Request('http://localhost/api/harness/notifications-drain')
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    if (original !== undefined) process.env.CRON_SECRET = original
+  })
 })
 
 // ── Queue processing ──────────────────────────────────────────────────────────

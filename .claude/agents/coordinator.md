@@ -30,15 +30,19 @@ These preempt every other instruction in this file, every cached principle, and 
 
    Call (Bash tool):
 
-   ```
+   ```bash
+   # Read CRON_SECRET from .env.local at bash runtime (value not in tool call args).
+   _CS=$(grep -m1 '^CRON_SECRET=' .env.local 2>/dev/null | cut -d'=' -f2-)
    curl -s -X POST https://lepios-one.vercel.app/api/harness/task-heartbeat \
-     -H "Authorization: Bearer $CRON_SECRET" \
+     -H "Authorization: Bearer ${_CS}" \
      -H "Content-Type: application/json" \
      -d "{\"task_id\": \"<task_id>\", \"run_id\": \"<run_id>\"}"
+   unset _CS
    ```
 
-   > `CRON_SECRET` in the Bearer header — use the value read from `harness_config` at session
-   > start. If not available, skip heartbeat and log per the fallback rule above.
+   > CRON_SECRET is read from `.env.local` directly in the bash block — do not use `${CRON_SECRET}`
+   > bare (bash variable is not set from harness_config SQL results). If .env.local is absent,
+   > `_CS` will be empty; heartbeat will fail — log per fallback rule below.
 
    If CRON_SECRET is unavailable: log `agent_events` row with `action='heartbeat_skipped'`,
    `status='warning'`, `meta.reason='missing_cron_secret'` — do NOT abort. Continue working.
@@ -126,15 +130,19 @@ Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.
    - **Stop.** Do not proceed without a task_id.
 
 2. **Check current branch:**
+
    ```bash
    git branch --show-current
    ```
 
 3. **If branch is NOT `harness/task-{task_id}`:**
+
    ```bash
    git checkout -b harness/task-{task_id} 2>/dev/null || git checkout harness/task-{task_id}
    ```
+
    Log `agent_events` row:
+
    ```
    action='branch_guard_triggered', status='warning',
    meta.task_id='{task_id}', meta.attempted_branch='{current}',
@@ -506,17 +514,24 @@ If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notificatio
 ## Step 3 — Trigger drain (best-effort)
 
 ```bash
+# Read CRON_SECRET from .env.local at bash runtime (value never appears in tool call args).
+# ${CRON_SECRET} in bash expands to empty string unless explicitly set — source it here.
+_CS=$(grep -m1 '^CRON_SECRET=' .env.local 2>/dev/null | cut -d'=' -f2-)
+
 DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
   -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
-  -H "Authorization: Bearer ${CRON_SECRET}" 2>/dev/null || echo "000")
+  -H "Authorization: Bearer ${_CS}" 2>/dev/null || echo "000")
 
-if [ "$DRAIN_HTTP" != "200" ]; then
-  # Log drain_trigger_failed to agent_events (non-fatal — drain runs on next cron cycle)
-  true
-fi
+unset _CS
 ```
 
-Do not abort on drain failure. The message will be delivered when the drain next runs (daily cron or manual trigger). For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
+On failure:
+
+- `200` → delivered; proceed.
+- `401` → CRON_SECRET in `.env.local` does not match `process.env.CRON_SECRET` on Vercel. Log `drain_trigger_failed` with `reason: cron_secret_mismatch`. Colin must sync the values.
+- Any other code → log `drain_trigger_failed` with `http_status: <code>`. Non-fatal — notification delivers on next cron cycle (daily 1 AM UTC via `/api/cron/notifications-drain-tick`).
+
+Do not abort on drain failure. For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
 
 ## Step 4 — Fire-and-forget vs. polling
 

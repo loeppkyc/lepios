@@ -3,8 +3,8 @@
  *
  * Covers:
  *   buildDrainStatsLine:
- *     - Returns correct run count and summed messages from agent_events
- *     - Returns "Drain runs (24h): 0, messages: 0" when no rows
+ *     - Returns summed delivered + failed counts from drain_run events in last 24h
+ *     - Returns "0 delivered, 0 failed" when no drain_run events
  *     - Returns "unavailable" on DB error (never throws)
  *
  *   buildReviewTimeoutLine:
@@ -43,7 +43,7 @@ function makeQueryChain(result: QueryResult) {
 describe('buildDrainStatsLine', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns run count and summed drained messages', async () => {
+  it('returns summed delivered and failed counts across drain_run events', async () => {
     mockFrom.mockReturnValue(
       makeQueryChain({
         data: [
@@ -55,16 +55,16 @@ describe('buildDrainStatsLine', () => {
       })
     )
     const result = await buildDrainStatsLine()
-    expect(result).toBe('Drain runs (24h): 3, messages: 4')
+    expect(result).toBe('Notifications drained (24h): 4 delivered, 1 failed')
   })
 
-  it('returns 0 runs and 0 messages when no drain_run events', async () => {
+  it('returns 0 delivered and 0 failed when no drain_run events', async () => {
     mockFrom.mockReturnValue(makeQueryChain({ data: [], error: null }))
     const result = await buildDrainStatsLine()
-    expect(result).toBe('Drain runs (24h): 0, messages: 0')
+    expect(result).toBe('Notifications drained (24h): 0 delivered, 0 failed')
   })
 
-  it('handles missing meta.drained gracefully (defaults to 0)', async () => {
+  it('handles missing meta.drained/failed gracefully (defaults to 0)', async () => {
     mockFrom.mockReturnValue(
       makeQueryChain({
         data: [{ meta: null }, { meta: {} }],
@@ -72,7 +72,7 @@ describe('buildDrainStatsLine', () => {
       })
     )
     const result = await buildDrainStatsLine()
-    expect(result).toBe('Drain runs (24h): 2, messages: 0')
+    expect(result).toBe('Notifications drained (24h): 0 delivered, 0 failed')
   })
 
   it('returns "unavailable" on DB error (never throws)', async () => {
@@ -80,7 +80,7 @@ describe('buildDrainStatsLine', () => {
       throw new Error('connection refused')
     })
     const result = await buildDrainStatsLine()
-    expect(result).toBe('Drain runs (24h): unavailable')
+    expect(result).toBe('Notifications drained (24h): unavailable')
   })
 
   it('queries action=drain_run in agent_events', async () => {
