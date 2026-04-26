@@ -19,6 +19,8 @@ const {
   mockBuildStartupForecastLine,
   mockBuildTaxSanityLine,
   mockBuildAmazonOrdersSyncLine,
+  mockBuildAmazonSettlementsSyncLine,
+  mockBuildOllamaTunnelHealthLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -36,6 +38,8 @@ const {
   mockBuildStartupForecastLine: vi.fn(),
   mockBuildTaxSanityLine: vi.fn(),
   mockBuildAmazonOrdersSyncLine: vi.fn(),
+  mockBuildAmazonSettlementsSyncLine: vi.fn(),
+  mockBuildOllamaTunnelHealthLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -112,6 +116,16 @@ vi.mock('@/lib/harness/tax-sanity', () => ({
 // Mock orders-digest so buildAmazonOrdersSyncLine does not consume mockFrom slots.
 vi.mock('@/lib/amazon/orders-digest', () => ({
   buildAmazonOrdersSyncLine: mockBuildAmazonOrdersSyncLine,
+}))
+
+// Mock settlements-digest so buildAmazonSettlementsSyncLine does not consume mockFrom slots.
+vi.mock('@/lib/amazon/settlements-digest', () => ({
+  buildAmazonSettlementsSyncLine: mockBuildAmazonSettlementsSyncLine,
+}))
+
+// Mock ollama-tunnel-stats so buildOllamaTunnelHealthLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/ollama-tunnel-stats', () => ({
+  buildOllamaTunnelHealthLine: mockBuildOllamaTunnelHealthLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -226,6 +240,10 @@ beforeEach(() => {
   mockBuildTaxSanityLine.mockResolvedValue('Tax sanity: no snapshot yet')
   // Default: Amazon sync not yet calibrated (baseline null on first run)
   mockBuildAmazonOrdersSyncLine.mockResolvedValue('Amazon sync: no run in last 24h')
+  // Default: Amazon settlements sync not yet run (first deploy)
+  mockBuildAmazonSettlementsSyncLine.mockResolvedValue('Amazon settlements: no run in last 24h')
+  // Default: Ollama tunnel smoke has no data yet (first run after deploy)
+  mockBuildOllamaTunnelHealthLine.mockResolvedValue('Ollama tunnel: no smoke data (last 24h)')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────

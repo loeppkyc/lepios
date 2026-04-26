@@ -15,6 +15,7 @@ import {
 } from '@/lib/harness/deploy-gate'
 import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
+import { runOllamaHealthSmoke } from '@/lib/harness/smoke-tests/ollama-health'
 import { parseBumpDirectives, applyBumps } from '@/lib/harness/component-bump'
 
 export const dynamic = 'force-dynamic'
@@ -387,9 +388,10 @@ async function runProductionSmokes(): Promise<{ processed: number; results: stri
     const mergeSha = row.meta.merge_sha as string
     const commitSha = (row.meta.commit_sha as string) ?? 'unknown'
 
-    const [routeHealthResult, cronResult] = await Promise.all([
+    const [routeHealthResult, cronResult, ollamaResult] = await Promise.all([
       runRouteHealthSmoke(baseUrl, commitSha),
       runCronRegistrationSmoke(baseUrl),
+      runOllamaHealthSmoke(), // non-critical — does not block deploy
     ])
     const allPassed = routeHealthResult.passed && cronResult.passed
 
@@ -413,6 +415,12 @@ async function runProductionSmokes(): Promise<{ processed: number; results: stri
               module: 'cron-registration',
               passed: cronResult.passed,
               reason: cronResult.reason,
+            },
+            {
+              module: 'ollama-health',
+              passed: ollamaResult.passed,
+              detail: ollamaResult.detail,
+              latency_ms: ollamaResult.latency_ms,
             },
           ],
           total_ms: routeHealthResult.total_ms,
