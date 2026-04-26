@@ -9,6 +9,7 @@ import { buildProcessEfficiencyLines } from '@/lib/harness/process-efficiency'
 import { buildFtsFallbackLine } from '@/lib/twin/fts-fallback'
 import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/telegram-stats'
 import { buildQuotaCliffLine } from '@/lib/harness/quota-cliff'
+import { buildHarnessRollupLine } from '@/lib/harness/rollup'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -226,6 +227,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Routines quota cliff signal ─────────────────────────────────────────
   const quotaCliffLine = await buildQuotaCliffLine()
   messageToSend = `${messageToSend}\n${quotaCliffLine}`
+
+  // ── Harness rollup — auto-computed from harness_components table ──────────────
+  const harnessRollupLine = await buildHarnessRollupLine()
+  messageToSend = `${messageToSend}\n${harnessRollupLine}`
 
   // ── P6+P1: Drain stats + review timeout lines ─────────────────────────────────
   const drainStatsLine = await buildDrainStatsLine()
