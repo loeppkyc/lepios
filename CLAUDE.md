@@ -155,6 +155,26 @@ Newest-first. For global failures (Streamlit, BBV, general patterns), see `~/.cl
 
 ### FAILURES
 
+**F-L15: Single-window-then-many ramp — under-utilization while concurrency is felt out (2026-04-27)**
+Started today with one window, periodically asked "should we open more?", eventually ran four. The right concurrency is "just below where reports stack faster than I can read them." ~30 min of single-window under-utilization while the first task anchored before parallelism kicked in.
+→ Session start should include a concurrency recommendation based on task_queue depth: >2 open unblocked tasks → suggest opening a second window immediately. Don't wait to feel out the right level. Queue task: per-window status signal in coordinator startup or Telegram.
+
+**F-L14: ingest-claude-md.ts static entity list — new arch rules invisible to Twin (2026-04-27)**
+F21 was registered in the registry and added to CLAUDE.md, but the Twin can't answer F21 arch-rule queries because `ingest-claude-md.ts` maintains a hard-coded entity list that wasn't updated. W4 flagged the gap; a targeted ingest run (W2 today) patches F21 specifically. The root issue persists.
+→ `ingest-claude-md.ts` should derive its `arch-F*` entity list from `lib/rules/registry.ts` at runtime instead of a parallel static list. Any new `RULES` entry would then be automatically ingested on next run. Queue task: registry-driven ingest.
+
+**F-L13: Component % bumps require manual SQL — generates Colin-interrupt on every advancement (2026-04-27)**
+W2's rollup table auto-computes but doesn't auto-update component percentages — they stay at seed values until someone runs a manual UPDATE. W3 had to manually bump `smoke_test_framework` today. Each harness advancement that earns a % change requires a separate SQL intervention.
+→ Component % bumps should land in the same PR as the work that earned them. Parse a `bumps harness:slug to N%` directive in PR description and run the UPDATE post-merge via migration or CI script. Queue task: component % auto-bump on PR merge.
+
+**F-L12: F17 rule number cited with wrong meaning throughout session (2026-04-27)**
+F17 was assumed throughout chat to mean "acceptance tests first" (former unnumbered rule 6) but actually means "behavioral-ingestion-justification." The rule "acceptance tests first" had no F-number until today (now F21, PR #13). Downstream sessions propagated the wrong meaning before the registry was consulted.
+→ When an assistant cites an F-number in prose, cross-check `lib/rules/registry.ts` before propagating. Rule numbers are not self-evident from content; the registry is the source of truth, not context memory.
+
+**F-L11: Vercel silent rejection at config-validation — no failed deploy created, 12h undeployed main (2026-04-27)**
+The hourly notifications-drain cron (PR #9, merged yesterday) was rejected by Vercel Hobby plan at config validation — before any build ran, no failed deploy record was created, GitHub commit status was the only signal. Main was undeployable for 12+ hours while tests showed green and CI passed. The deploy gate verified tests + merge but had no production-deploy verification step.
+→ Any cron addition must be validated against Vercel Hobby limits (max 1 hourly cron) before merge. Post-merge: confirm a new deployment landed in Vercel before marking done. The smoke test framework (PRs #12, #15) addresses the production verification gap going forward.
+
 **F-L10: Manual rollup tracking — Colin asked twice (2026-04-26)**
 Autonomy percentage was computed by hand mid-session and Colin had to ask for it twice. No authoritative rollup in any dashboard.
 → Auto-compute harness rollup from `task_queue` weights and surface in `morning_digest`. Colin should never need to ask for a number the system can compute. Queue task: morning_digest rollup widget.
@@ -196,6 +216,26 @@ Coordinator pushed acceptance docs and code to `main`. Required manual history c
 → Branch guard enforced: every session verifies `harness/task-{task_id}` before any file write. Drift triggers `branch_guard_triggered` in `agent_events` and aborts. See `.claude/agents/coordinator.md` Branch Naming section.
 
 ### SUCCESSES
+
+**S-L15: 12 PRs merged in one day — squash-merge + CI gate held, no rollbacks (2026-04-27)**
+PRs #4–#15 shipped across two sessions (yesterday + today). All squash-merged, all passed CI, zero production incidents. #9 was reverted cleanly before it could break deploys. The harness deploy gate + test suite provided sufficient coverage across 370+ tests.
+→ Squash merge + CI gate is the right policy for this repo. Every main commit is a deployable unit. The gate isn't perfect (see F-L11 — Vercel config-validation gap) but covered all code-correctness cases. Continue.
+
+**S-L14: DB rollup replaced manual tracking — caught agent over-count in real time (2026-04-27)**
+W2's harness rollup table auto-computed autonomy at 84.6%. The chat assistant had been citing ~89% from mental arithmetic. DB number is authoritative; agent estimate was wrong by ~4.4 points. Pattern: when the system can self-report a metric, stop letting agents track it in their heads.
+→ Any metric that appears in session chat more than once is a candidate for DB-resident tracking. Self-reported numbers from agents are estimates; DB-resident numbers are facts. Colin should be able to ask a live question and get a DB-sourced answer, not a recollection.
+
+**S-L13: Audit-only tasks are zero-contention — run freely alongside build windows (2026-04-27)**
+W4's rule consistency audit and W3's harness status diagnostic ran read-only throughout the session and never conflicted with W1/W2's build windows. Audit windows produced structured reports that build windows consumed — clean handoff with no coordination overhead.
+→ Read-only/audit tasks have no contention with build windows. Run them in parallel whenever the task is correctly scoped (no file writes, no migrations, no deploys). The only constraint is Colin's attention span on incoming reports.
+
+**S-L12: Rule registry self-policing proven on first real use (2026-04-27)**
+W4 built the registry yesterday; W1 used `getNextRuleNumber()` today to register F21 cleanly with no collision and no cross-session coordination. The collision-detection test (18/18) caught a deliberately-injected duplicate. Registry workflow (claim → append → test → prose) worked end-to-end.
+→ The registry + test gate is the right pattern for any shared enumeration that multiple sessions write to concurrently. Proven on F-rules; applicable to migration numbers, entity slugs, and other monotonically-increasing identifiers.
+
+**S-L11: Quota cliff visibility + prevention closed same-day (2026-04-27)**
+W1 shipped the quota-cliff digest signal (PR #10) and W2 shipped the pre-claim 429 guard (PR ee78867) same-day, after yesterday's F-L7 named the pattern. Both the visibility layer and the prevention layer landed before the next window could hit the cliff again.
+→ When a recurring failure mode is named: pair "make it visible in digest" with "prevent it at source" in the same session. Shipping the signal without the guard leaves a visible-but-preventable failure. Shipping the guard without the signal leaves a silent one. Neither alone is sufficient.
 
 **S-L10: Buffer slot discipline — 1 idle window prevents Colin-as-bottleneck (2026-04-26)**
 Holding one window idle when 3 are active meant stacked reports didn't pile up waiting on a free slot. Colin could review and redirect without the queue stalling.
