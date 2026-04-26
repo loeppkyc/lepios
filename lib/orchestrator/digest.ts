@@ -14,6 +14,8 @@ import { buildQuotaGuardLine } from '@/lib/harness/quota-guard'
 import { buildStartupForecastLine } from '@/lib/harness/quota-forecast'
 import { buildTaxSanityLine } from '@/lib/harness/tax-sanity'
 import { buildAmazonOrdersSyncLine } from '@/lib/amazon/orders-digest'
+import { buildAmazonSettlementsSyncLine } from '@/lib/amazon/settlements-digest'
+import { buildOllamaTunnelHealthLine } from '@/lib/harness/ollama-tunnel-stats'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -259,6 +261,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Amazon orders sync — daily row count vs. baseline ───────────────
   const amazonOrdersSyncLine = await buildAmazonOrdersSyncLine()
   messageToSend = `${messageToSend}\n${amazonOrdersSyncLine}`
+
+  // ── Ollama tunnel smoke health — P1 line on failure, silent on pass ───────
+  const ollamaTunnelLine = await buildOllamaTunnelHealthLine()
+  messageToSend = `${messageToSend}\n${ollamaTunnelLine}`
 
   characterCount = messageToSend.length
 
