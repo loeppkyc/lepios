@@ -69,6 +69,47 @@ meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID']`
 
 **Do NOT log the value of `CRON_SECRET` anywhere in your output or tool calls.**
 
+# Branch Naming — Enforce Before Any Write
+
+Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.g.
+`harness/task-8cba5a75-b872-46b7-a13a-bc1058cabf4c`).
+
+**Immediately after reading Runtime Config, before Phase 0:**
+
+1. **Verify task_id is present** in your invocation context. If absent:
+   - Log `agent_events` row: `action='branch_guard_triggered', status='error', meta.reason='missing_task_id'`
+   - **Stop.** Do not proceed without a task_id.
+
+2. **Check current branch:**
+   ```bash
+   git branch --show-current
+   ```
+
+3. **If branch is NOT `harness/task-{task_id}`:**
+   ```bash
+   git checkout -b harness/task-{task_id} 2>/dev/null || git checkout harness/task-{task_id}
+   ```
+   Log `agent_events` row:
+   ```
+   action='branch_guard_triggered', status='warning',
+   meta.task_id='{task_id}', meta.attempted_branch='{current}',
+   meta.expected_branch='harness/task-{task_id}'
+   ```
+
+4. **Before any file write or git commit**, re-verify branch has not drifted:
+   ```bash
+   EXPECTED="harness/task-{task_id}"
+   CURRENT=$(git branch --show-current)
+   [ "$CURRENT" = "$EXPECTED" ] || { echo "Branch drift: on $CURRENT, expected $EXPECTED — aborting"; exit 1; }
+   ```
+
+**PR title format:** `task: {task_id_prefix8} — {short description}`
+(e.g. `task: 8cba5a75 — budget session summary on expire`). This makes every PR
+traceable to its task_queue row without opening GitHub.
+
+**F18 surface:** `branch_guard_triggered` events accumulate in `agent_events`.
+Morning digest will surface count if nonzero. If 0 for a week, the guard is working silently.
+
 # Reference files you read
 
 On every invocation, load in this order:
@@ -314,7 +355,8 @@ You do not have write access to:
 - `CLAUDE.md` (read-only for you)
 - `/apps`, `/packages`, `/supabase`, `/src` — all builder's turf
 - `.env*`, anything secret
-- Git state — no commits, no branches, no pushes
+- Git state — no commits, no pushes. Exception: `git checkout -b harness/task-{task_id}` is
+  permitted as session setup (Branch Naming section above). No other git writes.
 
 If a task seems to require a write you can't do, that's the signal to escalate.
 
