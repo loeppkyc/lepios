@@ -124,6 +124,7 @@ chunks_planned:
 - "coordinator-env"
 - "stall-alert"
 - "notification-drain-dedup"
+- "button-data-invalid"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -152,7 +153,19 @@ active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
 active_chunk_build_complete_at: "2026-04-26T01:21:00Z"
 active_chunk_commit: "ea4f826"
 active_chunk_tests: "600 passing, 8 pre-existing failing (next/server env issue)"
-last_updated_at: "2026-04-26T01:22:00Z"
+last_updated_at: "2026-04-26T19:09:00Z"
+
+button_data_invalid_chunk:
+status: "in-build"
+acceptance_doc: "docs/sprint-5/button-data-invalid-acceptance.md"
+colin_approved_at: "2026-04-26T01:49:32Z"
+coordinator_task_id: "915d1fee-18bd-4718-bde5-8a6956a72084"
+builder_task_id: "6d4f2276-dc65-42e8-8696-0ff01724d49b"
+delegated_to_builder_at: "2026-04-26T19:09:00Z"
+key_files:
+  - "lib/harness/telegram-buttons.ts"
+  - "app/api/telegram/webhook/route.ts"
+  - ".claude/agents/coordinator.md (inline keyboard template section)"
 
 prior_active_chunk: "stall-alert"
 prior_active_chunk_acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
