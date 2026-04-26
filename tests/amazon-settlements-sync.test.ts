@@ -100,10 +100,10 @@ describe('mapSettlementGroupToRow', () => {
     const { mapSettlementGroupToRow } = await import('@/lib/amazon/settlements-sync')
     const group = makeClosedGroup()
     const row = mapSettlementGroupToRow(group)
-    expect((row.raw_json as FinancialEventGroup).FinancialEventGroupId).toBe(
+    expect((row.raw_json as unknown as FinancialEventGroup).FinancialEventGroupId).toBe(
       group.FinancialEventGroupId
     )
-    expect((row.raw_json as FinancialEventGroup).FundTransferStatus).toBe('Transferred')
+    expect((row.raw_json as unknown as FinancialEventGroup).FundTransferStatus).toBe('Transferred')
   })
 
   it('updated_at is a valid ISO timestamp', async () => {

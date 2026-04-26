@@ -10,6 +10,7 @@ export interface FinancialEventGroup {
    * Constraint B-1: check field presence, not value.
    */
   FundTransferStatus?: string
+  FundTransferDate?: string
   FinancialEventGroupStart?: string
   FinancialEventGroupEnd?: string
   OriginalTotal?: {
