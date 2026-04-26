@@ -147,3 +147,28 @@ reversibility_check: |
 confidence: high (direct Colin ratification, not cache-match; escalation is procedurally correct)
 outcome: proceeding_to_builder_on_colin_direct_ratification
 proceed_reason: "Colin approved via callback at 2026-04-25T23:05:19Z — direct ratification, not cache-match"
+
+---
+
+2026-04-26T01:16:00Z sprint=5 chunk=notification-drain-dedup doc=docs/sprint-5/notification-drain-dedup-acceptance.md
+cited_principles: ["19 (destructive ops — not applicable, migration is additive index change)", "17 (no speculative infrastructure — all 3 improvements have explicit Colin approval)", "F18 (measurement required — latency logging is the F18 artifact)", "META-C"]
+trigger_match_evidence: |
+  META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
+  Therefore META-C does NOT apply. This entry is logged per the schema requirement that
+  escalations are also logged with the same schema.
+
+  The doc proceeds NOT via cache-match but via direct Colin ratification:
+  task_queue row c622d367-704d-4838-83bf-15a196c8c074, review_action="approved",
+  review_received_at="2026-04-26T00:08:12.684723Z". All 3 pending questions answered:
+  Q1 (dedup via UNIQUE constraint), Q2 (daily safety-net cron), Q3 (latency logging).
+reversibility_check: |
+  Migration 0030 (DROP old INDEX + CREATE UNIQUE INDEX): reversible — DROP the unique index
+  and recreate the non-unique one. No data is deleted.
+  route.ts change (add agent_events insert): reversible — remove the insert block.
+  vercel.json change (add cron): reversible — remove the cron entry.
+  study + acceptance docs: new files, fully reversible (delete or rewrite).
+  sprint-state.md update: reversible via git.
+  All decisions: LOW cost to reverse.
+confidence: high (direct Colin ratification, not cache-match; all 3 improvements explicitly approved)
+outcome: proceeding_to_builder_on_colin_direct_ratification
+proceed_reason: "Colin approved all 3 Q answers via task_queue metadata at 2026-04-26T00:08:12Z"
