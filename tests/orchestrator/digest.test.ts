@@ -2,11 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const { mockFrom, mockPostMessage, mockFetchHistory, mockScoreMorningDigest } = vi.hoisted(() => ({
+const {
+  mockFrom,
+  mockPostMessage,
+  mockFetchHistory,
+  mockScoreMorningDigest,
+  mockGetDigestStallSummary,
+} = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
   mockFetchHistory: vi.fn(),
   mockScoreMorningDigest: vi.fn(),
+  mockGetDigestStallSummary: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -27,6 +34,12 @@ vi.mock('@/lib/orchestrator/telegram', () => {
   }
   return { postMessage: mockPostMessage, MissingTelegramConfigError }
 })
+
+// Mock stall-check so getDigestStallSummary does not consume mockFrom slots.
+// Individual tests can override this mock to test stall-summary line behaviour.
+vi.mock('@/lib/harness/stall-check', () => ({
+  getDigestStallSummary: mockGetDigestStallSummary,
+}))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
 import { MissingTelegramConfigError } from '@/lib/orchestrator/telegram'
@@ -115,6 +128,8 @@ beforeEach(() => {
     prior_durations_ms: [],
   })
   mockScoreMorningDigest.mockReturnValue(MOCK_QUALITY_SCORE)
+  // Default: no stalled tasks — stall summary line omitted
+  mockGetDigestStallSummary.mockResolvedValue({ count: 0, descriptions: [] })
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────

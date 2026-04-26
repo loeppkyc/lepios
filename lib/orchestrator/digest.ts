@@ -3,6 +3,7 @@ import { postMessage, MissingTelegramConfigError } from './telegram'
 import { fetchHistoricalContext, scoreMorningDigest } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { DigestResult, DigestStatus, QualityScore, TickResult } from './types'
+import { getDigestStallSummary } from '@/lib/harness/stall-check'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -183,6 +184,22 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
       messageToSend = '⚠️ No night tick found for last night'
       digestStatus = 'no_tick_found'
     }
+  }
+
+  // ── Stall summary line — T3 + T4 tasks, omitted if count = 0 ────────────────
+  // Not deduped — always reflects current state (see stall-alert acceptance doc).
+  try {
+    const stall = await getDigestStallSummary()
+    if (stall.count > 0) {
+      const stallLine = `⚠️ ${stall.count} stalled — ${stall.descriptions.join(', ')}`
+      // Insert near the top: right after the first line (date header + blank line)
+      const lines = messageToSend.split('\n')
+      // Insert after line index 1 (blank line after header)
+      lines.splice(2, 0, stallLine)
+      messageToSend = lines.join('\n')
+    }
+  } catch {
+    // Non-fatal — digest still sends without stall summary
   }
 
   // ── F18: Append Ollama stats line — always added, never breaks digest ────────
