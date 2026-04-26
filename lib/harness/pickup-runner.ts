@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { claimTask, peekTask, reclaimStale, failTask } from '@/lib/harness/task-pickup'
+import { preClaimQuotaCheck } from '@/lib/harness/quota-guard'
 import { postMessage } from '@/lib/orchestrator/telegram'
 import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
@@ -247,6 +248,33 @@ export async function runPickup(runId: string): Promise<PickupResult> {
         duration_ms,
         ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
       }
+    }
+  }
+
+  // Quota guard — skip pickup if Routines API 429 backoff is active.
+  // Fails open: guard errors do not block pickup.
+  const quotaGuard = await preClaimQuotaCheck()
+  if (!quotaGuard.safe_to_claim) {
+    const duration_ms = Date.now() - start
+    void logEvent(
+      runId,
+      'warning',
+      null,
+      `pickup_skipped_quota_guard: ${quotaGuard.reason}`,
+      duration_ms,
+      'pickup_skipped_quota_guard',
+      {
+        reason: quotaGuard.reason,
+        retry_after_minutes: quotaGuard.retry_after_minutes ?? null,
+      }
+    )
+    return {
+      ok: true,
+      claimed: null,
+      reason: 'quota-guard',
+      run_id: runId,
+      duration_ms,
+      ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
     }
   }
 

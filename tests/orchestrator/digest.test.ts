@@ -15,6 +15,7 @@ const {
   mockBuildReviewTimeoutLine,
   mockBuildQuotaCliffLine,
   mockBuildHarnessRollupLine,
+  mockBuildQuotaGuardLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -28,6 +29,7 @@ const {
   mockBuildReviewTimeoutLine: vi.fn(),
   mockBuildQuotaCliffLine: vi.fn(),
   mockBuildHarnessRollupLine: vi.fn(),
+  mockBuildQuotaGuardLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -84,6 +86,11 @@ vi.mock('@/lib/harness/quota-cliff', () => ({
 // Mock rollup so buildHarnessRollupLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/rollup', () => ({
   buildHarnessRollupLine: mockBuildHarnessRollupLine,
+}))
+
+// Mock quota-guard so buildQuotaGuardLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/quota-guard', () => ({
+  buildQuotaGuardLine: mockBuildQuotaGuardLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -190,6 +197,8 @@ beforeEach(() => {
   mockBuildQuotaCliffLine.mockResolvedValue('Routines quota: clean (24h) ✅')
   // Default: healthy harness rollup with no prior event (first run)
   mockBuildHarnessRollupLine.mockResolvedValue('Harness rollup: 84.6% (13/18 components complete)')
+  // Default: quota guard clean — no pickup skips in 24h
+  mockBuildQuotaGuardLine.mockResolvedValue('Quota guard skips (24h): 0 ✅')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────

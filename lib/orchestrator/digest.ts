@@ -10,6 +10,7 @@ import { buildFtsFallbackLine } from '@/lib/twin/fts-fallback'
 import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/telegram-stats'
 import { buildQuotaCliffLine } from '@/lib/harness/quota-cliff'
 import { buildHarnessRollupLine } from '@/lib/harness/rollup'
+import { buildQuotaGuardLine } from '@/lib/harness/quota-guard'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -227,6 +228,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Routines quota cliff signal ─────────────────────────────────────────
   const quotaCliffLine = await buildQuotaCliffLine()
   messageToSend = `${messageToSend}\n${quotaCliffLine}`
+
+  // ── Quota guard: pickup skips due to 429 backoff (prevention layer) ───────────
+  const quotaGuardLine = await buildQuotaGuardLine()
+  messageToSend = `${messageToSend}\n${quotaGuardLine}`
 
   // ── Harness rollup — auto-computed from harness_components table ──────────────
   const harnessRollupLine = await buildHarnessRollupLine()

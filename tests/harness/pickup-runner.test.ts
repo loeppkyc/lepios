@@ -54,6 +54,16 @@ vi.mock('@/lib/harness/invoke-coordinator', () => ({
   fireCoordinator: mockFireCoordinator,
 }))
 
+// ── Mock quota-guard ──────────────────────────────────────────────────────────
+
+const { mockPreClaimQuotaCheck } = vi.hoisted(() => ({
+  mockPreClaimQuotaCheck: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/quota-guard', () => ({
+  preClaimQuotaCheck: mockPreClaimQuotaCheck,
+}))
+
 import {
   runPickup,
   buildTelegramMessage,
@@ -101,6 +111,8 @@ beforeEach(() => {
     session_id: 'session_test123',
     session_url: 'https://claude.ai/code/session_test123',
   })
+  // Default: quota guard safe — no active 429 backoff
+  mockPreClaimQuotaCheck.mockResolvedValue({ safe_to_claim: true, reason: 'no_recent_429s' })
 })
 
 afterEach(() => {
@@ -680,5 +692,118 @@ describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation f
     mockClaimTask.mockResolvedValue(mockTask)
     const result = await runPickup('run-abc')
     expect(result.claimed).toEqual(mockTask)
+  })
+})
+
+// ── Quota guard integration ───────────────────────────────────────────────────
+
+describe('runPickup — quota guard: backoff active', () => {
+  it('returns reason=quota-guard and claimed=null when guard is unsafe', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: false,
+      reason: 'quota_429_backoff_active',
+      retry_after_minutes: 28,
+    })
+
+    const result = await runPickup('run-abc')
+
+    expect(result.ok).toBe(true)
+    expect(result.claimed).toBeNull()
+    expect(result.reason).toBe('quota-guard')
+  })
+
+  it('does not call claimTask when guard is unsafe', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: false,
+      reason: 'quota_429_backoff_active',
+      retry_after_minutes: 28,
+    })
+
+    await runPickup('run-abc')
+
+    expect(mockClaimTask).not.toHaveBeenCalled()
+  })
+
+  it('still runs reclaimStale before the guard check (maintenance runs regardless)', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: false,
+      reason: 'quota_429_backoff_active',
+      retry_after_minutes: 5,
+    })
+
+    await runPickup('run-abc')
+
+    // reclaimStale is a maintenance step unrelated to Routines API quota — it always runs
+    expect(mockReclaimStale).toHaveBeenCalled()
+    // claimTask must NOT be called
+    expect(mockClaimTask).not.toHaveBeenCalled()
+  })
+
+  it('does not send Telegram when guard is unsafe', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: false,
+      reason: 'quota_429_backoff_active',
+      retry_after_minutes: 28,
+    })
+
+    await runPickup('run-abc')
+    await Promise.resolve()
+
+    expect(mockPostMessage).not.toHaveBeenCalled()
+  })
+
+  it('writes agent_events row with task_type=pickup_skipped_quota_guard', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: false,
+      reason: 'quota_429_backoff_active',
+      retry_after_minutes: 28,
+    })
+
+    const b = makeInsertBuilder()
+    mockFrom.mockReturnValue(b)
+
+    await runPickup('run-abc')
+
+    expect(b.insert).toHaveBeenCalled()
+    const row = b.insert.mock.calls[0][0]
+    expect(row.task_type).toBe('pickup_skipped_quota_guard')
+    expect(row.meta.reason).toBe('quota_429_backoff_active')
+    expect(row.meta.retry_after_minutes).toBe(28)
+  })
+})
+
+describe('runPickup — quota guard: guard safe (default)', () => {
+  it('calls claimTask when guard returns safe', async () => {
+    mockClaimTask.mockResolvedValue(null)
+
+    await runPickup('run-abc')
+
+    expect(mockClaimTask).toHaveBeenCalledWith('run-abc')
+  })
+
+  it('proceeds normally when guard returns expired backoff', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: true,
+      reason: 'quota_429_backoff_expired',
+    })
+    mockClaimTask.mockResolvedValue(mockTask)
+
+    const result = await runPickup('run-abc')
+
+    expect(result.claimed).toEqual(mockTask)
+    expect(mockClaimTask).toHaveBeenCalled()
+  })
+
+  it('proceeds normally when guard returns guard_error (fail-open)', async () => {
+    mockPreClaimQuotaCheck.mockResolvedValue({
+      safe_to_claim: true,
+      reason: 'guard_error',
+    })
+    mockClaimTask.mockResolvedValue(null)
+
+    const result = await runPickup('run-abc')
+
+    expect(result.ok).toBe(true)
+    expect(mockClaimTask).toHaveBeenCalled()
   })
 })
