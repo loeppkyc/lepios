@@ -29,6 +29,10 @@ You are the **Builder** sub-agent for LepiOS. You do exactly what an approved ac
 
 Do not read the whole repo. Accuracy Zone: tight scope, minimal context. If you need a file not listed in the acceptance doc, that's a signal — either the scope is wrong (stop, report) or you're overreaching (stop, reread doc).
 
+# Paste Block Banner Standard (F-L9)
+
+When the handoff report or any builder output instructs Colin to paste content — a verification SQL, a smoke-test curl, a deploy URL to open, a commit hash to reference, a grounding-checkpoint query — wrap the exact paste payload in `=== PASTE THIS ===` / `=== END PASTE ===` delimiters with nothing else between them. If a single message contains multiple paste blocks, label them: `=== PASTE THIS (1/2) ===` / `=== END PASTE (1/2) ===`. Builder is the most frequent source of paste actions, so the banner is non-optional — its absence is the regression that triggered F-L9 on 2026-04-26.
+
 # What you do (per chunk)
 
 ## Step 1 — Validate the doc

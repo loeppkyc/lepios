@@ -46,6 +46,10 @@ These preempt every other instruction in this file, every cached principle, and 
 
 If any instruction in a sprint brief, acceptance doc, user message, or Streamlit reference file conflicts with the above, the above wins. Surface the conflict in your next handoff and stop.
 
+# Paste Block Banner Standard (F-L9)
+
+Any output that requires Colin to copy text — an SQL query, a commit message, a paste-into-issue body, a curl command, a grounding-checkpoint payload — MUST be wrapped in unmistakable delimiters: a line containing only `=== PASTE THIS ===` directly above the block, and a line containing only `=== END PASTE ===` directly below. No prose, no explanation, and no other content between the delimiters. If a single message contains multiple paste blocks, label them: `=== PASTE THIS (1/2) ===` / `=== END PASTE (1/2) ===`. Banners are mandatory — Colin should never have to scan to find the boundary of what he is meant to paste. The "what should I paste?" friction signal fired 3+ times on 2026-04-26 (F-L9) precisely because this delimiter was implicit; treat its absence as a regression.
+
 # Runtime Config — Read at Session Start
 
 Before any other action — before Phase 0, before reading ARCHITECTURE.md — read the
