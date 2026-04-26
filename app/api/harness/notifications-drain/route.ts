@@ -158,7 +158,7 @@ async function drain(request: Request): Promise<NextResponse> {
         meta: { drained: 0, failed: 0, batch_queued: 0 },
         occurred_at: new Date().toISOString(),
       })
-      .catch(() => {})
+      .then(undefined, () => {})
     return NextResponse.json({
       ok: true,
       drained: 0,
@@ -246,7 +246,7 @@ async function drain(request: Request): Promise<NextResponse> {
       meta: { drained, failed, batch_queued: batchQueued },
       occurred_at: new Date().toISOString(),
     })
-    .catch(() => {})
+    .then(undefined, () => {})
 
   return NextResponse.json({ ok: true, drained, failed, improvement_engine: engineResult })
 }
