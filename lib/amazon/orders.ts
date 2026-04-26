@@ -18,11 +18,14 @@ export interface SpOrder {
   }
   NumberOfItemsShipped?: number
   NumberOfItemsUnshipped?: number
+  // ISO-8601 UTC timestamp e.g. "2026-04-22T18:30:00Z"
+  PurchaseDate?: string
 }
 
 export interface SpOrderItem {
   OrderItemId: string
   ASIN?: string
+  Title?: string
   QuantityOrdered: number
   // Pre-tax item price — the correct revenue field (Principle 6)
   ItemPrice?: { Amount: string; CurrencyCode: string }
@@ -153,7 +156,7 @@ export function yesterdayEndEdmontonUTC(): string {
  * machines alike. The offset is derived from localDate via Intl, so MST/MDT
  * is handled automatically without hardcoding.
  */
-function dayBoundaryUTC(localDate: Date, boundary: 'start' | 'end'): string {
+export function dayBoundaryUTC(localDate: Date, boundary: 'start' | 'end'): string {
   // Get year/month/day as seen in Edmonton at this UTC moment
   const dateFmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Edmonton',
