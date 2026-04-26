@@ -17,15 +17,16 @@ export async function buildDrainStatsLine(): Promise<string> {
       .gte('occurred_at', since)
       .limit(50)
 
-    const runs = data?.length ?? 0
-    const messages = (data ?? []).reduce((sum, r) => {
-      const drained = (r as { meta?: { drained?: number } }).meta?.drained ?? 0
-      return sum + drained
-    }, 0)
+    type DrainMeta = { meta?: { drained?: number; failed?: number } }
+    const delivered = (data ?? []).reduce(
+      (sum, r) => sum + ((r as DrainMeta).meta?.drained ?? 0),
+      0
+    )
+    const failed = (data ?? []).reduce((sum, r) => sum + ((r as DrainMeta).meta?.failed ?? 0), 0)
 
-    return `Drain runs (24h): ${runs}, messages: ${messages}`
+    return `Notifications drained (24h): ${delivered} delivered, ${failed} failed`
   } catch {
-    return 'Drain runs (24h): unavailable'
+    return 'Notifications drained (24h): unavailable'
   }
 }
 
