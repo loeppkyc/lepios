@@ -41,6 +41,7 @@ shared authority. This registry makes collisions impossible to miss.
 | F18    | measurement-benchmark-required     | project |
 | F19    | continuous-improvement-process     | global  |
 | F20    | design-system-enforcement          | project |
+| F21    | acceptance-tests-first             | project |
 
 ## Namespace note
 

@@ -10,7 +10,9 @@ import {
   sendPromotionNotification,
   fetchMigrationSQL,
   sendMigrationGateMessage,
+  insertSmokePendingEvent,
 } from '@/lib/harness/deploy-gate'
+import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +22,7 @@ const PROCESSING_WINDOW_MS = 2 * 60 * 1000
 const NOT_FOUND_GRACE_MS = 2 * 60 * 1000
 const TRIGGER_LOOKBACK_MS = 2 * 60 * 60 * 1000 // only look at last 2h of triggers
 const TERMINAL_LOOKBACK_MS = 4 * 60 * 60 * 1000 // terminal outcomes from last 4h
+const SMOKE_LOOKBACK_MS = 2 * 60 * 60 * 1000
 
 type Meta = Record<string, unknown>
 
@@ -270,6 +273,10 @@ async function runAutoPromote(
     } catch {
       // swallow — branch cleanup must not block the promoted result
     }
+
+    if (mergeResult.merge_sha) {
+      await insertSmokePendingEvent({ merge_sha: mergeResult.merge_sha, commit_sha, branch })
+    }
   } else {
     try {
       await writeGateEvent({
@@ -285,7 +292,86 @@ async function runAutoPromote(
   }
 }
 
+async function runProductionSmokes(): Promise<{ processed: number; results: string[] }> {
+  const db = createServiceClient()
+  const now = Date.now()
+
+  const { data: pendingRows, error } = await db
+    .from('agent_events')
+    .select('id, meta, occurred_at')
+    .eq('action', 'production_smoke_pending')
+    .gte('occurred_at', new Date(now - SMOKE_LOOKBACK_MS).toISOString())
+    .order('occurred_at', { ascending: true })
+    .limit(10)
+
+  if (error || !pendingRows || pendingRows.length === 0) {
+    return { processed: 0, results: [] }
+  }
+
+  const { data: completeRows } = await db
+    .from('agent_events')
+    .select('meta')
+    .eq('action', 'production_smoke_complete')
+    .gte('occurred_at', new Date(now - SMOKE_LOOKBACK_MS).toISOString())
+
+  const completedMergeShas = new Set(
+    (completeRows ?? []).map((r) => (r.meta as Meta)?.merge_sha as string).filter(Boolean)
+  )
+
+  const pending = (pendingRows as Array<{ id: string; meta: Meta; occurred_at: string }>).filter(
+    (r) => {
+      const mergeSha = r.meta?.merge_sha as string
+      return mergeSha && !completedMergeShas.has(mergeSha)
+    }
+  )
+
+  if (pending.length === 0) {
+    return { processed: 0, results: [] }
+  }
+
+  const baseUrl = process.env.LEPIOS_BASE_URL ?? 'https://lepios-one.vercel.app'
+  const results: string[] = []
+
+  for (const row of pending) {
+    const mergeSha = row.meta.merge_sha as string
+    const commitSha = (row.meta.commit_sha as string) ?? 'unknown'
+
+    const smokeResult = await runRouteHealthSmoke(baseUrl, commitSha)
+
+    try {
+      await db.from('agent_events').insert({
+        domain: 'orchestrator',
+        action: 'production_smoke_complete',
+        actor: 'deploy-gate',
+        status: smokeResult.passed ? 'success' : 'error',
+        meta: {
+          merge_sha: mergeSha,
+          commit_sha: commitSha,
+          l2_passed: smokeResult.passed,
+          l3_results: [
+            {
+              module: 'route-health',
+              passed: smokeResult.passed,
+              failed_routes: smokeResult.failed_routes,
+            },
+          ],
+          total_ms: smokeResult.total_ms,
+          base_url: baseUrl,
+        },
+      })
+    } catch {
+      // Non-fatal
+    }
+
+    results.push(`${mergeSha.slice(0, 8)}:${smokeResult.passed ? 'smoke-passed' : 'smoke-failed'}`)
+  }
+
+  return { processed: pending.length, results }
+}
+
 async function runGateRunner(): Promise<object> {
+  const smokeOutcome = await runProductionSmokes()
+
   const db = createServiceClient()
   const now = Date.now()
 
@@ -301,7 +387,12 @@ async function runGateRunner(): Promise<object> {
 
   if (triggerErr) throw triggerErr
   if (!triggers || triggers.length === 0) {
-    return { ok: true, processed: 0, reason: 'no-pending-triggers' }
+    return {
+      ok: true,
+      processed: smokeOutcome.processed,
+      results: smokeOutcome.results,
+      reason: 'no-pending-triggers',
+    }
   }
 
   // Query terminal outcome rows — any commit_sha that already reached an end state
@@ -350,7 +441,12 @@ async function runGateRunner(): Promise<object> {
   })
 
   if (pending.length === 0) {
-    return { ok: true, processed: 0, reason: 'all-in-progress-or-terminal' }
+    return {
+      ok: true,
+      processed: smokeOutcome.processed,
+      results: smokeOutcome.results,
+      reason: 'all-in-progress-or-terminal',
+    }
   }
 
   const toProcess = pending.slice(0, MAX_PER_TICK)
@@ -528,7 +624,11 @@ async function runGateRunner(): Promise<object> {
     }
   }
 
-  return { ok: true, processed: toProcess.length, results }
+  return {
+    ok: true,
+    processed: toProcess.length + smokeOutcome.processed,
+    results: [...smokeOutcome.results, ...results],
+  }
 }
 
 export async function GET(request: Request) {
