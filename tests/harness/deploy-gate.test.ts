@@ -7,14 +7,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
 
-const { mockInsert, mockFrom } = vi.hoisted(() => {
+const { mockInsert, mockFrom, mockRunRouteHealthSmoke } = vi.hoisted(() => {
   const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
   const mockFrom = vi.fn()
-  return { mockInsert, mockFrom }
+  const mockRunRouteHealthSmoke = vi.fn()
+  return { mockInsert, mockFrom, mockRunRouteHealthSmoke }
 })
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
+}))
+
+vi.mock('@/lib/harness/smoke-tests/route-health', () => ({
+  runRouteHealthSmoke: mockRunRouteHealthSmoke,
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -29,6 +34,7 @@ import {
   sendPromotionNotification,
   fetchMigrationSQL,
   sendMigrationGateMessage,
+  insertSmokePendingEvent,
 } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
@@ -101,6 +107,13 @@ beforeEach(() => {
   process.env.GITHUB_TOKEN = 'test-github-token'
   process.env.DEPLOY_GATE_AUTO_PROMOTE = '0' // disable auto-promote in all baseline tests
   delete process.env.VERCEL_TEAM_ID
+  // Default: route health smoke passes — prevents interference with trigger-focused tests
+  mockRunRouteHealthSmoke.mockResolvedValue({
+    passed: true,
+    routes: [],
+    failed_routes: [],
+    total_ms: 50,
+  })
 })
 
 afterEach(() => {
@@ -276,6 +289,7 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger])) // triggers query
       .mockReturnValueOnce(makeSelectBuilder([])) // terminal rows
       .mockReturnValueOnce(makeSelectBuilder([])) // processing markers
@@ -344,6 +358,7 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     const trigger = makeTriggerRow('building1', 3)
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -373,6 +388,7 @@ describe('GET /api/cron/deploy-gate-runner — skips terminal triggers', () => {
     const terminalRow = { id: 'x', meta: { commit_sha: 'abc1234' } }
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([terminalRow])) // terminal outcome exists
       .mockReturnValue(makeSelectBuilder([]))
@@ -389,6 +405,7 @@ describe('GET /api/cron/deploy-gate-runner — skips terminal triggers', () => {
     const processingRow = { meta: { commit_sha: 'inprog1' } }
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([])) // no terminal rows
       .mockReturnValueOnce(makeSelectBuilder([processingRow])) // processing marker exists
@@ -409,6 +426,7 @@ describe('GET /api/cron/deploy-gate-runner — timeout', () => {
     const trigger = makeTriggerRow('old1234', 12) // 12 minutes ago
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -434,6 +452,7 @@ describe('GET /api/cron/deploy-gate-runner — timeout', () => {
     const trigger = makeTriggerRow('edge1', 9) // 9 minutes ago — under timeout
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -461,6 +480,7 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
     const triggers = shas.map((sha) => makeTriggerRow(sha, 3))
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder(triggers)) // all 6 returned by DB
       .mockReturnValueOnce(makeSelectBuilder([])) // no terminal rows
       .mockReturnValueOnce(makeSelectBuilder([])) // no processing markers
@@ -511,6 +531,7 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
     const processingMarkers = shas.map((sha) => ({ meta: { commit_sha: sha } }))
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder(triggers))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder(processingMarkers))
@@ -626,6 +647,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -676,6 +698,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -706,6 +729,7 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -866,6 +890,7 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
   it('writes schema_check:success when no migration files detected', async () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -886,6 +911,7 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
   it('writes schema_check:warning (not error) when migration files detected', async () => {
     const trigger = makeTriggerRow('f3f43eb', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -913,6 +939,7 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
     delete process.env.GITHUB_TOKEN
     const trigger = makeTriggerRow('f3f43eb', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -938,6 +965,7 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
     const smokePassedRow = { meta: { commit_sha: 'smokeonly' } }
 
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger])) // triggers
       .mockReturnValueOnce(makeSelectBuilder([])) // terminal (no schema_check yet)
       .mockReturnValueOnce(makeSelectBuilder([])) // processing markers
@@ -1078,6 +1106,7 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote kill switch', () => 
     // DEPLOY_GATE_AUTO_PROMOTE=0 already set in beforeEach
     const trigger = makeTriggerRow('f3f43eb', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1113,6 +1142,7 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
   it('calls mergeToMain and writes deploy_gate_promoted on successful merge', async () => {
     const trigger = makeTriggerRow('abc1234', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1142,13 +1172,17 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
     const body = await res.json()
     expect(res.status).toBe(200)
 
-    // processing + preview_ready + smoke + schema + promoted = 5 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(5)
+    // processing + preview_ready + smoke + schema + promoted + smoke_pending = 6 inserts
+    expect(mockInsert).toHaveBeenCalledTimes(6)
     const promotedRow = mockInsert.mock.calls[4][0]
     expect(promotedRow.task_type).toBe('deploy_gate_promoted')
     expect(promotedRow.status).toBe('success')
     expect(promotedRow.meta.commit_sha).toBe('abc1234')
     expect(promotedRow.meta.merge_sha).toBe('mergesha123')
+
+    const smokePendingRow = mockInsert.mock.calls[5][0]
+    expect(smokePendingRow.action).toBe('production_smoke_pending')
+    expect(smokePendingRow.meta.merge_sha).toBe('mergesha123')
 
     expect(body.results.some((r: string) => r.includes(':promoted'))).toBe(true)
   })
@@ -1156,6 +1190,7 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
   it('writes deploy_gate_failed when merge returns non-201', async () => {
     const trigger = makeTriggerRow('abc1234', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1190,6 +1225,7 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote enabled', () => {
   it('does not call merge when schema-migrations detected (sends migration gate instead)', async () => {
     const trigger = makeTriggerRow('abc1234', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1467,6 +1503,7 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
   it('writes deploy_gate_notification_sent row when Telegram succeeds', async () => {
     const trigger = makeTriggerRow('notifsha', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1503,8 +1540,8 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     await GET(makeRequest())
 
-    // processing + preview_ready + smoke + schema + promoted + notification_sent = 6
-    expect(mockInsert).toHaveBeenCalledTimes(6)
+    // processing + preview_ready + smoke + schema + promoted + notification_sent + smoke_pending = 7
+    expect(mockInsert).toHaveBeenCalledTimes(7)
     const notifRow = mockInsert.mock.calls[5][0]
     expect(notifRow.task_type).toBe('deploy_gate_notification_sent')
     expect(notifRow.status).toBe('success')
@@ -1515,6 +1552,7 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
   it('promoted row includes task_id in meta', async () => {
     const trigger = makeTriggerRow('taskidsha', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1561,6 +1599,7 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     const trigger = makeTriggerRow('nonotif', 3)
     mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([])) // production smoke pending — none
       .mockReturnValueOnce(makeSelectBuilder([trigger]))
       .mockReturnValueOnce(makeSelectBuilder([]))
       .mockReturnValueOnce(makeSelectBuilder([]))
@@ -1586,8 +1625,8 @@ describe('GET /api/cron/deploy-gate-runner — promotion notification', () => {
 
     await GET(makeRequest())
 
-    // 5 inserts only — no notification_sent (Telegram not configured)
-    expect(mockInsert).toHaveBeenCalledTimes(5)
+    // 6 inserts — no notification_sent (Telegram not configured) but smoke_pending after delete
+    expect(mockInsert).toHaveBeenCalledTimes(6)
     const taskTypes = mockInsert.mock.calls.map(
       (c: unknown[][]) => (c[0] as { task_type: string }).task_type
     )
@@ -1822,5 +1861,122 @@ describe('sendMigrationGateMessage', () => {
     expect(result.truncated).toBe(true)
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string)
     expect(body.text.length).toBeLessThanOrEqual(3800)
+  })
+})
+
+// ── insertSmokePendingEvent ───────────────────────────────────────────────────
+
+describe('insertSmokePendingEvent', () => {
+  it('inserts correct row fields into agent_events', async () => {
+    mockFrom.mockReturnValue(makeInsertBuilder())
+
+    await insertSmokePendingEvent({
+      merge_sha: 'abc123def456',
+      commit_sha: 'def456abc123',
+      branch: 'harness/task-test',
+    })
+
+    expect(mockFrom).toHaveBeenCalledWith('agent_events')
+    const row = mockInsert.mock.calls[0][0]
+    expect(row.domain).toBe('orchestrator')
+    expect(row.action).toBe('production_smoke_pending')
+    expect(row.actor).toBe('deploy-gate')
+    expect(row.status).toBe('success')
+    expect(row.meta.merge_sha).toBe('abc123def456')
+    expect(row.meta.commit_sha).toBe('def456abc123')
+    expect(row.meta.branch).toBe('harness/task-test')
+    expect(row.meta.merged_at).toBeDefined()
+  })
+
+  it('swallows errors without throwing', async () => {
+    mockFrom.mockImplementationOnce(() => {
+      throw new Error('db connection failed')
+    })
+
+    await expect(
+      insertSmokePendingEvent({ merge_sha: 'abc', commit_sha: 'def', branch: 'main' })
+    ).resolves.toBeUndefined()
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — production smoke runner ────────────────
+
+describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
+  it('calls runRouteHealthSmoke with baseUrl and commitSha from pending event', async () => {
+    const pendingRow = {
+      id: 'evt-smoke1',
+      meta: { merge_sha: 'abcdef121234', commit_sha: 'sha123', branch: 'main' },
+      occurred_at: new Date().toISOString(),
+    }
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
+      .mockReturnValueOnce(makeSelectBuilder([]))           // smoke complete query
+      .mockReturnValueOnce(makeInsertBuilder())             // smoke_complete insert
+      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+
+    expect(mockRunRouteHealthSmoke).toHaveBeenCalledOnce()
+    expect(mockRunRouteHealthSmoke).toHaveBeenCalledWith('https://lepios-one.vercel.app', 'sha123')
+    expect(body.processed).toBe(1)
+    expect(body.results[0]).toContain('smoke-passed')
+  })
+
+  it('does not re-run smoke for already-completed merge_sha (idempotent)', async () => {
+    const pendingRow = {
+      id: 'evt-smoke2',
+      meta: { merge_sha: 'deadbeef1234', commit_sha: 'sha456', branch: 'main' },
+      occurred_at: new Date().toISOString(),
+    }
+    const completeRow = { meta: { merge_sha: 'deadbeef1234' } }
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
+      .mockReturnValueOnce(makeSelectBuilder([completeRow])) // smoke complete — already done
+      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+
+    expect(mockRunRouteHealthSmoke).not.toHaveBeenCalled()
+    expect(body.processed).toBe(0)
+  })
+
+  it('writes production_smoke_complete with status:error on smoke failure', async () => {
+    const pendingRow = {
+      id: 'evt-smoke3',
+      meta: { merge_sha: 'failsha12345', commit_sha: 'sha789', branch: 'main' },
+      occurred_at: new Date().toISOString(),
+    }
+
+    mockRunRouteHealthSmoke.mockResolvedValueOnce({
+      passed: false,
+      routes: [],
+      failed_routes: ['/api/health'],
+      total_ms: 100,
+    })
+
+    mockFrom
+      .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
+      .mockReturnValueOnce(makeSelectBuilder([]))           // smoke complete query
+      .mockReturnValueOnce(makeInsertBuilder())             // smoke_complete insert
+      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+
+    expect(mockRunRouteHealthSmoke).toHaveBeenCalledOnce()
+    expect(body.results[0]).toContain('smoke-failed')
+
+    const smokeCompleteRow = mockInsert.mock.calls[0][0]
+    expect(smokeCompleteRow.action).toBe('production_smoke_complete')
+    expect(smokeCompleteRow.status).toBe('error')
+    expect(smokeCompleteRow.meta.merge_sha).toBe('failsha12345')
+    expect(smokeCompleteRow.meta.l2_passed).toBe(false)
   })
 })

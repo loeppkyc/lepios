@@ -88,6 +88,28 @@ export const RULES: readonly Rule[] = [
     defined_at: 'CLAUDE.md:73',
     references: ['tests/design-system.test.ts', 'docs/sprint-5/purpose-review-acceptance.md'],
   },
+  {
+    // F21 was previously unlabeled (CLAUDE.md §3 rule 6, list position only).
+    // Registered 2026-04-27 to prevent agents from conflating it with F17, which
+    // sits immediately below it in the numbered list. Audit confirmed no actual
+    // F17 drift — F17 consistently means behavioral-ingestion-justification.
+    number: 21,
+    name: 'acceptance-tests-first',
+    scope: 'project',
+    summary:
+      'Every module must have written acceptance criteria before any code is written. The acceptance doc is the contract; code exists to satisfy it, not the other way around.',
+    defined_at: 'CLAUDE.md:69',
+    references: [
+      '.claude/agents/coordinator.md',
+      '.claude/agents/builder.md',
+      'docs/sprint-5/20-percent-better-engine-acceptance.md',
+      'docs/sprint-5/attribution-acceptance.md',
+      'docs/sprint-5/gmail-scanner-acceptance.md',
+      'docs/sprint-5/ollama-100-acceptance.md',
+      'docs/sprint-5/purpose-review-acceptance.md',
+      'docs/sprint-5/work-budget-acceptance.md',
+    ],
+  },
 ] as const
 
 /**
