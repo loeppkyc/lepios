@@ -20,6 +20,8 @@ type PendingRow = {
   chat_id: string | null
   payload: Record<string, unknown>
   attempts: number
+  created_at?: string
+  correlation_id?: string | null
 }
 
 function makeAuthorizedRequest(): Request {
@@ -46,12 +48,14 @@ function makeSelectChain(rows: PendingRow[]) {
 }
 
 // Wires mockFrom: first call → task_queue (improvement engine trigger — returns empty),
-// second call → outbound_notifications select chain, subsequent calls → update builder.
-// Returns update/updateEq spies for assertions.
+// second call → outbound_notifications select chain, subsequent calls → update builder
+// or agent_events insert builder (matched by table name).
+// Returns update/updateEq spies and agentEventsInsert spy for assertions.
 function setupDrainMock(rows: PendingRow[]) {
   const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
   const update = vi.fn().mockReturnValue({ eq: updateEq })
   const selectChain = makeSelectChain(rows)
+  const agentEventsInsert = vi.fn().mockResolvedValue({ data: null, error: null })
 
   // Chain for task_queue select in improvement engine trigger (returns no completed rows)
   const emptyTaskQueueChain: Record<string, unknown> = {
@@ -65,14 +69,15 @@ function setupDrainMock(rows: PendingRow[]) {
   }
 
   let fromCallCount = 0
-  mockFrom.mockImplementation(() => {
+  mockFrom.mockImplementation((table: string) => {
+    if (table === 'agent_events') return { insert: agentEventsInsert }
     fromCallCount++
     if (fromCallCount === 1) return { select: vi.fn().mockReturnValue(emptyTaskQueueChain) } // task_queue trigger
     if (fromCallCount === 2) return selectChain  // outbound_notifications select
     return { update }                            // outbound_notifications update
   })
 
-  return { update, updateEq }
+  return { update, updateEq, agentEventsInsert }
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -249,5 +254,34 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
     expect(sentBody.text).toBe('Approve or reject?')
     expect(sentBody.parse_mode).toBe('HTML')
     expect(sentBody.reply_markup).toBeDefined()
+  })
+
+  it('successful send logs notification_delivered to agent_events with non-negative delivery_latency_ms', async () => {
+    const createdAt = new Date(Date.now() - 5000).toISOString() // 5 seconds ago
+    const row: PendingRow = {
+      id: 'row-6',
+      channel: 'telegram',
+      chat_id: '444555666',
+      payload: { text: 'Latency test' },
+      attempts: 0,
+      created_at: createdAt,
+      correlation_id: 'corr-abc-123',
+    }
+    const { agentEventsInsert } = setupDrainMock([row])
+
+    const res = await GET(makeAuthorizedRequest())
+    const body = await res.json()
+
+    expect(body).toMatchObject({ ok: true, drained: 1, failed: 0 })
+
+    expect(agentEventsInsert).toHaveBeenCalledOnce()
+    const insertArg = agentEventsInsert.mock.calls[0][0] as Record<string, unknown>
+    expect(insertArg.action).toBe('notification_delivered')
+    const meta = insertArg.meta as Record<string, unknown>
+    expect(typeof meta.delivery_latency_ms).toBe('number')
+    expect(meta.delivery_latency_ms as number).toBeGreaterThanOrEqual(0)
+    expect(meta.notification_id).toBe('row-6')
+    expect(meta.correlation_id).toBe('corr-abc-123')
+    expect(meta.channel).toBe('telegram')
   })
 })

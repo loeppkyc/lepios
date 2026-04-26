@@ -123,6 +123,7 @@ chunks_planned:
 - "purpose-review-correctness"
 - "coordinator-env"
 - "stall-alert"
+- "notification-drain-dedup"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -142,16 +143,26 @@ chunks_awaiting_grounding:
   chunks_awaiting_grounding_stall_alert:
 - "stall-alert"
 
-active_chunk: "stall-alert"
-active_chunk_acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
-active_chunk_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+active_chunk: "notification-drain-dedup"
+active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
+active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
 active_chunk_status: "awaiting-grounding"
-active_chunk_colin_approved_at: "2026-04-25T23:21:57Z"
-active_chunk_delegated_to_builder_at: "2026-04-26T00:40:00Z"
-active_chunk_build_complete_at: "2026-04-26T00:50:00Z"
-active_chunk_commit: "59e43fe0"
-active_chunk_tests: "946 passing, 1 pre-existing failing (task-pickup cron schedule)"
-last_updated_at: "2026-04-26T00:50:00Z"
+active_chunk_colin_approved_at: "2026-04-26T00:08:12Z"
+active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
+active_chunk_build_complete_at: "2026-04-26T01:21:00Z"
+active_chunk_commit: "ea4f826"
+active_chunk_tests: "600 passing, 8 pre-existing failing (next/server env issue)"
+last_updated_at: "2026-04-26T01:22:00Z"
+
+prior_active_chunk: "stall-alert"
+prior_active_chunk_acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
+prior_active_chunk_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+prior_active_chunk_status: "awaiting-grounding"
+prior_active_chunk_colin_approved_at: "2026-04-25T23:21:57Z"
+prior_active_chunk_delegated_to_builder_at: "2026-04-26T00:40:00Z"
+prior_active_chunk_build_complete_at: "2026-04-26T00:50:00Z"
+prior_active_chunk_commit: "59e43fe0"
+prior_active_chunk_tests: "946 passing, 1 pre-existing failing (task-pickup cron schedule)"
 
 stall_alert_chunk:
 status: "awaiting-grounding"
@@ -182,6 +193,21 @@ build_complete_at: "2026-04-25T23:35:34Z"
 commit: "b7ecf50"
 tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
 grounding_checkpoints: - "Apply migration 0029_harness_config.sql to production Supabase" - "UPDATE harness_config SET value = '<actual-cron-secret>' WHERE key = 'CRON_SECRET'" - "UPDATE harness_config SET value = '<actual-chat-id>' WHERE key = 'TELEGRAM_CHAT_ID'" - "Verify: agent_events heartbeat row with status='success' on next coordinator run" - "Verify: outbound_notifications chat_id non-null on coordinator-generated rows"
+
+notification_drain_dedup_chunk:
+status: "awaiting-grounding"
+acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
+study_doc: "docs/sprint-5/notification-drain-dedup-study.md"
+colin_approved_at: "2026-04-26T00:08:12Z"
+coordinator_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
+delegated_to_builder_at: "2026-04-26T01:16:00Z"
+build_complete_at: "2026-04-26T01:21:00Z"
+commit: "ea4f826"
+tests: "600 passing, 8 pre-existing failing (next/server env, not caused by this chunk)"
+grounding_checkpoints:
+  - "INSERT duplicate correlation_id into outbound_notifications — confirm unique-violation error (23505)"
+  - "Confirm /api/harness/notifications-drain cron appears in Vercel Cron Jobs tab after deploy to main"
+  - "SELECT meta FROM agent_events WHERE action='notification_delivered' ORDER BY occurred_at DESC LIMIT 3 — expect delivery_latency_ms > 0"
 
 # Grounding checkpoints still pending for completed-build chunks
 
