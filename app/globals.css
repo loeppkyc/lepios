@@ -7,9 +7,9 @@
    --cockpit-* flag AND update the component that reads it.
    ============================================================ */
 
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 /* NOTE: JetBrains Mono + Inter are loaded in app/layout.tsx via next/font.
    --font-jetbrains and --font-inter CSS vars are set there and consumed below. */
@@ -18,64 +18,64 @@
 
 /* ── Tailwind v4 theme mapping ─────────────────────────────── */
 @theme inline {
-  --color-background:             var(--background);
-  --color-foreground:             var(--foreground);
-  --color-card:                   var(--card);
-  --color-card-foreground:        var(--card-foreground);
-  --color-popover:                var(--popover);
-  --color-popover-foreground:     var(--popover-foreground);
-  --color-primary:                var(--primary);
-  --color-primary-foreground:     var(--primary-foreground);
-  --color-secondary:              var(--secondary);
-  --color-secondary-foreground:   var(--secondary-foreground);
-  --color-muted:                  var(--muted);
-  --color-muted-foreground:       var(--muted-foreground);
-  --color-accent:                 var(--accent);
-  --color-accent-foreground:      var(--accent-foreground);
-  --color-destructive:            var(--destructive);
-  --color-border:                 var(--border);
-  --color-input:                  var(--input);
-  --color-ring:                   var(--ring);
-  --color-sidebar-ring:           var(--sidebar-ring);
-  --color-sidebar-border:         var(--sidebar-border);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent:         var(--sidebar-accent);
+  --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary:        var(--sidebar-primary);
-  --color-sidebar-foreground:     var(--sidebar-foreground);
-  --color-sidebar:                var(--sidebar);
-  --color-chart-5:                var(--chart-5);
-  --color-chart-4:                var(--chart-4);
-  --color-chart-3:                var(--chart-3);
-  --color-chart-2:                var(--chart-2);
-  --color-chart-1:                var(--chart-1);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
 
   /* Cockpit palette exposed to Tailwind utilities */
-  --color-cockpit-base:           var(--color-base);
-  --color-cockpit-surface:        var(--color-surface);
-  --color-cockpit-surface-2:      var(--color-surface-2);
-  --color-cockpit-overlay:        var(--color-overlay);
-  --color-cockpit-accent:         var(--color-accent-gold);
-  --color-cockpit-positive:       var(--color-positive);
-  --color-cockpit-warning:        var(--color-warning);
-  --color-cockpit-critical:       var(--color-critical);
-  --color-cockpit-info:           var(--color-info);
-  --color-pillar-money:           var(--color-pillar-money);
-  --color-pillar-health:          var(--color-pillar-health);
-  --color-pillar-growing:         var(--color-pillar-growing);
-  --color-pillar-happy:           var(--color-pillar-happy);
+  --color-cockpit-base: var(--color-base);
+  --color-cockpit-surface: var(--color-surface);
+  --color-cockpit-surface-2: var(--color-surface-2);
+  --color-cockpit-overlay: var(--color-overlay);
+  --color-cockpit-accent: var(--color-accent-gold);
+  --color-cockpit-positive: var(--color-positive);
+  --color-cockpit-warning: var(--color-warning);
+  --color-cockpit-critical: var(--color-critical);
+  --color-cockpit-info: var(--color-info);
+  --color-pillar-money: var(--color-pillar-money);
+  --color-pillar-health: var(--color-pillar-health);
+  --color-pillar-growing: var(--color-pillar-growing);
+  --color-pillar-happy: var(--color-pillar-happy);
 
   /* Fonts */
-  --font-sans:    var(--font-inter);
-  --font-mono:    var(--font-jetbrains);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
   --font-heading: var(--font-inter);
-  --font-ui:      var(--font-inter);
+  --font-ui: var(--font-inter);
 
   /* Radius — cockpit scale (tighter than shadcn defaults) */
-  --radius-sm:  4px;
-  --radius-md:  6px;
-  --radius-lg:  10px;
-  --radius-xl:  14px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
   --radius-2xl: 18px;
   --radius-3xl: 22px;
   --radius-4xl: 26px;
@@ -91,81 +91,81 @@
      Cool-dark: #0b0c14, near-black with blue-indigo tint.
      Swap path: change --color-base and re-derive --color-surface
      by lightening 7–8 lightness points per step.           */
-  --color-base:       #0b0c14;
-  --color-surface:    #12131f;
-  --color-surface-2:  #1a1b2e;
-  --color-overlay:    #22243a;
+  --color-base: #0b0c14;
+  --color-surface: #12131f;
+  --color-surface-2: #1a1b2e;
+  --color-overlay: #22243a;
 
   /* ── Q2:C LOCKED — Primary accent (gold) ───────────────────
      Gold #c89b37 retains Streamlit OS brand continuity.
      Swap path: change all three --color-accent-* vars together. */
   --color-accent-gold: #c89b37;
-  --color-accent-dim:  rgba(200, 155, 55, 0.15);
+  --color-accent-dim: rgba(200, 155, 55, 0.15);
   --color-accent-glow: rgba(200, 155, 55, 0.35);
 
   /* ── Status semantics — LOCKED (instrument colors) ─────────
      These are non-negotiable. Green=healthy, amber=watch,
      red=crisis, blue=info. Change only if you change the
      design language entirely.                               */
-  --color-positive:     #3ddc84;
+  --color-positive: #3ddc84;
   --color-positive-dim: rgba(61, 220, 132, 0.12);
-  --color-warning:      #f59e0b;
-  --color-warning-dim:  rgba(245, 158, 11, 0.12);
-  --color-critical:     #ef4444;
+  --color-warning: #f59e0b;
+  --color-warning-dim: rgba(245, 158, 11, 0.12);
+  --color-critical: #ef4444;
   --color-critical-dim: rgba(239, 68, 68, 0.12);
-  --color-info:         #60a5fa;
-  --color-info-dim:     rgba(96, 165, 250, 0.12);
+  --color-info: #60a5fa;
+  --color-info-dim: rgba(96, 165, 250, 0.12);
 
   /* ── Q6:A LOCKED — Pillar colors ───────────────────────────
      Money=amber, Health=green, Growing=blue, Happy=violet.
      Tints are 4% opacity — barely visible at nominal state.
      Swap path: change the hex AND its rgba tint together.  */
-  --color-pillar-money:        #f59e0b;
-  --color-pillar-health:       #3ddc84;
-  --color-pillar-growing:      #60a5fa;
-  --color-pillar-happy:        #a78bfa;
-  --color-pillar-money-tint:   rgba(245, 158, 11, 0.04);
-  --color-pillar-health-tint:  rgba(61, 220, 132, 0.04);
+  --color-pillar-money: #f59e0b;
+  --color-pillar-health: #3ddc84;
+  --color-pillar-growing: #60a5fa;
+  --color-pillar-happy: #a78bfa;
+  --color-pillar-money-tint: rgba(245, 158, 11, 0.04);
+  --color-pillar-health-tint: rgba(61, 220, 132, 0.04);
   --color-pillar-growing-tint: rgba(96, 165, 250, 0.04);
-  --color-pillar-happy-tint:   rgba(167, 139, 250, 0.04);
+  --color-pillar-happy-tint: rgba(167, 139, 250, 0.04);
 
   /* ── Text hierarchy — PROVISIONAL ──────────────────────────
      Likely to tweak after real-pixel review.               */
-  --color-text-primary:   #f0eef8;
+  --color-text-primary: #f0eef8;
   --color-text-secondary: #c4c0d8;
-  --color-text-muted:     #7a7890;
-  --color-text-disabled:  #3e3c50;
+  --color-text-muted: #9896b0;
+  --color-text-disabled: #7e7c96;
 
   /* ── Borders / chrome — PROVISIONAL ────────────────────────
      Low opacity by design — cockpit chrome is structural,
      not decorative.                                        */
-  --color-border:        rgba(255, 255, 255, 0.07);
+  --color-border: rgba(255, 255, 255, 0.07);
   --color-border-accent: rgba(255, 255, 255, 0.12);
   --color-border-pillar: rgba(255, 255, 255, 0.05);
-  --color-chrome:        rgba(255, 255, 255, 0.06);
-  --color-rail:          #c89b37;
-  --color-rail-glow:     rgba(200, 155, 55, 0.35);
+  --color-chrome: rgba(255, 255, 255, 0.06);
+  --color-rail: #c89b37;
+  --color-rail-glow: rgba(200, 155, 55, 0.35);
 
   /* ── Q8:A LOCKED — Typography scale ────────────────────────
      Large and confident. Numbers readable from across a room.
      All numeric values use --font-mono.
      Swap path: change both --text-master and --text-pillar-value
      together (they're proportional).                       */
-  --text-master:       3.5rem;   /* QoL Index — the big number */
-  --text-pillar-value: 2rem;     /* Pillar gauge readout       */
-  --text-heading:      1.1rem;
-  --text-label:        0.75rem;  /* uppercase labels           */
-  --text-body:         0.875rem;
-  --text-small:        0.72rem;
-  --text-ticker:       0.75rem;
-  --text-nano:         0.65rem;  /* gauge min/max tick labels  */
+  --text-master: 3.5rem; /* QoL Index — the big number */
+  --text-pillar-value: 2rem; /* Pillar gauge readout       */
+  --text-heading: 1.1rem;
+  --text-label: 0.75rem; /* uppercase labels           */
+  --text-body: 0.875rem;
+  --text-small: 0.72rem;
+  --text-ticker: 0.75rem;
+  --text-nano: 0.65rem; /* gauge min/max tick labels  */
 
   /* ── Typography ─────────────────────────────────────────────
      Fonts injected by layout.tsx via next/font as CSS vars.
      --font-jetbrains = JetBrains Mono (numbers, key values)
      --font-inter     = Inter (labels, body, UI text)       */
   --font-mono: var(--font-jetbrains, 'JetBrains Mono', 'Courier New', monospace);
-  --font-ui:   var(--font-inter, 'Inter', system-ui, -apple-system, sans-serif);
+  --font-ui: var(--font-inter, 'Inter', system-ui, -apple-system, sans-serif);
 
   /* ── Spacing rhythm ─────────────────────────────────────────
      Cockpit = tight. Default is --space-4 (16px) for padding. */
@@ -178,20 +178,20 @@
 
   /* ── Border radius ──────────────────────────────────────────
      Instrument panel: tight corners. Pill only for status chips. */
-  --radius:      0.375rem;   /* shadcn base — overrides default 0.625rem */
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   10px;
+  --radius: 0.375rem; /* shadcn base — overrides default 0.625rem */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
   --radius-pill: 999px;
 
   /* ── Q5:B LOCKED — Transitions ─────────────────────────────
      --transition-cinematic fires ONCE on initial page load
      for the master QoL gauge count-up. All other animations
      use --transition-fast. Do not add more cinematic moments. */
-  --transition-snap:       80ms ease;
-  --transition-fast:       150ms ease;
-  --transition-normal:     250ms ease;
-  --transition-cinematic:  400ms ease-out;
+  --transition-snap: 80ms ease;
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-cinematic: 400ms ease-out;
 
   /* ── Component behavior flags ───────────────────────────────
      These document taste-session decisions for component authors.
@@ -203,12 +203,12 @@
      Q7:B  → NextMoveButton uses glow variant (soft accent glow on hover)
      Q9:B  → StatusBar renders at bottom of screen, below SituationTicker
      Q10:C → SituationTicker uses fade-rotate (one headline, fades every 8s) */
-  --cockpit-gauge-style:         arc;
-  --cockpit-sub-density:         full;
-  --cockpit-next-move-variant:   glow;
-  --cockpit-status-position:     bottom;
-  --cockpit-ticker-mode:         fade-rotate;
-  --cockpit-ticker-interval:     8000ms;
+  --cockpit-gauge-style: arc;
+  --cockpit-sub-density: full;
+  --cockpit-next-move-variant: glow;
+  --cockpit-status-position: bottom;
+  --cockpit-ticker-mode: fade-rotate;
+  --cockpit-ticker-interval: 8000ms;
 
   /* ── shadcn var overrides (map to cockpit palette) ──────────
      These replace the light-mode shadcn defaults.
@@ -230,12 +230,12 @@
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);
   --input: rgba(255, 255, 255, 0.07);
-  --ring: rgba(200, 155, 55, 0.40);
-  --chart-1: #f59e0b;   /* Money */
-  --chart-2: #3ddc84;   /* Health */
-  --chart-3: #60a5fa;   /* Growing */
-  --chart-4: #a78bfa;   /* Happy */
-  --chart-5: #c89b37;   /* Accent gold */
+  --ring: rgba(200, 155, 55, 0.4);
+  --chart-1: #f59e0b; /* Money */
+  --chart-2: #3ddc84; /* Health */
+  --chart-3: #60a5fa; /* Growing */
+  --chart-4: #a78bfa; /* Happy */
+  --chart-5: #c89b37; /* Accent gold */
   --sidebar: #12131f;
   --sidebar-foreground: #c4c0d8;
   --sidebar-primary: #c89b37;
@@ -243,7 +243,7 @@
   --sidebar-accent: #1a1b2e;
   --sidebar-accent-foreground: #c4c0d8;
   --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: rgba(200, 155, 55, 0.40);
+  --sidebar-ring: rgba(200, 155, 55, 0.4);
 }
 
 /* LepiOS is always dark. .dark mirrors :root exactly so shadcn
@@ -266,7 +266,7 @@
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);
   --input: rgba(255, 255, 255, 0.07);
-  --ring: rgba(200, 155, 55, 0.40);
+  --ring: rgba(200, 155, 55, 0.4);
   --sidebar: #12131f;
   --sidebar-foreground: #c4c0d8;
   --sidebar-primary: #c89b37;
@@ -274,7 +274,7 @@
   --sidebar-accent: #1a1b2e;
   --sidebar-accent-foreground: #c4c0d8;
   --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: rgba(200, 155, 55, 0.40);
+  --sidebar-ring: rgba(200, 155, 55, 0.4);
 }
 
 /* ── Base styles ─────────────────────────────────────────────── */
@@ -308,25 +308,51 @@
 /* ── Cockpit utility classes ─────────────────────────────────── */
 @layer utilities {
   /* Pillar left-accent rail (3px solid left border in pillar color) */
-  .pillar-rail-money   { border-left: 3px solid var(--color-pillar-money); }
-  .pillar-rail-health  { border-left: 3px solid var(--color-pillar-health); }
-  .pillar-rail-growing { border-left: 3px solid var(--color-pillar-growing); }
-  .pillar-rail-happy   { border-left: 3px solid var(--color-pillar-happy); }
+  .pillar-rail-money {
+    border-left: 3px solid var(--color-pillar-money);
+  }
+  .pillar-rail-health {
+    border-left: 3px solid var(--color-pillar-health);
+  }
+  .pillar-rail-growing {
+    border-left: 3px solid var(--color-pillar-growing);
+  }
+  .pillar-rail-happy {
+    border-left: 3px solid var(--color-pillar-happy);
+  }
 
   /* Pillar row tinted background */
-  .pillar-row-money   { background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-money) 4%); }
-  .pillar-row-health  { background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-health) 4%); }
-  .pillar-row-growing { background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-growing) 4%); }
-  .pillar-row-happy   { background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-happy) 4%); }
+  .pillar-row-money {
+    background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-money) 4%);
+  }
+  .pillar-row-health {
+    background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-health) 4%);
+  }
+  .pillar-row-growing {
+    background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-growing) 4%);
+  }
+  .pillar-row-happy {
+    background-color: color-mix(in srgb, var(--color-surface) 100%, var(--color-pillar-happy) 4%);
+  }
 
   /* Status text coloring */
-  .text-positive { color: var(--color-positive); }
-  .text-warning  { color: var(--color-warning); }
-  .text-critical { color: var(--color-critical); }
-  .text-info     { color: var(--color-info); }
+  .text-positive {
+    color: var(--color-positive);
+  }
+  .text-warning {
+    color: var(--color-warning);
+  }
+  .text-critical {
+    color: var(--color-critical);
+  }
+  .text-info {
+    color: var(--color-info);
+  }
 
   /* Inactive pillar rows (Health, Growing, Happy in v1) */
-  .pillar-row-inactive { opacity: 0.4; }
+  .pillar-row-inactive {
+    opacity: 0.4;
+  }
 
   /* Uppercase instrument labels */
   .label-caps {
@@ -347,7 +373,9 @@
   /* Q7:B — NextMoveButton glow on hover (applied by the component) */
   .next-move-glow {
     border-left: 3px solid var(--color-accent-gold);
-    transition: background-color var(--transition-normal), box-shadow var(--transition-normal);
+    transition:
+      background-color var(--transition-normal),
+      box-shadow var(--transition-normal);
   }
   .next-move-glow:hover {
     background-color: var(--color-accent-dim);

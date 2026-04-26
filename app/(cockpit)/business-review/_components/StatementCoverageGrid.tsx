@@ -63,16 +63,7 @@ function GridSkeleton() {
         gap: 16,
       }}
     >
-      <span
-        style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 'var(--text-nano)',
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-disabled)',
-        }}
-      >
+      <span className="label-caps" style={{ color: 'var(--color-pillar-money)' }}>
         Statement Coverage · Bank & Credit
       </span>
       <div
@@ -103,16 +94,7 @@ function GridError({ message }: { message: string }) {
         gap: 8,
       }}
     >
-      <span
-        style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 'var(--text-nano)',
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-disabled)',
-        }}
-      >
+      <span className="label-caps" style={{ color: 'var(--color-pillar-money)' }}>
         Statement Coverage · Bank & Credit
       </span>
       <span
@@ -253,16 +235,7 @@ export function StatementCoverageGrid() {
       }}
     >
       {/* Section heading */}
-      <span
-        style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 'var(--text-nano)',
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-disabled)',
-        }}
-      >
+      <span className="label-caps" style={{ color: 'var(--color-pillar-money)' }}>
         Statement Coverage · Bank & Credit
       </span>
 
@@ -325,8 +298,8 @@ export function StatementCoverageGrid() {
           color: 'var(--color-text-disabled)',
         }}
       >
-        Fetched: {new Date(data.fetchedAt).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })}{' '}
-        MT
+        Fetched:{' '}
+        {new Date(data.fetchedAt).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })} MT
       </span>
     </div>
   )
