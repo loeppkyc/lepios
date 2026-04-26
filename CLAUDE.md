@@ -101,4 +101,99 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 2 weeks from Phase 3 start: if LepiOS is not measurably helping Colin make or save money (Amazon Telegram alerts firing on real deals, Expenses tile tracking real spend, Betting/Trading tiles logging real activity), stop and simplify. Elegance is not a substitute for utility.
 
+---
+
+## 8 — Capabilities (LepiOS-specific)
+
+### Autonomous Harness Agents
+
+| Agent | Spec file | Invoked by | Use for | Never use for |
+|-------|-----------|-----------|---------|---------------|
+| **Coordinator** | `.claude/agents/coordinator.md` | task_queue harness or Colin directly | Sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation | Writing code, self-approving acceptance docs, any destructive operation |
+| **Builder** | `.claude/agents/builder.md` | Coordinator only | Translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON | Anything without an approved acceptance doc, sprint planning, grounding checkpoint execution |
+
+**Coordinator → Builder handoff:** Coordinator passes the acceptance doc path. Builder returns `docs/sprint-{N}/chunk-{id}-handoff.json`. Coordinator reads the JSON and decides next step. They run in **separate Claude Code context windows** — never the same session.
+
+### Harness Endpoints (production)
+
+| Endpoint | Use for |
+|----------|---------|
+| `POST /api/harness/task-heartbeat` | Coordinator liveness signal during long-running phases — prevents stale-reclaim |
+| `POST /api/harness/notifications-drain` | Flush `outbound_notifications` queue to Telegram — call after every insert |
+| `POST /api/twin/ask` | Digital Twin Q&A (production URL) — batch queries only, never mid-phase |
+| `GET /api/health` | Quick liveness check — 200 = app up, body has service states |
+
+Local dev equivalents: replace `https://lepios-one.vercel.app` with `http://localhost:3000`.
+
+### LepiOS MCP Tools
+
+| Tool | When to use in this project |
+|------|-----------------------------|
+| `mcp__claude_ai_Supabase__execute_sql` | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
+| `mcp__claude_ai_Supabase__apply_migration` | Apply schema migrations during sprint builds (builder only) |
+| `mcp__claude_ai_Supabase__list_migrations` | Verify migration was applied; cross-check against `supabase/migrations/` |
+| `mcp__claude_ai_Vercel__list_deployments` | Confirm a deploy landed before marking a chunk complete |
+| `mcp__claude_ai_Vercel__get_runtime_logs` | Diagnose production errors that don't appear in local logs |
+| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated |
+
+### Runtime Config Pattern
+
+All values agents need at runtime live in the `harness_config` Supabase table:
+
+```sql
+SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID');
+```
+
+Read at coordinator session start before any other action. Never read from `process.env` for cross-boundary values — env vars are for the Next.js process, not for agent sub-processes.
+
+---
+
+## 9 — Failure / Success Log (LepiOS-specific)
+
+Newest-first. For global failures (Streamlit, BBV, general patterns), see `~/.claude/CLAUDE.md §4`.
+
+### FAILURES
+
+**F-L5: Sprint context lost mid-run without phase handoff (Sprint 5, 2026-04)**
+Coordinator hit context limit 2+ hours into a session. `sprint-state.md` reflected the session START state, not the last completed phase. New window re-ran Phase 1a.
+→ Write `sprint-state.md` after EVERY phase completion — not at session end. Each phase boundary is a potential termination point. Heartbeat every ~3 min prevents stale-reclaim during long phases.
+
+**F-L4: Twin endpoint unreachable in production, silently routed to Colin (Sprint 5, 2026-04)**
+`coordinator.md` declared `/api/twin/ask` as the Q&A endpoint before it was verified live. Production returned 404. All twin queries escalated to Colin; Colin noticed in W2 audit.
+→ Before documenting any endpoint in an agent spec, verify it returns 200 from both local (localhost:3000) AND production. Add a connectivity preflight in Phase 1b before the first batch query; log failure to `agent_events`.
+
+**F-L3: Table name spec drift — `error_events` vs `agent_events` (Sprint 5, 2026-04)**
+Acceptance doc said `error_events`; actual Supabase table was `agent_events`. Builder's INSERTs all failed silently. Tests passed (no table-existence assertion). Caught by W1 pre-build schema grep.
+→ Grep the exact table name in migrations and schema files before writing SQL. Cross-reference with `information_schema.tables`. Never write a table name from memory.
+
+**F-L2: Env vars absent at coordinator runtime (Sprint 5, fixed by 14c7809, 2026-04-20)**
+`CRON_SECRET` and `TELEGRAM_CHAT_ID` were Vercel env vars, not accessible to the sub-agent process. All heartbeats and Telegram notifications silently failed.
+→ Store runtime config in `harness_config` (Supabase). Read via SQL at session start. See §8 Runtime Config Pattern.
+
+**F-L1: Coordinator writing to main instead of task-scoped branch (Sprint 5, fixed by 8a1758e, 2026-04-22)**
+Coordinator pushed acceptance docs and code to `main`. Required manual history cleanup.
+→ Branch guard enforced: every session verifies `harness/task-{task_id}` before any file write. Drift triggers `branch_guard_triggered` in `agent_events` and aborts. See `.claude/agents/coordinator.md` Branch Naming section.
+
+### SUCCESSES
+
+**S-L5: Parallel context windows — coordinator + builder in separate sessions (Sprint 5)**
+Each role runs at full context depth without fighting the same window. Coordinator waits for `handoff.json`; builder never sees coordinator's sprint context.
+→ Always separate coordinator and builder sessions. Pass only the acceptance doc path as the handoff artifact.
+
+**S-L4: FTS fallback on top of pgvector for Twin knowledge store (Sprint 5)**
+pgvector similarity returned 0 results on low-confidence queries. FTS catches keyword-exact matches embeddings miss. First deployment had 0% hit rate before FTS was added.
+→ Every vector similarity search needs a keyword fallback. Semantic search that returns empty on low-confidence is broken, not smart.
+
+**S-L3: Branch guard as F18 surfacing metric (8a1758e, 2026-04-22)**
+`branch_guard_triggered` events in `agent_events` + morning_digest count. Zero events = guard working silently. Non-zero = drift caught. Self-monitoring without polling.
+→ New enforcement rules: log compliance events to `agent_events`, surface count in morning_digest. Absence of events is the success signal.
+
+**S-L2: Phase 1a Streamlit study before any acceptance doc (coordinator, 2026-04)**
+Caught table-name drift, timezone handling bugs, and scope ambiguity before build. Became non-optional Phase 1a. Reduced Colin interventions from 14 (Chunk D v1, no study) to ~2 (Chunk D v2, with study).
+→ For any port: study first (quote code), spec second, code third. The study doc is the spec input. Vagueness here propagates to spec-wrong builds.
+
+**S-L1: `harness_config` as DB-resident runtime config (14c7809, 2026-04-20)**
+Eliminated the "env var missing at coordinator runtime" failure class. Config survives Vercel env rotation. Coordinator reads at startup; no process.env dependency.
+→ Autonomous agent runtime values → `harness_config`. App runtime values → Vercel env. Never cross the boundary.
+
 @AGENTS.md
