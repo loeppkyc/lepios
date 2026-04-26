@@ -39,6 +39,14 @@
     {
       "path": "/api/harness/notifications-drain",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/amazon-orders-sync",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/amazon-settlements-sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }
