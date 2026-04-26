@@ -10,6 +10,7 @@ const {
   mockGetDigestStallSummary,
   mockBuildBranchGuardLine,
   mockBuildProcessEfficiencyLines,
+  mockBuildAutonomyRollupLine,
   mockBuildFtsFallbackLine,
   mockBuildDrainStatsLine,
   mockBuildReviewTimeoutLine,
@@ -21,6 +22,7 @@ const {
   mockGetDigestStallSummary: vi.fn(),
   mockBuildBranchGuardLine: vi.fn(),
   mockBuildProcessEfficiencyLines: vi.fn(),
+  mockBuildAutonomyRollupLine: vi.fn(),
   mockBuildFtsFallbackLine: vi.fn(),
   mockBuildDrainStatsLine: vi.fn(),
   mockBuildReviewTimeoutLine: vi.fn(),
@@ -59,6 +61,11 @@ vi.mock('@/lib/harness/branch-guard', () => ({
 // Mock process-efficiency so buildProcessEfficiencyLines does not consume mockFrom slots.
 vi.mock('@/lib/harness/process-efficiency', () => ({
   buildProcessEfficiencyLines: mockBuildProcessEfficiencyLines,
+}))
+
+// Mock autonomy-rollup so buildAutonomyRollupLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/autonomy-rollup', () => ({
+  buildAutonomyRollupLine: mockBuildAutonomyRollupLine,
 }))
 
 // Mock fts-fallback so buildFtsFallbackLine does not consume mockFrom slots.
@@ -169,6 +176,8 @@ beforeEach(() => {
   mockBuildProcessEfficiencyLines.mockResolvedValue(
     'Process efficiency (24h):\n• Queue throughput: no tasks created\n• Pickup latency: no pickups in 24h | 💡 Check pickup cron is firing\n• Queue depth: 0 tasks waiting ✅\n• Friction: 0 grounding blocks / retries ✅'
   )
+  // Default: no completed tasks in 7d window
+  mockBuildAutonomyRollupLine.mockResolvedValue('Autonomy (7d): no tasks completed')
   // Default: drain ran 0 times (first run after deploy), no review timeouts
   mockBuildDrainStatsLine.mockResolvedValue('Drain runs (24h): 0, messages: 0')
   mockBuildReviewTimeoutLine.mockResolvedValue(null)

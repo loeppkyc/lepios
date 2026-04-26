@@ -6,6 +6,7 @@ import type { DigestResult, DigestStatus, QualityScore, TickResult } from './typ
 import { getDigestStallSummary } from '@/lib/harness/stall-check'
 import { buildBranchGuardLine } from '@/lib/harness/branch-guard'
 import { buildProcessEfficiencyLines } from '@/lib/harness/process-efficiency'
+import { buildAutonomyRollupLine } from '@/lib/harness/autonomy-rollup'
 import { buildFtsFallbackLine } from '@/lib/twin/fts-fallback'
 import { buildDrainStatsLine, buildReviewTimeoutLine } from '@/lib/harness/telegram-stats'
 export function composeMorningDigest(tick: TickResult): string {
@@ -221,6 +222,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── 20% Better: Append process efficiency section ─────────────────────────────
   const processEfficiencyLines = await buildProcessEfficiencyLines()
   messageToSend = `${messageToSend}\n${processEfficiencyLines}`
+
+  // ── F-L10: Append autonomy rollup line — always added, never breaks digest ────
+  const autonomyLine = await buildAutonomyRollupLine()
+  messageToSend = `${messageToSend}\n${autonomyLine}`
 
   // ── P6+P1: Drain stats + review timeout lines ─────────────────────────────────
   const drainStatsLine = await buildDrainStatsLine()
