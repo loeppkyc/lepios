@@ -139,7 +139,7 @@ export async function stopSession(sessionId: string): Promise<WorkBudgetSession 
   }
 }
 
-// ── Build drain summary message (§4a) ─────────────────────────────────────────
+// ── Build drain summary message (§4a) — legacy format, kept for callers ──────
 
 export function buildDrainSummary(
   session: WorkBudgetSession,
@@ -167,48 +167,161 @@ export function buildDrainSummary(
   return lines.join('\n')
 }
 
+// ── Task row shape for budget summary ────────────────────────────────────────
+
+interface TaskSummaryRow {
+  id: string
+  task: string
+}
+
+// ── Build new-format budget summary message ───────────────────────────────────
+// Format matches acceptance doc §Summary message content.
+
+export function buildBudgetSummaryText(
+  session: WorkBudgetSession,
+  opts: {
+    claimedTasks: TaskSummaryRow[]
+    completedTasks: TaskSummaryRow[]
+    awaitingTasks: TaskSummaryRow[]
+    durationMinutes: number
+  }
+): string {
+  const shortId = session.id.slice(0, 8)
+  const startedLabel = session.started_at
+    ? new Date(session.started_at).toISOString().slice(0, 16).replace('T', ' ')
+    : '?'
+  const endedLabel = session.completed_at
+    ? new Date(session.completed_at).toISOString().slice(0, 16).replace('T', ' ')
+    : '?'
+
+  const lines: string[] = [
+    `[LepiOS Budget] Session ${shortId} ended — ${session.status}`,
+    `Duration: ${opts.durationMinutes} min (${startedLabel} → ${endedLabel})`,
+  ]
+
+  function taskLines(tasks: TaskSummaryRow[]): string[] {
+    return tasks.map((t) => {
+      const tid = t.id.slice(0, 8)
+      const desc = t.task.length > 40 ? t.task.slice(0, 40) : t.task
+      return `  • ${tid} — ${desc}`
+    })
+  }
+
+  if (opts.claimedTasks.length > 0) {
+    lines.push('')
+    lines.push(`Tasks claimed (${opts.claimedTasks.length}):`)
+    lines.push(...taskLines(opts.claimedTasks))
+  }
+
+  if (opts.completedTasks.length > 0) {
+    lines.push('')
+    lines.push(`Tasks completed (${opts.completedTasks.length}):`)
+    lines.push(...taskLines(opts.completedTasks))
+  }
+
+  if (opts.awaitingTasks.length > 0) {
+    lines.push('')
+    lines.push(`Awaiting review/grounding (${opts.awaitingTasks.length}):`)
+    lines.push(...taskLines(opts.awaitingTasks))
+  }
+
+  // Cost line omitted: cost_log table does not exist in v1
+
+  return lines.join('\n')
+}
+
 // ── Insert Telegram summary into outbound_notifications ──────────────────────
+// Handles both 'drained' and 'stopped' terminal statuses.
+// Deduplicates via session.metadata.budget_summary_sent.
 
 export async function sendDrainSummary(session: WorkBudgetSession): Promise<void> {
   try {
+    // Dedup: skip if already sent for this session
+    if (session.metadata?.budget_summary_sent) return
+
     const db = createServiceClient()
 
-    // Count awaiting_review tasks
-    const { count: awaitingCount } = await db
-      .from('task_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'awaiting_review')
+    // Determine time window for task queries
+    const windowStart = session.started_at
+    const windowEnd = session.completed_at ?? new Date().toISOString()
 
-    // Count remaining queued tasks
-    const { count: queuedCount } = await db
+    // Claimed tasks in the session window
+    const { data: claimedRaw } = await db
       .from('task_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'queued')
+      .select('id, task')
+      .gte('claimed_at', windowStart)
+      .lte('claimed_at', windowEnd)
 
-    const fullyDrained = (queuedCount ?? 0) === 0 && (awaitingCount ?? 0) === 0
-    const text = buildDrainSummary(session, {
-      awaitingReviewCount: awaitingCount ?? 0,
-      queuedCount: queuedCount ?? 0,
-      fullyDrained,
+    const claimedTasks: TaskSummaryRow[] = (claimedRaw ?? []) as TaskSummaryRow[]
+
+    // Completed tasks in the session window
+    const { data: completedRaw } = await db
+      .from('task_queue')
+      .select('id, task')
+      .eq('status', 'completed')
+      .gte('claimed_at', windowStart)
+      .lte('claimed_at', windowEnd)
+
+    const completedTasks: TaskSummaryRow[] = (completedRaw ?? []) as TaskSummaryRow[]
+
+    // Awaiting review/grounding tasks in the session window
+    const { data: awaitingRaw } = await db
+      .from('task_queue')
+      .select('id, task')
+      .in('status', ['awaiting_review', 'awaiting_grounding'])
+      .gte('claimed_at', windowStart)
+      .lte('claimed_at', windowEnd)
+
+    const awaitingTasks: TaskSummaryRow[] = (awaitingRaw ?? []) as TaskSummaryRow[]
+
+    // Duration in minutes
+    const startMs = new Date(session.started_at).getTime()
+    const endMs = new Date(windowEnd).getTime()
+    const durationMinutes = Math.round((endMs - startMs) / 60_000)
+
+    const text = buildBudgetSummaryText(session, {
+      claimedTasks,
+      completedTasks,
+      awaitingTasks,
+      durationMinutes,
     })
+
+    // correlation_id varies by terminal status
+    const correlationId =
+      session.status === 'stopped' ? `budget_stop_${session.id}` : `budget_drain_${session.id}`
 
     await db.from('outbound_notifications').insert({
       channel: 'telegram',
       payload: { text },
-      correlation_id: `budget_drain_${session.id}`,
+      correlation_id: correlationId,
       requires_response: false,
       ...(session.telegram_chat_id ? { chat_id: session.telegram_chat_id } : {}),
     })
 
-    // F17: log drain event
-    void logKnowledgeEvent('work_budget', 'work_budget.drained', {
-      actor: 'system',
+    // Mark dedup flag on session metadata (JSONB merge)
+    await db
+      .from('work_budget_sessions')
+      .update({
+        metadata: {
+          ...((session.metadata as Record<string, unknown>) ?? {}),
+          budget_summary_sent: true,
+        },
+      })
+      .eq('id', session.id)
+
+    // F18: log budget_summary_sent event to agent_events
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'budget_summary_sent',
+      actor: 'budget-summary',
       status: 'success',
       meta: {
         session_id: session.id,
-        budget_minutes: session.budget_minutes,
-        used_minutes: session.used_minutes,
-        completed_count: session.completed_count,
+        session_status: session.status,
+        tasks_claimed: claimedTasks.length,
+        tasks_completed: completedTasks.length,
+        tasks_awaiting: awaitingTasks.length,
+        duration_minutes: durationMinutes,
       },
     })
   } catch {

@@ -17,6 +17,7 @@ import {
   getActiveSession,
   stopSession,
   buildStatusMessage,
+  sendDrainSummary,
   type WorkBudgetSession,
 } from './tracker'
 import { runCalibration } from './calibrator'
@@ -294,6 +295,11 @@ export async function handleBudgetCommand(message: TgMessage, db: SupabaseClient
       chatId,
       `Budget stopped. ${completedCount} tasks completed in ${usedMinutes} minutes.`
     )
+
+    // Fire budget summary notification for stopped session
+    if (stopped) {
+      void sendDrainSummary(stopped)
+    }
 
     // F17: log stop event
     void logKnowledgeEvent('work_budget', 'work_budget.stopped', {

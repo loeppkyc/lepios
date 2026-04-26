@@ -386,14 +386,31 @@ describe('drain: Telegram summary sent via outbound_notifications', () => {
   it('inserts a row into outbound_notifications on drain', async () => {
     let insertedPayload: unknown = null
 
+    // sendDrainSummary now queries task_queue three times (claimed/completed/awaiting)
+    // using .select().gte().lte() chains, then inserts into outbound_notifications,
+    // updates work_budget_sessions metadata, and inserts into agent_events.
+    const taskQueueChain = {
+      select: vi.fn().mockReturnValue({
+        gte: vi.fn().mockReturnValue({
+          lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+        eq: vi.fn().mockReturnValue({
+          gte: vi.fn().mockReturnValue({
+            lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+        in: vi.fn().mockReturnValue({
+          gte: vi.fn().mockReturnValue({
+            lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        }),
+      }),
+    }
+
     const db: AnyDb = {
       from: vi.fn().mockImplementation((table: string) => {
         if (table === 'task_queue') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue(Promise.resolve({ count: 2, error: null })),
-            }),
-          }
+          return taskQueueChain
         }
         if (table === 'outbound_notifications') {
           return {
@@ -401,6 +418,18 @@ describe('drain: Telegram summary sent via outbound_notifications', () => {
               insertedPayload = row
               return Promise.resolve({ data: null, error: null })
             }),
+          }
+        }
+        if (table === 'work_budget_sessions') {
+          return {
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }
+        }
+        if (table === 'agent_events') {
+          return {
+            insert: vi.fn().mockResolvedValue({ data: null, error: null }),
           }
         }
         return {}
