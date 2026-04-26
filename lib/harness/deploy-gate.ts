@@ -465,6 +465,30 @@ export async function fetchMigrationSQL(
 const COMPARE_BASE_URL = `https://github.com/${GITHUB_REPO}/compare/main...`
 const MAX_MIGRATION_MSG_CHARS = 3800
 
+export async function insertSmokePendingEvent(params: {
+  merge_sha: string
+  commit_sha: string
+  branch: string
+}): Promise<void> {
+  try {
+    const db = createServiceClient()
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'production_smoke_pending',
+      actor: 'deploy-gate',
+      status: 'success',
+      meta: {
+        merge_sha: params.merge_sha,
+        commit_sha: params.commit_sha,
+        branch: params.branch,
+        merged_at: new Date().toISOString(),
+      },
+    })
+  } catch {
+    // Non-fatal — smoke pending event failure must not block the promotion success
+  }
+}
+
 export type MigrationGateMessageResult = {
   ok: boolean
   message_id?: number
