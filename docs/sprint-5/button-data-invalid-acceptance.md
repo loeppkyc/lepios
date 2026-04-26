@@ -27,29 +27,38 @@ two tasks share the same 8-char prefix.
 
 ## Short format spec
 
-| Button | callback_data | Max bytes |
-|--------|--------------|-----------|
-| Approve | `ap:{first_8_chars_of_correlation_id}` | 11 bytes ✓ |
-| Reject / revise | `re:{first_8_chars_of_correlation_id}` | 11 bytes ✓ |
-| Grounding pass | `gp:{first_8_chars_of_correlation_id}` | 11 bytes ✓ |
+| Button            | callback_data                             | Max bytes  |
+| ----------------- | ----------------------------------------- | ---------- |
+| Approve           | `ap:{first_8_chars_of_correlation_id}`    | 11 bytes ✓ |
+| Reject / revise   | `re:{first_8_chars_of_correlation_id}`    | 11 bytes ✓ |
+| Grounding pass    | `gp:{first_8_chars_of_correlation_id}`    | 11 bytes ✓ |
 | Grounding partial | `gpart:{first_8_chars_of_correlation_id}` | 14 bytes ✓ |
-| Grounding fail | `gf:{first_8_chars_of_correlation_id}` | 11 bytes ✓ |
+| Grounding fail    | `gf:{first_8_chars_of_correlation_id}`    | 11 bytes ✓ |
 
-All well under 64 bytes. No other actions currently exist.
+All well under 64 bytes.
+
+> **Audit note 2026-04-26:** As of today, `lib/harness/telegram-buttons.ts` already defines
+> two other callback families that builder must NOT break:
+>
+> - `tf:up:{agentEventId}` / `tf:dn:{agentEventId}` — thumbs-up/down feedback buttons
+> - `dg:rb:{sha8}` / `dg:promote:{sha8}` / `dg:abort:{sha8}` — deploy-gate buttons
+> - `improve_approve_all:{chunkId}` / `improve_review:{chunkId}` / `improve_dismiss:{chunkId}` — improvement engine buttons
+>
+> The `ap:` / `re:` / `gp:` handler additions must co-exist with these. Do not replace or
+> alter the existing dispatch logic — extend it.
 
 ---
 
 ## Lookup logic on callback receive
 
 ```typescript
-const [prefix, id8] = callbackData.split(':')  // e.g. ['ap', '40b1aa4b']
+const [prefix, id8] = callbackData.split(':') // e.g. ['ap', '40b1aa4b']
 
-const { data: matches } = await supabase
-  .from('task_queue')
-  .select('id')
-  .like('id', `${id8}%`)
+const { data: matches } = await supabase.from('task_queue').select('id').like('id', `${id8}%`)
 
-if (matches.length === 0) { /* log error, return */ }
+if (matches.length === 0) {
+  /* log error, return */
+}
 if (matches.length > 1) {
   // log callback_collision_detected to agent_events, return error
 }
@@ -69,11 +78,11 @@ const fullTaskId = matches[0].id
 
 ## Files expected to change
 
-| File | Change |
-|------|--------|
-| Telegram send helper (find via grep for `callback_data` or `inline_keyboard`) | Replace JSON callback_data construction with short format |
-| Telegram callback handler (find via grep for `callback_data` in `app/api/telegram/`) | Add prefix-lookup + collision guard |
-| `tests/integrations/telegram/` or similar | New unit tests for serialize/parse + collision detection |
+| File                                                                                 | Change                                                    |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| Telegram send helper (find via grep for `callback_data` or `inline_keyboard`)        | Replace JSON callback_data construction with short format |
+| Telegram callback handler (find via grep for `callback_data` in `app/api/telegram/`) | Add prefix-lookup + collision guard                       |
+| `tests/integrations/telegram/` or similar                                            | New unit tests for serialize/parse + collision detection  |
 
 Builder must grep to confirm exact file paths before editing.
 
@@ -83,12 +92,12 @@ Builder must grep to confirm exact file paths before editing.
 
 Builder must verify before coding:
 
-| Item | Action |
-|------|--------|
-| Current callback_data construction | `grep -r "callback_data" app/ lib/ --include="*.ts"` |
-| Telegram callback handler route | `grep -r "callback_data\|telegram.*webhook" app/api/ --include="*.ts"` |
-| All existing button action strings | Enumerate every `action:` value used in callback_data |
-| `task_queue.id` type | UUID — first 8 chars of UUID hex are sufficient (collision probability ~10⁻⁹ at current queue size) |
+| Item                               | Action                                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Current callback_data construction | `grep -r "callback_data" app/ lib/ --include="*.ts"`                                                |
+| Telegram callback handler route    | `grep -r "callback_data\|telegram.*webhook" app/api/ --include="*.ts"`                              |
+| All existing button action strings | Enumerate every `action:` value used in callback_data                                               |
+| `task_queue.id` type               | UUID — first 8 chars of UUID hex are sufficient (collision probability ~10⁻⁹ at current queue size) |
 
 ---
 

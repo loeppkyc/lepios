@@ -14,7 +14,7 @@ is not available in the coordinator's runtime environment. Add `LEPIOS_BASE_URL`
 `TELEGRAM_CHAT_ID`, and use it wherever the drain URL is constructed.
 
 **Acceptance criterion:**
-(a) Migration 0031 applied — `harness_config` contains a `LEPIOS_BASE_URL` row,
+(a) Migration 0032 applied — `harness_config` contains a `LEPIOS_BASE_URL` row,
 (b) coordinator startup block reads `LEPIOS_BASE_URL` and logs a `config_read` agent_event
 confirming all three keys are present, and
 (c) a coordinator self-trigger drain succeeds (HTTP 200, notifications delivered) without a
@@ -33,18 +33,18 @@ confirming all three keys are present, and
 
 ## Files expected to change
 
-| File | Change |
-|------|--------|
-| `supabase/migrations/0031_lepios_base_url.sql` | New — insert `LEPIOS_BASE_URL` row into `harness_config` |
-| `.claude/agents/coordinator.md` | Update startup block to fetch + export `$LEPIOS_BASE_URL` |
-| Drain self-trigger call site (find via grep) | Replace hardcoded/broken URL with `$LEPIOS_BASE_URL/api/harness/notifications-drain` |
+| File                                           | Change                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `supabase/migrations/0032_lepios_base_url.sql` | New — insert `LEPIOS_BASE_URL` row into `harness_config`                             |
+| `.claude/agents/coordinator.md`                | Update startup block to fetch + export `$LEPIOS_BASE_URL`                            |
+| Drain self-trigger call site (find via grep)   | Replace hardcoded/broken URL with `$LEPIOS_BASE_URL/api/harness/notifications-drain` |
 
 ---
 
 ## Migration 0031 — exact SQL
 
 ```sql
--- 0031_lepios_base_url.sql
+-- 0032_lepios_base_url.sql
 -- Add LEPIOS_BASE_URL to coordinator runtime config.
 -- Colin must UPDATE this value after migration:
 --   UPDATE harness_config SET value = 'https://lepios-one.vercel.app'
@@ -66,9 +66,11 @@ WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID', 'LEPIOS_BASE_URL');
 ```
 
 Add to the "store in working context" list:
+
 - `LEPIOS_BASE_URL` — used as the base for all self-trigger API calls
 
 Add to the failure fallback:
+
 - If `LEPIOS_BASE_URL` is missing or empty: log `config_read_failed` with
   `meta.missing_keys=['LEPIOS_BASE_URL']`, skip drain self-trigger, continue session.
 
@@ -80,22 +82,22 @@ Add to the failure fallback:
 
 Builder must verify before coding:
 
-| Item | Action |
-|------|--------|
-| Current drain self-trigger call site | `grep -r "notifications-drain\|drain.*url\|lepios.*vercel" .claude/ lib/ app/ --include="*.ts" --include="*.md"` |
-| `harness_config` existing rows | `SELECT key FROM harness_config` — confirm CRON_SECRET + TELEGRAM_CHAT_ID exist |
-| coordinator.md startup block location | Read `.claude/agents/coordinator.md` lines containing `harness_config` |
-| Migration numbering | Confirm 0030 is latest — next is 0031 |
+| Item                                  | Action                                                                                                           |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Current drain self-trigger call site  | `grep -r "notifications-drain\|drain.*url\|lepios.*vercel" .claude/ lib/ app/ --include="*.ts" --include="*.md"` |
+| `harness_config` existing rows        | `SELECT key FROM harness_config` — confirm CRON_SECRET + TELEGRAM_CHAT_ID exist                                  |
+| coordinator.md startup block location | Read `.claude/agents/coordinator.md` lines containing `harness_config`                                           |
+| Migration numbering                   | 0031 is taken (`awaiting_grounding_constraint`, shipped 2026-04-26 in PR #5). Next is 0032.                      |
 
 ---
 
 ## External deps
 
-| Dep | Note |
-|-----|------|
-| `harness_config` table | Exists (migration 0029). RLS: service role only. |
-| `outbound_notifications` drain route | `GET /api/harness/notifications-drain`, Bearer auth |
-| coordinator.md | Existing startup block reads CRON_SECRET + TELEGRAM_CHAT_ID — extend, don't replace |
+| Dep                                  | Note                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `harness_config` table               | Exists (migration 0029). RLS: service role only.                                    |
+| `outbound_notifications` drain route | `GET /api/harness/notifications-drain`, Bearer auth                                 |
+| coordinator.md                       | Existing startup block reads CRON_SECRET + TELEGRAM_CHAT_ID — extend, don't replace |
 
 ---
 
@@ -116,7 +118,7 @@ ORDER BY occurred_at DESC LIMIT 5;
 
 ## Grounding checkpoint
 
-1. Apply migration 0031.
+1. Apply migration 0032.
 2. Insert real value:
    ```sql
    UPDATE harness_config SET value = 'https://lepios-one.vercel.app'
