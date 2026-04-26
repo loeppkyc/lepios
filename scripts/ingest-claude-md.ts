@@ -822,6 +822,19 @@ const CHUNKS: Chunk[] = [
     confidence: 0.9,
   },
   {
+    entity: 'cmdingest:lepios:arch-F21-acceptance-tests-first',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'F21: Acceptance tests first — write acceptance criteria before writing any code',
+    problem:
+      'When can I start writing code for a new module? Is it OK to write code before the acceptance criteria are defined?',
+    solution:
+      'Every module has written acceptance criteria before code is written. The acceptance doc is the contract; code exists to satisfy it. No exceptions — acceptance tests first, always. The acceptance doc must be written and approved before any builder work begins. See lib/rules/registry.ts for the canonical rule registry.',
+    context:
+      'Source: lepios CLAUDE.md §3 Architecture Rules rule 6 (F21). Keywords: F21, acceptance tests, acceptance criteria, acceptance doc, contract, module, builder, before code',
+    confidence: 0.95,
+  },
+  {
     entity: 'cmdingest:lepios:kill-criterion',
     category: 'rule',
     domain: 'lepios',
