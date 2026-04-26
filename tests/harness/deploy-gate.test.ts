@@ -7,15 +7,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
 
-const { mockInsert, mockFrom, mockRunRouteHealthSmoke, mockRunCronRegistrationSmoke } = vi.hoisted(
-  () => {
-    const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
-    const mockFrom = vi.fn()
-    const mockRunRouteHealthSmoke = vi.fn()
-    const mockRunCronRegistrationSmoke = vi.fn()
-    return { mockInsert, mockFrom, mockRunRouteHealthSmoke, mockRunCronRegistrationSmoke }
+const {
+  mockInsert,
+  mockFrom,
+  mockRunRouteHealthSmoke,
+  mockRunCronRegistrationSmoke,
+  mockApplyBumps,
+  mockParseBumpDirectives,
+} = vi.hoisted(() => {
+  const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+  const mockFrom = vi.fn()
+  const mockRunRouteHealthSmoke = vi.fn()
+  const mockRunCronRegistrationSmoke = vi.fn()
+  const mockApplyBumps = vi.fn().mockResolvedValue([])
+  const mockParseBumpDirectives = vi.fn().mockReturnValue([])
+  return {
+    mockInsert,
+    mockFrom,
+    mockRunRouteHealthSmoke,
+    mockRunCronRegistrationSmoke,
+    mockApplyBumps,
+    mockParseBumpDirectives,
   }
-)
+})
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
@@ -27,6 +41,11 @@ vi.mock('@/lib/harness/smoke-tests/route-health', () => ({
 
 vi.mock('@/lib/harness/smoke-tests/cron-registration', () => ({
   runCronRegistrationSmoke: mockRunCronRegistrationSmoke,
+}))
+
+vi.mock('@/lib/harness/component-bump', () => ({
+  parseBumpDirectives: mockParseBumpDirectives,
+  applyBumps: mockApplyBumps,
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -42,6 +61,7 @@ import {
   fetchMigrationSQL,
   sendMigrationGateMessage,
   insertSmokePendingEvent,
+  fetchMainCommits,
 } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
@@ -126,6 +146,8 @@ beforeEach(() => {
     reason: '10 crons registered, 0 hourly — Hobby plan compliant',
     details: { hourly_count: 0, schedules: [] },
   })
+  // Default: fetchMainCommits returns [] — keeps runBumpSweep a no-op in all baseline tests
+  mockFetch.mockResolvedValue({ ok: false, status: 404 })
 })
 
 afterEach(() => {
@@ -449,9 +471,12 @@ describe('GET /api/cron/deploy-gate-runner — timeout', () => {
     const body = await res.json()
     expect(body.results[0]).toContain('timeout')
 
-    // processing marker + timeout failure = 2 inserts; no Vercel API call
+    // processing marker + timeout failure = 2 inserts; Vercel was never polled
     expect(mockInsert).toHaveBeenCalledTimes(2)
-    expect(mockFetch).not.toHaveBeenCalled()
+    const vercelCalls = mockFetch.mock.calls.filter(
+      (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('api.vercel.com')
+    )
+    expect(vercelCalls).toHaveLength(0)
 
     const timeoutRow = mockInsert.mock.calls[1][0]
     expect(timeoutRow.task_type).toBe('deploy_gate_failed')
@@ -1911,6 +1936,59 @@ describe('insertSmokePendingEvent', () => {
   })
 })
 
+// ── fetchMainCommits ──────────────────────────────────────────────────────────
+
+describe('fetchMainCommits', () => {
+  afterEach(() => {
+    delete process.env.GITHUB_TOKEN
+  })
+
+  it('returns empty array when GITHUB_TOKEN is missing', async () => {
+    delete process.env.GITHUB_TOKEN
+    const result = await fetchMainCommits()
+    expect(result).toEqual([])
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns empty array when GitHub API returns non-200', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 403 })
+    const result = await fetchMainCommits()
+    expect(result).toEqual([])
+  })
+
+  it('returns empty array when response body is not an array', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ commits: [] }) })
+    const result = await fetchMainCommits()
+    expect(result).toEqual([])
+  })
+
+  it('maps sha and commit message from GitHub response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          { sha: 'abc123', commit: { message: 'BUMP: harness:smoke_test_framework=90' } },
+          { sha: 'def456', commit: { message: 'feat: normal commit' } },
+        ]),
+    })
+
+    const result = await fetchMainCommits()
+
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ sha: 'abc123', message: 'BUMP: harness:smoke_test_framework=90' })
+    expect(result[1]).toEqual({ sha: 'def456', message: 'feat: normal commit' })
+  })
+
+  it('calls the correct GitHub commits URL with sha=main and per_page=20', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) })
+    await fetchMainCommits()
+    const url = mockFetch.mock.calls[0][0] as string
+    expect(url).toContain('api.github.com/repos/loeppkyc/lepios/commits')
+    expect(url).toContain('sha=main')
+    expect(url).toContain('per_page=20')
+  })
+})
+
 // ── GET /api/cron/deploy-gate-runner — production smoke runner ────────────────
 
 describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
@@ -1992,5 +2070,63 @@ describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
     expect(smokeCompleteRow.status).toBe('error')
     expect(smokeCompleteRow.meta.merge_sha).toBe('failsha12345')
     expect(smokeCompleteRow.meta.l2_passed).toBe(false)
+  })
+})
+
+// ── GET /api/cron/deploy-gate-runner — bump sweep ─────────────────────────────
+
+describe('GET /api/cron/deploy-gate-runner — bump sweep', () => {
+  beforeEach(() => {
+    mockParseBumpDirectives.mockReturnValue([
+      { id: 'harness:smoke_test_framework', pct: 90, raw: 'BUMP: harness:smoke_test_framework=90' },
+    ])
+    mockApplyBumps.mockResolvedValue([{ id: 'harness:smoke_test_framework', pct: 90, success: true }])
+  })
+
+  it('returns bumps.checked=1 and bumps.applied=1 when commit has BUMP directives', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          { sha: 'bumpsha1', commit: { message: 'BUMP: harness:smoke_test_framework=90' } },
+        ]),
+    })
+    mockFrom.mockReturnValue(makeSelectBuilder([]))
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.bumps.checked).toBe(1)
+    expect(body.bumps.applied).toBe(1)
+    expect(mockApplyBumps).toHaveBeenCalledOnce()
+  })
+
+  it('skips commits already in harness_bump_processed and applies nothing', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          { sha: 'already1', commit: { message: 'BUMP: harness:smoke_test_framework=90' } },
+        ]),
+    })
+    // All queries return the processed sha — bump dedup picks it up
+    mockFrom.mockImplementation(() => makeSelectBuilder([{ meta: { sha: 'already1' } }]))
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(body.bumps.checked).toBe(1)
+    expect(body.bumps.applied).toBe(0)
+    expect(mockApplyBumps).not.toHaveBeenCalled()
+  })
+
+  it('returns bumps.checked=0 applied=0 when fetchMainCommits returns empty', async () => {
+    // Default mockFetch (ok: false) causes fetchMainCommits to return [] — early return
+    mockFrom.mockReturnValue(makeSelectBuilder([]))
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(body.bumps.checked).toBe(0)
+    expect(body.bumps.applied).toBe(0)
+    expect(mockApplyBumps).not.toHaveBeenCalled()
   })
 })

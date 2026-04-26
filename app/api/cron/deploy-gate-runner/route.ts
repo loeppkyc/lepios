@@ -11,9 +11,11 @@ import {
   fetchMigrationSQL,
   sendMigrationGateMessage,
   insertSmokePendingEvent,
+  fetchMainCommits,
 } from '@/lib/harness/deploy-gate'
 import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
+import { parseBumpDirectives, applyBumps } from '@/lib/harness/component-bump'
 
 export const dynamic = 'force-dynamic'
 
@@ -293,6 +295,54 @@ async function runAutoPromote(
   }
 }
 
+const BUMP_DEDUP_MS = 7 * 24 * 60 * 60 * 1000
+
+async function runBumpSweep(): Promise<{ checked: number; applied: number }> {
+  const commits = await fetchMainCommits(20)
+  if (commits.length === 0) return { checked: 0, applied: 0 }
+
+  const db = createServiceClient()
+
+  const { data: processedRows } = await db
+    .from('agent_events')
+    .select('meta')
+    .eq('action', 'harness_bump_processed')
+    .gte('occurred_at', new Date(Date.now() - BUMP_DEDUP_MS).toISOString())
+
+  const processedShas = new Set(
+    (processedRows ?? [])
+      .map((r) => ((r.meta as Record<string, unknown>)?.sha as string) ?? '')
+      .filter(Boolean)
+  )
+
+  let applied = 0
+
+  for (const commit of commits) {
+    if (processedShas.has(commit.sha)) continue
+
+    const directives = parseBumpDirectives(commit.message)
+
+    if (directives.length > 0) {
+      const results = await applyBumps(directives, commit.sha)
+      applied += results.filter((r) => r.success).length
+    }
+
+    try {
+      await db.from('agent_events').insert({
+        domain: 'harness',
+        action: 'harness_bump_processed',
+        actor: 'deploy-gate',
+        status: 'success',
+        meta: { sha: commit.sha, directives_found: directives.length },
+      })
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  return { checked: commits.length, applied }
+}
+
 async function runProductionSmokes(): Promise<{ processed: number; results: string[] }> {
   const db = createServiceClient()
   const now = Date.now()
@@ -380,7 +430,7 @@ async function runProductionSmokes(): Promise<{ processed: number; results: stri
 }
 
 async function runGateRunner(): Promise<object> {
-  const smokeOutcome = await runProductionSmokes()
+  const [smokeOutcome, bumpOutcome] = await Promise.all([runProductionSmokes(), runBumpSweep()])
 
   const db = createServiceClient()
   const now = Date.now()
@@ -402,6 +452,7 @@ async function runGateRunner(): Promise<object> {
       processed: smokeOutcome.processed,
       results: smokeOutcome.results,
       reason: 'no-pending-triggers',
+      bumps: bumpOutcome,
     }
   }
 
@@ -456,6 +507,7 @@ async function runGateRunner(): Promise<object> {
       processed: smokeOutcome.processed,
       results: smokeOutcome.results,
       reason: 'all-in-progress-or-terminal',
+      bumps: bumpOutcome,
     }
   }
 
@@ -638,6 +690,7 @@ async function runGateRunner(): Promise<object> {
     ok: true,
     processed: toProcess.length + smokeOutcome.processed,
     results: [...smokeOutcome.results, ...results],
+    bumps: bumpOutcome,
   }
 }
 
