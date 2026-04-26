@@ -50,21 +50,10 @@ if (!serviceKey) throw new Error('Missing env var: SUPABASE_SERVICE_ROLE_KEY')
 
 import { createClient } from '@supabase/supabase-js'
 import { embed, healthCheck, OllamaUnreachableError } from '../lib/ollama/client'
+import { RULES } from '../lib/rules/registry'
+import { buildArchRuleChunks, type KnowledgeChunk as Chunk } from '../lib/rules/chunk-builder'
 
 const supabase = createClient(supabaseUrl, serviceKey)
-
-// ── Chunk definition ──────────────────────────────────────────────────────────
-
-type Chunk = {
-  entity: string
-  category: 'rule' | 'principle'
-  domain: string
-  title: string
-  problem: string
-  solution: string
-  context: string
-  confidence: number
-}
 
 // Each chunk is a coherent answer to a likely coordinator question.
 // problem = the question this chunk answers
@@ -773,30 +762,8 @@ const CHUNKS: Chunk[] = [
     confidence: 0.9,
   },
   {
-    entity: 'cmdingest:lepios:arch-F17-behavioral',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F17: Every new module must justify its behavioral ingestion signal',
-    problem: 'What do I need to justify before building a new LepiOS module?',
-    solution:
-      'Every new module must justify its contribution to the behavioral ingestion spec and path probability engine. If a module has no engine-feeding signal, reconsider building it. See docs/vision/behavioral-ingestion-spec.md.',
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F17. Keywords: behavioral, ingestion, signal, module, justify',
-    confidence: 0.85,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F18-measurement',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F18: Every new module must ship with metrics, benchmark, and surfacing path',
-    problem: 'What observability requirements must every new LepiOS module meet?',
-    solution:
-      "Every new module must ship with: (a) metrics capture (agent_events or dedicated table), (b) a defined benchmark to compare against (industry standard, known-good reference, or Colin target), (c) a surfacing path so Colin can ask 'how is X doing?' and get a number + comparison. Required for autonomous operation.",
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F18. Keywords: metrics, benchmark, measurement, observability, module',
-    confidence: 0.85,
-  },
-  {
+    // F19 is scope='global' (defined in ~/.claude/CLAUDE.md) — stays static here.
+    // F17, F18, F20, F21 are scope='project' — auto-generated below from RULES.
     entity: 'cmdingest:lepios:arch-F19-continuous-improvement',
     category: 'rule',
     domain: 'lepios',
@@ -808,31 +775,6 @@ const CHUNKS: Chunk[] = [
     context:
       'Source: lepios CLAUDE.md §3 Architecture Rules F19. Instrumented: lib/harness/process-efficiency.ts (4 signals: queue throughput, pickup latency, queue depth, friction index). Keywords: 20% better, continuous improvement, build process, efficiency, autonomous',
     confidence: 0.85,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F20-design-system',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F20: No inline style={} in TSX — shadcn/ui + Tailwind only',
-    problem: 'Can I use inline style attributes or ad-hoc CSS in LepiOS TSX files?',
-    solution:
-      "No inline style={} attributes in TSX files. No ad-hoc CSS files. shadcn/ui components and Tailwind utility classes only. All shared components in app/components/ or components/ui/. Builder acceptance tests must grep new TSX files for 'style=' and fail if found.",
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F20. Keywords: inline style, TSX, shadcn, Tailwind, CSS',
-    confidence: 0.9,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F21-acceptance-tests-first',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F21: Acceptance tests first — write acceptance criteria before writing any code',
-    problem:
-      'When can I start writing code for a new module? Is it OK to write code before the acceptance criteria are defined?',
-    solution:
-      'Every module has written acceptance criteria before code is written. The acceptance doc is the contract; code exists to satisfy it. No exceptions — acceptance tests first, always. The acceptance doc must be written and approved before any builder work begins. See lib/rules/registry.ts for the canonical rule registry.',
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules rule 6 (F21). Keywords: F21, acceptance tests, acceptance criteria, acceptance doc, contract, module, builder, before code',
-    confidence: 0.95,
   },
   {
     entity: 'cmdingest:lepios:kill-criterion',
@@ -1101,6 +1043,15 @@ const CHUNKS: Chunk[] = [
   },
 ]
 
+// ── Auto-generated arch-F* chunks from rule registry ─────────────────────────
+// project-scoped rules only — global-scoped rules (e.g. F19) remain static above.
+// Entity ID: cmdingest:lepios:arch-F{number}-{name}
+// Adding a new project-scoped rule to RULES auto-ingests on next script run.
+const ALL_CHUNKS: Chunk[] = [
+  ...CHUNKS,
+  ...buildArchRuleChunks(RULES.filter((r) => r.scope === 'project')),
+]
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function embedText(c: Chunk): string {
@@ -1120,7 +1071,7 @@ function delay(ms: number) {
 async function main() {
   console.log('='.repeat(60))
   console.log('LepiOS — CLAUDE.md knowledge ingest')
-  console.log(`Total chunks defined: ${CHUNKS.length}`)
+  console.log(`Total chunks defined: ${ALL_CHUNKS.length} (${CHUNKS.length} static + ${ALL_CHUNKS.length - CHUNKS.length} from rule registry)`)
   console.log('='.repeat(60))
 
   // Check Ollama health (non-fatal — chunks save without embeddings)
@@ -1139,9 +1090,9 @@ async function main() {
   let skipped = 0
   let failed = 0
 
-  for (let i = 0; i < CHUNKS.length; i++) {
-    const chunk = CHUNKS[i]
-    process.stdout.write(`  [${i + 1}/${CHUNKS.length}] ${chunk.entity} … `)
+  for (let i = 0; i < ALL_CHUNKS.length; i++) {
+    const chunk = ALL_CHUNKS[i]
+    process.stdout.write(`  [${i + 1}/${ALL_CHUNKS.length}] ${chunk.entity} … `)
 
     // ── Idempotency check ────────────────────────────────────────────────────
     const { data: existing } = await supabase
@@ -1193,7 +1144,7 @@ async function main() {
     }
 
     // Small delay to avoid flooding Ollama on rapid successive requests
-    if (health.reachable && i < CHUNKS.length - 1) await delay(50)
+    if (health.reachable && i < ALL_CHUNKS.length - 1) await delay(50)
   }
 
   console.log('\n' + '='.repeat(60))
