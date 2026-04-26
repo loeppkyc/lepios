@@ -34,7 +34,14 @@ interface PersonalChunk {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const PERSONAL_CATEGORIES = ['personal_correspondence', 'personal_knowledge_base']
+// Expanded in P3 to include coordinator rule/principle chunks ingested from
+// CLAUDE.md. Without these categories the twin corpus is only raw emails.
+const SEARCHABLE_CATEGORIES = [
+  'personal_correspondence',
+  'personal_knowledge_base',
+  'principle',
+  'rule',
+]
 
 const SYSTEM_PROMPT =
   "You are a Q&A interface to Colin's personal knowledge. " +
@@ -69,7 +76,7 @@ async function retrievePersonalChunks(question: string, limit = 10): Promise<Per
   if (error || !data) return []
 
   return (data as PersonalChunk[])
-    .filter((r) => PERSONAL_CATEGORIES.includes(r.category))
+    .filter((r) => SEARCHABLE_CATEGORIES.includes(r.category))
     .slice(0, limit)
 }
 
