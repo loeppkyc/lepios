@@ -462,6 +462,48 @@ export async function fetchMigrationSQL(
   return { files: results, total_size_bytes }
 }
 
+export type CommitSummary = {
+  sha: string
+  message: string
+}
+
+export async function fetchMainCommits(perPage = 20): Promise<CommitSummary[]> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return []
+
+  let res: Response
+  try {
+    res = await fetch(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/commits?sha=main&per_page=${perPage}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    )
+  } catch {
+    return []
+  }
+
+  if (!res.ok) return []
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return []
+  }
+
+  if (!Array.isArray(json)) return []
+
+  return (json as Array<{ sha: string; commit: { message: string } }>).map((c) => ({
+    sha: c.sha,
+    message: c.commit?.message ?? '',
+  }))
+}
+
 const COMPARE_BASE_URL = `https://github.com/${GITHUB_REPO}/compare/main...`
 const MAX_MIGRATION_MSG_CHARS = 3800
 
