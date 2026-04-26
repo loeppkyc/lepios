@@ -122,6 +122,7 @@ chunks_planned:
 - "purpose-review"
 - "purpose-review-correctness"
 - "coordinator-env"
+- "stall-alert"
 
 chunks_complete: []
 chunks_awaiting_grounding:
@@ -134,16 +135,27 @@ chunks_awaiting_grounding:
 - "purpose-review"
   chunks_awaiting_grounding_correctness:
 - "purpose-review-correctness"
+  chunks_awaiting_grounding_coordinator_env:
+- "coordinator-env"
   chunks_not_started:
 - "task-pickup-100"
+  chunks_in_build:
+- "stall-alert"
 
-active_chunk: "purpose-review-correctness"
-active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"
-active_chunk_task_id: "fdf5a51e-28ca-4584-88f2-e922046ee276"
-active_chunk_status: "awaiting-grounding"
-active_chunk_colin_approved_at: "2026-04-25T19:34:44Z"
-active_chunk_commit: "1efef0f5985c12bd13bdf6476028be4e1f8af3a0"
-active_chunk_tests: "935 passing, 1 pre-existing failing (task-pickup cron schedule)"
+active_chunk: "stall-alert"
+active_chunk_acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
+active_chunk_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+active_chunk_status: "in-build"
+active_chunk_colin_approved_at: "2026-04-25T23:21:57Z"
+active_chunk_delegated_to_builder_at: "2026-04-26T00:40:00Z"
+last_updated_at: "2026-04-26T00:40:00Z"
+
+stall_alert_chunk:
+status: "in-build"
+acceptance_doc: "docs/sprint-5/stall-alert-acceptance.md"
+colin_approved_at: "2026-04-25T23:21:57Z"
+coordinator_task_id: "40b1aa4b-c969-4d94-93f7-49ce29f3fc26"
+delegated_to_builder_at: "2026-04-26T00:40:00Z"
 
 coordinator_env_chunk:
 status: "awaiting-grounding"
