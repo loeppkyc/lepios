@@ -13,6 +13,7 @@ const {
   mockBuildFtsFallbackLine,
   mockBuildDrainStatsLine,
   mockBuildReviewTimeoutLine,
+  mockBuildQuotaCliffLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockBuildFtsFallbackLine: vi.fn(),
   mockBuildDrainStatsLine: vi.fn(),
   mockBuildReviewTimeoutLine: vi.fn(),
+  mockBuildQuotaCliffLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -70,6 +72,11 @@ vi.mock('@/lib/twin/fts-fallback', () => ({
 vi.mock('@/lib/harness/telegram-stats', () => ({
   buildDrainStatsLine: mockBuildDrainStatsLine,
   buildReviewTimeoutLine: mockBuildReviewTimeoutLine,
+}))
+
+// Mock quota-cliff so buildQuotaCliffLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/quota-cliff', () => ({
+  buildQuotaCliffLine: mockBuildQuotaCliffLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -172,6 +179,8 @@ beforeEach(() => {
   // Default: drain ran 0 times (first run after deploy), no review timeouts
   mockBuildDrainStatsLine.mockResolvedValue('Drain runs (24h): 0, messages: 0')
   mockBuildReviewTimeoutLine.mockResolvedValue(null)
+  // Default: quota cliff clean — no 429 errors, no stuck tasks
+  mockBuildQuotaCliffLine.mockResolvedValue('Routines quota: clean (24h) ✅')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
