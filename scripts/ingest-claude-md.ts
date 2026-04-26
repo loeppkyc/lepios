@@ -542,6 +542,132 @@ const CHUNKS: Chunk[] = [
       'Source: global CLAUDE.md §4 Success Log S6. Keywords: BBV, anti-hallucination, confidence, retry, git',
     confidence: 0.9,
   },
+  {
+    entity: 'cmdingest:global:F17',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F17: Coordinator must verify task-scoped branch before any file write',
+    problem: 'Can the coordinator push acceptance docs or code to main?',
+    solution:
+      'Every coordinator session must verify it is on harness/task-{task_id} before any file write. Branch drift aborts the session and logs branch_guard_triggered to agent_events. Never push to main from a coordinator session. Fixed by LepiOS commit 8a1758e.',
+    context:
+      'Source: global CLAUDE.md §4 Failure Log F17. Related: LepiOS fix 8a1758e. Keywords: branch, main, coordinator, branch-guard, git',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:global:F18',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F18: Store coordinator runtime config in harness_config (Supabase), not process.env',
+    problem:
+      'Where should CRON_SECRET, TELEGRAM_CHAT_ID, and other coordinator runtime values be stored?',
+    solution:
+      'Store runtime config that agents need in the harness_config Supabase table. Coordinator reads at startup via SQL: SELECT key, value FROM harness_config. Never rely on process.env for values that must survive env rotation or cross process boundaries. Fixed by LepiOS commit 14c7809.',
+    context:
+      'Source: global CLAUDE.md §4 Failure Log F18. Related: LepiOS fix 14c7809. Keywords: harness_config, process.env, runtime config, Supabase, coordinator',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:global:F19',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F19: Grep exact table name before writing any SQL — never from memory',
+    problem: 'Can I write SQL referencing a table name from the acceptance doc or from memory?',
+    solution:
+      "Grep the exact table name in every migration and schema file before writing SQL. Cross-reference with: SELECT table_name FROM information_schema.tables WHERE table_schema='public'. Never write a table name from memory. The acceptance doc may say error_events when the schema has agent_events.",
+    context:
+      'Source: global CLAUDE.md §4 Failure Log F19. Keywords: table name, SQL, grep, agent_events, schema',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:global:F20',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F20: Verify endpoint returns 200 from both local and production before documenting it',
+    problem:
+      'Can I document an API endpoint in an agent spec without verifying it is reachable in production?',
+    solution:
+      'Before documenting any endpoint in an agent spec, verify it returns 200 from both local (localhost:3000) and production (lepios-one.vercel.app). Add a connectivity preflight to Phase 1b before the first batch query. Log failure to agent_events rather than silently escalating to Colin.',
+    context:
+      'Source: global CLAUDE.md §4 Failure Log F20. Keywords: endpoint, production, 404, twin, verify, preflight',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:F21',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F21: Write sprint-state.md after every phase — context window termination is always possible',
+    problem:
+      'When should sprint-state.md be updated? Is it OK to update it at the end of a long session?',
+    solution:
+      'Write sprint-state.md after EVERY phase completion — not at the end of the session. Each phase boundary is a potential termination point. Heartbeat every ~3 min prevents stale-reclaim during long phases. If context is lost mid-phase, the last phase boundary state is the recovery point.',
+    context:
+      'Source: global CLAUDE.md §4 Failure Log F21. Keywords: sprint-state, phase, context window, termination, recovery',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:S7',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S7: Log compliance events (not just violations) to agent_events — absence = success signal',
+    problem: 'How should enforcement rules surface their status in the morning digest?',
+    solution:
+      'Log compliance events to agent_events, not just violations. branch_guard_triggered count in morning_digest: 0 events = guard working silently, N events = N branch drifts caught. The absence of events is the success signal. Self-monitoring without polling.',
+    context:
+      'Source: global CLAUDE.md §4 Success Log S7. Related: LepiOS fix 8a1758e. Keywords: agent_events, morning_digest, compliance, enforcement, branch_guard',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:S8',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S8: Phase 1a audit-first Streamlit study before any acceptance doc',
+    problem:
+      'When can I start writing the acceptance doc for a feature being ported from Streamlit?',
+    solution:
+      'Read the full Streamlit implementation first and write a study doc. For any port: study first (quote the relevant code), spec second, code third. The study doc is the spec input — vagueness here propagates to spec-wrong code. Non-optional Phase 1a for all ported chunks.',
+    context:
+      'Source: global CLAUDE.md §4 Success Log S8. Keywords: Phase 1a, Streamlit study, port, acceptance doc, spec',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:S9',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S9: harness_config Supabase table for all autonomous agent runtime values',
+    problem:
+      'Where should CRON_SECRET, TELEGRAM_CHAT_ID, and similar runtime values live for agents?',
+    solution:
+      'Store in harness_config (Supabase table). Coordinator reads at startup via SQL. Survives Vercel env rotation without touching agent specs. Eliminated the entire "env var missing at coordinator runtime" failure class. Autonomous agent runtime values → harness_config. App runtime values → Vercel env.',
+    context:
+      'Source: global CLAUDE.md §4 Success Log S9. Related: LepiOS fix 14c7809. Keywords: harness_config, Supabase, runtime, env vars, coordinator',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:S10',
+    category: 'principle',
+    domain: 'lepios',
+    title: 'S10: FTS fallback required for any pgvector similarity search',
+    problem:
+      'Is it OK to ship a semantic/vector similarity search that returns empty results on low-confidence queries?',
+    solution:
+      "Any semantic/vector search must ship with a keyword fallback (FTS). Never ship a similarity search that returns empty on low-confidence queries — FTS is the defensive catch layer. Twin knowledge store: pgvector similarity + FTS fallback. Without FTS, first deployment had 0% hit rate.",
+    context:
+      'Source: global CLAUDE.md §4 Success Log S10. Keywords: FTS, pgvector, similarity, fallback, twin, knowledge store',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:global:S11',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S11: Coordinator and builder always run in separate Claude Code context windows',
+    problem: 'Can coordinator and builder run in the same Claude Code session?',
+    solution:
+      "Always run coordinator and builder in separate Claude Code context windows. Pass only the acceptance doc path as the handoff artifact; never forward the coordinator's full context to builder. Each role works at full context depth without fighting the same window. Coordinator waits for handoff.json before proceeding to Phase 4.",
+    context:
+      'Source: global CLAUDE.md §4 Success Log S11. Keywords: coordinator, builder, context window, handoff, separate sessions',
+    confidence: 0.9,
+  },
 
   // ── LEPIOS CLAUDE.MD — §1 Quick Context ─────────────────────────────────────
 
@@ -671,6 +797,19 @@ const CHUNKS: Chunk[] = [
     confidence: 0.85,
   },
   {
+    entity: 'cmdingest:lepios:arch-F19-continuous-improvement',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'F19: Every system/process/workflow evaluated for 20% faster/cheaper/better',
+    problem:
+      'What continuous improvement obligation applies to every LepiOS system and build process?',
+    solution:
+      'Every system, process, and workflow is continuously evaluated for "how can this be 20% faster, cheaper, or better?" Scope: (a) build process — parallelization, batching, idle resource detection; (b) module quality — correctness, performance, UX, extensibility, data model, observability; (c) communication patterns — paste blocks, friction signals, repeated clarifications; (d) resource utilization — Claude Code windows, coordinator quota, Ollama vs frontier routing; (e) Colin-time vs autonomous-time ratio — should trend toward autonomous. Every build cycle ends with "what would have made this 20% faster?" logged to CLAUDE.md §9. 20% Better loop surfaces top 3 suggestions in morning_digest.',
+    context:
+      'Source: lepios CLAUDE.md §3 Architecture Rules F19. Instrumented: lib/harness/process-efficiency.ts (4 signals: queue throughput, pickup latency, queue depth, friction index). Keywords: 20% better, continuous improvement, build process, efficiency, autonomous',
+    confidence: 0.85,
+  },
+  {
     entity: 'cmdingest:lepios:arch-F20-design-system',
     category: 'rule',
     domain: 'lepios',
@@ -756,6 +895,196 @@ const CHUNKS: Chunk[] = [
     context:
       'Source: lepios AGENTS.md. Keywords: ARCHITECTURE.md, northstar, contradict, flag, design',
     confidence: 0.95,
+  },
+
+  // ── LEPIOS CLAUDE.MD — §8 Capabilities ──────────────────────────────────────
+
+  {
+    entity: 'cmdingest:lepios:cap-coordinator-agent',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'LepiOS coordinator agent: what it does and what it must never do',
+    problem: 'What is the coordinator agent responsible for in LepiOS? What are its limits?',
+    solution:
+      'Coordinator (spec: .claude/agents/coordinator.md): invoked by task_queue harness or Colin directly. Use for: sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation. NEVER for: writing code, self-approving acceptance docs, any destructive operation. Handoff: coordinator passes acceptance doc path; builder returns docs/sprint-{N}/chunk-{id}-handoff.json. Run in separate Claude Code context windows.',
+    context:
+      'Source: lepios CLAUDE.md §8 Capabilities. Keywords: coordinator, agent, sprint planning, acceptance doc, builder, handoff',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:lepios:cap-builder-agent',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'LepiOS builder agent: what it does and what it must never do',
+    problem: 'What is the builder agent responsible for? When can builder be invoked?',
+    solution:
+      'Builder (spec: .claude/agents/builder.md): invoked by coordinator ONLY. Use for: translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON. NEVER for: anything without an approved acceptance doc, sprint planning, grounding checkpoint execution. Builder never sees coordinator context — receives only the acceptance doc path.',
+    context:
+      'Source: lepios CLAUDE.md §8 Capabilities. Keywords: builder, agent, acceptance doc, deploy, handoff JSON, coordinator',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:lepios:cap-harness-endpoints',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'LepiOS harness endpoints: heartbeat, notifications-drain, twin/ask, health',
+    problem: 'What production endpoints does the coordinator use during a session?',
+    solution:
+      'Production harness endpoints (replace lepios-one.vercel.app with localhost:3000 for local): POST /api/harness/task-heartbeat (coordinator liveness — prevents stale-reclaim); POST /api/harness/notifications-drain (flush outbound_notifications queue to Telegram — call after every insert); POST /api/twin/ask (Digital Twin Q&A — batch queries only, never mid-phase); GET /api/health (quick liveness — 200 = app up). Verify each endpoint returns 200 before documenting in any spec.',
+    context:
+      'Source: lepios CLAUDE.md §8 Capabilities. Keywords: heartbeat, notifications-drain, twin/ask, health, production endpoints, harness',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:cap-lepios-mcp-tools',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'LepiOS MCP tools: Supabase and Vercel tools specific to this project',
+    problem: 'Which MCP tools should I use for DB inspection and deployment verification in LepiOS?',
+    solution:
+      'LepiOS MCP tools: mcp__claude_ai_Supabase__execute_sql (read harness_config, query agent_events, inspect task_queue — primary DB tool); mcp__claude_ai_Supabase__apply_migration (apply migrations — builder only); mcp__claude_ai_Supabase__list_migrations (verify migration applied); mcp__claude_ai_Vercel__list_deployments (confirm deploy landed); mcp__claude_ai_Vercel__get_runtime_logs (diagnose production errors); mcp__claude_ai_Vercel__get_deployment_build_logs (debug failed builds).',
+    context:
+      'Source: lepios CLAUDE.md §8 Capabilities. Keywords: Supabase, Vercel, MCP tools, execute_sql, apply_migration, list_deployments, runtime_logs',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:cap-runtime-config',
+    category: 'rule',
+    domain: 'lepios',
+    title: 'LepiOS runtime config pattern: read from harness_config at coordinator session start',
+    problem: 'How does a coordinator session get CRON_SECRET, TELEGRAM_CHAT_ID, and other runtime values?',
+    solution:
+      "All values agents need at runtime live in the harness_config Supabase table. Read at coordinator session start: SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID'). Never read from process.env for cross-boundary values — env vars are for the Next.js process, not for agent sub-processes.",
+    context:
+      'Source: lepios CLAUDE.md §8 Runtime Config Pattern. Keywords: harness_config, runtime config, CRON_SECRET, TELEGRAM_CHAT_ID, session start',
+    confidence: 0.95,
+  },
+
+  // ── LEPIOS CLAUDE.MD — §9 Failure / Success Log ──────────────────────────────
+
+  {
+    entity: 'cmdingest:lepios:FL1',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F-L1: Coordinator must be on harness/task-{id} branch — never write to main',
+    problem: 'What branch should the coordinator be on when writing acceptance docs or code?',
+    solution:
+      'Branch guard enforced: every coordinator session verifies harness/task-{task_id} before any file write. Drift triggers branch_guard_triggered in agent_events and aborts the session. See .claude/agents/coordinator.md Branch Naming section. Fixed by LepiOS commit 8a1758e.',
+    context:
+      'Source: lepios CLAUDE.md §9 Failure Log F-L1. Keywords: branch guard, coordinator, main, harness/task, agent_events',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:lepios:FL2',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F-L2: Vercel env vars not accessible to coordinator sub-process — use harness_config',
+    problem:
+      'Can coordinator rely on Vercel env vars like CRON_SECRET at runtime in sub-agent processes?',
+    solution:
+      'Vercel env vars are not accessible to the coordinator sub-agent process at runtime. Store in harness_config (Supabase). Read via SQL at session start. Never rely on process.env for cross-boundary values. Fixed by LepiOS commit 14c7809.',
+    context:
+      'Source: lepios CLAUDE.md §9 Failure Log F-L2. Keywords: env vars, coordinator, runtime, harness_config, process.env, CRON_SECRET',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:lepios:FL3',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F-L3: Grep exact table name from schema before any SQL — acceptance doc may be wrong',
+    problem:
+      'How do I know the correct table name to use in SQL? Can I trust the acceptance doc?',
+    solution:
+      "Acceptance doc may say error_events when schema has agent_events. Grep the exact table name in migrations and schema files before writing SQL. Cross-reference: SELECT table_name FROM information_schema.tables WHERE table_schema='public'. Tests may pass even with wrong table if there is no table-existence assertion.",
+    context:
+      'Source: lepios CLAUDE.md §9 Failure Log F-L3. Keywords: table name, SQL, agent_events, error_events, schema grep',
+    confidence: 0.95,
+  },
+  {
+    entity: 'cmdingest:lepios:FL4',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F-L4: Verify /api/twin/ask returns 200 from production before using it',
+    problem: 'Can I use the /api/twin/ask endpoint without verifying it is live in production?',
+    solution:
+      'Before documenting /api/twin/ask (or any endpoint) in an agent spec, verify it returns 200 from both local (localhost:3000) AND production (lepios-one.vercel.app). Add a connectivity preflight in Phase 1b before the first batch query. Log failure to agent_events rather than silently routing to Colin.',
+    context:
+      'Source: lepios CLAUDE.md §9 Failure Log F-L4. Keywords: twin/ask, endpoint, production, 404, preflight, Phase 1b',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:FL5',
+    category: 'rule',
+    domain: 'coordinator',
+    title: 'F-L5: Write sprint-state.md after every phase — treat each phase boundary as a potential termination',
+    problem: 'When should sprint-state.md be updated during a long coordinator session?',
+    solution:
+      'Write sprint-state.md after EVERY phase completion — not at session end. Each phase boundary is a potential termination point. Heartbeat every ~3 min prevents stale-reclaim during long phases. If context window closes mid-phase, the last completed phase boundary is the recovery point for the next window.',
+    context:
+      'Source: lepios CLAUDE.md §9 Failure Log F-L5. Keywords: sprint-state, phase, context window, heartbeat, recovery',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:SL1',
+    category: 'principle',
+    domain: 'lepios',
+    title: 'S-L1: harness_config (Supabase) eliminates env-var runtime failures for autonomous agents',
+    problem:
+      'What is the pattern that eliminated the "env var missing at coordinator runtime" failure class?',
+    solution:
+      'Store all autonomous agent runtime values in harness_config Supabase table. Coordinator reads at session start via SQL. Config survives Vercel env rotation without touching agent specs. Autonomous agent runtime values → harness_config. App runtime values → Vercel env. Never cross the boundary. LepiOS commit 14c7809.',
+    context:
+      'Source: lepios CLAUDE.md §9 Success Log S-L1. Keywords: harness_config, Supabase, runtime, env vars, coordinator, autonomous',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:SL2',
+    category: 'principle',
+    domain: 'lepios',
+    title: 'S-L2: Phase 1a Streamlit study catches spec drift before build — non-optional for ports',
+    problem: 'How much did Phase 1a Streamlit study reduce Colin interventions during sprint builds?',
+    solution:
+      'Phase 1a reduced Colin interventions from 14 (Chunk D v1, no study) to ~2 (Chunk D v2, with study). Caught table-name drift, timezone handling bugs, scope ambiguity. Non-optional for all ported chunks. Study first (quote relevant code), spec second, code third. The study doc is the spec input.',
+    context:
+      'Source: lepios CLAUDE.md §9 Success Log S-L2. Keywords: Phase 1a, Streamlit study, port, acceptance doc, Colin interventions',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:SL3',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S-L3: Branch guard events in agent_events → morning_digest count is the success signal',
+    problem: 'How does the branch guard self-report its health without polling?',
+    solution:
+      'branch_guard_triggered events logged to agent_events; morning_digest surfaces the count. Zero events = guard working silently. Non-zero = N branch drifts caught. Self-monitoring without polling — absence of events is the success signal. Apply same pattern to new enforcement rules.',
+    context:
+      'Source: lepios CLAUDE.md §9 Success Log S-L3. Related: commit 8a1758e. Keywords: branch_guard_triggered, agent_events, morning_digest, enforcement, compliance',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:SL4',
+    category: 'principle',
+    domain: 'lepios',
+    title: 'S-L4: FTS fallback on pgvector is what made the Twin knowledge store functional',
+    problem:
+      'What prevented the Twin knowledge store from returning 0 results on low-confidence queries?',
+    solution:
+      'FTS (full-text search) fallback on top of pgvector similarity. When embedding distance exceeds threshold and returns 0 results, FTS catches keyword-exact matches that embeddings miss. Without FTS, first Twin production deployment had 0% hit rate. Every vector similarity search must ship with a keyword fallback.',
+    context:
+      'Source: lepios CLAUDE.md §9 Success Log S-L4. Keywords: FTS, pgvector, similarity, fallback, Twin, knowledge store, 0% hit rate',
+    confidence: 0.9,
+  },
+  {
+    entity: 'cmdingest:lepios:SL5',
+    category: 'principle',
+    domain: 'coordinator',
+    title: 'S-L5: Coordinator and builder in separate context windows — pass only the acceptance doc path',
+    problem: 'Should coordinator and builder share the same Claude Code context window?',
+    solution:
+      "Always run coordinator and builder in separate Claude Code context windows. Each role works at full context depth without fighting for space. Coordinator waits for handoff.json; builder never sees coordinator sprint context. Pass only the acceptance doc path as the handoff artifact — never the full coordinator context.",
+    context:
+      'Source: lepios CLAUDE.md §9 Success Log S-L5. Keywords: coordinator, builder, context window, handoff, separate sessions, parallel',
+    confidence: 0.9,
   },
 ]
 
