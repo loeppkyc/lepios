@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T23:24:00Z"
+last_updated_at: "2026-04-25T23:59:00Z"
 
 chunks_planned:
 
@@ -136,6 +136,18 @@ chunks_awaiting_grounding:
 - "purpose-review-correctness"
   chunks_not_started:
 - "task-pickup-100"
+
+  notification_drain_dedup_chunk:
+    status: "awaiting-async-response"
+    study_doc: "docs/sprint-5/notification-drain-dedup-study.md"
+    acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
+    task_id: "c622d367-704d-4838-83bf-15a196c8c074"
+    twin_qa: "blocked — host not in allowlist from local Claude Code env"
+    pending_colin_questions: 3
+    escalated_at: "2026-04-25T23:59:00Z"
+    pending_notification_id: "eb712e42-4f07-4b3c-a061-ba06e1a07c35"
+    drain_status: "pending — 403 on trigger (harness_config CRON_SECRET placeholder; coordinator-env grounding checkpoint not yet applied)"
+    resume_instructions: "Colin: (1) apply coordinator-env grounding checkpoint, OR (2) manually POST /api/harness/notifications-drain to deliver the Telegram message"
 
 active_chunk: "purpose-review-correctness"
 active_chunk_acceptance_doc: "docs/sprint-5/purpose-review-correctness-acceptance.md"

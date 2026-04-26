@@ -147,3 +147,38 @@ reversibility_check: |
 confidence: high (direct Colin ratification, not cache-match; escalation is procedurally correct)
 outcome: proceeding_to_builder_on_colin_direct_ratification
 proceed_reason: "Colin approved via callback at 2026-04-25T23:05:19Z — direct ratification, not cache-match"
+
+---
+
+2026-04-25T23:59:00Z sprint=5 chunk=notification-drain-dedup phase=1a-1d doc=docs/sprint-5/notification-drain-dedup-acceptance.md
+cited_principles: ["2 (split until grounding checkpoint fits)", "4 (no speculative enums)", "17 (no speculative infrastructure)", "META-C"]
+trigger_match_evidence: |
+  META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
+  Therefore META-C does NOT apply. This entry is the escalation log per coordinator.md Phase 2 step 5:
+  "Log the escalation too, with the same schema, so Colin can see what you _would_ have cached if
+  confidence had been higher."
+  
+  Chunk: notification-drain-dedup (greenfield — no Streamlit predecessor).
+  Phase 1a skipped (greenfield). Phase 1b blocked (twin endpoint unreachable — host not in allowlist).
+  Phase 1c completed in study doc (20% Better analysis for all 6 categories).
+  Phase 1d draft written but marked DRAFT pending 3 Colin confirmations.
+  
+  Three pending questions escalate to Colin per twin-blocked rule:
+  Q1: Permanent unique constraint on correlation_id vs time-windowed dedup (30s)
+  Q2: Add daily safety-net cron to vercel.json for drain
+  Q3: Log delivery_latency_ms to agent_events per send
+reversibility_check: |
+  Study doc: new file, fully reversible (delete or rewrite).
+  Acceptance doc: new file, DRAFT status, fully reversible (delete or rewrite).
+  sprint-state.md update: document only, no code/schema effect.
+  auto-proceed-log.md append: this entry — append-only, reversible via git.
+  No code written, no schema changed, no external calls made (beyond read-only Supabase queries).
+  All pending questions are decisions Colin must make; no irrevocable actions pending.
+confidence: high (escalation is correct and unambiguous; cache-match disabled + twin blocked + Q1-Q3 open)
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - twin_blocked_all_questions (host not in allowlist from local Claude Code env)
+  - Q1_dedup_strategy (coordinator design decision — Colin's call)
+  - Q2_safety_net_cron (vercel.json config decision — Colin's call)
+  - Q3_latency_logging (observability granularity — Colin's call)
