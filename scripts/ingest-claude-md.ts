@@ -50,6 +50,7 @@ if (!serviceKey) throw new Error('Missing env var: SUPABASE_SERVICE_ROLE_KEY')
 
 import { createClient } from '@supabase/supabase-js'
 import { embed, healthCheck, OllamaUnreachableError } from '../lib/ollama/client'
+import { ARCHITECTURE_RULES } from '../lib/rules'
 
 const supabase = createClient(supabaseUrl, serviceKey)
 
@@ -596,7 +597,8 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:global:F21',
     category: 'rule',
     domain: 'coordinator',
-    title: 'F21: Write sprint-state.md after every phase — context window termination is always possible',
+    title:
+      'F21: Write sprint-state.md after every phase — context window termination is always possible',
     problem:
       'When should sprint-state.md be updated? Is it OK to update it at the end of a long session?',
     solution:
@@ -609,7 +611,8 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:global:S7',
     category: 'principle',
     domain: 'coordinator',
-    title: 'S7: Log compliance events (not just violations) to agent_events — absence = success signal',
+    title:
+      'S7: Log compliance events (not just violations) to agent_events — absence = success signal',
     problem: 'How should enforcement rules surface their status in the morning digest?',
     solution:
       'Log compliance events to agent_events, not just violations. branch_guard_triggered count in morning_digest: 0 events = guard working silently, N events = N branch drifts caught. The absence of events is the success signal. Self-monitoring without polling.',
@@ -651,7 +654,7 @@ const CHUNKS: Chunk[] = [
     problem:
       'Is it OK to ship a semantic/vector similarity search that returns empty results on low-confidence queries?',
     solution:
-      "Any semantic/vector search must ship with a keyword fallback (FTS). Never ship a similarity search that returns empty on low-confidence queries — FTS is the defensive catch layer. Twin knowledge store: pgvector similarity + FTS fallback. Without FTS, first deployment had 0% hit rate.",
+      'Any semantic/vector search must ship with a keyword fallback (FTS). Never ship a similarity search that returns empty on low-confidence queries — FTS is the defensive catch layer. Twin knowledge store: pgvector similarity + FTS fallback. Without FTS, first deployment had 0% hit rate.',
     context:
       'Source: global CLAUDE.md §4 Success Log S10. Keywords: FTS, pgvector, similarity, fallback, twin, knowledge store',
     confidence: 0.9,
@@ -772,55 +775,19 @@ const CHUNKS: Chunk[] = [
       'Source: lepios CLAUDE.md §3 Architecture Rules rule 6. Keywords: acceptance, test, criteria, before, module',
     confidence: 0.9,
   },
-  {
-    entity: 'cmdingest:lepios:arch-F17-behavioral',
-    category: 'rule',
+  // Architecture rules F17+ are sourced from the canonical registry at
+  // lib/rules/index.ts. TypeScript blocks duplicate keys there, so adding
+  // F21+ is a registry-only edit; this loop picks them up automatically.
+  ...Object.values(ARCHITECTURE_RULES).map((rule) => ({
+    entity: `cmdingest:lepios:arch-${rule.id}-${rule.slug}`,
+    category: 'rule' as const,
     domain: 'lepios',
-    title: 'F17: Every new module must justify its behavioral ingestion signal',
-    problem: 'What do I need to justify before building a new LepiOS module?',
-    solution:
-      'Every new module must justify its contribution to the behavioral ingestion spec and path probability engine. If a module has no engine-feeding signal, reconsider building it. See docs/vision/behavioral-ingestion-spec.md.',
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F17. Keywords: behavioral, ingestion, signal, module, justify',
-    confidence: 0.85,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F18-measurement',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F18: Every new module must ship with metrics, benchmark, and surfacing path',
-    problem: 'What observability requirements must every new LepiOS module meet?',
-    solution:
-      "Every new module must ship with: (a) metrics capture (agent_events or dedicated table), (b) a defined benchmark to compare against (industry standard, known-good reference, or Colin target), (c) a surfacing path so Colin can ask 'how is X doing?' and get a number + comparison. Required for autonomous operation.",
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F18. Keywords: metrics, benchmark, measurement, observability, module',
-    confidence: 0.85,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F19-continuous-improvement',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F19: Every system/process/workflow evaluated for 20% faster/cheaper/better',
-    problem:
-      'What continuous improvement obligation applies to every LepiOS system and build process?',
-    solution:
-      'Every system, process, and workflow is continuously evaluated for "how can this be 20% faster, cheaper, or better?" Scope: (a) build process — parallelization, batching, idle resource detection; (b) module quality — correctness, performance, UX, extensibility, data model, observability; (c) communication patterns — paste blocks, friction signals, repeated clarifications; (d) resource utilization — Claude Code windows, coordinator quota, Ollama vs frontier routing; (e) Colin-time vs autonomous-time ratio — should trend toward autonomous. Every build cycle ends with "what would have made this 20% faster?" logged to CLAUDE.md §9. 20% Better loop surfaces top 3 suggestions in morning_digest.',
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F19. Instrumented: lib/harness/process-efficiency.ts (4 signals: queue throughput, pickup latency, queue depth, friction index). Keywords: 20% better, continuous improvement, build process, efficiency, autonomous',
-    confidence: 0.85,
-  },
-  {
-    entity: 'cmdingest:lepios:arch-F20-design-system',
-    category: 'rule',
-    domain: 'lepios',
-    title: 'F20: No inline style={} in TSX — shadcn/ui + Tailwind only',
-    problem: 'Can I use inline style attributes or ad-hoc CSS in LepiOS TSX files?',
-    solution:
-      "No inline style={} attributes in TSX files. No ad-hoc CSS files. shadcn/ui components and Tailwind utility classes only. All shared components in app/components/ or components/ui/. Builder acceptance tests must grep new TSX files for 'style=' and fail if found.",
-    context:
-      'Source: lepios CLAUDE.md §3 Architecture Rules F20. Keywords: inline style, TSX, shadcn, Tailwind, CSS',
-    confidence: 0.9,
-  },
+    title: rule.ingest.title,
+    problem: rule.ingest.problem,
+    solution: rule.ingest.solution,
+    context: rule.ingest.context,
+    confidence: rule.ingest.confidence,
+  })),
   {
     entity: 'cmdingest:lepios:kill-criterion',
     category: 'rule',
@@ -940,7 +907,8 @@ const CHUNKS: Chunk[] = [
     category: 'rule',
     domain: 'lepios',
     title: 'LepiOS MCP tools: Supabase and Vercel tools specific to this project',
-    problem: 'Which MCP tools should I use for DB inspection and deployment verification in LepiOS?',
+    problem:
+      'Which MCP tools should I use for DB inspection and deployment verification in LepiOS?',
     solution:
       'LepiOS MCP tools: mcp__claude_ai_Supabase__execute_sql (read harness_config, query agent_events, inspect task_queue — primary DB tool); mcp__claude_ai_Supabase__apply_migration (apply migrations — builder only); mcp__claude_ai_Supabase__list_migrations (verify migration applied); mcp__claude_ai_Vercel__list_deployments (confirm deploy landed); mcp__claude_ai_Vercel__get_runtime_logs (diagnose production errors); mcp__claude_ai_Vercel__get_deployment_build_logs (debug failed builds).',
     context:
@@ -952,7 +920,8 @@ const CHUNKS: Chunk[] = [
     category: 'rule',
     domain: 'lepios',
     title: 'LepiOS runtime config pattern: read from harness_config at coordinator session start',
-    problem: 'How does a coordinator session get CRON_SECRET, TELEGRAM_CHAT_ID, and other runtime values?',
+    problem:
+      'How does a coordinator session get CRON_SECRET, TELEGRAM_CHAT_ID, and other runtime values?',
     solution:
       "All values agents need at runtime live in the harness_config Supabase table. Read at coordinator session start: SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID'). Never read from process.env for cross-boundary values — env vars are for the Next.js process, not for agent sub-processes.",
     context:
@@ -992,8 +961,7 @@ const CHUNKS: Chunk[] = [
     category: 'rule',
     domain: 'coordinator',
     title: 'F-L3: Grep exact table name from schema before any SQL — acceptance doc may be wrong',
-    problem:
-      'How do I know the correct table name to use in SQL? Can I trust the acceptance doc?',
+    problem: 'How do I know the correct table name to use in SQL? Can I trust the acceptance doc?',
     solution:
       "Acceptance doc may say error_events when schema has agent_events. Grep the exact table name in migrations and schema files before writing SQL. Cross-reference: SELECT table_name FROM information_schema.tables WHERE table_schema='public'. Tests may pass even with wrong table if there is no table-existence assertion.",
     context:
@@ -1016,7 +984,8 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:lepios:FL5',
     category: 'rule',
     domain: 'coordinator',
-    title: 'F-L5: Write sprint-state.md after every phase — treat each phase boundary as a potential termination',
+    title:
+      'F-L5: Write sprint-state.md after every phase — treat each phase boundary as a potential termination',
     problem: 'When should sprint-state.md be updated during a long coordinator session?',
     solution:
       'Write sprint-state.md after EVERY phase completion — not at session end. Each phase boundary is a potential termination point. Heartbeat every ~3 min prevents stale-reclaim during long phases. If context window closes mid-phase, the last completed phase boundary is the recovery point for the next window.',
@@ -1028,7 +997,8 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:lepios:SL1',
     category: 'principle',
     domain: 'lepios',
-    title: 'S-L1: harness_config (Supabase) eliminates env-var runtime failures for autonomous agents',
+    title:
+      'S-L1: harness_config (Supabase) eliminates env-var runtime failures for autonomous agents',
     problem:
       'What is the pattern that eliminated the "env var missing at coordinator runtime" failure class?',
     solution:
@@ -1041,8 +1011,10 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:lepios:SL2',
     category: 'principle',
     domain: 'lepios',
-    title: 'S-L2: Phase 1a Streamlit study catches spec drift before build — non-optional for ports',
-    problem: 'How much did Phase 1a Streamlit study reduce Colin interventions during sprint builds?',
+    title:
+      'S-L2: Phase 1a Streamlit study catches spec drift before build — non-optional for ports',
+    problem:
+      'How much did Phase 1a Streamlit study reduce Colin interventions during sprint builds?',
     solution:
       'Phase 1a reduced Colin interventions from 14 (Chunk D v1, no study) to ~2 (Chunk D v2, with study). Caught table-name drift, timezone handling bugs, scope ambiguity. Non-optional for all ported chunks. Study first (quote relevant code), spec second, code third. The study doc is the spec input.',
     context:
@@ -1078,10 +1050,11 @@ const CHUNKS: Chunk[] = [
     entity: 'cmdingest:lepios:SL5',
     category: 'principle',
     domain: 'coordinator',
-    title: 'S-L5: Coordinator and builder in separate context windows — pass only the acceptance doc path',
+    title:
+      'S-L5: Coordinator and builder in separate context windows — pass only the acceptance doc path',
     problem: 'Should coordinator and builder share the same Claude Code context window?',
     solution:
-      "Always run coordinator and builder in separate Claude Code context windows. Each role works at full context depth without fighting for space. Coordinator waits for handoff.json; builder never sees coordinator sprint context. Pass only the acceptance doc path as the handoff artifact — never the full coordinator context.",
+      'Always run coordinator and builder in separate Claude Code context windows. Each role works at full context depth without fighting for space. Coordinator waits for handoff.json; builder never sees coordinator sprint context. Pass only the acceptance doc path as the handoff artifact — never the full coordinator context.',
     context:
       'Source: lepios CLAUDE.md §9 Success Log S-L5. Keywords: coordinator, builder, context window, handoff, separate sessions, parallel',
     confidence: 0.9,

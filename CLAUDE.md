@@ -61,6 +61,8 @@ gated on a clean week of overnight runs.
 
 ## 3 — Architecture Rules (non-negotiable)
 
+> **F-numbered rules: registry at `lib/rules/index.ts` is canonical.** Claim a number there before adding prose below — TypeScript blocks duplicate keys, so the F19/F19 collision (commit `344ca13`, F-L8) cannot recur. The registry test (`tests/rules/registry.test.ts`) asserts this list and the registry stay in sync.
+
 1. **Check-Before-Build (§8.4):** Before any new code/schema/config — verify it doesn't exist in the Streamlit OS baseline (Phase 2) or in this repo (Phase 3+). Default action: Beef-Up. Replace requires Colin's explicit approval. Build-New is last resort.
 2. **Accuracy-Zone Pipeline (§8.5):** Tight-scope tasks (one sentence + acceptance criterion). Stop at 40-50% context window, write handoff note, fresh worker picks up. Reality-Check Agent reviews every report. Hallucination log: `docs/hallucination-log.md`.
 3. **Decisions Are Colin's:** Agents propose; Colin decides. Every destructive operation, schema change, and migration plan requires explicit Colin approval.
@@ -108,34 +110,34 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ### Autonomous Harness Agents
 
-| Agent | Spec file | Invoked by | Use for | Never use for |
-|-------|-----------|-----------|---------|---------------|
-| **Coordinator** | `.claude/agents/coordinator.md` | task_queue harness or Colin directly | Sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation | Writing code, self-approving acceptance docs, any destructive operation |
-| **Builder** | `.claude/agents/builder.md` | Coordinator only | Translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON | Anything without an approved acceptance doc, sprint planning, grounding checkpoint execution |
+| Agent           | Spec file                       | Invoked by                           | Use for                                                                                                                   | Never use for                                                                                |
+| --------------- | ------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Coordinator** | `.claude/agents/coordinator.md` | task_queue harness or Colin directly | Sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation                  | Writing code, self-approving acceptance docs, any destructive operation                      |
+| **Builder**     | `.claude/agents/builder.md`     | Coordinator only                     | Translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON | Anything without an approved acceptance doc, sprint planning, grounding checkpoint execution |
 
 **Coordinator → Builder handoff:** Coordinator passes the acceptance doc path. Builder returns `docs/sprint-{N}/chunk-{id}-handoff.json`. Coordinator reads the JSON and decides next step. They run in **separate Claude Code context windows** — never the same session.
 
 ### Harness Endpoints (production)
 
-| Endpoint | Use for |
-|----------|---------|
-| `POST /api/harness/task-heartbeat` | Coordinator liveness signal during long-running phases — prevents stale-reclaim |
-| `POST /api/harness/notifications-drain` | Flush `outbound_notifications` queue to Telegram — call after every insert |
-| `POST /api/twin/ask` | Digital Twin Q&A (production URL) — batch queries only, never mid-phase |
-| `GET /api/health` | Quick liveness check — 200 = app up, body has service states |
+| Endpoint                                | Use for                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| `POST /api/harness/task-heartbeat`      | Coordinator liveness signal during long-running phases — prevents stale-reclaim |
+| `POST /api/harness/notifications-drain` | Flush `outbound_notifications` queue to Telegram — call after every insert      |
+| `POST /api/twin/ask`                    | Digital Twin Q&A (production URL) — batch queries only, never mid-phase         |
+| `GET /api/health`                       | Quick liveness check — 200 = app up, body has service states                    |
 
 Local dev equivalents: replace `https://lepios-one.vercel.app` with `http://localhost:3000`.
 
 ### LepiOS MCP Tools
 
-| Tool | When to use in this project |
-|------|-----------------------------|
-| `mcp__claude_ai_Supabase__execute_sql` | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
-| `mcp__claude_ai_Supabase__apply_migration` | Apply schema migrations during sprint builds (builder only) |
-| `mcp__claude_ai_Supabase__list_migrations` | Verify migration was applied; cross-check against `supabase/migrations/` |
-| `mcp__claude_ai_Vercel__list_deployments` | Confirm a deploy landed before marking a chunk complete |
-| `mcp__claude_ai_Vercel__get_runtime_logs` | Diagnose production errors that don't appear in local logs |
-| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated |
+| Tool                                               | When to use in this project                                                                    |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `mcp__claude_ai_Supabase__execute_sql`             | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
+| `mcp__claude_ai_Supabase__apply_migration`         | Apply schema migrations during sprint builds (builder only)                                    |
+| `mcp__claude_ai_Supabase__list_migrations`         | Verify migration was applied; cross-check against `supabase/migrations/`                       |
+| `mcp__claude_ai_Vercel__list_deployments`          | Confirm a deploy landed before marking a chunk complete                                        |
+| `mcp__claude_ai_Vercel__get_runtime_logs`          | Diagnose production errors that don't appear in local logs                                     |
+| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated                                        |
 
 ### Runtime Config Pattern
 
