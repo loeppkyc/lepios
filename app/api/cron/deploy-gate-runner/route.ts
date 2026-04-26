@@ -13,6 +13,7 @@ import {
   insertSmokePendingEvent,
 } from '@/lib/harness/deploy-gate'
 import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
+import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
 
 export const dynamic = 'force-dynamic'
 
@@ -336,26 +337,35 @@ async function runProductionSmokes(): Promise<{ processed: number; results: stri
     const mergeSha = row.meta.merge_sha as string
     const commitSha = (row.meta.commit_sha as string) ?? 'unknown'
 
-    const smokeResult = await runRouteHealthSmoke(baseUrl, commitSha)
+    const [routeHealthResult, cronResult] = await Promise.all([
+      runRouteHealthSmoke(baseUrl, commitSha),
+      runCronRegistrationSmoke(baseUrl),
+    ])
+    const allPassed = routeHealthResult.passed && cronResult.passed
 
     try {
       await db.from('agent_events').insert({
         domain: 'orchestrator',
         action: 'production_smoke_complete',
         actor: 'deploy-gate',
-        status: smokeResult.passed ? 'success' : 'error',
+        status: allPassed ? 'success' : 'error',
         meta: {
           merge_sha: mergeSha,
           commit_sha: commitSha,
-          l2_passed: smokeResult.passed,
+          l2_passed: routeHealthResult.passed,
           l3_results: [
             {
               module: 'route-health',
-              passed: smokeResult.passed,
-              failed_routes: smokeResult.failed_routes,
+              passed: routeHealthResult.passed,
+              failed_routes: routeHealthResult.failed_routes,
+            },
+            {
+              module: 'cron-registration',
+              passed: cronResult.passed,
+              reason: cronResult.reason,
             },
           ],
-          total_ms: smokeResult.total_ms,
+          total_ms: routeHealthResult.total_ms,
           base_url: baseUrl,
         },
       })
@@ -363,7 +373,7 @@ async function runProductionSmokes(): Promise<{ processed: number; results: stri
       // Non-fatal
     }
 
-    results.push(`${mergeSha.slice(0, 8)}:${smokeResult.passed ? 'smoke-passed' : 'smoke-failed'}`)
+    results.push(`${mergeSha.slice(0, 8)}:${allPassed ? 'smoke-passed' : 'smoke-failed'}`)
   }
 
   return { processed: pending.length, results }

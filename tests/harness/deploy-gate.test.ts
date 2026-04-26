@@ -7,12 +7,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
 
-const { mockInsert, mockFrom, mockRunRouteHealthSmoke } = vi.hoisted(() => {
-  const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
-  const mockFrom = vi.fn()
-  const mockRunRouteHealthSmoke = vi.fn()
-  return { mockInsert, mockFrom, mockRunRouteHealthSmoke }
-})
+const { mockInsert, mockFrom, mockRunRouteHealthSmoke, mockRunCronRegistrationSmoke } = vi.hoisted(
+  () => {
+    const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+    const mockFrom = vi.fn()
+    const mockRunRouteHealthSmoke = vi.fn()
+    const mockRunCronRegistrationSmoke = vi.fn()
+    return { mockInsert, mockFrom, mockRunRouteHealthSmoke, mockRunCronRegistrationSmoke }
+  }
+)
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
@@ -20,6 +23,10 @@ vi.mock('@/lib/supabase/service', () => ({
 
 vi.mock('@/lib/harness/smoke-tests/route-health', () => ({
   runRouteHealthSmoke: mockRunRouteHealthSmoke,
+}))
+
+vi.mock('@/lib/harness/smoke-tests/cron-registration', () => ({
+  runCronRegistrationSmoke: mockRunCronRegistrationSmoke,
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -107,12 +114,17 @@ beforeEach(() => {
   process.env.GITHUB_TOKEN = 'test-github-token'
   process.env.DEPLOY_GATE_AUTO_PROMOTE = '0' // disable auto-promote in all baseline tests
   delete process.env.VERCEL_TEAM_ID
-  // Default: route health smoke passes — prevents interference with trigger-focused tests
+  // Default: both production smokes pass — prevents interference with trigger-focused tests
   mockRunRouteHealthSmoke.mockResolvedValue({
     passed: true,
     routes: [],
     failed_routes: [],
     total_ms: 50,
+  })
+  mockRunCronRegistrationSmoke.mockResolvedValue({
+    passed: true,
+    reason: '10 crons registered, 0 hourly — Hobby plan compliant',
+    details: { hourly_count: 0, schedules: [] },
   })
 })
 
@@ -1911,9 +1923,9 @@ describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
 
     mockFrom
       .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
-      .mockReturnValueOnce(makeSelectBuilder([]))           // smoke complete query
-      .mockReturnValueOnce(makeInsertBuilder())             // smoke_complete insert
-      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke complete query
+      .mockReturnValueOnce(makeInsertBuilder()) // smoke_complete insert
+      .mockReturnValue(makeSelectBuilder([])) // triggers query + rest
 
     const res = await GET(makeRequest())
     const body = await res.json()
@@ -1921,6 +1933,8 @@ describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
 
     expect(mockRunRouteHealthSmoke).toHaveBeenCalledOnce()
     expect(mockRunRouteHealthSmoke).toHaveBeenCalledWith('https://lepios-one.vercel.app', 'sha123')
+    expect(mockRunCronRegistrationSmoke).toHaveBeenCalledOnce()
+    expect(mockRunCronRegistrationSmoke).toHaveBeenCalledWith('https://lepios-one.vercel.app')
     expect(body.processed).toBe(1)
     expect(body.results[0]).toContain('smoke-passed')
   })
@@ -1936,7 +1950,7 @@ describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
     mockFrom
       .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
       .mockReturnValueOnce(makeSelectBuilder([completeRow])) // smoke complete — already done
-      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+      .mockReturnValue(makeSelectBuilder([])) // triggers query + rest
 
     const res = await GET(makeRequest())
     const body = await res.json()
@@ -1962,9 +1976,9 @@ describe('GET /api/cron/deploy-gate-runner — production smoke runner', () => {
 
     mockFrom
       .mockReturnValueOnce(makeSelectBuilder([pendingRow])) // smoke pending query
-      .mockReturnValueOnce(makeSelectBuilder([]))           // smoke complete query
-      .mockReturnValueOnce(makeInsertBuilder())             // smoke_complete insert
-      .mockReturnValue(makeSelectBuilder([]))               // triggers query + rest
+      .mockReturnValueOnce(makeSelectBuilder([])) // smoke complete query
+      .mockReturnValueOnce(makeInsertBuilder()) // smoke_complete insert
+      .mockReturnValue(makeSelectBuilder([])) // triggers query + rest
 
     const res = await GET(makeRequest())
     const body = await res.json()
