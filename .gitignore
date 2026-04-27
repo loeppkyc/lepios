@@ -2,6 +2,7 @@
 
 # secrets — never commit
 webhook.json
+.claude/settings.local.json
 
 # scratch / temp files
 .emb_q*.txt
