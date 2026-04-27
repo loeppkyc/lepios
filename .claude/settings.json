@@ -19,5 +19,10 @@
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Vercel__list_teams"
     ]
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["lepios-one.vercel.app"]
+    }
   }
 }
