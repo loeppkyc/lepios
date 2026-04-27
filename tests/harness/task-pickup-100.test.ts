@@ -393,6 +393,6 @@ describe('vercel.json — task-pickup cron schedule', () => {
 
     const entry = config.crons?.find((c) => c.path === '/api/cron/task-pickup')
     expect(entry).toBeDefined()
-    expect(entry!.schedule).toBe('0 * * * *')
+    expect(entry!.schedule).toBe('0 0 * * *') // Part B (hourly) deferred — Hobby plan blocks >1 hourly cron (F-L11)
   })
 })
