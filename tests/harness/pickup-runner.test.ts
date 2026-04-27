@@ -661,9 +661,9 @@ describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation s
   })
 })
 
-// ── HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure ────────────
+// ── HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure (H3 Part A) ─
 
-describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure', () => {
+describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation failure (H3 unclaim)', () => {
   beforeEach(() => {
     process.env.HARNESS_REMOTE_INVOCATION_ENABLED = '1'
     mockFireCoordinator.mockResolvedValue({
@@ -674,24 +674,124 @@ describe('runPickup — HARNESS_REMOTE_INVOCATION_ENABLED: flag on, invocation f
     })
   })
 
-  it('falls back to manual Telegram message when invocation fails', async () => {
-    mockClaimTask.mockResolvedValue(mockTask)
-    await runPickup('run-abc')
-    await Promise.resolve()
-    const msg: string = mockPostMessage.mock.calls[0]?.[0] ?? ''
-    expect(msg).toContain(`Run task ${mockTask.id}`)
-  })
-
-  it('returns ok:true even when invocation fails', async () => {
+  it('returns ok:true when invocation fails', async () => {
     mockClaimTask.mockResolvedValue(mockTask)
     const result = await runPickup('run-abc')
     expect(result.ok).toBe(true)
   })
 
-  it('returns claimed task even when invocation fails', async () => {
+  it('returns claimed=null when invocation fails (task unclaimed)', async () => {
     mockClaimTask.mockResolvedValue(mockTask)
     const result = await runPickup('run-abc')
-    expect(result.claimed).toEqual(mockTask)
+    expect(result.claimed).toBeNull()
+  })
+
+  it('returns reason=coordinator-unavailable when invocation fails', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const result = await runPickup('run-abc')
+    expect(result.reason).toBe('coordinator-unavailable')
+  })
+
+  it('issues UPDATE to task_queue to reset status=queued on coordinator failure', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+
+    const updateBuilder = {
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+        count: null,
+      }),
+    }
+    mockFrom.mockReturnValue(updateBuilder)
+
+    await runPickup('run-abc')
+
+    // Verify an UPDATE was issued on task_queue
+    expect(mockFrom).toHaveBeenCalledWith('task_queue')
+    const updateCall = updateBuilder.update.mock.calls.find(
+      (c: unknown[]) =>
+        c[0] !== null &&
+        typeof c[0] === 'object' &&
+        (c[0] as Record<string, unknown>).status === 'queued'
+    )
+    expect(updateCall).toBeDefined()
+    const payload = updateCall?.[0] as Record<string, unknown>
+    expect(payload.claimed_at).toBeNull()
+    expect(payload.claimed_by).toBeNull()
+    expect(payload.last_heartbeat_at).toBeNull()
+  })
+
+  it('sends Telegram message containing coordinator-unavailable on failure', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const calls = mockPostMessage.mock.calls
+    const unavailMsg: string =
+      calls.find((c: string[][]) => c[0].includes('Coordinator unavailable'))?.[0] ?? ''
+    expect(unavailMsg).toContain('Coordinator unavailable')
+    expect(unavailMsg).toContain(mockTask.id.slice(0, 8))
+  })
+
+  it('does not send the manual "Run task" instruction Telegram on coordinator failure', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    await runPickup('run-abc')
+    await Promise.resolve()
+    const calls = mockPostMessage.mock.calls
+    const runTaskMsg = calls.find((c: string[][]) => c[0].includes('Run task'))
+    expect(runTaskMsg).toBeUndefined()
+  })
+
+  it('logs invoke_coordinator_failed_unclaim event to agent_events', async () => {
+    mockClaimTask.mockResolvedValue(mockTask)
+    const insertFn = vi.fn().mockResolvedValue({ data: null, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'agent_events') return { insert: insertFn }
+      return {
+        insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }),
+            }),
+          }),
+          count: null,
+        }),
+      }
+    })
+
+    await runPickup('run-abc')
+    await Promise.resolve()
+
+    const calls = insertFn.mock.calls
+    const unclaimed = calls.find((c: unknown[]) => {
+      const row = c[0] as Record<string, unknown>
+      const meta = row.meta as Record<string, unknown> | undefined
+      return meta?.action === 'invoke_coordinator_failed_unclaim'
+    })
+    expect(unclaimed).toBeDefined()
+    const row = unclaimed?.[0] as Record<string, unknown>
+    expect(row.status).toBe('warning')
+    const meta = row.meta as Record<string, unknown>
+    expect(meta.task_id).toBe(mockTask.id)
+    expect(meta.failure_type).toBe('upstream')
   })
 })
 

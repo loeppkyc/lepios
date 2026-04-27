@@ -383,16 +383,16 @@ describe('runPickup — F18 queue_depth in agent_events meta', () => {
   })
 })
 
-// ── Test 5: vercel.json daily cron shape ──────────────────────────────────────
+// ── Test 5: vercel.json hourly cron shape (H3 Part B) ─────────────────────────
 
 describe('vercel.json — task-pickup cron schedule', () => {
-  it('task-pickup entry has schedule "0 0 * * *" (daily)', () => {
+  it('task-pickup entry has schedule "0 * * * *" (hourly — H3 Part B)', () => {
     const vercelJsonPath = path.resolve(__dirname, '../../vercel.json')
     const raw = fs.readFileSync(vercelJsonPath, 'utf-8')
     const config = JSON.parse(raw) as { crons?: Array<{ path: string; schedule: string }> }
 
     const entry = config.crons?.find((c) => c.path === '/api/cron/task-pickup')
     expect(entry).toBeDefined()
-    expect(entry!.schedule).toBe('0 0 * * *')
+    expect(entry!.schedule).toBe('0 * * * *')
   })
 })
