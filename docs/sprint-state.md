@@ -140,10 +140,19 @@ chunks_awaiting_grounding:
 - "coordinator-env"
   chunks_not_started:
 - "task-pickup-100"
+
+utility_tracker_chunk:
+  status: "awaiting-colin-approval"
+  task_id: "8b3d7030-a873-431a-b82f-6dbd4ceda83d"
+  study_doc: "docs/sprint-5/utility-tracker-streamlit-study.md"
+  acceptance_doc: "docs/sprint-5/utility-tracker-acceptance.md"
+  source_module: "pages/52_Utility_Tracker.py"
+  started_at: "2026-04-27T04:17:00Z"
+  acceptance_doc_ready_at: "2026-04-27T04:25:00Z"
   chunks_awaiting_grounding_stall_alert:
 - "stall-alert"
 
-active_chunk: "notification-drain-dedup"
+active_chunk: "utility-tracker"
 active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
 active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
 active_chunk_status: "awaiting-grounding"
