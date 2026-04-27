@@ -149,6 +149,23 @@ utility_tracker_chunk:
   source_module: "pages/52_Utility_Tracker.py"
   started_at: "2026-04-27T04:17:00Z"
   acceptance_doc_ready_at: "2026-04-27T04:25:00Z"
+
+n8n_webhook_chunk:
+  status: "awaiting_grounding"
+  task_id: "ec1d00c7-d331-451e-ba4e-f43c946ed65e"
+  run_id: "e45415ae-d5e8-433e-b979-a4a41f37b2c2"
+  source_module: "pages/99_n8n_Webhook.py"
+  study_doc: "docs/sprint-5/n8n-webhook-streamlit-study.md"
+  recommendation: "direction_c_skip"
+  notification_row_id: "8756bc9a-73f8-4b29-8e34-2b00023ef4c3"
+  correlation_id: "e45415ae"
+  pending_colin_questions:
+    - "Direction: A (port), B (replace with crons), or C (skip/close) — coordinator recommends C"
+    - "OK to register harness:streamlit_rebuild_n8n_webhook at 100% via builder migration if C?"
+  started_at: "2026-04-27T13:37:00Z"
+  awaiting_grounding_at: "2026-04-27T13:50:00Z"
+  note: "Twin endpoint unreachable. Drain returned 403 (CRON_SECRET absent). Notification queued, delivers on next cron."
+
   chunks_awaiting_grounding_stall_alert:
 - "stall-alert"
 
