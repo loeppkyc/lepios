@@ -1,0 +1,2872 @@
+{
+  "generated_at": "2026-04-27T01:44:57.070Z",
+  "streamlit_root": "C:\\Users\\Colin\\Downloads\\Claude_Code_Workspace_TEMPLATE (1)\\streamlit_app",
+  "total_modules": 84,
+  "by_category": {
+    "finance": 26,
+    "betting_trading": 4,
+    "inventory": 19,
+    "health": 3,
+    "life": 10,
+    "misc": 3,
+    "automation": 12,
+    "amazon": 7
+  },
+  "instructions": "Review this file before inserting into task_queue. Do not auto-queue. Each spec is one coordinator acceptance-doc sprint.",
+  "queue": [
+    {
+      "queue_position": 1,
+      "module_filename": "1_Life_PL.py",
+      "title": "rebuild streamlit module: Life PL",
+      "description": "355 lines, medium complexity. Imports from: style, life_pl, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [
+        "app/(cockpit)/business-review/page.tsx"
+      ],
+      "candidate": {
+        "filename": "1_Life_PL.py",
+        "page_number": 1,
+        "title": "Life PL",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "life_pl",
+          "dev_mode"
+        ],
+        "line_count": 355,
+        "tab_count": 0,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 2,
+      "module_filename": "4_Monthly_Expenses.py",
+      "title": "rebuild streamlit module: Monthly Expenses",
+      "description": "1040 lines, large complexity. External APIs: sheets. Imports from: sheets, style, ai, dev_mode, masterfile, actions.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "4_Monthly_Expenses.py",
+        "page_number": 4,
+        "title": "Monthly Expenses",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "ai",
+          "dev_mode",
+          "masterfile",
+          "actions"
+        ],
+        "line_count": 1040,
+        "tab_count": 0,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 3,
+      "module_filename": "5_Monthly_PL.py",
+      "title": "rebuild streamlit module: Monthly PL",
+      "description": "2127 lines, large complexity. External APIs: keepa, sheets. Imports from: sheets, style, ai, token_tracker, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "app/(cockpit)/business-review/page.tsx"
+      ],
+      "candidate": {
+        "filename": "5_Monthly_PL.py",
+        "page_number": 5,
+        "title": "Monthly PL",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "ai",
+          "token_tracker",
+          "dev_mode"
+        ],
+        "line_count": 2127,
+        "tab_count": 0,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 4,
+      "module_filename": "6_Tax_Centre.py",
+      "title": "rebuild streamlit module: Tax Centre",
+      "description": "148 lines, medium complexity. Imports from: style, dev_mode, tax_centre.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [
+        "lib/amazon/settlements-sync.ts (net_payout for revenue reconciliation)"
+      ],
+      "candidate": {
+        "filename": "6_Tax_Centre.py",
+        "page_number": 6,
+        "title": "Tax Centre",
+        "category": "finance",
+        "confidence": 1,
+        "complexity": "medium",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "tax_centre"
+        ],
+        "line_count": 148,
+        "tab_count": 0,
+        "import_count": 22
+      }
+    },
+    {
+      "queue_position": 5,
+      "module_filename": "8_Bookkeeping_Hub.py",
+      "title": "rebuild streamlit module: Bookkeeping Hub",
+      "description": "688 lines, medium complexity. External APIs: sheets, dropbox. UI: 1 tab group(s). Imports from: sheets, style, dev_mode, dropbox_statements, life_pl.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "app/(cockpit)/business-review/page.tsx",
+        "lib/amazon/settlements-sync.ts"
+      ],
+      "candidate": {
+        "filename": "8_Bookkeeping_Hub.py",
+        "page_number": 8,
+        "title": "Bookkeeping Hub",
+        "category": "finance",
+        "confidence": 1,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "dropbox"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "dev_mode",
+          "dropbox_statements",
+          "life_pl"
+        ],
+        "line_count": 688,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 6,
+      "module_filename": "12_Receipts.py",
+      "title": "rebuild streamlit module: Receipts",
+      "description": "2641 lines, large complexity. External APIs: sheets, gmail, anthropic, dropbox. UI: 2 tab group(s). Imports from: style, drive, sheets, ai, token_tracker, ocr, dev_mode, actions, email_invoices, data_layer, gmail, dropbox_statements.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "app/(cockpit)/business-review/page.tsx"
+      ],
+      "candidate": {
+        "filename": "12_Receipts.py",
+        "page_number": 12,
+        "title": "Receipts",
+        "category": "finance",
+        "confidence": 1,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "gmail",
+          "anthropic",
+          "dropbox"
+        ],
+        "dependencies": [
+          "style",
+          "drive",
+          "sheets",
+          "ai",
+          "token_tracker",
+          "ocr",
+          "dev_mode",
+          "actions",
+          "email_invoices",
+          "data_layer",
+          "gmail",
+          "dropbox_statements"
+        ],
+        "line_count": 2641,
+        "tab_count": 2,
+        "import_count": 40
+      }
+    },
+    {
+      "queue_position": 7,
+      "module_filename": "13_Vehicles.py",
+      "title": "rebuild streamlit module: Vehicles",
+      "description": "279 lines, medium complexity. External APIs: sheets. Imports from: sheets, dev_mode, style, ai, token_tracker.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "13_Vehicles.py",
+        "page_number": 13,
+        "title": "Vehicles",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "dev_mode",
+          "style",
+          "ai",
+          "token_tracker"
+        ],
+        "line_count": 279,
+        "tab_count": 0,
+        "import_count": 10
+      }
+    },
+    {
+      "queue_position": 8,
+      "module_filename": "17_Payouts.py",
+      "title": "rebuild streamlit module: Payouts",
+      "description": "213 lines, small complexity. External APIs: sheets. Imports from: sheets, style, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "small",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "17_Payouts.py",
+        "page_number": 17,
+        "title": "Payouts",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "dev_mode"
+        ],
+        "line_count": 213,
+        "tab_count": 0,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 9,
+      "module_filename": "23_Expense_Dashboard.py",
+      "title": "rebuild streamlit module: Expense Dashboard",
+      "description": "476 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, masterfile, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "23_Expense_Dashboard.py",
+        "page_number": 23,
+        "title": "Expense Dashboard",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "masterfile",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 476,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 10,
+      "module_filename": "25_Personal_Expenses.py",
+      "title": "rebuild streamlit module: Personal Expenses",
+      "description": "239 lines, small complexity. Imports from: masterfile, style, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "25_Personal_Expenses.py",
+        "page_number": 25,
+        "title": "Personal Expenses",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [],
+        "dependencies": [
+          "masterfile",
+          "style",
+          "dev_mode"
+        ],
+        "line_count": 239,
+        "tab_count": 0,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 11,
+      "module_filename": "26_Sales_Charts.py",
+      "title": "rebuild streamlit module: Sales Charts",
+      "description": "405 lines, medium complexity. External APIs: keepa, sheets. UI: 2 tab group(s). Imports from: sheets, style, amazon, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "26_Sales_Charts.py",
+        "page_number": 26,
+        "title": "Sales Charts",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "amazon",
+          "dev_mode"
+        ],
+        "line_count": 405,
+        "tab_count": 2,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 12,
+      "module_filename": "28_Category_PL.py",
+      "title": "rebuild streamlit module: Category PL",
+      "description": "356 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: sheets, style, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "app/(cockpit)/business-review/page.tsx"
+      ],
+      "candidate": {
+        "filename": "28_Category_PL.py",
+        "page_number": 28,
+        "title": "Category PL",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "dev_mode"
+        ],
+        "line_count": 356,
+        "tab_count": 1,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 13,
+      "module_filename": "51_Retirement_Tracker.py",
+      "title": "rebuild streamlit module: Retirement Tracker",
+      "description": "291 lines, medium complexity. External APIs: keepa, telegram. Imports from: style, lego_retirement, keepa_api, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "51_Retirement_Tracker.py",
+        "page_number": 51,
+        "title": "Retirement Tracker",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "lego_retirement",
+          "keepa_api",
+          "dev_mode"
+        ],
+        "line_count": 291,
+        "tab_count": 0,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 14,
+      "module_filename": "52_Utility_Tracker.py",
+      "title": "rebuild streamlit module: Utility Tracker",
+      "description": "141 lines, small complexity. External APIs: sheets. Imports from: style, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "small",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "52_Utility_Tracker.py",
+        "page_number": 52,
+        "title": "Utility Tracker",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 141,
+        "tab_count": 0,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 15,
+      "module_filename": "53_Business_History.py",
+      "title": "rebuild streamlit module: Business History",
+      "description": "352 lines, medium complexity. External APIs: sheets. Imports from: style, sheets, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "53_Business_History.py",
+        "page_number": 53,
+        "title": "Business History",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode"
+        ],
+        "line_count": 352,
+        "tab_count": 0,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 16,
+      "module_filename": "54_Monthly_Close.py",
+      "title": "rebuild streamlit module: Monthly Close",
+      "description": "732 lines, medium complexity. External APIs: sheets, telegram. Imports from: style, sheets, audit_log, dev_mode, life_pl, masterfile, auto_reconcile.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "54_Monthly_Close.py",
+        "page_number": 54,
+        "title": "Monthly Close",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "audit_log",
+          "dev_mode",
+          "life_pl",
+          "masterfile",
+          "auto_reconcile"
+        ],
+        "line_count": 732,
+        "tab_count": 0,
+        "import_count": 13
+      }
+    },
+    {
+      "queue_position": 17,
+      "module_filename": "55_Phone_Plans.py",
+      "title": "rebuild streamlit module: Phone Plans",
+      "description": "301 lines, medium complexity. Imports from: style, ai, token_tracker, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "55_Phone_Plans.py",
+        "page_number": 55,
+        "title": "Phone Plans",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "ai",
+          "token_tracker",
+          "dev_mode"
+        ],
+        "line_count": 301,
+        "tab_count": 0,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 18,
+      "module_filename": "56_Insurance.py",
+      "title": "rebuild streamlit module: Insurance",
+      "description": "1573 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: ai, insurance_analysis, sheets, style, token_tracker, dev_mode, life_pl.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "56_Insurance.py",
+        "page_number": 56,
+        "title": "Insurance",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "ai",
+          "insurance_analysis",
+          "sheets",
+          "style",
+          "token_tracker",
+          "dev_mode",
+          "life_pl"
+        ],
+        "line_count": 1573,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 19,
+      "module_filename": "58_Tax_Return.py",
+      "title": "rebuild streamlit module: Tax Return",
+      "description": "1223 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "lib/amazon/settlements-sync.ts (net_payout for revenue reconciliation)"
+      ],
+      "candidate": {
+        "filename": "58_Tax_Return.py",
+        "page_number": 58,
+        "title": "Tax Return",
+        "category": "finance",
+        "confidence": 1,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode"
+        ],
+        "line_count": 1223,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 20,
+      "module_filename": "60_Amazon_Orders.py",
+      "title": "rebuild streamlit module: Amazon Orders",
+      "description": "899 lines, large complexity. External APIs: sp_api, sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode, amazon.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "harness:amazon_orders_sync",
+        "lib/google/sheets-client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [
+        "lib/amazon/orders.ts",
+        "lib/amazon/orders-sync.ts",
+        "app/(cockpit)/amazon/page.tsx"
+      ],
+      "candidate": {
+        "filename": "60_Amazon_Orders.py",
+        "page_number": 60,
+        "title": "Amazon Orders",
+        "category": "amazon",
+        "confidence": 0.95,
+        "complexity": "large",
+        "external_apis": [
+          "sp_api",
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode",
+          "amazon"
+        ],
+        "line_count": 899,
+        "tab_count": 1,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 21,
+      "module_filename": "61_Net_Worth.py",
+      "title": "rebuild streamlit module: Net Worth",
+      "description": "572 lines, medium complexity. External APIs: sheets. Imports from: style, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "61_Net_Worth.py",
+        "page_number": 61,
+        "title": "Net Worth",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 572,
+        "tab_count": 0,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 22,
+      "module_filename": "62_eBay.py",
+      "title": "rebuild streamlit module: eBay",
+      "description": "1326 lines, large complexity. External APIs: sheets, ebay. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, ai, token_tracker.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "62_eBay.py",
+        "page_number": 62,
+        "title": "eBay",
+        "category": "amazon",
+        "confidence": 0.95,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "ebay"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "ai",
+          "token_tracker"
+        ],
+        "line_count": 1326,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 23,
+      "module_filename": "63_Debt_Payoff.py",
+      "title": "rebuild streamlit module: Debt Payoff",
+      "description": "650 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode, config.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "63_Debt_Payoff.py",
+        "page_number": 63,
+        "title": "Debt Payoff",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode",
+          "config"
+        ],
+        "line_count": 650,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 24,
+      "module_filename": "64_Marketplace_Hub.py",
+      "title": "rebuild streamlit module: Marketplace Hub",
+      "description": "1319 lines, large complexity. External APIs: keepa, sheets, ebay. UI: 1 tab group(s). Imports from: style, sheets, dev_mode, ai, token_tracker, amazon, book_lookup.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [
+        "lib/amazon/orders.ts",
+        "app/(cockpit)/amazon/page.tsx"
+      ],
+      "candidate": {
+        "filename": "64_Marketplace_Hub.py",
+        "page_number": 64,
+        "title": "Marketplace Hub",
+        "category": "amazon",
+        "confidence": 0.95,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "ebay"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode",
+          "ai",
+          "token_tracker",
+          "amazon",
+          "book_lookup"
+        ],
+        "line_count": 1319,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 25,
+      "module_filename": "65_Repricer.py",
+      "title": "rebuild streamlit module: Repricer",
+      "description": "913 lines, large complexity. External APIs: keepa, sheets, telegram. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, amazon, fba_fees.",
+      "priority": "critical",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [
+        "lib/amazon/orders.ts",
+        "app/(cockpit)/amazon/page.tsx"
+      ],
+      "candidate": {
+        "filename": "65_Repricer.py",
+        "page_number": 65,
+        "title": "Repricer",
+        "category": "amazon",
+        "confidence": 0.95,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "amazon",
+          "fba_fees"
+        ],
+        "line_count": 913,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 26,
+      "module_filename": "67_Cash_Forecast.py",
+      "title": "rebuild streamlit module: Cash Forecast",
+      "description": "322 lines, medium complexity. External APIs: keepa, sheets. Imports from: style, dev_mode, sheets, config.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "67_Cash_Forecast.py",
+        "page_number": 67,
+        "title": "Cash Forecast",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "config"
+        ],
+        "line_count": 322,
+        "tab_count": 0,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 27,
+      "module_filename": "69_Subscriptions.py",
+      "title": "rebuild streamlit module: Subscriptions",
+      "description": "303 lines, medium complexity. External APIs: keepa, sheets. Imports from: style, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "69_Subscriptions.py",
+        "page_number": 69,
+        "title": "Subscriptions",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 303,
+        "tab_count": 0,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 28,
+      "module_filename": "71_Savings_Goals.py",
+      "title": "rebuild streamlit module: Savings Goals",
+      "description": "442 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "71_Savings_Goals.py",
+        "page_number": 71,
+        "title": "Savings Goals",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 442,
+        "tab_count": 1,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 29,
+      "module_filename": "73_Keepa_Intel.py",
+      "title": "rebuild streamlit module: Keepa Intel",
+      "description": "410 lines, medium complexity. External APIs: keepa, ollama, chromadb. UI: 1 tab group(s). Imports from: style, dev_mode, keepa_api, keepa_harvester.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "lib/amazon/orders.ts"
+      ],
+      "candidate": {
+        "filename": "73_Keepa_Intel.py",
+        "page_number": 73,
+        "title": "Keepa Intel",
+        "category": "amazon",
+        "confidence": 1,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "ollama",
+          "chromadb"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "keepa_api",
+          "keepa_harvester"
+        ],
+        "line_count": 410,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 30,
+      "module_filename": "74_Product_Intel.py",
+      "title": "rebuild streamlit module: Product Intel",
+      "description": "315 lines, medium complexity. External APIs: keepa, telegram. UI: 1 tab group(s). Imports from: style, product_intel, alerts, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "74_Product_Intel.py",
+        "page_number": 74,
+        "title": "Product Intel",
+        "category": "amazon",
+        "confidence": 1,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "product_intel",
+          "alerts",
+          "dev_mode"
+        ],
+        "line_count": 315,
+        "tab_count": 1,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 31,
+      "module_filename": "76_Crypto.py",
+      "title": "rebuild streamlit module: Crypto",
+      "description": "514 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "76_Crypto.py",
+        "page_number": 76,
+        "title": "Crypto",
+        "category": "finance",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode"
+        ],
+        "line_count": 514,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 32,
+      "module_filename": "79_MileIQ.py",
+      "title": "rebuild streamlit module: MileIQ",
+      "description": "216 lines, small complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets.",
+      "priority": "critical",
+      "estimated_weight": "small",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "79_MileIQ.py",
+        "page_number": 79,
+        "title": "MileIQ",
+        "category": "finance",
+        "confidence": 1,
+        "complexity": "small",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 216,
+        "tab_count": 1,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 33,
+      "module_filename": "85_Retail_Radar.py",
+      "title": "rebuild streamlit module: Retail Radar",
+      "description": "569 lines, medium complexity. External APIs: sheets, telegram. UI: 1 tab group(s). Imports from: style, sheets, dev_mode, redflagdeals, retail_intel, flyer_intel, retail_scout, price_monitor.",
+      "priority": "critical",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "85_Retail_Radar.py",
+        "page_number": 85,
+        "title": "Retail Radar",
+        "category": "amazon",
+        "confidence": 0.95,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode",
+          "redflagdeals",
+          "retail_intel",
+          "flyer_intel",
+          "retail_scout",
+          "price_monitor"
+        ],
+        "line_count": 569,
+        "tab_count": 1,
+        "import_count": 13
+      }
+    },
+    {
+      "queue_position": 34,
+      "module_filename": "7_Inventory.py",
+      "title": "rebuild streamlit module: Inventory",
+      "description": "1095 lines, large complexity. External APIs: sheets. UI: 2 tab group(s). Imports from: sheets, amazon, style, dev_mode, fba_fees.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "7_Inventory.py",
+        "page_number": 7,
+        "title": "Inventory",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "amazon",
+          "style",
+          "dev_mode",
+          "fba_fees"
+        ],
+        "line_count": 1095,
+        "tab_count": 2,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 35,
+      "module_filename": "20_Scout.py",
+      "title": "rebuild streamlit module: Scout",
+      "description": "692 lines, medium complexity. External APIs: keepa, sheets. UI: 1 tab group(s). Imports from: style, dev_mode, book_lookup, sheets, ai, token_tracker, bsr_history, amazon, fba_fees.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "20_Scout.py",
+        "page_number": 20,
+        "title": "Scout",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "book_lookup",
+          "sheets",
+          "ai",
+          "token_tracker",
+          "bsr_history",
+          "amazon",
+          "fba_fees"
+        ],
+        "line_count": 692,
+        "tab_count": 1,
+        "import_count": 24
+      }
+    },
+    {
+      "queue_position": 36,
+      "module_filename": "21_PageProfit.py",
+      "title": "rebuild streamlit module: PageProfit",
+      "description": "3374 lines, large complexity. External APIs: sp_api, keepa, sheets, ebay. UI: 1 tab group(s). Imports from: style, dev_mode, book_lookup, sheets, amazon, ebay, sourcing, bsr_history, ai, token_tracker, quick_vision, actions, knowledge, keepa_api, fba_fees, fnsku_generator.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "harness:amazon_orders_sync",
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "21_PageProfit.py",
+        "page_number": 21,
+        "title": "PageProfit",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sp_api",
+          "keepa",
+          "sheets",
+          "ebay"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "book_lookup",
+          "sheets",
+          "amazon",
+          "ebay",
+          "sourcing",
+          "bsr_history",
+          "ai",
+          "token_tracker",
+          "quick_vision",
+          "actions",
+          "knowledge",
+          "keepa_api",
+          "fba_fees",
+          "fnsku_generator"
+        ],
+        "line_count": 3374,
+        "tab_count": 1,
+        "import_count": 59
+      }
+    },
+    {
+      "queue_position": 37,
+      "module_filename": "22_Inventory_Spend.py",
+      "title": "rebuild streamlit module: Inventory Spend",
+      "description": "748 lines, medium complexity. External APIs: sheets, anthropic. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, masterfile, drive, ai, token_tracker.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "22_Inventory_Spend.py",
+        "page_number": 22,
+        "title": "Inventory Spend",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "anthropic"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "masterfile",
+          "drive",
+          "ai",
+          "token_tracker"
+        ],
+        "line_count": 748,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 38,
+      "module_filename": "29_Groceries.py",
+      "title": "rebuild streamlit module: Groceries",
+      "description": "792 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: sheets, style, ai, token_tracker, dev_mode.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "29_Groceries.py",
+        "page_number": 29,
+        "title": "Groceries",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "ai",
+          "token_tracker",
+          "dev_mode"
+        ],
+        "line_count": 792,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 39,
+      "module_filename": "30_Shipment_Manager.py",
+      "title": "rebuild streamlit module: Shipment Manager",
+      "description": "1177 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, book_lookup, amazon, fnsku_generator.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "30_Shipment_Manager.py",
+        "page_number": 30,
+        "title": "Shipment Manager",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "book_lookup",
+          "amazon",
+          "fnsku_generator"
+        ],
+        "line_count": 1177,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 40,
+      "module_filename": "35_Scoutly.py",
+      "title": "rebuild streamlit module: Scoutly",
+      "description": "296 lines, medium complexity. External APIs: sheets. Imports from: style, dev_mode, book_lookup, amazon, sheets.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "35_Scoutly.py",
+        "page_number": 35,
+        "title": "Scoutly",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "book_lookup",
+          "amazon",
+          "sheets"
+        ],
+        "line_count": 296,
+        "tab_count": 0,
+        "import_count": 10
+      }
+    },
+    {
+      "queue_position": 41,
+      "module_filename": "41_Coupon_Lady.py",
+      "title": "rebuild streamlit module: Coupon Lady",
+      "description": "869 lines, large complexity. UI: 4 tab group(s). Imports from: style, ai, dev_mode, token_tracker, coupon_lady.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "41_Coupon_Lady.py",
+        "page_number": 41,
+        "title": "Coupon Lady",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "ai",
+          "dev_mode",
+          "token_tracker",
+          "coupon_lady"
+        ],
+        "line_count": 869,
+        "tab_count": 4,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 42,
+      "module_filename": "42_Retail_Scout.py",
+      "title": "rebuild streamlit module: Retail Scout",
+      "description": "641 lines, medium complexity. UI: 3 tab group(s). Imports from: style, dev_mode, ai, token_tracker, retail_scout.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "42_Retail_Scout.py",
+        "page_number": 42,
+        "title": "Retail Scout",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "ai",
+          "token_tracker",
+          "retail_scout"
+        ],
+        "line_count": 641,
+        "tab_count": 3,
+        "import_count": 10
+      }
+    },
+    {
+      "queue_position": 43,
+      "module_filename": "46_Arbitrage_Scanner.py",
+      "title": "rebuild streamlit module: Arbitrage Scanner",
+      "description": "1633 lines, large complexity. External APIs: keepa, sheets, telegram. UI: 2 tab group(s). Imports from: dev_mode, style, sheets, keepa_api, alerts, price_monitor, coupon_lady, keepa_harvester, retail_matcher.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "46_Arbitrage_Scanner.py",
+        "page_number": 46,
+        "title": "Arbitrage Scanner",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "dev_mode",
+          "style",
+          "sheets",
+          "keepa_api",
+          "alerts",
+          "price_monitor",
+          "coupon_lady",
+          "keepa_harvester",
+          "retail_matcher"
+        ],
+        "line_count": 1633,
+        "tab_count": 2,
+        "import_count": 24
+      }
+    },
+    {
+      "queue_position": 44,
+      "module_filename": "47_Lego_Vault.py",
+      "title": "rebuild streamlit module: Lego Vault",
+      "description": "719 lines, medium complexity. External APIs: keepa, sheets, telegram. UI: 1 tab group(s). Imports from: style, sheets, keepa_api, alerts, dev_mode, lego_retirement.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "47_Lego_Vault.py",
+        "page_number": 47,
+        "title": "Lego Vault",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "keepa_api",
+          "alerts",
+          "dev_mode",
+          "lego_retirement"
+        ],
+        "line_count": 719,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 45,
+      "module_filename": "48_Retail_Monitor.py",
+      "title": "rebuild streamlit module: Retail Monitor",
+      "description": "194 lines, small complexity. External APIs: telegram. UI: 1 tab group(s). Imports from: style, dev_mode, price_monitor, alerts.",
+      "priority": "high",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "48_Retail_Monitor.py",
+        "page_number": 48,
+        "title": "Retail Monitor",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "price_monitor",
+          "alerts"
+        ],
+        "line_count": 194,
+        "tab_count": 1,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 46,
+      "module_filename": "49_Cashback_HQ.py",
+      "title": "rebuild streamlit module: Cashback HQ",
+      "description": "1859 lines, large complexity. External APIs: sheets, telegram. UI: 2 tab group(s). Imports from: style, sheets, alerts, token_tracker, dev_mode, ai, keepa_api, flyer_intel.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "49_Cashback_HQ.py",
+        "page_number": 49,
+        "title": "Cashback HQ",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "alerts",
+          "token_tracker",
+          "dev_mode",
+          "ai",
+          "keepa_api",
+          "flyer_intel"
+        ],
+        "line_count": 1859,
+        "tab_count": 2,
+        "import_count": 13
+      }
+    },
+    {
+      "queue_position": 47,
+      "module_filename": "50_3D_Printer_HQ.py",
+      "title": "rebuild streamlit module: 3D Printer HQ",
+      "description": "649 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, ai, token_tracker.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "50_3D_Printer_HQ.py",
+        "page_number": 50,
+        "title": "3D Printer HQ",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "ai",
+          "token_tracker"
+        ],
+        "line_count": 649,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 48,
+      "module_filename": "59_Shipments.py",
+      "title": "rebuild streamlit module: Shipments",
+      "description": "575 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "59_Shipments.py",
+        "page_number": 59,
+        "title": "Shipments",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode"
+        ],
+        "line_count": 575,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 49,
+      "module_filename": "75_Retail_HQ.py",
+      "title": "rebuild streamlit module: Retail HQ",
+      "description": "1466 lines, large complexity. External APIs: keepa, sheets, telegram. UI: 3 tab group(s). Imports from: style, sheets, alerts, dev_mode, flipp_api, stocktrack_api, arb_engine, brand_risk, keepa_api, amazon.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "75_Retail_HQ.py",
+        "page_number": 75,
+        "title": "Retail HQ",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "alerts",
+          "dev_mode",
+          "flipp_api",
+          "stocktrack_api",
+          "arb_engine",
+          "brand_risk",
+          "keepa_api",
+          "amazon"
+        ],
+        "line_count": 1466,
+        "tab_count": 3,
+        "import_count": 18
+      }
+    },
+    {
+      "queue_position": 50,
+      "module_filename": "80_Deal_Tracker.py",
+      "title": "rebuild streamlit module: Deal Tracker",
+      "description": "233 lines, medium complexity. External APIs: sheets, telegram. UI: 1 tab group(s). Imports from: style, sheets, redflagdeals, dev_mode, alerts.",
+      "priority": "high",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "80_Deal_Tracker.py",
+        "page_number": 80,
+        "title": "Deal Tracker",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "redflagdeals",
+          "dev_mode",
+          "alerts"
+        ],
+        "line_count": 233,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 51,
+      "module_filename": "83_Grocery_Tracker.py",
+      "title": "rebuild streamlit module: Grocery Tracker",
+      "description": "1557 lines, large complexity. External APIs: sheets, anthropic, telegram. UI: 2 tab group(s). Imports from: style, dev_mode, sheets, flyer_intel, staple_monitor.",
+      "priority": "high",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "83_Grocery_Tracker.py",
+        "page_number": 83,
+        "title": "Grocery Tracker",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "anthropic",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "flyer_intel",
+          "staple_monitor"
+        ],
+        "line_count": 1557,
+        "tab_count": 2,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 52,
+      "module_filename": "99_Scanner_Phone.py",
+      "title": "rebuild streamlit module: 📱 Book Scanner",
+      "description": "168 lines, small complexity. External APIs: sheets. Imports from: sheets.",
+      "priority": "high",
+      "estimated_weight": "small",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "99_Scanner_Phone.py",
+        "page_number": 99,
+        "title": "📱 Book Scanner",
+        "category": "inventory",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets"
+        ],
+        "line_count": 168,
+        "tab_count": 0,
+        "import_count": 3
+      }
+    },
+    {
+      "queue_position": 53,
+      "module_filename": "2_Trading_Journal.py",
+      "title": "rebuild streamlit module: Trading Journal",
+      "description": "1904 lines, large complexity. External APIs: sheets, telegram. UI: 2 tab group(s). Imports from: sheets, style, dev_mode, ai, token_tracker, market_data, knowledge, life_pl.",
+      "priority": "medium",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "2_Trading_Journal.py",
+        "page_number": 2,
+        "title": "Trading Journal",
+        "category": "betting_trading",
+        "confidence": 1,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "dev_mode",
+          "ai",
+          "token_tracker",
+          "market_data",
+          "knowledge",
+          "life_pl"
+        ],
+        "line_count": 1904,
+        "tab_count": 2,
+        "import_count": 18
+      }
+    },
+    {
+      "queue_position": 54,
+      "module_filename": "3_Sports_Betting.py",
+      "title": "rebuild streamlit module: Sports Betting",
+      "description": "2042 lines, large complexity. External APIs: sheets, ollama, telegram. UI: 3 tab group(s). Imports from: style, dev_mode, sheets, sports_odds, sports_coach, knowledge, sports_backtester, ai, token_tracker, life_pl.",
+      "priority": "medium",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "3_Sports_Betting.py",
+        "page_number": 3,
+        "title": "Sports Betting",
+        "category": "betting_trading",
+        "confidence": 1,
+        "complexity": "large",
+        "external_apis": [
+          "sheets",
+          "ollama",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "sports_odds",
+          "sports_coach",
+          "knowledge",
+          "sports_backtester",
+          "ai",
+          "token_tracker",
+          "life_pl"
+        ],
+        "line_count": 2042,
+        "tab_count": 3,
+        "import_count": 20
+      }
+    },
+    {
+      "queue_position": 55,
+      "module_filename": "37_Command_Centre.py",
+      "title": "rebuild streamlit module: Command Centre",
+      "description": "835 lines, medium complexity. External APIs: keepa, sheets, anthropic, ollama, chromadb, telegram, dropbox, ebay. UI: 1 tab group(s). Imports from: style, dev_mode, sports_odds, market_data, prediction_engine, knowledge, redflagdeals.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "app/(cockpit)/status/page.tsx"
+      ],
+      "candidate": {
+        "filename": "37_Command_Centre.py",
+        "page_number": 37,
+        "title": "Command Centre",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "anthropic",
+          "ollama",
+          "chromadb",
+          "telegram",
+          "dropbox",
+          "ebay"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sports_odds",
+          "market_data",
+          "prediction_engine",
+          "knowledge",
+          "redflagdeals"
+        ],
+        "line_count": 835,
+        "tab_count": 1,
+        "import_count": 11
+      }
+    },
+    {
+      "queue_position": 56,
+      "module_filename": "38_Paper_Trail.py",
+      "title": "rebuild streamlit module: Paper Trail",
+      "description": "1035 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, statement_rules, audit_log, dev_mode.",
+      "priority": "medium",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "38_Paper_Trail.py",
+        "page_number": 38,
+        "title": "Paper Trail",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "statement_rules",
+          "audit_log",
+          "dev_mode"
+        ],
+        "line_count": 1035,
+        "tab_count": 1,
+        "import_count": 11
+      }
+    },
+    {
+      "queue_position": 57,
+      "module_filename": "66_Notifications.py",
+      "title": "rebuild streamlit module: Notifications",
+      "description": "311 lines, medium complexity. External APIs: sheets. Imports from: style, dev_mode, sheets.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [
+        "lib/harness/notifications.ts (if exists)",
+        "app/api/harness/notifications-drain/route.ts"
+      ],
+      "candidate": {
+        "filename": "66_Notifications.py",
+        "page_number": 66,
+        "title": "Notifications",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 311,
+        "tab_count": 0,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 58,
+      "module_filename": "72_Local_AI.py",
+      "title": "rebuild streamlit module: Local AI",
+      "description": "174 lines, small complexity. External APIs: ollama, chromadb. Imports from: style, dev_mode, local_ai.",
+      "priority": "medium",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "72_Local_AI.py",
+        "page_number": 72,
+        "title": "Local AI",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "ollama",
+          "chromadb"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "local_ai"
+        ],
+        "line_count": 174,
+        "tab_count": 0,
+        "import_count": 4
+      }
+    },
+    {
+      "queue_position": 59,
+      "module_filename": "77_AI_Coach.py",
+      "title": "rebuild streamlit module: AI Coach",
+      "description": "1030 lines, large complexity. External APIs: keepa, sheets, anthropic, ollama, chromadb, telegram. Imports from: style, dev_mode, sheets_context, local_ai, ai, coach_brain, translator, knowledge, sports_odds.",
+      "priority": "medium",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "77_AI_Coach.py",
+        "page_number": 77,
+        "title": "AI Coach",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "anthropic",
+          "ollama",
+          "chromadb",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets_context",
+          "local_ai",
+          "ai",
+          "coach_brain",
+          "translator",
+          "knowledge",
+          "sports_odds"
+        ],
+        "line_count": 1030,
+        "tab_count": 0,
+        "import_count": 36
+      }
+    },
+    {
+      "queue_position": 60,
+      "module_filename": "78_Automations.py",
+      "title": "rebuild streamlit module: Automations",
+      "description": "354 lines, medium complexity. External APIs: keepa, sheets, chromadb, telegram. UI: 1 tab group(s). Imports from: style, sheets, dev_mode, local_ai.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "78_Automations.py",
+        "page_number": 78,
+        "title": "Automations",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "chromadb",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode",
+          "local_ai"
+        ],
+        "line_count": 354,
+        "tab_count": 1,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 61,
+      "module_filename": "80_AI_Chat.py",
+      "title": "rebuild streamlit module: AI Chat",
+      "description": "212 lines, small complexity. External APIs: ollama. Imports from: style, local_ai, knowledge.",
+      "priority": "medium",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "80_AI_Chat.py",
+        "page_number": 80,
+        "title": "AI Chat",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "ollama"
+        ],
+        "dependencies": [
+          "style",
+          "local_ai",
+          "knowledge"
+        ],
+        "line_count": 212,
+        "tab_count": 0,
+        "import_count": 7
+      }
+    },
+    {
+      "queue_position": 62,
+      "module_filename": "81_Prediction_Engine.py",
+      "title": "rebuild streamlit module: Prediction Engine",
+      "description": "416 lines, medium complexity. External APIs: telegram. UI: 1 tab group(s). Imports from: style, dev_mode, prediction_engine, market_data.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "81_Prediction_Engine.py",
+        "page_number": 81,
+        "title": "Prediction Engine",
+        "category": "betting_trading",
+        "confidence": 0.95,
+        "complexity": "medium",
+        "external_apis": [
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "prediction_engine",
+          "market_data"
+        ],
+        "line_count": 416,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 63,
+      "module_filename": "84_Agent_Swarm.py",
+      "title": "rebuild streamlit module: Agent Swarm",
+      "description": "488 lines, medium complexity. External APIs: keepa, sheets, telegram. Imports from: sheets, style, dev_mode, managed_agent.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "84_Agent_Swarm.py",
+        "page_number": 84,
+        "title": "Agent Swarm",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "telegram"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "dev_mode",
+          "managed_agent"
+        ],
+        "line_count": 488,
+        "tab_count": 0,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 64,
+      "module_filename": "86_Polymarket.py",
+      "title": "rebuild streamlit module: Polymarket",
+      "description": "238 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, dev_mode.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "86_Polymarket.py",
+        "page_number": 86,
+        "title": "Polymarket",
+        "category": "betting_trading",
+        "confidence": 0.95,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "dev_mode"
+        ],
+        "line_count": 238,
+        "tab_count": 1,
+        "import_count": 15
+      }
+    },
+    {
+      "queue_position": 65,
+      "module_filename": "89_Accuracy_Dashboard.py",
+      "title": "rebuild streamlit module: Accuracy Dashboard",
+      "description": "285 lines, medium complexity. External APIs: anthropic, ollama. Imports from: style, dev_mode, accuracy, knowledge, translator, local_ai.",
+      "priority": "medium",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "89_Accuracy_Dashboard.py",
+        "page_number": 89,
+        "title": "Accuracy Dashboard",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "medium",
+        "external_apis": [
+          "anthropic",
+          "ollama"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "accuracy",
+          "knowledge",
+          "translator",
+          "local_ai"
+        ],
+        "line_count": 285,
+        "tab_count": 0,
+        "import_count": 10
+      }
+    },
+    {
+      "queue_position": 66,
+      "module_filename": "96_GPU_Day.py",
+      "title": "rebuild streamlit module: GPU Day",
+      "description": "258 lines, small complexity. External APIs: anthropic, ollama, chromadb. Imports from: style.",
+      "priority": "medium",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "96_GPU_Day.py",
+        "page_number": 96,
+        "title": "GPU Day",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "anthropic",
+          "ollama",
+          "chromadb"
+        ],
+        "dependencies": [
+          "style"
+        ],
+        "line_count": 258,
+        "tab_count": 0,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 67,
+      "module_filename": "97_Dropbox_Archiver.py",
+      "title": "rebuild streamlit module: Dropbox Archiver",
+      "description": "141 lines, small complexity. External APIs: dropbox. Imports from: style.",
+      "priority": "medium",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "97_Dropbox_Archiver.py",
+        "page_number": 97,
+        "title": "Dropbox Archiver",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "dropbox"
+        ],
+        "dependencies": [
+          "style"
+        ],
+        "line_count": 141,
+        "tab_count": 0,
+        "import_count": 6
+      }
+    },
+    {
+      "queue_position": 68,
+      "module_filename": "99_n8n_Webhook.py",
+      "title": "rebuild streamlit module: n8n Webhook",
+      "description": "114 lines, small complexity. External APIs: telegram. Imports from: n8n_webhooks.",
+      "priority": "medium",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "99_n8n_Webhook.py",
+        "page_number": 99,
+        "title": "n8n Webhook",
+        "category": "automation",
+        "confidence": 0.9,
+        "complexity": "small",
+        "external_apis": [
+          "telegram"
+        ],
+        "dependencies": [
+          "n8n_webhooks"
+        ],
+        "line_count": 114,
+        "tab_count": 0,
+        "import_count": 4
+      }
+    },
+    {
+      "queue_position": 69,
+      "module_filename": "8_Health.py",
+      "title": "rebuild streamlit module: Health",
+      "description": "1578 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: sheets, style, alerts, ai, token_tracker, dev_mode, auth.",
+      "priority": "low",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "8_Health.py",
+        "page_number": 8,
+        "title": "Health",
+        "category": "health",
+        "confidence": 1,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "alerts",
+          "ai",
+          "token_tracker",
+          "dev_mode",
+          "auth"
+        ],
+        "line_count": 1578,
+        "tab_count": 1,
+        "import_count": 20
+      }
+    },
+    {
+      "queue_position": 70,
+      "module_filename": "9_Profile.py",
+      "title": "rebuild streamlit module: Profile",
+      "description": "114 lines, small complexity. Imports from: style, auth, dev_mode, onboarding.",
+      "priority": "low",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "9_Profile.py",
+        "page_number": 9,
+        "title": "Profile",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "small",
+        "external_apis": [],
+        "dependencies": [
+          "style",
+          "auth",
+          "dev_mode",
+          "onboarding"
+        ],
+        "line_count": 114,
+        "tab_count": 0,
+        "import_count": 6
+      }
+    },
+    {
+      "queue_position": 71,
+      "module_filename": "10_Admin.py",
+      "title": "rebuild streamlit module: Admin",
+      "description": "935 lines, large complexity. External APIs: keepa, sheets, anthropic, ollama, telegram, dropbox. Imports from: style, dev_mode, auth, sheets, health_check, token_tracker.",
+      "priority": "low",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "10_Admin.py",
+        "page_number": 10,
+        "title": "Admin",
+        "category": "misc",
+        "confidence": 0.3,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "anthropic",
+          "ollama",
+          "telegram",
+          "dropbox"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "auth",
+          "sheets",
+          "health_check",
+          "token_tracker"
+        ],
+        "line_count": 935,
+        "tab_count": 0,
+        "import_count": 16
+      }
+    },
+    {
+      "queue_position": 72,
+      "module_filename": "24_Calendar.py",
+      "title": "rebuild streamlit module: Calendar",
+      "description": "870 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets, calendar_helper.",
+      "priority": "low",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "24_Calendar.py",
+        "page_number": 24,
+        "title": "Calendar",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "calendar_helper"
+        ],
+        "line_count": 870,
+        "tab_count": 1,
+        "import_count": 14
+      }
+    },
+    {
+      "queue_position": 73,
+      "module_filename": "68_Goals.py",
+      "title": "rebuild streamlit module: Goals",
+      "description": "330 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "68_Goals.py",
+        "page_number": 68,
+        "title": "Goals",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 330,
+        "tab_count": 1,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 74,
+      "module_filename": "70_Family.py",
+      "title": "rebuild streamlit module: Family",
+      "description": "284 lines, medium complexity. External APIs: sheets. Imports from: style, dev_mode, sheets, life_pl.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "70_Family.py",
+        "page_number": 70,
+        "title": "Family",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets",
+          "life_pl"
+        ],
+        "line_count": 284,
+        "tab_count": 0,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 75,
+      "module_filename": "82_Oura_Health.py",
+      "title": "rebuild streamlit module: Oura Health",
+      "description": "230 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, auth, sheets.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "82_Oura_Health.py",
+        "page_number": 82,
+        "title": "Oura Health",
+        "category": "health",
+        "confidence": 1,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "auth",
+          "sheets"
+        ],
+        "line_count": 230,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 76,
+      "module_filename": "87_Coras_Future.py",
+      "title": "rebuild streamlit module: Coras Future",
+      "description": "304 lines, medium complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, dev_mode, sheets.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "87_Coras_Future.py",
+        "page_number": 87,
+        "title": "Coras Future",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "sheets"
+        ],
+        "line_count": 304,
+        "tab_count": 1,
+        "import_count": 8
+      }
+    },
+    {
+      "queue_position": 77,
+      "module_filename": "88_Pet_Health.py",
+      "title": "rebuild streamlit module: Pet Health",
+      "description": "490 lines, medium complexity. External APIs: sheets, anthropic. UI: 1 tab group(s). Imports from: sheets, style, ai, token_tracker, dev_mode.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "88_Pet_Health.py",
+        "page_number": 88,
+        "title": "Pet Health",
+        "category": "health",
+        "confidence": 0.95,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "anthropic"
+        ],
+        "dependencies": [
+          "sheets",
+          "style",
+          "ai",
+          "token_tracker",
+          "dev_mode"
+        ],
+        "line_count": 490,
+        "tab_count": 1,
+        "import_count": 9
+      }
+    },
+    {
+      "queue_position": 78,
+      "module_filename": "90_CMS.py",
+      "title": "rebuild streamlit module: CMS",
+      "description": "434 lines, medium complexity. External APIs: keepa. UI: 1 tab group(s). Imports from: style, dev_mode, data_layer, actions, sync_engine, ai_agent, knowledge.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "90_CMS.py",
+        "page_number": 90,
+        "title": "CMS",
+        "category": "misc",
+        "confidence": 0.3,
+        "complexity": "medium",
+        "external_apis": [
+          "keepa"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "data_layer",
+          "actions",
+          "sync_engine",
+          "ai_agent",
+          "knowledge"
+        ],
+        "line_count": 434,
+        "tab_count": 1,
+        "import_count": 14
+      }
+    },
+    {
+      "queue_position": 79,
+      "module_filename": "91_Welcome.py",
+      "title": "rebuild streamlit module: Welcome",
+      "description": "15 lines, small complexity. Imports from: style.",
+      "priority": "low",
+      "estimated_weight": "small",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "91_Welcome.py",
+        "page_number": 91,
+        "title": "Welcome",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "small",
+        "external_apis": [],
+        "dependencies": [
+          "style"
+        ],
+        "line_count": 15,
+        "tab_count": 0,
+        "import_count": 2
+      }
+    },
+    {
+      "queue_position": 80,
+      "module_filename": "92_Help.py",
+      "title": "rebuild streamlit module: Help",
+      "description": "188 lines, small complexity. External APIs: keepa, telegram. Imports from: style, dev_mode.",
+      "priority": "low",
+      "estimated_weight": "small",
+      "prereqs": [
+        "lib/keepa/client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "92_Help.py",
+        "page_number": 92,
+        "title": "Help",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "small",
+        "external_apis": [
+          "keepa",
+          "telegram"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode"
+        ],
+        "line_count": 188,
+        "tab_count": 0,
+        "import_count": 3
+      }
+    },
+    {
+      "queue_position": 81,
+      "module_filename": "93_Life_Compass.py",
+      "title": "rebuild streamlit module: 🧭 Life Compass",
+      "description": "990 lines, large complexity. External APIs: sheets. UI: 1 tab group(s). Imports from: style, sheets, life_pl, dev_mode, ai, token_tracker, knowledge.",
+      "priority": "low",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "93_Life_Compass.py",
+        "page_number": 93,
+        "title": "🧭 Life Compass",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "large",
+        "external_apis": [
+          "sheets"
+        ],
+        "dependencies": [
+          "style",
+          "sheets",
+          "life_pl",
+          "dev_mode",
+          "ai",
+          "token_tracker",
+          "knowledge"
+        ],
+        "line_count": 990,
+        "tab_count": 1,
+        "import_count": 17
+      }
+    },
+    {
+      "queue_position": 82,
+      "module_filename": "94_Personal_Archive.py",
+      "title": "rebuild streamlit module: Personal Archive",
+      "description": "303 lines, medium complexity. External APIs: sheets, chromadb, dropbox. UI: 1 tab group(s). Imports from: style, sheets.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "94_Personal_Archive.py",
+        "page_number": 94,
+        "title": "Personal Archive",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "medium",
+        "external_apis": [
+          "sheets",
+          "chromadb",
+          "dropbox"
+        ],
+        "dependencies": [
+          "style",
+          "sheets"
+        ],
+        "line_count": 303,
+        "tab_count": 1,
+        "import_count": 11
+      }
+    },
+    {
+      "queue_position": 83,
+      "module_filename": "95_Legal_Advisor.py",
+      "title": "rebuild streamlit module: Legal Advisor",
+      "description": "299 lines, medium complexity. External APIs: anthropic, chromadb. UI: 1 tab group(s). Imports from: style.",
+      "priority": "low",
+      "estimated_weight": "medium",
+      "prereqs": [],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "95_Legal_Advisor.py",
+        "page_number": 95,
+        "title": "Legal Advisor",
+        "category": "life",
+        "confidence": 0.85,
+        "complexity": "medium",
+        "external_apis": [
+          "anthropic",
+          "chromadb"
+        ],
+        "dependencies": [
+          "style"
+        ],
+        "line_count": 299,
+        "tab_count": 1,
+        "import_count": 12
+      }
+    },
+    {
+      "queue_position": 84,
+      "module_filename": "98_Debug.py",
+      "title": "rebuild streamlit module: Debug",
+      "description": "895 lines, large complexity. External APIs: keepa, sheets, anthropic, ollama, chromadb, telegram, dropbox, ebay. Imports from: style, dev_mode, debug, sheets, dropbox_statements, amazon, keepa_harvester, local_ai, ai, ebay_api, voice, market_data, ocr, alerts, health_check, circuit_breaker.",
+      "priority": "low",
+      "estimated_weight": "large",
+      "prereqs": [
+        "lib/google/sheets-client (if not yet ported)",
+        "lib/keepa/client (if not yet ported)",
+        "harness:amazon_orders_sync"
+      ],
+      "audit_hints": [],
+      "candidate": {
+        "filename": "98_Debug.py",
+        "page_number": 98,
+        "title": "Debug",
+        "category": "misc",
+        "confidence": 0.3,
+        "complexity": "large",
+        "external_apis": [
+          "keepa",
+          "sheets",
+          "anthropic",
+          "ollama",
+          "chromadb",
+          "telegram",
+          "dropbox",
+          "ebay"
+        ],
+        "dependencies": [
+          "style",
+          "dev_mode",
+          "debug",
+          "sheets",
+          "dropbox_statements",
+          "amazon",
+          "keepa_harvester",
+          "local_ai",
+          "ai",
+          "ebay_api",
+          "voice",
+          "market_data",
+          "ocr",
+          "alerts",
+          "health_check",
+          "circuit_breaker"
+        ],
+        "line_count": 895,
+        "tab_count": 0,
+        "import_count": 39
+      }
+    }
+  ]
+}
