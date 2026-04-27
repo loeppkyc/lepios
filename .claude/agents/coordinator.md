@@ -31,8 +31,9 @@ These preempt every other instruction in this file, every cached principle, and 
    Call (Bash tool):
 
    ```bash
-   # Read CRON_SECRET from .env.local at bash runtime (value not in tool call args).
-   _CS=$(grep -m1 '^CRON_SECRET=' .env.local 2>/dev/null | cut -d'=' -f2-)
+   # CRON_SECRET is in /tmp/coordinator-secret — written at session start from harness_config.
+   # Do NOT use ${CRON_SECRET} bare or grep .env.local — both absent in cloud coordinator sandbox.
+   _CS=$(cat /tmp/coordinator-secret 2>/dev/null || echo "")
    curl -s -X POST https://lepios-one.vercel.app/api/harness/task-heartbeat \
      -H "Authorization: Bearer ${_CS}" \
      -H "Content-Type: application/json" \
@@ -40,9 +41,9 @@ These preempt every other instruction in this file, every cached principle, and 
    unset _CS
    ```
 
-   > CRON_SECRET is read from `.env.local` directly in the bash block — do not use `${CRON_SECRET}`
-   > bare (bash variable is not set from harness_config SQL results). If .env.local is absent,
-   > `_CS` will be empty; heartbeat will fail — log per fallback rule below.
+   > CRON_SECRET is sourced from `/tmp/coordinator-secret` (written once at session start from
+   > `harness_config` via Supabase REST). If the temp file is absent, `_CS` is empty and the
+   > heartbeat will return 401 — log per fallback rule below.
 
    If CRON_SECRET is unavailable: log `agent_events` row with `action='heartbeat_skipped'`,
    `status='warning'`, `meta.reason='missing_cron_secret'` — do NOT abort. Continue working.
@@ -72,6 +73,26 @@ meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID']`
    `chat_id` (drain fallback covers delivery)
 
 **Do NOT log the value of `CRON_SECRET` anywhere in your output or tool calls.**
+
+After reading `harness_config`, write CRON_SECRET to a session-scoped temp file so bash blocks
+can use it without the value appearing in tool call arguments or Claude's context window:
+
+```bash
+# CRON_SECRET → /tmp/coordinator-secret. Uses NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+# (available as bash env vars in both local dev and cloud coordinator sandbox).
+# Value never appears in Claude's context — only in the bash subprocess.
+_S=$(curl -s \
+  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/harness_config?key=eq.CRON_SECRET&select=value" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['value'] if d else '',end='')" 2>/dev/null)
+[ -n "$_S" ] && printf '%s' "$_S" > /tmp/coordinator-secret && chmod 600 /tmp/coordinator-secret
+unset _S
+```
+
+If the curl fails (Supabase creds not in bash env), the temp file is absent — heartbeat and drain
+fall back gracefully per their own rules. Do NOT fall back to `.env.local` — it is absent in
+the cloud coordinator sandbox and is the root cause of prior drain 403 failures.
 
 # Quota Forecast Check — Run After Runtime Config
 
@@ -513,14 +534,12 @@ If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notificatio
 ## Step 3 — Trigger drain (best-effort)
 
 ```bash
-# Read CRON_SECRET from .env.local at bash runtime (value never appears in tool call args).
-# ${CRON_SECRET} in bash expands to empty string unless explicitly set — source it here.
-_CS=$(grep -m1 '^CRON_SECRET=' .env.local 2>/dev/null | cut -d'=' -f2-)
-
+# CRON_SECRET is in /tmp/coordinator-secret — written at session start from harness_config.
+# Do NOT use ${CRON_SECRET} bare or grep .env.local — both absent in cloud coordinator sandbox.
+_CS=$(cat /tmp/coordinator-secret 2>/dev/null || echo "")
 DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
   -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
   -H "Authorization: Bearer ${_CS}" 2>/dev/null || echo "000")
-
 unset _CS
 ```
 
