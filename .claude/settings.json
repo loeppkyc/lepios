@@ -20,5 +20,9 @@
       "mcp__claude_ai_Vercel__list_teams"
     ]
   },
-  "allowedHosts": ["lepios-one.vercel.app"]
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["lepios-one.vercel.app"]
+    }
+  }
 }
