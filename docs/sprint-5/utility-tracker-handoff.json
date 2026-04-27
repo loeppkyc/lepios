@@ -1,0 +1,48 @@
+{
+  "chunk_id": "utility-tracker",
+  "task_id": "8b3d7030-a873-431a-b82f-6dbd4ceda83d",
+  "acceptance_doc_path": "docs/sprint-5/utility-tracker-acceptance.md",
+  "files_changed": [
+    "app/(cockpit)/_components/CockpitNav.tsx",
+    "app/(cockpit)/utility/page.tsx",
+    "app/(cockpit)/utility/_components/UtilityEntryForm.tsx",
+    "app/(cockpit)/utility/actions.ts",
+    "supabase/migrations/0039_utility_bills.sql",
+    "supabase/migrations/0040_register_utility_tracker_component.sql",
+    "tests/utility-tracker.test.ts",
+    "docs/review-skips.md"
+  ],
+  "tests": {
+    "passing": 1392,
+    "failing": 0,
+    "skipped": 7,
+    "new": 22
+  },
+  "migrations_applied": [],
+  "migrations_pending": [
+    "supabase/migrations/0039_utility_bills.sql",
+    "supabase/migrations/0040_register_utility_tracker_component.sql"
+  ],
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/31",
+  "deploy_url": "https://lepios-162i2kokb-loeppkycs-projects.vercel.app",
+  "vercel_deployment_status": "success",
+  "grounding_checkpoint_required": [
+    "Apply migration 0039 (utility_bills table) via Supabase MCP or dashboard SQL editor, then confirm: SELECT * FROM utility_bills ORDER BY month DESC LIMIT 5 — table exists and is queryable.",
+    "Apply migration 0040 (harness_components INSERT) and confirm: SELECT * FROM harness_components WHERE id = 'harness:streamlit_rebuild_utility_tracker' — row present at 100%.",
+    "Load /utility at the Vercel preview URL — page renders with 4 metrics showing — or $0 (no data yet). No 500 error.",
+    "Enter one month of data via the form: Month=2026-01, kWh=456, Amount=78.90, Provider=Metergy. Verify row appears in the table below the form after page refreshes.",
+    "Re-enter the same month (2026-01) with updated values (e.g. kWh=460). Verify UPDATE semantics: SELECT COUNT(*) FROM utility_bills WHERE month='2026-01' returns 1.",
+    "SELECT * FROM agent_events WHERE action='utility_bill_saved' ORDER BY occurred_at DESC LIMIT 3 — verify F18 events logged.",
+    "Enter a month with provider different from Metergy (e.g. 'Other Co') — verify Provider column appears in the table (auto-hide logic works in both directions)."
+  ],
+  "unknowns": [
+    "Migrations 0039 and 0040 not applied to production Supabase. The mcp__claude_ai_Supabase__apply_migration tool is registered per CLAUDE.md §8 but is not available as a function call in the builder sub-agent tool context (only Read/Write/Edit/Grep/Glob/Bash are available here). Coordinator must apply via MCP tool or instruct Colin to run via Supabase dashboard SQL editor. SQL is in supabase/migrations/0039_utility_bills.sql and 0040_register_utility_tracker_component.sql.",
+    "docs/review-skips.md was modified by the commit-skip.sh script (the documented bypass path per scripts/commit-skip.sh). This file is outside the acceptance doc's 'files expected to change' list. Not a code change — it is an audit log of the bypass reason. Logging here per builder protocol.",
+    "Pre-existing TypeScript errors exist in tests/api/telegram-webhook.test.ts (2 errors), tests/harness/deploy-gate.test.ts (2 errors), and .next/types/validator.ts (1 error). None are in utility files. Not introduced by this chunk."
+  ],
+  "next_chunk_blockers": [
+    "Migrations 0039 and 0040 must be applied before the /utility page can save or load data. Page renders fine without the table (shows empty state), but form save will 500 until the table exists."
+  ],
+  "tokens_used": 45000,
+  "timestamp": "2026-04-27T06:35:00Z"
+}

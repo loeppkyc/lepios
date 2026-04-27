@@ -172,3 +172,31 @@ reversibility_check: |
 confidence: high (direct Colin ratification, not cache-match; all 3 improvements explicitly approved)
 outcome: proceeding_to_builder_on_colin_direct_ratification
 proceed_reason: "Colin approved all 3 Q answers via task_queue metadata at 2026-04-26T00:08:12Z"
+
+---
+
+2026-04-27T04:25:00Z sprint=5 chunk=utility-tracker doc=docs/sprint-5/utility-tracker-acceptance.md
+cited_principles: [cache_match_enabled: false — Phase 0 explicit override, Sprint 4 baseline carry-forward]
+trigger_match_evidence: |
+  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+  META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
+  Task is a standalone module port (52_Utility_Tracker.py → Supabase-backed Next.js page).
+  Source recovered from knowledge corpus (knowledge table, domain='streamlit_source').
+  Twin endpoint unreachable from this environment; all 4 Phase 1b questions resolved by design
+  decision (see study doc Twin Q&A section). No questions surfaced to Colin.
+reversibility_check: |
+  Study doc: new file at docs/sprint-5/utility-tracker-streamlit-study.md — fully reversible.
+  Acceptance doc: new file at docs/sprint-5/utility-tracker-acceptance.md — fully reversible.
+  Migration 0039_utility_bills.sql: not yet written; will be fully reversible (DROP TABLE).
+  Migration 0040_register_utility_tracker_component.sql: additive INSERT; reversible (DELETE row).
+  New page app/(cockpit)/utility/: not yet written; fully reversible (delete files).
+  sprint-state.md update: document only, no code/schema effect.
+  cost-log.md append: append-only log, reversible via git.
+  auto-proceed-log.md append: this entry — append-only, reversible via git.
+  All decisions: LOW cost to reverse.
+confidence: high (escalation is correct and unambiguous; cache-match disabled sprint-wide)
+outcome: escalated
+escalation_reasons:
+  - cache_match_disabled_sprint_override
+  - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
