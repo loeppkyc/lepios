@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T23:24:00Z"
+last_updated_at: "2026-04-27T04:25:00Z"
 
 chunks_planned:
 
@@ -124,6 +124,21 @@ chunks_planned:
 - "coordinator-env"
 - "stall-alert"
 - "notification-drain-dedup"
+- "streamlit-profile"
+
+streamlit_profile_chunk:
+status: "awaiting_grounding"
+task_id: "a88b0018-72fd-4e14-8d8f-815eb6eee2b9"
+module: "9_Profile.py"
+escalated_at: "2026-04-27T04:25:00Z"
+escalation_reason: "Phase 1a blocked (Streamlit source not in coordinator filesystem). F17 justification pending. Harness component not registered."
+study_doc: "docs/sprint-5/streamlit-profile-study.md"
+grounding_questions:
+  - "Provide 9_Profile.py source or approve audit-description-only study"
+  - "F17 gate: does a user settings page justify porting?"
+  - "weight_pct for harness:streamlit_rebuild_profile (suggest 0.5%)"
+  - "Task intent: bump=100 = end-goal after porting or directive to bump now?"
+notification_id: "1ac07643-2ae0-4fc5-be12-e0efe884b3e4"
 
 chunks_complete: []
 chunks_awaiting_grounding:
