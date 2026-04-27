@@ -349,13 +349,63 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   )
 
   // Step 5: Remote invocation — fire coordinator automatically when flag is set.
-  // On failure: fireCoordinator already logged to agent_events. Fall back to manual message.
+  // On failure: immediately unclaim the task (return to queued) so it isn't burned
+  // through stale-reclaim retry_count. Log to agent_events + Telegram fire-and-forget.
   // No retries — duplicate /fire calls create duplicate sessions.
   let telegramMsg = buildTelegramMessage(task)
   if (process.env.HARNESS_REMOTE_INVOCATION_ENABLED) {
     const invokeResult = await fireCoordinator({ task_id: task.id, run_id: runId })
     if (invokeResult.ok) {
       telegramMsg = buildRemoteTelegramMessage(task, invokeResult.session_url)
+    } else {
+      // Part A (H3): coordinator unavailable — unclaim task immediately.
+      // Do NOT increment retry_count — this is infrastructure failure, not task failure.
+      try {
+        const db = createServiceClient()
+        await db
+          .from('task_queue')
+          .update({
+            status: 'queued',
+            claimed_at: null,
+            claimed_by: null,
+            last_heartbeat_at: null,
+          })
+          .eq('id', task.id)
+      } catch {
+        // Unclaim failure is non-fatal — task will stale-reclaim in 15 min (existing behaviour)
+      }
+
+      // Log coordinator-unavailable event
+      void logEvent(
+        runId,
+        'warning',
+        task.id,
+        `invoke_coordinator_failed_unclaim: ${invokeResult.failure_type}`,
+        Date.now() - start,
+        'task_pickup',
+        {
+          action: 'invoke_coordinator_failed_unclaim',
+          task_id: task.id,
+          error: invokeResult.error,
+          failure_type: invokeResult.failure_type,
+          upstream_status: invokeResult.upstream_status ?? null,
+        }
+      )
+
+      // Telegram fire-and-forget — coordinator unavailable alert
+      const shortId = task.id.slice(0, 8)
+      void postMessage(
+        `[LepiOS Harness] Coordinator unavailable — ${invokeResult.failure_type}. Task ${shortId} returned to queue. Reason: ${invokeResult.upstream_status ?? invokeResult.error}.`
+      ).catch(() => {})
+
+      return {
+        ok: true,
+        claimed: null,
+        reason: 'coordinator-unavailable',
+        run_id: runId,
+        duration_ms: Date.now() - start,
+        ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+      }
     }
   }
 
