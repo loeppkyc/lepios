@@ -33,37 +33,37 @@ dependency.
 
 ## Files expected to change
 
-| File | Change |
-|------|--------|
-| `supabase/migrations/0039_utility_bills.sql` | New — creates `utility_bills` table |
+| File                                                              | Change                                                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `supabase/migrations/0039_utility_bills.sql`                      | New — creates `utility_bills` table                                                         |
 | `supabase/migrations/0040_register_utility_tracker_component.sql` | New — registers `harness:streamlit_rebuild_utility_tracker` in `harness_components` at 100% |
-| `app/(cockpit)/utility/page.tsx` | New — server component: renders metrics, charts, table |
-| `app/(cockpit)/utility/_components/UtilityEntryForm.tsx` | New — client component: add/update form |
-| `app/(cockpit)/utility/actions.ts` | New — server action: upsert entry into `utility_bills` |
-| `app/(cockpit)/layout.tsx` | Update — add nav entry for `/utility` if nav list is explicit |
-| `tests/utility-tracker.test.ts` | New — F21 acceptance tests (written before implementation) |
+| `app/(cockpit)/utility/page.tsx`                                  | New — server component: renders metrics, charts, table                                      |
+| `app/(cockpit)/utility/_components/UtilityEntryForm.tsx`          | New — client component: add/update form                                                     |
+| `app/(cockpit)/utility/actions.ts`                                | New — server action: upsert entry into `utility_bills`                                      |
+| `app/(cockpit)/layout.tsx`                                        | Update — add nav entry for `/utility` if nav list is explicit                               |
+| `tests/utility-tracker.test.ts`                                   | New — F21 acceptance tests (written before implementation)                                  |
 
 ---
 
 ## Check-Before-Build findings
 
-| Check | Result |
-|-------|--------|
-| `utility_bills` table in Supabase | Not found — build fresh |
-| Existing utility page in `app/` | Not found — build fresh |
-| Google Sheets client in `lib/` | Not found — no dependency; Supabase-native |
+| Check                               | Result                                                          |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `utility_bills` table in Supabase   | Not found — build fresh                                         |
+| Existing utility page in `app/`     | Not found — build fresh                                         |
+| Google Sheets client in `lib/`      | Not found — no dependency; Supabase-native                      |
 | Streamlit `load_utility_data` logic | Recovered from knowledge corpus (2 chunks); fully reconstructed |
-| Next migration number available | 0039 ✓ (0037 is last applied; 0038 exists locally, unapplied) |
+| Next migration number available     | 0039 ✓ (0037 is last applied; 0038 exists locally, unapplied)   |
 
 ---
 
 ## External deps tested
 
-| Dep | Status | Notes |
-|-----|--------|-------|
-| Supabase (lepios project) | Live, healthy | createServiceClient pattern confirmed working in money/page.tsx |
-| Google Sheets | NOT used | Intentional — data moves to Supabase |
-| Twin endpoint | Unreachable from build env | All Phase 1b questions resolved by design decision (see study doc) |
+| Dep                       | Status                     | Notes                                                              |
+| ------------------------- | -------------------------- | ------------------------------------------------------------------ |
+| Supabase (lepios project) | Live, healthy              | createServiceClient pattern confirmed working in money/page.tsx    |
+| Google Sheets             | NOT used                   | Intentional — data moves to Supabase                               |
+| Twin endpoint             | Unreachable from build env | All Phase 1b questions resolved by design decision (see study doc) |
 
 ---
 
@@ -94,6 +94,7 @@ CREATE INDEX utility_bills_month_idx ON utility_bills (month DESC);
 > Schema is reversible (DROP TABLE). Service-role-only policy is the standard LepiOS pattern.
 
 **Component registration (0040_register_utility_tracker_component.sql):**
+
 ```sql
 INSERT INTO harness_components (id, display_name, weight_pct, completion_pct, notes, updated_at)
 VALUES (
@@ -111,44 +112,53 @@ VALUES (
 ## Page spec
 
 ### Route
+
 `app/(cockpit)/utility/page.tsx` → URL: `/utility`
 
 ### Server component data fetch
+
 ```typescript
 const { data: bills } = await supabase
   .from('utility_bills')
   .select('id, month, kwh, amount_cad, provider, notes, updated_at')
-  .order('month', { ascending: false })  // newest first
-  .limit(60)                              // ~5 years of data
+  .order('month', { ascending: false }) // newest first
+  .limit(60) // ~5 years of data
 ```
 
 ### Summary metrics (4 tiles)
-| Metric | Formula | Format |
-|--------|---------|--------|
-| Total Billed | `SUM(amount_cad)` | `$X,XXX.XX` |
-| Avg Monthly Cost | `AVG(amount_cad)` | `$XX.XX` |
-| Avg Monthly kWh | `AVG(kwh)` | `XXX kWh` |
-| Latest Bill | `bills[0].amount_cad` (newest row) | `$XX.XX` + delta vs prior month |
+
+| Metric           | Formula                            | Format                          |
+| ---------------- | ---------------------------------- | ------------------------------- |
+| Total Billed     | `SUM(amount_cad)`                  | `$X,XXX.XX`                     |
+| Avg Monthly Cost | `AVG(amount_cad)`                  | `$XX.XX`                        |
+| Avg Monthly kWh  | `AVG(kwh)`                         | `XXX kWh`                       |
+| Latest Bill      | `bills[0].amount_cad` (newest row) | `$XX.XX` + delta vs prior month |
 
 **20% Better — Latest Bill metric:** Add month-over-month delta (▲/▼ vs previous month amount_cad)
 as a secondary line. If no prior month, show the month label only.
 
 ### Charts
+
 Two bar charts side by side using shadcn/ui `<BarChart>` or a thin wrapper over Recharts:
+
 - Left: Monthly kWh (amber token: `var(--color-pillar-growing)`)
 - Right: Monthly Cost in CAD (gold token: `var(--color-pillar-money)`)
 - X-axis: month labels `MMM YYYY` format
 - Data ordered oldest-to-newest on chart (ascending), table displayed newest-first
 
 ### Data table
+
 shadcn/ui `<Table>` component. Columns: Month | kWh | Amount | Provider | Notes
+
 - kWh formatted to 1 decimal
 - Amount formatted as `$XX.XX`
 - Provider column hidden if all rows share the same value (show as caption note instead)
 - Newest first (data fetched DESC)
 
 ### Add/Update form (Client Component)
+
 `UtilityEntryForm.tsx`:
+
 - Fields: Month (YYYY-MM text input), kWh (number), Amount $ (number), Provider (text, default "Metergy"), Notes (text optional)
 - Validation: month matches `/^\d{4}-\d{2}$/`, kWh ≥ 0, amount ≥ 0
 - Month normalization: normalize single-digit month to two digits before send (fixes Streamlit upsert dup bug)
@@ -157,18 +167,29 @@ shadcn/ui `<Table>` component. Columns: Month | kWh | Amount | Provider | Notes
 - Error display: inline below the form (not a toast)
 
 ### Server action (`actions.ts`)
+
 ```typescript
 'use server'
 // Upsert: ON CONFLICT (month) DO UPDATE — no positional column dependency
-await supabase.from('utility_bills').upsert({
-  month, kwh, amount_cad: amount, provider, notes,
-  updated_at: new Date().toISOString(),
-}, { onConflict: 'month' })
+await supabase.from('utility_bills').upsert(
+  {
+    month,
+    kwh,
+    amount_cad: amount,
+    provider,
+    notes,
+    updated_at: new Date().toISOString(),
+  },
+  { onConflict: 'month' }
+)
 
 // F18: log agent_events
 await supabase.from('agent_events').insert({
-  domain: 'finance', action: 'utility_bill_saved', actor: 'user',
-  status: 'success', meta: { month, kwh, amount_cad: amount }
+  domain: 'finance',
+  action: 'utility_bill_saved',
+  actor: 'user',
+  status: 'success',
+  meta: { month, kwh, amount_cad: amount },
 })
 ```
 
@@ -186,12 +207,12 @@ number. Satisfies F17 minimum bar: measurable, autonomous-queryable.
 
 ## F18 — Measurement + benchmark
 
-| Metric | How to query | Benchmark |
-|--------|-------------|-----------|
-| Total entries | `SELECT COUNT(*) FROM utility_bills` | Should grow by 1/month |
-| YTD total | `SELECT SUM(amount_cad) FROM utility_bills WHERE month LIKE '2026-%'` | Colin's target: N/A (track actuals) |
-| Month-over-month delta | `SELECT month, amount_cad, LAG(amount_cad) OVER (ORDER BY month) FROM utility_bills` | Stable or decreasing |
-| Save events | `SELECT COUNT(*) FROM agent_events WHERE action='utility_bill_saved'` | Should match row count |
+| Metric                 | How to query                                                                         | Benchmark                           |
+| ---------------------- | ------------------------------------------------------------------------------------ | ----------------------------------- |
+| Total entries          | `SELECT COUNT(*) FROM utility_bills`                                                 | Should grow by 1/month              |
+| YTD total              | `SELECT SUM(amount_cad) FROM utility_bills WHERE month LIKE '2026-%'`                | Colin's target: N/A (track actuals) |
+| Month-over-month delta | `SELECT month, amount_cad, LAG(amount_cad) OVER (ORDER BY month) FROM utility_bills` | Stable or decreasing                |
+| Save events            | `SELECT COUNT(*) FROM agent_events WHERE action='utility_bill_saved'`                | Should match row count              |
 
 ---
 
@@ -222,6 +243,7 @@ After builder ships and migration is applied:
 ## F20 compliance requirements
 
 Builder acceptance tests MUST grep `app/(cockpit)/utility/` for `style=` and verify:
+
 - No arbitrary values (hex colors, pixel values, string widths) in `style={}`
 - CSS design-token vars (`var(--color-*)`, `var(--font-*)`, etc.) are allowed
 - All layout via Tailwind utility classes (`flex`, `gap-*`, `p-*`, `grid`, etc.)
@@ -240,3 +262,21 @@ None. Design decisions in study doc `## Twin Q&A — blocked` section cover all 
 (Sprint 4 baseline, rule 4 of Phase 0). Every acceptance doc escalates to Colin.
 
 This doc is submitted to Colin for explicit approval before going to builder.
+
+---
+
+## Builder pre-flight notes
+
+Added 2026-04-27 by Colin review before builder handoff.
+
+1. **Nav structure** — Before adding `/utility` to the nav, read `app/(cockpit)/layout.tsx` and identify the exact nav list structure. Do not guess the pattern; match what's there.
+
+2. **Provider must be a form field** — Do NOT hardcode `"Metergy"` in `actions.ts`. Provider is a free-text input in `UtilityEntryForm.tsx` with a default value of `"Metergy"`. The server action must accept `provider` as a parameter.
+
+3. **F20 grep required** — After writing all TSX files under `app/(cockpit)/utility/`, grep for `style=` and verify: no arbitrary values (hex, px, rem). CSS design-system token vars (`var(--color-*)`, etc.) are permitted. If any arbitrary `style=` is found, fix before committing.
+
+4. **Auth pattern** — Use the Supabase auth-helpers pattern that matches existing cockpit pages (e.g. `app/(cockpit)/money/` or `app/(cockpit)/business-review/`). Read one of those pages before writing the server component — do not invent a new auth pattern.
+
+5. **F21 — tests before code** — Write `tests/utility-tracker.test.ts` before implementing `page.tsx`, `actions.ts`, or `UtilityEntryForm.tsx`. The test file must exist and pass (with stubs if needed) before any implementation code is written. Record test counts in the handoff JSON.
+
+6. **Migration number** — Verify 0039 is still the next available number at build time. Check `supabase/migrations/` for any migrations added since this doc was written. If 0039 is taken, use the next available number and update the component registration migration number accordingly.
