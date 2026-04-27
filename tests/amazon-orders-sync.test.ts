@@ -333,4 +333,64 @@ describe('syncOrdersForRange', () => {
     expect(result.skipped).toBe(1)
     expect(mockUpsert).not.toHaveBeenCalled()
   })
+
+  // ── CreatedBefore future-date fix (Constraint 1) ──────────────────────────
+
+  it('omits CreatedBefore when endDate is today (prevents SP-API 400)', async () => {
+    const { spFetch } = await import('@/lib/amazon/client')
+    vi.mocked(spFetch).mockResolvedValue({ payload: { Orders: [] } })
+
+    const mockDb = { from: vi.fn().mockReturnValue({ upsert: vi.fn() }) }
+    const { syncOrdersForRange } = await import('@/lib/amazon/orders-sync')
+
+    const now = new Date()
+    await syncOrdersForRange({
+      startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      endDate: now,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase: mockDb as any,
+    })
+
+    const firstCall = vi.mocked(spFetch).mock.calls[0]
+    expect(firstCall[1]?.params).not.toHaveProperty('CreatedBefore')
+  })
+
+  it('omits CreatedBefore when endDate is in the future', async () => {
+    const { spFetch } = await import('@/lib/amazon/client')
+    vi.mocked(spFetch).mockResolvedValue({ payload: { Orders: [] } })
+
+    const mockDb = { from: vi.fn().mockReturnValue({ upsert: vi.fn() }) }
+    const { syncOrdersForRange } = await import('@/lib/amazon/orders-sync')
+
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    await syncOrdersForRange({
+      startDate: new Date(),
+      endDate: tomorrow,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase: mockDb as any,
+    })
+
+    const firstCall = vi.mocked(spFetch).mock.calls[0]
+    expect(firstCall[1]?.params).not.toHaveProperty('CreatedBefore')
+  })
+
+  it('includes CreatedBefore when endDate is yesterday (fully past)', async () => {
+    const { spFetch } = await import('@/lib/amazon/client')
+    vi.mocked(spFetch).mockResolvedValue({ payload: { Orders: [] } })
+
+    const mockDb = { from: vi.fn().mockReturnValue({ upsert: vi.fn() }) }
+    const { syncOrdersForRange } = await import('@/lib/amazon/orders-sync')
+
+    // Use a fixed past date guaranteed to have a past end-of-day boundary
+    const yesterday = new Date('2026-04-15T00:00:00Z')
+    await syncOrdersForRange({
+      startDate: new Date('2026-04-14T00:00:00Z'),
+      endDate: yesterday,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase: mockDb as any,
+    })
+
+    const firstCall = vi.mocked(spFetch).mock.calls[0]
+    expect(firstCall[1]?.params).toHaveProperty('CreatedBefore')
+  })
 })

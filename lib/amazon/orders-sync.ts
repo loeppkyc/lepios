@@ -106,7 +106,10 @@ export async function syncOrdersForRange(params: SyncParams): Promise<SyncResult
   const { startDate, endDate, supabase, dryRun = false } = params
 
   const createdAfter = dayBoundaryUTC(startDate, 'start')
-  const createdBefore = dayBoundaryUTC(endDate, 'end')
+  const createdBeforeTs = dayBoundaryUTC(endDate, 'end')
+  // SP-API returns 400 if CreatedBefore is a future timestamp (Constraint 1, orders.ts:63).
+  // Omit it when endDate is today or future so the query remains open-ended.
+  const createdBefore = new Date(createdBeforeTs) > new Date() ? undefined : createdBeforeTs
 
   const orders = await fetchOrders({ createdAfter, createdBefore })
 
