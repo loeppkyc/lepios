@@ -9,6 +9,22 @@ last_reviewed_by_colin_at: 2026-04-22
 
 ---
 
+2026-04-27T00:00:00Z sprint=5 chunk=H3 doc=docs/sprint-5/h3-pickup-ordering-acceptance.md
+cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
+trigger_match_evidence: |
+  cache_match_enabled: false per sprint-state.md sprint_5.cache_match_reason = "Sprint 4 baseline
+  carries forward; every acceptance doc escalates to Colin". Phase 0 rule 4: explicit override
+  in sprint-state.md → honor regardless of audit state. Cache-match not attempted.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or edit).
+  Part A (unclaim logic in pickup-runner.ts): reversible — revert file, no schema change.
+  Part B (vercel.json cron change): reversible — change schedule back to 0 0 * * *.
+  No schema migrations, no destructive operations.
+confidence: n/a (cache-match disabled)
+outcome: escalated-mandatory (cache_match_enabled=false)
+
+---
+
 2026-04-22T15:30:00-06:00 sprint=harness-e2e chunk=v0-test doc=docs/harness-e2e/chunk-v0-test-acceptance.md
 phase: 6 (sprint close)
 cited_principles: [cache_match_enabled: false — Phase 0 result honored throughout]
