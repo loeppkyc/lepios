@@ -513,6 +513,7 @@ ROW=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/outbound_notification
     \"chat_id\": \"<TELEGRAM_CHAT_ID from harness_config>\",
     \"payload\": {
       \"text\": \"[LepiOS Coordinator] {chunk_id}\\nStatus: {status}\\ntask_id: ${TASK_ID}\\n{one-line summary}\",
+      \"parse_mode\": \"HTML\",
       \"reply_markup\": {
         \"inline_keyboard\": [[
           {\"text\": \"👍 Approve\", \"callback_data\": \"{\\\"correlation_id\\\":\\\"${CORR_ID}\\\",\\\"action\\\":\\\"approve\\\"}\"},
@@ -546,7 +547,7 @@ unset _CS
 On failure:
 
 - `200` → delivered; proceed.
-- `401` → CRON_SECRET in `.env.local` does not match `process.env.CRON_SECRET` on Vercel. Log `drain_trigger_failed` with `reason: cron_secret_mismatch`. Colin must sync the values.
+- `401` → CRON_SECRET in `/tmp/coordinator-secret` does not match `process.env.CRON_SECRET` on Vercel. Log `drain_trigger_failed` with `reason: cron_secret_mismatch`. Re-read `harness_config` and rewrite the temp file.
 - Any other code → log `drain_trigger_failed` with `http_status: <code>`. Non-fatal — notification delivers on next cron cycle (daily 1 AM UTC via `/api/cron/notifications-drain-tick`).
 
 Do not abort on drain failure. For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
