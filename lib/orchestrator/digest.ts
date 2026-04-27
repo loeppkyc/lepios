@@ -262,6 +262,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   const amazonOrdersSyncLine = await buildAmazonOrdersSyncLine()
   messageToSend = `${messageToSend}\n${amazonOrdersSyncLine}`
 
+  // ── F18: Amazon settlements sync — groups synced + net payout ────────────
+  const amazonSettlementsSyncLine = await buildAmazonSettlementsSyncLine()
+  messageToSend = `${messageToSend}\n${amazonSettlementsSyncLine}`
+
   // ── Ollama tunnel smoke health — P1 line on failure, silent on pass ───────
   const ollamaTunnelLine = await buildOllamaTunnelHealthLine()
   messageToSend = `${messageToSend}\n${ollamaTunnelLine}`
