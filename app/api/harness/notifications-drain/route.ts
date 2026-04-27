@@ -65,6 +65,24 @@ async function triggerImprovementEngineForRecentCompletions(): Promise<{
   return { triggered, errors }
 }
 
+async function markPendingDrainTriggersProcessed(
+  db: ReturnType<typeof createServiceClient>
+): Promise<void> {
+  const { data: pending } = await db
+    .from('pending_drain_triggers')
+    .select('id')
+    .eq('status', 'pending')
+    .limit(20)
+
+  if (!pending || pending.length === 0) return
+
+  const ids = (pending as { id: string }[]).map((r) => r.id)
+  await db
+    .from('pending_drain_triggers')
+    .update({ status: 'processed', processed_at: new Date().toISOString() })
+    .in('id', ids)
+}
+
 interface PendingRow {
   id: string
   channel: string
@@ -145,6 +163,13 @@ async function drain(request: Request): Promise<NextResponse> {
   const batchQueued = rows?.length ?? 0
   let drained = 0
   let failed = 0
+
+  // Mark any pending_drain_triggers as processed — always, even if the queue is empty
+  try {
+    await markPendingDrainTriggersProcessed(db)
+  } catch {
+    // Non-fatal — drain proceeds regardless
+  }
 
   if (!rows || rows.length === 0) {
     // Log empty drain run — still a valid run for F18 observability

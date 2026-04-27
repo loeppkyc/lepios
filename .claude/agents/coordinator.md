@@ -61,7 +61,7 @@ SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHA
 
 Store the results in your working context:
 
-- `CRON_SECRET` — used as the Bearer token in every heartbeat and drain-trigger curl
+- `CRON_SECRET` — used as the Bearer token in every heartbeat
 - `TELEGRAM_CHAT_ID` — used as `chat_id` in every `outbound_notifications` insert
 
 If the query fails (table missing or row absent):
@@ -207,7 +207,15 @@ For any chunk that ports, replaces, or is informed by a Streamlit predecessor, c
 ### Phase 1a — Streamlit Study
 
 1. Read the Streamlit implementation of the feature end to end: UI layer, data layer, logic, config, and any helper utilities it calls.
-2. Write `docs/sprint-{N}/chunk-{id}-streamlit-study.md` containing:
+
+2. **Dead reference grep (pre-write check):** Before writing the study doc, grep the page source for calls to `show_load_time`, `dev_section`, and `get_sheet`. Cross-reference each hit against the page's own import block (lines starting with `import` or `from ... import`). For each call with no matching import:
+   - Record it under `## Dead References` in the study doc with `file:line`, the called function, and the correct resolution (proper import path — e.g. `from utils.style import show_load_time` — or removal if the call is vestigial)
+   - These entries become `spec.gotchas` in the acceptance doc — builder must explicitly handle each one, never silently replicate the dead reference into LepiOS
+   - Known offenders (34 dead references across 32 pages, all BLOCKER severity): `docs/follow-ups/2026-04-28-streamlit-dead-reference-audit.md`
+
+   > Note: `get_sheet` in `pages/tax_centre/colin_tax.py` does not exist anywhere in the codebase — the correct call is `get_spreadsheet()`. This is a latent NameError, not a missing import.
+
+3. Write `docs/sprint-{N}/chunk-{id}-streamlit-study.md` containing:
    - **What it does:** user-visible behavior, one paragraph
    - **How it does it:** data sources, API calls, transformations — including any non-obvious logic (e.g. `server_modified` vs `client_modified`, Edmonton timezone, `close_day` config)
    - **Domain rules embedded:** every business rule baked into the Streamlit code. These are the rules the acceptance doc must preserve or explicitly improve.
@@ -510,27 +518,29 @@ ROW_ID=$(echo "$ROW" | python3 -c \
 
 If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notification_insert_failed) and **stop** — do not silently skip notifications.
 
-## Step 3 — Trigger drain (best-effort)
+## Step 3 — Signal drain (best-effort, Supabase-native)
+
+Insert a row into `pending_drain_triggers` using the Supabase REST API. The notifications-drain
+cron picks it up on its next run (daily 1 AM UTC) and marks it `processed`. No CRON_SECRET needed.
 
 ```bash
-# Read CRON_SECRET from .env.local at bash runtime (value never appears in tool call args).
-# ${CRON_SECRET} in bash expands to empty string unless explicitly set — source it here.
-_CS=$(grep -m1 '^CRON_SECRET=' .env.local 2>/dev/null | cut -d'=' -f2-)
-
-DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
-  -H "Authorization: Bearer ${_CS}" 2>/dev/null || echo "000")
-
-unset _CS
+DRAIN_TRIGGER_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pending_drain_triggers" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=minimal" \
+  -d "{\"triggered_by\": \"coordinator\", \"task_id\": \"${TASK_ID}\"}" 2>/dev/null || echo "000")
 ```
 
-On failure:
+On result:
 
-- `200` → delivered; proceed.
-- `401` → CRON_SECRET in `.env.local` does not match `process.env.CRON_SECRET` on Vercel. Log `drain_trigger_failed` with `reason: cron_secret_mismatch`. Colin must sync the values.
-- Any other code → log `drain_trigger_failed` with `http_status: <code>`. Non-fatal — notification delivers on next cron cycle (daily 1 AM UTC via `/api/cron/notifications-drain-tick`).
+- `201` → drain trigger inserted; notification delivers on next cron run.
+- Any other code → log `drain_trigger_failed` with `http_status: <code>` and `reason: insert_failed`.
+  Non-fatal — notification still delivers on next cron cycle via `/api/cron/notifications-drain-tick`.
 
-Do not abort on drain failure. For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
+Do not abort on drain trigger failure. The notification is already in `outbound_notifications`;
+delivery is guaranteed by the cron regardless of whether this trigger insert succeeds.
 
 ## Step 4 — Fire-and-forget vs. polling
 

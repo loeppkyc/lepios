@@ -467,22 +467,48 @@ export type CommitSummary = {
   message: string
 }
 
+export async function fetchPRBody(prNumber: number): Promise<string | null> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return null
+
+  let res: Response
+  try {
+    res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/pulls/${prNumber}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+  } catch {
+    return null
+  }
+
+  if (!res.ok) return null
+
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    return null
+  }
+
+  return (json as { body?: string | null }).body ?? null
+}
+
 export async function fetchMainCommits(perPage = 20): Promise<CommitSummary[]> {
   const token = process.env.GITHUB_TOKEN
   if (!token) return []
 
   let res: Response
   try {
-    res = await fetch(
-      `${GITHUB_API}/repos/${GITHUB_REPO}/commits?sha=main&per_page=${perPage}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      }
-    )
+    res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/commits?sha=main&per_page=${perPage}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
   } catch {
     return []
   }

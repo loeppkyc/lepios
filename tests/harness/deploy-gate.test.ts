@@ -69,6 +69,7 @@ import {
   sendMigrationGateMessage,
   insertSmokePendingEvent,
   fetchMainCommits,
+  fetchPRBody,
 } from '@/lib/harness/deploy-gate'
 import { GET } from '@/app/api/cron/deploy-gate-runner/route'
 
@@ -2145,5 +2146,70 @@ describe('GET /api/cron/deploy-gate-runner — bump sweep', () => {
     expect(body.bumps.checked).toBe(0)
     expect(body.bumps.applied).toBe(0)
     expect(mockApplyBumps).not.toHaveBeenCalled()
+  })
+
+  it('parses BUMP directives from PR body when commit title contains (#N)', async () => {
+    // Commit title has squash-merge suffix "(#30)" — no BUMP in commit message itself
+    const commitTitle = 'feat(scanner): Streamlit module scanner + rebuild queue generator (#30)'
+    const prBody = 'BUMP: harness:streamlit_module_scanner=100\n\nSome other PR description text.'
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ sha: 'abc1230', commit: { message: commitTitle } }]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ body: prBody }),
+      })
+
+    // No directives from commit message; directives from PR body
+    mockParseBumpDirectives
+      .mockReturnValueOnce([]) // called with commit message
+      .mockReturnValueOnce([
+        {
+          id: 'harness:streamlit_module_scanner',
+          pct: 100,
+          raw: 'BUMP: harness:streamlit_module_scanner=100',
+        },
+      ]) // called with PR body
+
+    mockApplyBumps.mockResolvedValue([
+      { id: 'harness:streamlit_module_scanner', pct: 100, success: true },
+    ])
+    mockFrom.mockReturnValue(makeSelectBuilder([]))
+
+    const res = await GET(makeRequest())
+    const body = await res.json()
+
+    expect(body.bumps.applied).toBe(1)
+    // parseBumpDirectives called twice: once with commit message, once with PR body
+    expect(mockParseBumpDirectives).toHaveBeenCalledTimes(2)
+    expect(mockParseBumpDirectives).toHaveBeenCalledWith(commitTitle)
+    expect(mockParseBumpDirectives).toHaveBeenCalledWith(prBody)
+    expect(mockApplyBumps).toHaveBeenCalledOnce()
+  })
+
+  it('fetchPRBody returns null when GITHUB_TOKEN is missing', async () => {
+    const original = process.env.GITHUB_TOKEN
+    delete process.env.GITHUB_TOKEN
+    const result = await fetchPRBody(30)
+    expect(result).toBeNull()
+    process.env.GITHUB_TOKEN = original
+  })
+
+  it('fetchPRBody returns null when GitHub API returns non-ok status', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+    const result = await fetchPRBody(30)
+    expect(result).toBeNull()
+  })
+
+  it('fetchPRBody returns PR body string on success', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ body: 'BUMP: harness:smoke_test_framework=90' }),
+    })
+    const result = await fetchPRBody(42)
+    expect(result).toBe('BUMP: harness:smoke_test_framework=90')
   })
 })

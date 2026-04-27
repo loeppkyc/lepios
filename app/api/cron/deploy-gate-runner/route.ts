@@ -12,6 +12,7 @@ import {
   sendMigrationGateMessage,
   insertSmokePendingEvent,
   fetchMainCommits,
+  fetchPRBody,
 } from '@/lib/harness/deploy-gate'
 import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
@@ -321,7 +322,25 @@ async function runBumpSweep(): Promise<{ checked: number; applied: number }> {
   for (const commit of commits) {
     if (processedShas.has(commit.sha)) continue
 
+    // Directives from commit message (title only on squash-merge)
     const directives = parseBumpDirectives(commit.message)
+    const seen = new Set(directives.map((d) => d.id))
+
+    // For squash-merge commits, the PR description body is dropped from the commit
+    // message. Detect the PR number from the title suffix "(#N)" and fetch the body.
+    const prMatch = /\(#(\d+)\)\s*$/.exec(commit.message.split('\n')[0])
+    if (prMatch) {
+      const prNumber = parseInt(prMatch[1], 10)
+      const prBody = await fetchPRBody(prNumber)
+      if (prBody) {
+        for (const d of parseBumpDirectives(prBody)) {
+          if (!seen.has(d.id)) {
+            directives.push(d)
+            seen.add(d.id)
+          }
+        }
+      }
+    }
 
     if (directives.length > 0) {
       const results = await applyBumps(directives, commit.sha)

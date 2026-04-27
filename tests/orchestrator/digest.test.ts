@@ -21,6 +21,7 @@ const {
   mockBuildAmazonOrdersSyncLine,
   mockBuildAmazonSettlementsSyncLine,
   mockBuildOllamaTunnelHealthLine,
+  mockBuildUtilityBillSavedLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -40,6 +41,7 @@ const {
   mockBuildAmazonOrdersSyncLine: vi.fn(),
   mockBuildAmazonSettlementsSyncLine: vi.fn(),
   mockBuildOllamaTunnelHealthLine: vi.fn(),
+  mockBuildUtilityBillSavedLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -128,6 +130,10 @@ vi.mock('@/lib/harness/ollama-tunnel-stats', () => ({
   buildOllamaTunnelHealthLine: mockBuildOllamaTunnelHealthLine,
 }))
 
+// Mock utility-digest so buildUtilityBillSavedLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/utility-digest', () => ({
+  buildUtilityBillSavedLine: mockBuildUtilityBillSavedLine,
+}))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
 import { MissingTelegramConfigError } from '@/lib/orchestrator/telegram'
@@ -245,6 +251,8 @@ beforeEach(() => {
   mockBuildAmazonSettlementsSyncLine.mockResolvedValue('Amazon settlements: no run in last 24h')
   // Default: Ollama tunnel smoke has no data yet (first run after deploy)
   mockBuildOllamaTunnelHealthLine.mockResolvedValue('Ollama tunnel: no smoke data (last 24h)')
+  // Default: no utility bills saved yet (idle state)
+  mockBuildUtilityBillSavedLine.mockResolvedValue('Utility bills saved (24h): 0')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { buildTaxSanityLine } from '@/lib/harness/tax-sanity'
 import { buildAmazonOrdersSyncLine } from '@/lib/amazon/orders-digest'
 import { buildAmazonSettlementsSyncLine } from '@/lib/amazon/settlements-digest'
 import { buildOllamaTunnelHealthLine } from '@/lib/harness/ollama-tunnel-stats'
+import { buildUtilityBillSavedLine } from '@/lib/harness/utility-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -269,6 +270,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── Ollama tunnel smoke health — P1 line on failure, silent on pass ───────
   const ollamaTunnelLine = await buildOllamaTunnelHealthLine()
   messageToSend = `${messageToSend}\n${ollamaTunnelLine}`
+
+  // ── F18: Utility Tracker save events — always present, zero when idle ─────
+  const utilityBillSavedLine = await buildUtilityBillSavedLine()
+  messageToSend = `${messageToSend}\n${utilityBillSavedLine}`
 
   characterCount = messageToSend.length
 
