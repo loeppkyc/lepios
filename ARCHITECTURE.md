@@ -245,7 +245,7 @@ Context degradation under scope is the #1 quality risk. Model accuracy falls _ex
 ## 9. Tech Stack (locked)
 
 - **Framework:** Next.js (App Router)
-- **Database / Auth:** Supabase (RLS enforced; Safety Agent reviews)
+- **Database / Auth:** Supabase (RLS enforced; coordinator reviews all migration PRs before apply)
 - **Payments:** Stripe (not v1-critical)
 - **Hosting:** Vercel
 - **UI:** React + Tailwind + shadcn/ui as foundation only; heavily customized per Design Council

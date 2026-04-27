@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: '/business-review', label: 'Business Review' },
   { href: '/pallets', label: 'Pallets' },
   { href: '/utility', label: 'Utility' },
+  { href: '/status', label: 'Status' },
 ]
 
 export function CockpitNav() {
