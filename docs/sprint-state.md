@@ -109,7 +109,7 @@ status: "in-build"
 cache_match_enabled: false
 cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-25T23:24:00Z"
+last_updated_at: "2026-04-27T00:40:00Z"
 
 chunks_planned:
 
@@ -233,3 +233,28 @@ grounding_checkpoints:
 # - streamlit-inventory: migration 0023 + populate/embed scripts + smoke query pass rate
 
 # - purpose-review: migration 0026 (NOT yet applied to prod) + live Telegram callback test
+
+# ============================================================
+
+# Hardening tasks (post-first-autonomous-loop postmortem 2026-04-27)
+
+# ============================================================
+
+hardening_h1:
+  hardening_id: "H1"
+  task_id: "8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
+  source_label: "postmortem_915d1fee"
+  status: "awaiting_grounding"
+  description: "Fix coordinator drain 403 — notification delivery broken"
+  study_doc: "docs/sprint-5/drain-403-study.md"
+  acceptance_doc: "docs/sprint-5/drain-403-acceptance.md"
+  root_causes:
+    - "host_not_in_allowlist: lepios-one.vercel.app blocked in coordinator bash"
+    - "cron_secret_unset: CRON_SECRET not in bash env (no .env.local)"
+    - "parse_mode_bug: Markdown parse_mode fails on arbitrary text"
+  notification_row_id: "5708c92d-1210-45f5-b64e-8c0852620139"
+  awaiting_colin_approval_for: "acceptance doc — 3 open questions, see acceptance doc"
+  branch: "harness/task-8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
+  commit: "b617167"
+  opened_at: "2026-04-27T00:26:00Z"
+  last_updated_at: "2026-04-27T00:40:00Z"

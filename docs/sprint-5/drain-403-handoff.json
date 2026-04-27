@@ -1,0 +1,30 @@
+{
+  "chunk_id": "H1-drain-403",
+  "acceptance_doc_path": "docs/sprint-5/drain-403-acceptance.md",
+  "files_changed": [
+    ".claude/settings.json",
+    ".claude/agents/coordinator.md",
+    ".gitignore"
+  ],
+  "tests": { "passing": 1316, "failing": 0, "new": 0 },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/34",
+  "grounding_checkpoint_required": [
+    "Colin must populate .claude/settings.local.json with actual values: CRON_SECRET and SUPABASE_SERVICE_ROLE_KEY (NEXT_PUBLIC_SUPABASE_URL is pre-filled as https://xpanlbcjueimeofgsara.supabase.co). File is gitignored — must be created locally.",
+    "After populating settings.local.json, run any coordinator session to completion. Then query: SELECT id, status, sent_at, created_at, (extract(epoch from sent_at) - extract(epoch from created_at))::int as latency_s FROM outbound_notifications ORDER BY created_at DESC LIMIT 3; Expect: newest row status=sent, latency_s < 60.",
+    "If latency_s is NULL or > 300, check agent_events for notification_env_missing rows — env vars may not be injecting into coordinator bash as expected."
+  ],
+  "unknowns": [
+    "allowedHosts key name not confirmed from Anthropic Claude Code docs — used the name specified in acceptance doc. If the correct key is different (e.g., allowedDomains, networkAllowlist), Fix A will not take effect and coordinator curl calls will remain blocked. Kill signal: coordinator logs 'host_not_in_allowlist' after this fix ships.",
+    ".gitignore modified to add .claude/settings.local.json — this file is outside the acceptance doc's Files Expected to Change list. Change is essential to prevent accidental commit of service role key. No functional risk; pure gitignore addition.",
+    "pre-commit hook (AI Reviewer) could not run: ANTHROPIC_API_KEY not available in worktree bash context. Used commit-skip.sh documented bypass (logged to docs/review-skips.md). Linters (prettier) ran successfully.",
+    "settings.local.json uses NEXT_PUBLIC_SUPABASE_URL as key name to match coordinator.md bash patterns. Acceptance doc template showed SUPABASE_URL. Aligned to coordinator.md's actual usage — coordinator.md was not changed to use SUPABASE_URL because that would be a broader refactor."
+  ],
+  "next_chunk_blockers": [
+    "Colin must populate .claude/settings.local.json before grounding checkpoint can be executed. Without this, all three fixes are present but env vars are still missing at runtime.",
+    "H1-B (pg_net + pg_cron autonomous drain) is deferred — queued as separate task per acceptance doc."
+  ],
+  "tokens_used": 18500,
+  "timestamp": "2026-04-27T12:38:18Z"
+}
