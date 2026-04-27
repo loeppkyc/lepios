@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(curl https://lepios-one.vercel.app/*)",
+      "Bash(vercel whoami)",
+      "Bash(vercel ls *)",
+      "Bash(vercel ls)",
+      "Bash(vercel env ls)",
+      "Bash(vercel env ls *)",
+      "Bash(vercel inspect *)",
+      "Bash(ollama list)",
+      "Bash(ollama ps)",
+      "Bash(ollama show *)",
+      "Bash(pip show *)",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Vercel__list_teams"
+    ]
+  }
+}
