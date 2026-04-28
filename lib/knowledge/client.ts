@@ -18,6 +18,7 @@
  *   await retrieveContext('SP-API throttling')  // → prompt-injectable context string
  */
 
+import { createHash } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { embed, OllamaUnreachableError } from '@/lib/ollama/client'
 import type {
@@ -128,7 +129,59 @@ export async function saveKnowledge(
   try {
     const supabase = createServiceClient()
 
-    // Attempt to generate an embedding. Fail silently — the row is still saved.
+    // Compute the post-truncation values that will land in the row. The
+    // content_hash MUST be computed over the same values that the DB
+    // generated column will see — otherwise the lookup misses and we
+    // hit the unique-index error path on insert.
+    const titleStored    = trunc(title, 300) ?? title
+    const problemStored  = trunc(opts.problem,  1000) ?? null
+    const solutionStored = trunc(opts.solution, 1000) ?? null
+    const contextStored  = trunc(opts.context,  1000) ?? null
+    const entityValue    = opts.entity ?? null
+
+    // Mirror migration 0049's expression: md5(coalesce(title,'') || '||' || ...)
+    const contentHash = createHash('md5')
+      .update(
+        `${titleStored ?? ''}||${problemStored ?? ''}||${solutionStored ?? ''}||${contextStored ?? ''}`,
+      )
+      .digest('hex')
+
+    // Same-entity hash guard — DB-level final backstop is the unique index
+    // idx_knowledge_content_hash_entity (migration 0049). This lookup is the
+    // application-layer guard that turns a duplicate INSERT into an UPDATE
+    // (merge source_events, increment times_used).
+    let lookupQuery = supabase
+      .from('knowledge')
+      .select('id, source_events, times_used')
+      .eq('content_hash', contentHash)
+      .limit(1)
+    lookupQuery =
+      entityValue === null ? lookupQuery.is('entity', null) : lookupQuery.eq('entity', entityValue)
+    const { data: existing } = await lookupQuery.maybeSingle()
+
+    if (existing) {
+      const existingSourceEvents: string[] = Array.isArray(
+        (existing as { source_events?: unknown }).source_events,
+      )
+        ? ((existing as { source_events: unknown[] }).source_events as string[])
+        : []
+      const newSourceEvents = opts.sourceEvents ?? []
+      const merged = Array.from(new Set([...existingSourceEvents, ...newSourceEvents]))
+
+      await supabase
+        .from('knowledge')
+        .update({
+          source_events: merged.length > 0 ? merged : null,
+          times_used: ((existing as { times_used?: number | null }).times_used ?? 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', (existing as { id: string }).id)
+
+      return (existing as { id: string }).id
+    }
+
+    // No existing row — INSERT path. Attempt to generate an embedding;
+    // fail silently — the row is still saved.
     let embedding: number[] | null = null
     try {
       const embedText = [title, opts.problem, opts.solution, opts.context]
@@ -145,11 +198,11 @@ export async function saveKnowledge(
       .insert({
         category,
         domain,
-        title: trunc(title, 300) ?? title,
-        entity: opts.entity ?? null,
-        problem: trunc(opts.problem, 1000) ?? null,
-        solution: trunc(opts.solution, 1000) ?? null,
-        context: trunc(opts.context, 1000) ?? null,
+        title: titleStored,
+        entity: entityValue,
+        problem: problemStored,
+        solution: solutionStored,
+        context: contextStored,
         confidence: opts.confidence ?? 0.5,
         source_events: opts.sourceEvents ?? null,
         tags: opts.tags ?? null,
