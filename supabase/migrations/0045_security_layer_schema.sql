@@ -68,7 +68,7 @@ CREATE TABLE public.agent_actions (
 
   -- Context
   context         JSONB        NOT NULL DEFAULT '{}'::jsonb,
-  parent_action_id UUID        REFERENCES public.agent_actions(id) ON DELETE SET NULL,
+  parent_action_id UUID        REFERENCES public.agent_actions(id) ON DELETE NO ACTION,
 
   -- Generated FTS — operators can grep narratively
   fts             tsvector GENERATED ALWAYS AS (

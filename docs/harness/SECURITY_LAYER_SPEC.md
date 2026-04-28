@@ -331,7 +331,7 @@ CREATE TABLE public.agent_actions (
 
   -- Context
   context         JSONB        NOT NULL DEFAULT '{}'::jsonb,   -- {task_id, session_id, sandbox_id, sql_excerpt, file_path, ...}
-  parent_action_id UUID        REFERENCES public.agent_actions(id) ON DELETE SET NULL,
+  parent_action_id UUID        REFERENCES public.agent_actions(id) ON DELETE NO ACTION,
 
   -- Generated FTS — operators can grep
   fts             tsvector GENERATED ALWAYS AS (
@@ -361,8 +361,9 @@ CREATE POLICY "agent_actions_insert_authenticated" ON public.agent_actions
 CREATE POLICY "agent_actions_select_authenticated" ON public.agent_actions
   FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
 
--- No UPDATE policy. No DELETE policy. → Deny by default.
--- Service role bypasses RLS but is documented as never-update / never-delete in CLAUDE.md §X.
+-- No UPDATE policy. No DELETE policy. → Deny by default for authenticated.
+-- AD7: service_role does NOT bypass these — it's locked at the GRANT level (see M7).
+-- The migration's REVOKE/GRANT block, not a CLAUDE.md note, is the load-bearing protection.
 ```
 
 **Reason taxonomy (the canonical strings written to `reason`):**
@@ -416,13 +417,15 @@ return createClient(
 )
 ```
 
-Open redline question: `currentAgentId()` resolution. Three options:
+**`currentAgentId()` resolution — decision: AsyncLocalStorage** (option 2 of three considered: function-arg threading, AsyncLocalStorage, `X-Agent-Id` header).
 
-1. Pass `agentId` as a function arg through every call site — verbose.
-2. Use AsyncLocalStorage to resolve from the request context — needs setup at every entry point (route handler, cron, coordinator session start).
-3. Use a header convention — `X-Agent-Id` — set at agent boot, read by `secrets.get()`.
+Implementation:
 
-**Recommend (2)** with a fallback to a static `'system'` agent_id when no context is set. Initialized at every API route entry and at coordinator session start. Costs ~10 entry-point edits one time.
+- AsyncLocalStorage context initialized at every API route entry, every cron entry, and at coordinator/builder session start.
+- Fallback to a static `'system'` agent_id when no context is set (avoids hard-failing requests during the rollout window).
+- Costs ~10 entry-point edits one time. Lands as part of slice 4 (`secrets.get()` canary), not slice 3 (middleware) — middleware accepts `agentId` as a parameter; only secrets.get() needs the implicit context.
+
+Constraint per R5 (see Risks §): AsyncLocalStorage is Node-runtime only. Routes that run on Vercel Edge runtime cannot use `secrets.get()`; they must continue reading from `process.env` directly. Today no Edge-runtime routes hold secrets — verify in slice 4 before flipping enforce.
 
 ### M4. `agent_capabilities` table + `harness_config` extension
 
@@ -458,11 +461,14 @@ CREATE INDEX agent_capabilities_agent_idx ON public.agent_capabilities (agent_id
 ALTER TABLE public.capability_registry ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.agent_capabilities ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "capability_registry_authenticated" ON public.capability_registry
-  FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+-- AD7: SELECT-only policies. INSERT/UPDATE/DELETE deliberately omitted — those operations
+-- are denied for `authenticated` (no matching policy) and for `service_role` (GRANT-level
+-- REVOKE in M7). Writes require a postgres-role migration. See M7 for the GRANT block.
+CREATE POLICY "capability_registry_select" ON public.capability_registry
+  FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "agent_capabilities_authenticated" ON public.agent_capabilities
-  FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "agent_capabilities_select" ON public.agent_capabilities
+  FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
 
 -- Extend harness_config with audit-friendly columns.
 ALTER TABLE public.harness_config
