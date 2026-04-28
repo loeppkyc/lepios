@@ -5,11 +5,12 @@
 -- Spec deviation (REDLINE 2026-04-28, Option A):
 --   The parent spec (MEMORY_LAYER_SPEC.md §M3) called for a TABLE-WIDE
 --   `knowledge.entity UNIQUE` constraint. Pre-flight against prod found ~270
---   duplicate non-null entity values from the personal-archive corpus
---   (e.g., "Janice Jones" 541 dups, "Colin Loeppky" 2026, "megan" 1179).
---   Adding a table-wide UNIQUE would fail or require destructive dedupe of
---   thousands of personal-archive rows — that's a separate chunk with its
---   own acceptance doc and a defined win-rule.
+--   duplicate non-null entity values from the personal-archive corpus, with
+--   the worst offenders accumulating 500-2000+ duplicate rows per entity
+--   from months of multi-source ingest. Adding a table-wide UNIQUE would
+--   fail or require destructive dedupe of thousands of personal-archive
+--   rows — that's a separate chunk with its own acceptance doc and a
+--   defined win-rule.
 --
 --   This migration uses a PARTIAL unique index scoped to the
 --   `decisions_log:%` entity prefix instead. The mirror trigger's

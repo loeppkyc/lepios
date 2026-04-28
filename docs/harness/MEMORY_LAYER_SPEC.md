@@ -295,7 +295,7 @@ CREATE POLICY "decisions_log_authenticated" ON public.decisions_log
 >
 > Migration 0044 ships a **partial unique index** scoped to entity prefix `'decisions_log:%'` instead of the table-wide `knowledge.entity UNIQUE` constraint specified above. The mirror trigger's `ON CONFLICT (entity) WHERE entity LIKE 'decisions_log:%'` matches that partial index.
 >
-> **Why:** pre-flight against prod found ~270 duplicate non-null `entity` values in `knowledge` (e.g., "Janice Jones" 541 dups, "Colin Loeppky" 2026, "megan" 1179) — the personal-archive corpus has been ingesting same-entity rows from multiple sources for months. A table-wide UNIQUE would have required destructive dedupe of thousands of rows with no defined win-rule.
+> **Why:** pre-flight against prod found ~270 duplicate non-null `entity` values in `knowledge`, with the worst offenders accumulating 500–2000+ duplicate rows per entity — the personal-archive corpus has been ingesting same-entity rows from multiple sources for months. A table-wide UNIQUE would have required destructive dedupe of thousands of rows with no defined win-rule.
 >
 > **Effect:** memory-layer rows have unique-by-entity guarantees; existing personal-archive dups are untouched and still retrievable through twin's existing FTS path. Idea_inbox chunk #2 will add a sibling partial index for the `'idea_inbox:%'` prefix (same pattern, scoped predicate).
 >
