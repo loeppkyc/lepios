@@ -98,10 +98,15 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 - 2026-04-28: SANDBOX_LAYER_SPEC.md drafted, hard-blocked on security_layer slices 1/2/6
 - 2026-04-28: ARMS_LEGS_S2_SPEC.md drafted. Hard-blocked on arms_legs S1 (queued) + security_layer slices 1+2 (live). Q1/Q2 resolved in-spec; Q3-Q7 deferred.
 - 2026-04-28: F19_PRIME_SPEC.md drafted. Methodology spec, no harness_components row. Soft prereqs all live (decisions_log, agent_events, process-efficiency.ts). Demo target: friction index, slice 1.
+- 2026-04-28: CHAT_UI_SPEC.md drafted. Foundation spec table stale on chat_ui (0% reported, ~26% shipped). Slice 1 target ~45%. Hard prereqs all live (arms_legs S2 spec drafted, security_layer slices 1+2 live, chat shell+persistence+auth live). Q1/Q2/Q3/Q5/Q6/Q7 deferred.
 
 ### Implementation gaps
 
 - 2026-04-28: knowledge ingest spawning duplicate Ollama-burndown stubs (31+ rows in single cluster). Root cause TBD per audit 2026-04-28. Cleanup deferred to knowledge_dedupe phase 2a.
+
+### Foundation spec drift
+
+- 2026-04-28: Foundation spec stale on chat_ui (reported 0%, audit shows ~26% shipped — shell + persistence + auth + streaming + identity + markdown). Other components may have similar drift. Audit task queued.
 
 ### Research queued
 
