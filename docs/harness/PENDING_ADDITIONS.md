@@ -99,6 +99,7 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 - 2026-04-28: ARMS_LEGS_S2_SPEC.md drafted. Hard-blocked on arms_legs S1 (queued) + security_layer slices 1+2 (live). Q1/Q2 resolved in-spec; Q3-Q7 deferred.
 - 2026-04-28: F19_PRIME_SPEC.md drafted. Methodology spec, no harness_components row. Soft prereqs all live (decisions_log, agent_events, process-efficiency.ts). Demo target: friction index, slice 1.
 - 2026-04-28: CHAT_UI_SPEC.md drafted. Foundation spec table stale on chat_ui (0% reported, ~26% shipped). Slice 1 target ~45%. Hard prereqs all live (arms_legs S2 spec drafted, security_layer slices 1+2 live, chat shell+persistence+auth live). Q1/Q2/Q3/Q5/Q6/Q7 deferred.
+- 2026-04-28: SELF_REPAIR_SPEC.md drafted. Hard-blocked on sandbox slice 1 + security_layer slices 1+2+6. Slice 1 seed action type: coordinator_await_timeout.
 
 ### Implementation gaps
 
