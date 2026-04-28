@@ -1,6 +1,6 @@
 # MEMORY_LAYER_SPEC
 
-**Status:** APPROVED (Draft 2, 2026-04-28). Colin redline applied — source attribution on `idea_inbox` and `decisions_log`.
+**Status:** APPROVED (Draft 2, 2026-04-28). Colin redline applied — source attribution on `idea_inbox` and `decisions_log`. **decisions_log: shipped 2026-04-28** (chunk #1 of priority order; Option A partial-index redline applied — see §M3 footer).
 **Source of truth:** This doc.
 **Authority:** Migration `0044_memory_layer_schema.sql` is written from this doc.
 **Parent spec:** [`HARNESS_FOUNDATION_SPEC.md`](HARNESS_FOUNDATION_SPEC.md) — this is the deferred memory-layer scope referenced in its redline notes.
@@ -290,6 +290,20 @@ CREATE POLICY "decisions_log_authenticated" ON public.decisions_log
 **Seed corpus:** the existing `docs/decisions/*.md` files (currently 3 files) get one-shot ingested by `scripts/ingest-decisions.ts` — one row per file, `decided_by='colin'`, `source='redline_session'` (these all originated as session redlines), `category` parsed from filename or front-matter.
 
 **No new endpoint** — decisions are written by coordinator / Claude Code via `mcp__claude_ai_Supabase__execute_sql` or by extending the existing `acceptance-doc-approved` event flow to also INSERT here. (See M5 priority.)
+
+> **REDLINE 2026-04-28 (Option A — applied at chunk #1 ship):**
+>
+> Migration 0044 ships a **partial unique index** scoped to entity prefix `'decisions_log:%'` instead of the table-wide `knowledge.entity UNIQUE` constraint specified above. The mirror trigger's `ON CONFLICT (entity) WHERE entity LIKE 'decisions_log:%'` matches that partial index.
+>
+> **Why:** pre-flight against prod found ~270 duplicate non-null `entity` values in `knowledge` (e.g., "Janice Jones" 541 dups, "Colin Loeppky" 2026, "megan" 1179) — the personal-archive corpus has been ingesting same-entity rows from multiple sources for months. A table-wide UNIQUE would have required destructive dedupe of thousands of rows with no defined win-rule.
+>
+> **Effect:** memory-layer rows have unique-by-entity guarantees; existing personal-archive dups are untouched and still retrievable through twin's existing FTS path. Idea_inbox chunk #2 will add a sibling partial index for the `'idea_inbox:%'` prefix (same pattern, scoped predicate).
+>
+> **Follow-up:** task_queue row `task='knowledge_dedupe'` filed at chunk #1 ship. When prioritized: define win-rule (highest `times_used` then most recent `updated_at`), build dedup script, take backup, run it, then upgrade partial indices to table-wide UNIQUE if data shape supports it. Multi-hour chunk, own acceptance doc.
+>
+> **Spec impact:** §M2 (idea_inbox) inherits the same partial-index pattern when chunk #2 ships. The "Migration scope" section's pre-flight assumption ("Expected: 0 rows") is superseded for chunks #1–#3; restore once `knowledge_dedupe` runs.
+
+**Shipped:** 2026-04-28 — migration 0044 applied to prod; route `POST /api/memory/decision` deployed; twin `SEARCHABLE_CATEGORIES` whitelist expanded with `decision` + `idea`; 11 seed rows from today's redline + post-mortem sessions captured. `harness:digital_twin.completion_pct` re-scored 85 → 62 reflecting expanded memory-layer scope (decisions_log ~90%; idea_inbox + session_digest still pending). Follow-on `task_queue.knowledge_dedupe` filed for partial-index → table-wide upgrade.
 
 ### M4. `session_digests` table + composer
 
