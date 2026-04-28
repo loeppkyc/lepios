@@ -246,6 +246,13 @@ These trusts define the perimeter. Anything below them is out of scope for this 
 
 **Audit-log-tampering attack vector — closed.** Service_role has no UPDATE or DELETE on `agent_actions`. Even a fully-compromised application process cannot rewrite history. Modifications require a `postgres`-role migration which is itself version-controlled.
 
+**Verification methodology.** AD7's GRANT structure is verified at two layers:
+
+1. **Migration-time (schema correctness):** `has_table_privilege('service_role', 'public.agent_actions', 'UPDATE')` etc., asserted post-apply. This is the authoritative pgsql function for "can role X do Y on table Z" — it reads the same `pg_class.relacl` that Postgres consults at runtime. Confirmed `false` for UPDATE+DELETE, `true` for SELECT+INSERT against `service_role` on 2026-04-28 prod apply (migration 0045).
+2. **Runtime (live enforcement):** smoke test in slice 1 (`lib/security/audit.ts`) using a real `createServiceClient()` connection — not the MCP tool. Attempts INSERT (must succeed), UPDATE (must throw `permission denied`), DELETE (must throw `permission denied`). Closes the gap left by 0045's verification window, where the MCP execute_sql tool ran as `postgres` superuser and could not exercise the boundary directly.
+
+Two-layer verification covers both schema correctness (layer 1) and runtime behavior (layer 2). Either layer fails → AD7 is broken; both pass → AD7 is durable.
+
 ---
 
 ## Component specs
@@ -739,6 +746,30 @@ Ranked by leverage and prerequisite-ness. Each item is a chunk-sized slice (acce
 Total: **3 days end-to-end**, fully serial. With parallelism (1+2 same window, 3 after, 4+5 in parallel windows, 6 closing): **~2 days wall-clock.**
 
 **Stop conditions / off-ramp:** if Day 1's `log_only` data shows >100 denies/hour from any one agent_id, the registry seed is wrong — pause flips and redline before continuing. If `agent_capabilities` parity test fails persistently in CI, the `caps:` frontmatter shape needs a rethink (perhaps move to a separate `caps.yml` file per agent).
+
+### Slice 1 acceptance criteria — runtime AD7 smoke test (closes 0045 verification gap)
+
+Migration 0045 confirmed AD7's GRANT structure via `has_table_privilege` (layer 1). Slice 1 must close the runtime layer (layer 2) by exercising the boundary from a real `service_role` connection. Required as part of slice 1's `lib/security/audit.ts` work — not deferrable to a follow-on slice.
+
+**Smoke test location:** `tests/security/ad7-runtime.test.ts`
+
+**Test setup:** uses `createServiceClient()` from `lib/supabase/service.ts` (not the MCP tool, not the `postgres` role). This is the same connection the running app uses, with `SUPABASE_SERVICE_ROLE_KEY`.
+
+**The three assertions:**
+
+- [ ] **INSERT must succeed.** `client.from('agent_actions').insert({ agent_id: 'ad7_runtime_test', capability: 'security.test', action_type: 'override', result: 'allowed', reason: 'AD7 runtime smoke', enforcement_mode: 'enforce' })` — returns the inserted row, no error.
+- [ ] **UPDATE must throw `permission denied`.** `client.from('agent_actions').update({ reason: 'TAMPERED' }).eq('id', <inserted id>)` — must error. The error code/message must contain `permission denied for table agent_actions` (or the supabase-js equivalent — verify exact string in the test assertion).
+- [ ] **DELETE must throw `permission denied`.** `client.from('agent_actions').delete().eq('id', <inserted id>)` — must error with the same shape as UPDATE.
+
+**Test runs:**
+
+- In Vitest (or whatever the project's runner is) as part of the regular test suite. CI gate must pass.
+- On every CI cycle going forward — if Supabase ever changes service_role's privilege model (R8 in §Risks), this test fails loud.
+- Slice 1 cannot be marked complete until this test exists and passes.
+
+**Rationale:** Migration 0045's verification window could not exercise the boundary directly because the MCP execute_sql tool runs as `postgres` superuser. `has_table_privilege` confirmed the GRANT structure is correct; the runtime test confirms the running app actually hits the boundary as expected. Both checks together = AD7 durably verified.
+
+**Note for builder:** the test row inserted by this smoke test will persist in `agent_actions` (the same table can't delete it). That's fine and matches design — every CI run leaves a permanent breadcrumb. Use `agent_id = 'ad7_runtime_test'` consistently so these rows are filterable.
 
 ---
 
