@@ -407,7 +407,10 @@ export async function nightlyLearn(hours: number = 24): Promise<NightlyLearnResu
     const { category, domain, title, ...opts } = k
     // Deduplicate: if similar knowledge exists with confidence > 0.3, just reinforce it
     const existing = await findKnowledge(title, { category, limit: 1 })
-    if (existing.length && existing[0].confidence > 0.3) {
+    // 2026-04-28: halt patch — stops burndown re-ingestion.
+    // Structural fix (generated content_hash column) queued separately.
+    // See docs/harness/PENDING_ADDITIONS.md "Implementation gaps".
+    if (existing.length && existing[0].confidence >= 0.3) {
       await markUsed(existing[0].id, true)
     } else {
       const id = await saveKnowledge(category, domain, title, opts)
