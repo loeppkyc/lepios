@@ -92,3 +92,7 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 ### Open from this session
 
 - "GitHackers" — Colin mentioned, name unclear. Possibly GitHub trending, HN jobs, or something else. Capture name if it resurfaces.
+
+### Specs landed
+
+- 2026-04-28: SANDBOX_LAYER_SPEC.md drafted, hard-blocked on security_layer slices 1/2/6
