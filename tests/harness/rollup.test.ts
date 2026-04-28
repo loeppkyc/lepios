@@ -116,9 +116,14 @@ describe('computeHarnessRollup', () => {
     expect(result?.complete_count).toBe(1) // only one is 100%
   })
 
-  it('seeds math: 21 components from 0043 seed give 55.7%', async () => {
-    // Full seed from migration 0043 — regression baseline.
-    // Source of truth: docs/harness/HARNESS_FOUNDATION_SPEC.md (Draft 2, 2026-04-28).
+  it('seeds math: 21 components from 0043 seed give 58.4% (post-recompute 2026-04-28)', async () => {
+    // Full seed from migration 0043, with the 2026-04-28 rollup recompute applied.
+    // Source of truth: docs/harness/HARNESS_FOUNDATION_SPEC.md (Draft 2 + recompute log).
+    // Five row-level rescores landed 2026-04-28: chat_ui 0→26, digital_twin 85→62,
+    // specialized_agents 40→55, telegram_outbound 50→75, attribution 30→55.
+    // security_layer stays at 30 per the SECURITY_LAYER_SPEC completion-pct rubric
+    // (schema landed via 0045 ≠ runtime capability landed; only 30 is correct until
+    // lib/security/ modules ship).
     const rows = makeComponents([
       // T1 — Core orchestration (24 weight, all shipped)
       { weight_pct: 12, completion_pct: 100 }, // coordinator_loop
@@ -136,24 +141,24 @@ describe('computeHarnessRollup', () => {
       { weight_pct: 7, completion_pct: 0 }, // sandbox
       { weight_pct: 7, completion_pct: 30 }, // security_layer
       { weight_pct: 6, completion_pct: 0 }, // self_repair
-      { weight_pct: 6, completion_pct: 85 }, // digital_twin
-      { weight_pct: 5, completion_pct: 40 }, // specialized_agents
+      { weight_pct: 6, completion_pct: 62 }, // digital_twin (rescored 85→62)
+      { weight_pct: 5, completion_pct: 55 }, // specialized_agents (40→55)
       { weight_pct: 3, completion_pct: 0 }, // push_bash_automation
       { weight_pct: 2, completion_pct: 10 }, // debate_consensus
       // T4 — Interfaces + attribution (15 weight)
-      { weight_pct: 6, completion_pct: 0 }, // chat_ui
-      { weight_pct: 4, completion_pct: 50 }, // telegram_outbound
-      { weight_pct: 3, completion_pct: 30 }, // attribution
+      { weight_pct: 6, completion_pct: 26 }, // chat_ui (0→26)
+      { weight_pct: 4, completion_pct: 75 }, // telegram_outbound (50→75)
+      { weight_pct: 3, completion_pct: 55 }, // attribution (30→55)
       { weight_pct: 2, completion_pct: 50 }, // ollama_daytime
     ])
     mockFrom.mockReturnValueOnce(makeComponentsBuilder(rows))
     const result = await computeHarnessRollup()
-    // T1=24.0 + T2=15.7 + T3=12.1 + T4=3.9 = 55.7
-    expect(result?.rollup_pct).toBe(55.7)
-    expect(result?.complete_count).toBe(8) // 8 components at 100%
+    // T1=24.0 + T2=15.7 + T3=11.47 + T4=7.21 = 58.38 → rounded 58.4
+    expect(result?.rollup_pct).toBe(58.4)
+    expect(result?.complete_count).toBe(8) // 8 components at 100% (unchanged)
     expect(result?.total_count).toBe(21)
-    // Sum of weights = 100, so points_remaining = 100 - 55.7 = 44.3
-    expect(result?.points_remaining).toBe(44.3)
+    // Sum of weights = 100, so points_remaining = 100 - 58.4 = 41.6
+    expect(result?.points_remaining).toBe(41.6)
   })
 })
 

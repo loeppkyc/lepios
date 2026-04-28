@@ -33,6 +33,24 @@
 
 ---
 
+## Completion-percentage rubric
+
+Anti-drift definition for `harness_components.completion_pct WHERE id = 'harness:security_layer'`. The 2026-04-28 audit found the DB at 70% when only the schema slices had landed (no `lib/security/` runtime code), traced to migration 0045's verify comment over-crediting the bump. Reconciled DB 70→30; this rubric prevents recurrence.
+
+| %       | Tier                       | Required artifacts (all must be live in production)                                                                                                                                                                                                                                                                                                                                  |
+| ------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **30**  | Pre-build baseline         | (a) `lib/harness/branch-guard.ts` with `agent_events.action='branch_guard_triggered'` audit signal; (b) `CLAUDE.md §5` secrets-redaction rules; (c) `.husky/pre-commit` runs `scripts/ai-review.mjs` Layer 2; (d) `lib/safety/checker.ts` six-rule pre-execution check; (e) `harness_config` table as DB-resident runtime config. **No new code from migration 0045 yet.**          |
+| **50**  | Slices 1+2 schema landed   | All of 30%, plus migration 0045 applied: `agent_actions` audit table with AD7 GRANT lockdown; `capability_registry` + `agent_capabilities` tables seeded; `harness_config` extended with `description` + `last_accessed_at` + column-level UPDATE GRANT. **Schema only — no application code uses it yet.**                                                                          |
+| **70**  | Slices 1+2 runtime live    | All of 50%, plus: `lib/security/{capabilities,secrets,audit}.ts` shipped and used at agent boundaries; `requireCapability()` middleware called on every fs/net/db/shell access in coordinator + builder paths; `secrets.get()` replaces ≥80% of direct `process.env.X` reads; `agent_actions` rows written on every cap check (`action_type='cap_check'`). **Log-only enforcement is fine — denies are logged but not blocked.** |
+| **85**  | Enforcement on             | All of 70%, plus: `enforcement_mode` flipped to `enforce` for ≥3 destructive caps (`fs.delete`, `db.migrate`, `secret.write`); `agent_actions` denies actually block (not just log); morning_digest surfaces denied-cap counts.                                                                                                                                                     |
+| **100** | Full coverage              | All of 85%, plus: 100% of `process.env` reads migrated to `secrets.get()`; every `.claude/agents/*.md` declares `caps:` frontmatter; capability registry seed covers every action surface in the codebase; per-agent capability scoping enforced for coordinator + builder + reviewer + future agents.                                                                              |
+
+**Anti-drift rule:** A migration's verify comment may set `harness_components.completion_pct` only to a tier whose **runtime artifacts** are live, not just the schema. Schema-only landing is **50%**, not 70%. The migration that bumps to 70% is the one that lands the `lib/security/` modules and wires them into agent boundaries — not the migration that creates the tables.
+
+**Audit signal:** Run `SELECT id, completion_pct FROM harness_components WHERE id = 'harness:security_layer'` after every security-layer migration. Cross-reference against this rubric. If the migration only created tables, the value should be 50, not 70. The 2026-04-28 reconciliation logged in `decisions_log` is the canonical example of what this rubric prevents.
+
+---
+
 ## The problem (verbatim from kickoff)
 
 Security_layer is foundation spec priority #1 because it's the prereq for `sandbox`,
