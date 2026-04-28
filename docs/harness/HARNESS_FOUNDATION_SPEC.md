@@ -177,11 +177,18 @@ Q&A interface for agent-to-corpus questions before escalating to Colin.
 
 #### `specialized_agents` — 5 × 40% = 2.0 · 🟡
 
-Planner, coder, reviewer, deployer roles with enforced contracts.
+Planner, coder, reviewer, deployer, **scout** roles with enforced contracts.
 
-- **Why 40%:** Coordinator + builder are well-defined and separated (S-L11). Reviewer exists as a Claude Code subagent type but is invoked ad-hoc. Planner = global Plan subagent, ad-hoc. Deployer = informal (deploy_gate is the system, not an agent role).
+- **Why 40%:** Coordinator + builder are well-defined and separated (S-L11). Reviewer exists as a Claude Code subagent type but is invoked ad-hoc. Planner = global Plan subagent, ad-hoc. Deployer = informal (deploy_gate is the system, not an agent role). Scout = not yet built.
 - **Purpose:** Replace ad-hoc `subagent_type=...` calls with named role agents that have their own spec doc, capability scope, and metrics.
-- **Files:** [.claude/agents/coordinator.md](../../.claude/agents/coordinator.md), [.claude/agents/builder.md](../../.claude/agents/builder.md). Need: `.claude/agents/{reviewer,planner,deployer}.md`.
+- **Roles (5):**
+  - **planner** — multi-file design, architectural trade-offs (today: ad-hoc Plan subagent)
+  - **coder** — translates approved acceptance docs into code (today: builder.md)
+  - **reviewer** — code review, security pass, anti-pattern scan (today: ad-hoc, also `/dev-review` skill)
+  - **deployer** — preview→approve→promote pipeline ownership (today: deploy_gate as a system, no agent)
+  - **scout** — continuous environmental scanner. Watches the AI ecosystem (competitor systems like OpenClaw/Cursor/Claude Code, model releases, stack updates for Next.js/Supabase/Vercel/Anthropic, plug-in opportunities). Scores findings against LepiOS priorities; files high-leverage items into the idea inbox + morning digest. Producer-pattern agent feeding the idea-inbox queue.
+- **Weight note:** scout baked into the existing 5-weight allocation. Re-weight in a future revision if scout proves to be the dominant role.
+- **Files:** [.claude/agents/coordinator.md](../../.claude/agents/coordinator.md), [.claude/agents/builder.md](../../.claude/agents/builder.md). Need: `.claude/agents/{reviewer,planner,deployer,scout}.md`.
 
 #### `push_bash_automation` — 3 × 0% = 0.0 · ⬜
 
@@ -361,7 +368,7 @@ If everything in this list ships at the targets above, projected rollup ≈ 78%.
 - [x] **Component list** — 21 harness rows, 7 product rows, approved as drafted.
 - [x] **Weights** — sum to 100 after smoke_test_framework rebalance (T2: 3+3+3+4+3 = 16).
 - [x] **Completion %** — partial rows accepted as drafted.
-- [x] **Collapse mapping** — three collapses approved (coordinator*\*, twin*_, telegram\__).
+- [x] **Collapse mapping** — three collapses approved (coordinator*\*, twin*\_, telegram\_\_).
 - [x] **Product split** — approved with finalized membership.
 - [x] **Priority order** — digital_twin elevated to #1 in parallel with security_layer.
 
