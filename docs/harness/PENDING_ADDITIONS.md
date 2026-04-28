@@ -64,3 +64,31 @@ not foundation gaps.
 - Do not propose weight rebalances yet — those happen at next
   spec revision when other components have shipped and we know
   the new totals.
+
+---
+
+### training_pipeline (T3, deferred)
+
+LoRA fine-tune of 7B base model on LepiOS training corpus. Inference moves local once trained.
+
+- Base candidates: Qwen 2.5 7B (Apache 2.0) | Llama 3.1 8B (note 700M MAU clause)
+- Source: Hugging Face + free auth token
+- Gates: 3060 GPU acquisition (12GB VRAM borderline for QLoRA, confirm before purchase), 6+ months training corpus, fine-tuning skills
+- Open: training data format (JSONL/ChatML/instruction tuples — decide before corpus capture), eval methodology (held-out set + N-prompt human eval), inference target (3060 vs adapter-merge into Ollama), adapter registry/versioning
+
+### arbitrage_training_corpus (T2, data discipline)
+
+Capture every Amazon reselling decision as structured training data. Unique signal. Feeds training_pipeline.
+
+- Status: ~10% (pricing tiers documented, decision logging ad-hoc)
+- Open: decision schema (timestamp, ASIN/ISBN, decision_type, inputs_seen, decision_made, rationale, outcome_pending_until), storage (Supabase `arbitrage_decisions` table?), capture mechanism (must hook into existing reselling tooling to survive), outcome attribution job (back-link sell-through to decision row), negative-example capture (rejected books, same schema)
+
+### dev_market_intel (parked product idea — NOT harness component)
+
+"Keepa for development work" — pricing/scoping intelligence on Upwork, Toptal, Fiverr Pro completed-job data. Standalone product. Park alongside Amazon legal tool + building permit pre-screener.
+
+- Hard problem: source data acquisition (no public completed-job feeds, scraping ToS-fragile, Fiverr Pro gated)
+
+### Open from this session
+
+- "GitHackers" — Colin mentioned, name unclear. Possibly GitHub trending, HN jobs, or something else. Capture name if it resurfaces.
