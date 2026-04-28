@@ -96,3 +96,7 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 ### Specs landed
 
 - 2026-04-28: SANDBOX_LAYER_SPEC.md drafted, hard-blocked on security_layer slices 1/2/6
+
+### Implementation gaps
+
+- 2026-04-28: knowledge ingest spawning duplicate Ollama-burndown stubs (31+ rows in single cluster). Root cause TBD per audit 2026-04-28. Cleanup deferred to knowledge_dedupe phase 2a.
