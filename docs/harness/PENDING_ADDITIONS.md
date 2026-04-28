@@ -97,6 +97,7 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 
 - 2026-04-28: SANDBOX_LAYER_SPEC.md drafted, hard-blocked on security_layer slices 1/2/6
 - 2026-04-28: ARMS_LEGS_S2_SPEC.md drafted. Hard-blocked on arms_legs S1 (queued) + security_layer slices 1+2 (live). Q1/Q2 resolved in-spec; Q3-Q7 deferred.
+- 2026-04-28: F19_PRIME_SPEC.md drafted. Methodology spec, no harness_components row. Soft prereqs all live (decisions_log, agent_events, process-efficiency.ts). Demo target: friction index, slice 1.
 
 ### Implementation gaps
 
