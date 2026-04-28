@@ -57,6 +57,9 @@ export async function fireCoordinator(params: {
 
   let fireRes: Response
   try {
+    // Routines API /fire accepts only { text }. Branch selection happens
+    // inside the session via the guard in .claude/agents/coordinator.md.
+    // See decisions_log entry 2026-04-28 "Branch naming via in-session guard".
     fireRes = await fetch(`https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`, {
       method: 'POST',
       headers: {
@@ -65,7 +68,9 @@ export async function fireCoordinator(params: {
         'anthropic-beta': 'experimental-cc-routine-2026-04-01',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: `task_id: ${task_id}\nrun_id: ${run_id}` }),
+      body: JSON.stringify({
+        text: `task_id: ${task_id}\nrun_id: ${run_id}`,
+      }),
     })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'network error'

@@ -144,6 +144,17 @@ If `SAFE` is `True` (or the curl fails / returns non-JSON — fail open):
 Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.g.
 `harness/task-8cba5a75-b872-46b7-a13a-bc1058cabf4c`).
 
+**Branch creation mechanism:** the Routines API `/fire` endpoint does not accept a branch
+parameter (verified 2026-04-28 against `experimental-cc-routine-2026-04-01`). Every fire
+creates a default branch `claude/vibrant-heisenberg-{random}` via the Claude Code runtime.
+The guard below is the authoritative mechanism that places the session on
+`harness/task-{task_id}` before any commit.
+
+**Expected behavior:** `branch_guard_triggered` fires on every invocation as the guard
+rewrites from the runtime default to `harness/task-{task_id}`. This is normal operating
+signal, not a failure signal. The alarm condition is the inverse: zero events when fires
+happened means the guard did not run.
+
 **Immediately after reading Runtime Config, before Phase 0:**
 
 1. **Verify task_id is present** in your invocation context. If absent:
@@ -170,7 +181,16 @@ Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.
    meta.expected_branch='harness/task-{task_id}'
    ```
 
-4. **Before any file write or git commit**, re-verify branch has not drifted:
+4. **Delete the runtime's default stray branch** (was never used):
+
+   ```bash
+   STRAY_BRANCH=$(git branch | grep 'claude/vibrant-heisenberg-' | head -1 | xargs)
+   if [ -n "$STRAY_BRANCH" ] && [ "$STRAY_BRANCH" != "harness/task-{task_id}" ]; then
+     git branch -D "$STRAY_BRANCH" 2>/dev/null || true
+   fi
+   ```
+
+5. **Before any file write or git commit**, re-verify branch has not drifted:
    ```bash
    EXPECTED="harness/task-{task_id}"
    CURRENT=$(git branch --show-current)
@@ -181,8 +201,9 @@ Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.
 (e.g. `task: 8cba5a75 — budget session summary on expire`). This makes every PR
 traceable to its task_queue row without opening GitHub.
 
-**F18 surface:** `branch_guard_triggered` events accumulate in `agent_events`.
-Morning digest will surface count if nonzero. If 0 for a week, the guard is working silently.
+**F18 surface:** `branch_guard_triggered` events accumulate in `agent_events` — one per
+fire is expected (the runtime always starts on a default branch). Morning digest surfaces
+the count. Alarm condition: zero events on a day with fires means the guard did not run.
 
 # Reference files you read
 
