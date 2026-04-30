@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { deleteBranch } from '@/lib/harness/deploy-gate'
 
@@ -12,12 +13,6 @@ const LOOKBACK_MS = 2 * 60 * 60 * 1000 // look back 2h for notification rows
 
 type Meta = Record<string, unknown>
 type NotifRow = { id: string; meta: Meta; occurred_at: string }
-
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
 
 async function editTimeoutMessage(messageId: number): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -272,9 +267,9 @@ async function runTimeoutCron(): Promise<object> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   try {
     const result = await runTimeoutCron()

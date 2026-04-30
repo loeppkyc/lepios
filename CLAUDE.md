@@ -71,6 +71,7 @@ gated on a clean week of overnight runs.
 8. **F18 — Measurement + benchmark required:** Every new module must ship with (a) metrics capture (`agent_events` or a dedicated table), (b) a defined benchmark to compare against (industry standard, known-good reference, or explicit Colin target), and (c) a surfacing path so Colin can ask "how is X doing?" and get a number + comparison. Required for autonomous operation — Colin must be able to audit any system's health, security, or reliability against a known reference without reading code. See `docs/vision/measurement-framework.md`. Companion rule to F17.
 9. **F19 — Continuous improvement (process layer):** Every system, process, and workflow is continuously evaluated for "how can this be 20% faster, cheaper, or better?" Companion to F17 and F18 — extends the module-level 20% Better loop to the build process itself. Scope: (a) build process (parallelization, batching, idle resource detection); (b) module quality (original 20% Better loop scope); (c) communication patterns (paste blocks, friction signals, repeated clarifications); (d) resource utilization (Claude Code windows, coordinator quota, Ollama vs frontier routing); (e) Colin-time vs autonomous-time ratio — should trend toward autonomous. Implementation: every module ships with F18 metrics; every build cycle ends with a "what would have made this 20% faster?" reflection logged to CLAUDE.md §9; 20% Better loop runs nightly across all signals, surfaces top 3 actionable suggestions in morning_digest; any signal >20% inefficiency vs benchmark auto-queues a task. Process-layer instrumentation shipped 2026-04-26 in `lib/harness/process-efficiency.ts` (4 signals: queue throughput, pickup latency, queue depth, friction index).
 10. **F20 — Design system enforcement:** Every port chunk must use shadcn/ui components and Tailwind utility classes only. No inline `style={}` attributes in TSX files. No ad-hoc CSS files. All shared components in `app/components/` or `components/ui/`. Builder acceptance tests must grep new TSX files for `style=` and fail if found. See `docs/sprint-5/purpose-review-acceptance.md §9`.
+11. **F22 — Cron-secret auth via shared helper:** Every route under `app/api/**` that requires CRON_SECRET auth must call `requireCronSecret(request)` from `lib/auth/cron-secret.ts`. Inline `if (CRON_SECRET)` checks or local `isAuthorized()` helpers are forbidden — they re-introduce the fail-open bug (open endpoint when env var is missing). Enforced by `no-restricted-syntax` in `eslint.config.mjs` (scoped to `app/api/**`) and by reviewer-agent. Helper returns `null` on success, 500 if env unset, 401 on bad bearer. See `lib/rules/registry.ts` and `tests/auth/cron-secret.test.ts`.
 
 ---
 
@@ -108,34 +109,34 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ### Autonomous Harness Agents
 
-| Agent | Spec file | Invoked by | Use for | Never use for |
-|-------|-----------|-----------|---------|---------------|
-| **Coordinator** | `.claude/agents/coordinator.md` | task_queue harness or Colin directly | Sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation | Writing code, self-approving acceptance docs, any destructive operation |
-| **Builder** | `.claude/agents/builder.md` | Coordinator only | Translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON | Anything without an approved acceptance doc, sprint planning, grounding checkpoint execution |
+| Agent           | Spec file                       | Invoked by                           | Use for                                                                                                                   | Never use for                                                                                |
+| --------------- | ------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Coordinator** | `.claude/agents/coordinator.md` | task_queue harness or Colin directly | Sprint planning, acceptance docs, builder delegation, grounding checkpoint tracking, Telegram escalation                  | Writing code, self-approving acceptance docs, any destructive operation                      |
+| **Builder**     | `.claude/agents/builder.md`     | Coordinator only                     | Translating an approved acceptance doc into working Next.js/Supabase code, running tests, deploying, writing handoff JSON | Anything without an approved acceptance doc, sprint planning, grounding checkpoint execution |
 
 **Coordinator → Builder handoff:** Coordinator passes the acceptance doc path. Builder returns `docs/sprint-{N}/chunk-{id}-handoff.json`. Coordinator reads the JSON and decides next step. They run in **separate Claude Code context windows** — never the same session.
 
 ### Harness Endpoints (production)
 
-| Endpoint | Use for |
-|----------|---------|
-| `POST /api/harness/task-heartbeat` | Coordinator liveness signal during long-running phases — prevents stale-reclaim |
-| `POST /api/harness/notifications-drain` | Flush `outbound_notifications` queue to Telegram — call after every insert |
-| `POST /api/twin/ask` | Digital Twin Q&A (production URL) — batch queries only, never mid-phase |
-| `GET /api/health` | Quick liveness check — 200 = app up, body has service states |
+| Endpoint                                | Use for                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| `POST /api/harness/task-heartbeat`      | Coordinator liveness signal during long-running phases — prevents stale-reclaim |
+| `POST /api/harness/notifications-drain` | Flush `outbound_notifications` queue to Telegram — call after every insert      |
+| `POST /api/twin/ask`                    | Digital Twin Q&A (production URL) — batch queries only, never mid-phase         |
+| `GET /api/health`                       | Quick liveness check — 200 = app up, body has service states                    |
 
 Local dev equivalents: replace `https://lepios-one.vercel.app` with `http://localhost:3000`.
 
 ### LepiOS MCP Tools
 
-| Tool | When to use in this project |
-|------|-----------------------------|
-| `mcp__claude_ai_Supabase__execute_sql` | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
-| `mcp__claude_ai_Supabase__apply_migration` | Apply schema migrations during sprint builds (builder only) |
-| `mcp__claude_ai_Supabase__list_migrations` | Verify migration was applied; cross-check against `supabase/migrations/` |
-| `mcp__claude_ai_Vercel__list_deployments` | Confirm a deploy landed before marking a chunk complete |
-| `mcp__claude_ai_Vercel__get_runtime_logs` | Diagnose production errors that don't appear in local logs |
-| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated |
+| Tool                                               | When to use in this project                                                                    |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `mcp__claude_ai_Supabase__execute_sql`             | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
+| `mcp__claude_ai_Supabase__apply_migration`         | Apply schema migrations during sprint builds (builder only)                                    |
+| `mcp__claude_ai_Supabase__list_migrations`         | Verify migration was applied; cross-check against `supabase/migrations/`                       |
+| `mcp__claude_ai_Vercel__list_deployments`          | Confirm a deploy landed before marking a chunk complete                                        |
+| `mcp__claude_ai_Vercel__get_runtime_logs`          | Diagnose production errors that don't appear in local logs                                     |
+| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated                                        |
 
 ### Runtime Config Pattern
 

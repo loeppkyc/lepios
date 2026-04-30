@@ -1,15 +1,10 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
-
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const HEX_SHA_RE = /^[0-9a-f]{7,40}$/i
@@ -25,9 +20,9 @@ const TriggerSchema = z.object({
 })
 
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   let body: unknown
   try {

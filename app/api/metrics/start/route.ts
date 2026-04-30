@@ -10,18 +10,15 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 
-const CRON_SECRET = process.env.CRON_SECRET
 const TASK_TYPES = ['port', 'new_build', 'migration', 'fix'] as const
 const ESTIMATE_SOURCES = ['claude_chat', 'self', 'revised'] as const
 
 export async function POST(request: Request) {
-  if (CRON_SECRET) {
-    const auth = request.headers.get('authorization')
-    if (auth !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   let body: Record<string, unknown>
   try {

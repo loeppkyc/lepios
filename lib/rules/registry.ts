@@ -115,6 +115,20 @@ export const RULES: readonly Rule[] = [
       'docs/sprint-5/work-budget-acceptance.md',
     ],
   },
+  {
+    // Claimed 2026-04-30 after the reviewer agent flagged the fail-open auth
+    // pattern on metrics/start + metrics/finish (commit f86e3f6). Audit found
+    // 22 routes with the same pattern. Fixed by extracting requireCronSecret()
+    // and forbidding raw process.env.CRON_SECRET access in app/api/** via an
+    // ESLint no-restricted-syntax rule.
+    number: 22,
+    name: 'cron-secret-auth-via-helper',
+    scope: 'project',
+    summary:
+      'Every route under app/api/** that requires CRON_SECRET auth must call requireCronSecret(request) from lib/auth/cron-secret.ts. Inline if (CRON_SECRET) checks or local isAuthorized() helpers are forbidden — they re-introduce the fail-open bug (open endpoint when env var is missing). Enforced by no-restricted-syntax in eslint.config.mjs (scoped to app/api/**) and by reviewer-agent. Helper returns null on success, 500 if env unset, 401 on bad bearer.',
+    defined_at: 'CLAUDE.md:74',
+    references: ['lib/auth/cron-secret.ts', 'tests/auth/cron-secret.test.ts', 'eslint.config.mjs'],
+  },
 ] as const
 
 /**

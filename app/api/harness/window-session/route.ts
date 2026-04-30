@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { startWindowSession, heartbeatWindow, endWindowSession } from '@/lib/harness/window-tracker'
 
 export const dynamic = 'force-dynamic'
-
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
 
 type ActionBody =
   | {
@@ -20,9 +15,9 @@ type ActionBody =
   | { action: 'end'; session_id: string }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   let body: ActionBody
   try {

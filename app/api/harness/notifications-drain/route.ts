@@ -1,4 +1,5 @@
 import { NextResponse, after } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 
@@ -75,12 +76,6 @@ interface PendingRow {
   correlation_id: string | null
 }
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 async function sendTelegram(
   token: string,
   chatId: string,
@@ -107,9 +102,9 @@ async function sendTelegram(
 }
 
 async function drain(request: Request): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const token = process.env.TELEGRAM_BOT_TOKEN
   const defaultChatId = process.env.TELEGRAM_CHAT_ID

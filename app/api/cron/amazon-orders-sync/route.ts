@@ -2,6 +2,7 @@
 // F18: metrics captured → fetched/inserted/skipped/errors per run; benchmark = baseline orders/day
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { syncOrdersForRange } from '@/lib/amazon/orders-sync'
 import { spApiConfigured } from '@/lib/amazon/client'
@@ -12,16 +13,10 @@ export const dynamic = 'force-dynamic'
 // Surfacing: morning_digest "Amazon sync (24h): N (vs baseline ~X/day)".
 const BASELINE_ORDERS_PER_DAY = null as number | null // null = not yet calibrated
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const startTime = Date.now()
   const runId = crypto.randomUUID()

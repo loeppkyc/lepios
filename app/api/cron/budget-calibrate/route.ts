@@ -4,20 +4,15 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { runCalibration } from '@/lib/work-budget/calibrator'
 
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   try {
     const result = await runCalibration()

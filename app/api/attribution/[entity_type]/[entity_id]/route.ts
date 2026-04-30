@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -18,19 +19,13 @@ interface AttributionRecord {
   details: Record<string, unknown> | null
 }
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ entity_type: string; entity_id: string }> }
 ): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const { entity_type, entity_id } = await params
 
