@@ -115,6 +115,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.TASK_PICKUP_DRY_RUN
   delete process.env.HARNESS_REMOTE_INVOCATION_ENABLED
+  process.env.CRON_SECRET = 'test-secret'
   mockReclaimStale.mockResolvedValue([])
   mockPostMessage.mockResolvedValue(undefined)
   mockFireCoordinator.mockResolvedValue({ ok: false, error: 'not enabled' })
@@ -180,7 +181,7 @@ describe('task-heartbeat route — happy path', () => {
 
     const request = new Request('https://lepios-one.vercel.app/api/harness/task-heartbeat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-secret' },
       body: JSON.stringify({ task_id: TASK_UUID }),
     })
 
@@ -214,7 +215,7 @@ describe('task-heartbeat route — happy path', () => {
 
     const request = new Request('https://lepios-one.vercel.app/api/harness/task-heartbeat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-secret' },
       body: JSON.stringify({ run_id: 'run-xyz' }),
     })
 
@@ -227,7 +228,7 @@ describe('task-heartbeat route — happy path', () => {
 
     const request = new Request('https://lepios-one.vercel.app/api/harness/task-heartbeat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-secret' },
       body: JSON.stringify({ task_id: 'not-a-uuid' }),
     })
 

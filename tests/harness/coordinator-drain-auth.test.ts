@@ -157,12 +157,12 @@ describe('coordinator drain auth — 403 invariant', () => {
   })
 })
 
-// ── 5. No-CRON_SECRET configured (open drain) ─────────────────────────────────
+// ── 5. No-CRON_SECRET configured — fail-closed (F22) ─────────────────────────
 
 describe('coordinator drain auth — CRON_SECRET not configured on Vercel', () => {
-  it('returns 200 for any request when CRON_SECRET env var is unset', async () => {
+  it('returns 500 when CRON_SECRET env var is unset (F22 fail-closed)', async () => {
     delete process.env.CRON_SECRET
     const res = await GET(drainRequest(null))
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(500)
   })
 })

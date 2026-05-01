@@ -59,12 +59,11 @@ describe('GET /api/cron/notifications-drain-tick — auth', () => {
     expect(mockDrainGET).toHaveBeenCalledOnce()
   })
 
-  it('returns 200 for all requests when CRON_SECRET is not configured', async () => {
+  it('returns 500 when CRON_SECRET is not configured (F22 fail-closed)', async () => {
     delete process.env.CRON_SECRET
     const req = new Request('http://localhost/api/cron/notifications-drain-tick')
     const res = await GET(req)
-    expect(res.status).toBe(200)
-    expect(mockDrainGET).toHaveBeenCalledOnce()
+    expect(res.status).toBe(500)
   })
 })
 

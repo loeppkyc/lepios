@@ -113,12 +113,12 @@ describe('POST /api/cron/deploy-gate-timeout — auth', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 200 when no CRON_SECRET configured (dev mode)', async () => {
+  it('returns 500 when no CRON_SECRET configured (F22 fail-closed)', async () => {
     delete process.env.CRON_SECRET
     setupMocks([])
     const req = makeRequest({ Authorization: '' })
     const res = await POST(req)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(500)
   })
 
   it('returns 200 when correct secret provided', async () => {

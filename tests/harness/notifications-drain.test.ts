@@ -137,13 +137,13 @@ describe('GET /api/harness/notifications-drain — auth', () => {
     expect(res.status).toBe(200)
   })
 
-  it('returns 200 for all requests when CRON_SECRET is not configured', async () => {
+  it('returns 500 when CRON_SECRET is not configured (F22 fail-closed)', async () => {
     setupDrainMock([])
     const original = process.env.CRON_SECRET
     delete process.env.CRON_SECRET
     const req = new Request('http://localhost/api/harness/notifications-drain')
     const res = await GET(req)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(500)
     if (original !== undefined) process.env.CRON_SECRET = original
   })
 })
