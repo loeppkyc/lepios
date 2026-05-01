@@ -1,6 +1,6 @@
 # LepiOS Active State
 
-**Last updated:** 2026-05-01 (session — #36/#39/#40/#43/#44/#47 merged; rollup reconciled)
+**Last updated:** 2026-05-01 (session — #36/#39/#40/#43/#44/#47 merged; rollup reconciled; #46 merged)
 **Updated by:** end-of-session write; read this first when starting any new chat
 
 ---
@@ -21,23 +21,22 @@ End of every session: update this doc before closing. The next session starts he
 - **Repo:** lepios (Next.js 16, Supabase, Vercel, Tailwind, shadcn/ui)
 - **Path:** `C:/Users/Colin/Downloads/Claude_Code_Workspace_TEMPLATE (1)/lepios`
 - **Deploy:** https://lepios-one.vercel.app
-- **Main HEAD:** `1ef6788 docs(migrations): record 0041-0051 already applied in prod; reconcile ledger (#47)`
+- **Main HEAD:** `2eaccb6 fix(inventory): hide zero-fulfillable SKUs (#46)`
 
 ---
 
-## Open PRs (2 open)
+## Open PRs (1 open)
 
-- **#46** `feature/inventory-filter-zero-qty` — fix(inventory): hide zero-fulfillable SKUs
 - **#41** [DRAFT] `harness/task-8ab362ac-...` — Dropbox Archiver acceptance doc awaiting Colin approval
 
-**Merged this session (2026-05-01):** #38 (F22 auth hardening), #45 (cogs-v2), #37 (chart library), #39 (GST calc), #40 (gmail classifiers), #43 (SP-API financial events), #44 (gmail daily scanner), #36 (status page v2), #47 (migration ledger reconcile).
+**Merged this session (2026-05-01):** #38 (F22 auth hardening), #45 (cogs-v2), #37 (chart library), #39 (GST calc), #40 (gmail classifiers), #43 (SP-API financial events), #44 (gmail daily scanner), #36 (status page v2), #47 (migration ledger reconcile), #46 (inventory zero-qty filter).
 
 ---
 
 ## Worktrees
 
 ```
-lepios/                                    1ef6788 [main]
+lepios/                                    2eaccb6 [main]
 lepios/.worktrees/sp-api-financial-events  354b700 [feature/sp-api-financial-events-v2]
 lepios/.worktrees/window-2                 6d1bd73 (detached HEAD)
 lepios/.worktrees/window-3                 6d1bd73 (detached HEAD)
@@ -52,7 +51,6 @@ window-2/3/4 are detached — check out to a branch before use.
 
 | Branch                               | PR  | Status               |
 | ------------------------------------ | --- | -------------------- |
-| `feature/inventory-filter-zero-qty`  | #46 | Open                 |
 | `harness/task-8ab362ac-...`          | #41 | Draft                |
 | `feature/sp-api-financial-events-v2` | —   | Worktree; no open PR |
 
