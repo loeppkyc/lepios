@@ -35,47 +35,47 @@ command to get a ready-to-run terminal string — without navigating to Streamli
 
 ## Files expected to change
 
-| File | Change |
-|------|--------|
-| `supabase/migrations/0041_register_dropbox_archiver_component.sql` | New — registers `harness:streamlit_rebuild_dropbox_archiver` in `harness_components` at 100% |
-| `app/api/dropbox/audit/route.ts` | New — GET handler: refresh token exchange + space_usage + list_folder calls |
-| `app/(cockpit)/dropbox/page.tsx` | New — server component: renders stats tile + command reference |
-| `app/(cockpit)/dropbox/_components/CommandReference.tsx` | New — client component: copy-to-clipboard buttons, drive letter input |
-| `app/(cockpit)/layout.tsx` | Update — add nav entry for `/dropbox` if nav list is explicit |
-| `tests/dropbox-archiver.test.ts` | New — F21 acceptance tests (written before implementation) |
+| File                                                               | Change                                                                                       |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `supabase/migrations/0062_register_dropbox_archiver_component.sql` | New — registers `harness:streamlit_rebuild_dropbox_archiver` in `harness_components` at 100% |
+| `app/api/dropbox/audit/route.ts`                                   | New — GET handler: refresh token exchange + space_usage + list_folder calls                  |
+| `app/(cockpit)/dropbox/page.tsx`                                   | New — server component: renders stats tile + command reference                               |
+| `app/(cockpit)/dropbox/_components/CommandReference.tsx`           | New — client component: copy-to-clipboard buttons, drive letter input                        |
+| `app/(cockpit)/layout.tsx`                                         | Update — add nav entry for `/dropbox` if nav list is explicit                                |
+| `tests/dropbox-archiver.test.ts`                                   | New — F21 acceptance tests (written before implementation)                                   |
 
 ---
 
 ## Check-Before-Build findings
 
-| Check | Result |
-|-------|--------|
-| Existing `/dropbox` page | Not found — build fresh |
-| Existing `/api/dropbox/*` route | Not found — build fresh |
-| Dropbox env vars (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN) | DONE — verified present in Vercel env (task prerequisites) |
-| `harness:streamlit_rebuild_dropbox_archiver` in harness_components | Not found — migration 0041 creates it |
-| Prior `dropbox` imports in `lib/` | None — no existing Dropbox client code |
-| Next migration number | 0041 ✓ (0040 is last; 0100_chunk_h_promote.sql uses separate numbering block) |
+| Check                                                                         | Result                                                                                                              |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Existing `/dropbox` page                                                      | Not found — build fresh                                                                                             |
+| Existing `/api/dropbox/*` route                                               | Not found — build fresh                                                                                             |
+| Dropbox env vars (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN) | DONE — verified present in Vercel env (task prerequisites)                                                          |
+| `harness:streamlit_rebuild_dropbox_archiver` in harness_components            | Not found — migration 0062 creates it                                                                               |
+| Prior `dropbox` imports in `lib/`                                             | None — no existing Dropbox client code                                                                              |
+| Next migration number                                                         | 0062 ✓ (0041–0061 already applied in prod; 0059 PR-claimed; 0062 is next clean slot — ledger reconciled 2026-05-01) |
 
 ---
 
 ## External deps tested
 
-| Dep | Status | Notes |
-|-----|--------|-------|
-| Dropbox OAuth2 refresh token flow | Verified per prerequisites | Token exchange confirmed 2026-04-27 |
-| Dropbox REST API v2 `/users/get_space_usage` | Presumed live — same token | No direct test from coordinator env |
-| Dropbox REST API v2 `/files/list_folder` | Presumed live — same token | No direct test from coordinator env |
-| Twin endpoint | Unreachable from build env | All Phase 1b questions deferred to Colin |
+| Dep                                          | Status                     | Notes                                                      |
+| -------------------------------------------- | -------------------------- | ---------------------------------------------------------- |
+| Dropbox OAuth2 refresh token flow            | Verified per prerequisites | Token exchange confirmed 2026-04-27                        |
+| Dropbox REST API v2 `/users/get_space_usage` | Presumed live — same token | No direct test from coordinator env                        |
+| Dropbox REST API v2 `/files/list_folder`     | Presumed live — same token | No direct test from coordinator env                        |
+| Twin endpoint                                | Unreachable from build env | All Phase 1b questions resolved at Colin review 2026-05-01 |
 
 ---
 
 ## Schema spec
 
-### Migration 0041
+### Migration 0062
 
 ```sql
--- 0041_register_dropbox_archiver_component.sql
+-- 0062_register_dropbox_archiver_component.sql
 -- No table migration needed: Dropbox Archiver is a pure API + read-only page.
 -- Only registers the harness component.
 
@@ -100,9 +100,9 @@ VALUES (
 
 ### Query params
 
-| Param | Default | Notes |
-|-------|---------|-------|
-| `days` | `90` | Files older than this many days are considered archiveable; passed through to the response to drive Stage 2/3 commands |
+| Param  | Default | Notes                                                                                                                  |
+| ------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `days` | `90`    | Files older than this many days are considered archiveable; passed through to the response to drive Stage 2/3 commands |
 
 ### Auth flow (inside the route handler)
 
@@ -202,12 +202,12 @@ const data = await audit.json()
 
 ### Stats tile (4 metrics)
 
-| Metric | Value | Format |
-|--------|-------|--------|
-| Dropbox Used | `{used_gb} GB / {quota_gb} GB` | `X.XX GB / X.X GB` |
-| Usage % | `{pct}%` | `XX.X%` with progress bar |
-| Root Items | `{root_entry_count}` items | integer |
-| Oldest Folder | `{oldest_folder.name}` | name + `(last modified {date})` |
+| Metric        | Value                          | Format                          |
+| ------------- | ------------------------------ | ------------------------------- |
+| Dropbox Used  | `{used_gb} GB / {quota_gb} GB` | `X.XX GB / X.X GB`              |
+| Usage %       | `{pct}%`                       | `XX.X%` with progress bar       |
+| Root Items    | `{root_entry_count}` items     | integer                         |
+| Oldest Folder | `{oldest_folder.name}`         | name + `(last modified {date})` |
 
 Progress bar: `<Progress value={pct} className="mt-2" />` — capped at 100.
 
@@ -216,11 +216,13 @@ Progress bar: `<Progress value={pct} className="mt-2" />` — capped at 100.
 Client component `CommandReference.tsx` receives `{ days, oldest_folder }` props.
 
 #### Drive letter input
+
 - Text input (1 char, uppercase), default `D`
-  - **Coordinator assumed D per Streamlit hardcode.** Colin: please confirm at review (Q1).
+  - **Confirmed by Colin (2026-05-01):** No external drive mounted at review time; D is correct default. 24TB drive incoming — editable input handles it when it arrives.
 - Reactive: as input changes, all Stage 3 command strings update live (client-side).
 
 #### Stage 2 — Download
+
 ```
 Copy button → command string:
 cd "c:/Users/Colin/Downloads/Claude_Code_Workspace_TEMPLATE (1)"
@@ -228,6 +230,7 @@ python tools/dropbox_archiver.py --download --days {days}
 ```
 
 #### Stage 3 — Transfer
+
 ```
 Copy button → command string:
 cd "c:/Users/Colin/Downloads/Claude_Code_Workspace_TEMPLATE (1)"
@@ -235,16 +238,20 @@ python tools/dropbox_archiver.py --transfer {driveLetter} --days {days}
 ```
 
 #### Protected folders note
+
 Static callout: `Protected: /Hubdoc/Uploads (never deleted automatically)`
-- **Coordinator used only /Hubdoc/Uploads per Streamlit source.** Colin: confirm if others (Q2).
+
+- **Confirmed by Colin (2026-05-01):** Only `/Hubdoc/Uploads`. No other protected folders today.
 
 #### Last fetched
+
 Show `Last fetched: {relative time}` below the stats tile using `fetched_at` from API response.
 
 ### Cutoff days input
+
 - Optional `?days=N` query param drives both the API fetch and command strings.
 - Add a simple number input (min 30, max 730, step 30) that navigates to `?days={N}` on change.
-- Default shown: 90. Coordinator uses Streamlit default — Colin: confirm (Q4).
+- Default shown: 90. **Confirmed by Colin (2026-05-01):** 90 days is correct.
 
 ---
 
@@ -260,11 +267,11 @@ bar: measurable, autonomous-queryable.
 
 ## F18 — Measurement + benchmark
 
-| Metric | How to query | Benchmark |
-|--------|-------------|-----------|
-| Current Dropbox usage % | `SELECT meta->>'pct' FROM agent_events WHERE action='dropbox_audit_run' ORDER BY occurred_at DESC LIMIT 1` | < 80% = healthy |
-| Audit frequency | `SELECT COUNT(*) FROM agent_events WHERE action='dropbox_audit_run' AND occurred_at > now() - interval '30 days'` | Should increase after each archiving cycle |
-| Oldest folder age | Computed at render from `oldest_folder.client_modified` | If > 1 year old → archiving overdue |
+| Metric                  | How to query                                                                                                      | Benchmark                                  |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Current Dropbox usage % | `SELECT meta->>'pct' FROM agent_events WHERE action='dropbox_audit_run' ORDER BY occurred_at DESC LIMIT 1`        | < 80% = healthy                            |
+| Audit frequency         | `SELECT COUNT(*) FROM agent_events WHERE action='dropbox_audit_run' AND occurred_at > now() - interval '30 days'` | Should increase after each archiving cycle |
+| Oldest folder age       | Computed at render from `oldest_folder.client_modified`                                                           | If > 1 year old → archiving overdue        |
 
 ---
 
@@ -286,7 +293,7 @@ After builder ships and migration is applied:
 ## Kill signals
 
 - Dropbox token exchange fails with 401 (refresh token revoked) → unblock by rotating refresh token in Vercel env; do NOT hardcode in code
-- Migration 0041 conflicts with a concurrently applied migration → rename to next available number
+- Migration 0062 conflicts with a concurrently applied migration → rename to next available number
 - Page renders but API always returns 502 → diagnose Dropbox OAuth env vars in Vercel
 - Colin says Dropbox Archiver is being retired → close task as won't-fix
 
@@ -302,17 +309,16 @@ Builder acceptance tests MUST grep `app/(cockpit)/dropbox/` for `style=` and ver
 
 ---
 
-## Open questions — pending Colin confirmation
+## Confirmed answers (resolved at Colin review 2026-05-01)
 
-All four questions are from Twin Q&A (twin unreachable). Acceptance doc uses Streamlit-source
-defaults where deterministic; Colin confirms at review.
+All four questions were from Twin Q&A (twin unreachable at coordinator time). Resolved by Colin directly.
 
-| # | Question | Default used | Blocking? |
-|---|----------|-------------|-----------|
-| Q1 | Drive letter for Stage 3 transfer command? | `D` (Streamlit hardcode) | No — input with default |
-| Q2 | Other protected folders besides `/Hubdoc/Uploads`? | Only `/Hubdoc/Uploads` (Streamlit source) | No — static callout, easy to add more |
-| Q3 | How frequently is the archiver used? (informs whether to add "last run" tracker) | Not included in scope | No — out of scope for this doc |
-| Q4 | Preferred default cutoff: 90 days or different? | 90 (Streamlit default) | No — input with default |
+| #   | Question                                           | Answer                                                                                           |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Q1  | Drive letter for Stage 3 transfer command?         | `D` — no external drive mounted at review; 24TB drive incoming; editable input handles it        |
+| Q2  | Other protected folders besides `/Hubdoc/Uploads`? | Only `/Hubdoc/Uploads` — no other restrictions today                                             |
+| Q3  | How frequently is the archiver used?               | Ad-hoc — runs when bank statements arrive (irregular); "last run" tracker out of scope confirmed |
+| Q4  | Preferred default cutoff?                          | 90 days confirmed                                                                                |
 
 ---
 
@@ -327,7 +333,7 @@ This doc is submitted to Colin for explicit approval before going to builder.
 
 ## Builder pre-flight notes
 
-*(To be added by Colin at review if needed.)*
+_(To be added by Colin at review if needed.)_
 
 1. **Auth pattern** — Read `app/(cockpit)/money/page.tsx` or another cockpit server component for the correct Supabase auth-helpers pattern before writing `page.tsx`.
 2. **Nav structure** — Read `app/(cockpit)/layout.tsx` to identify the nav list structure before adding the `/dropbox` entry.
