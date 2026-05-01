@@ -27,7 +27,7 @@ export default async function InventoryPage() {
   let fbaItems: FbaInventoryItem[] = []
   let fetchError: string | null = null
   try {
-    fbaItems = await fetchFbaInventoryDetailed()
+    fbaItems = (await fetchFbaInventoryDetailed()).filter((i) => i.fulfillable_quantity > 0)
   } catch (err) {
     fetchError = err instanceof Error ? err.message : 'Failed to fetch FBA inventory.'
   }
@@ -49,7 +49,12 @@ export default async function InventoryPage() {
       .not('unit_cost_cad', 'is', null)
       .order('purchased_at', { ascending: true })
 
-    cogsEntries = ((data ?? []) as { asin: string; unit_cost_cad: number; quantity: number; purchased_at: string }[])
+    cogsEntries = (data ?? []) as {
+      asin: string
+      unit_cost_cad: number
+      quantity: number
+      purchased_at: string
+    }[]
   }
 
   const fifo = computeInventoryValue(cogsEntries, fulfillableByAsin)
