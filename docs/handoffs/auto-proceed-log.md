@@ -1,3 +1,20 @@
+2026-05-01T00:00:00Z sprint=5 chunk=dropbox-archiver doc=docs/sprint-5/dropbox-archiver-acceptance.md
+cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
+trigger_match_evidence: |
+  cache_match_enabled: false per sprint-state.md sprint_5.cache_match_reason = "Sprint 4 baseline
+  carries forward; every acceptance doc escalates to Colin". Phase 0 rule 4: explicit override
+  in sprint-state.md → honor regardless of audit state. Cache-match not attempted.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or edit).
+  Study doc: new file, fully reversible.
+  sprint-state.md update: document only, no code/schema effect.
+  No migrations applied yet. No code changes. All files in docs/.
+confidence: n/a (cache-match disabled)
+outcome: escalated-mandatory (cache_match_enabled=false) — awaiting Colin approval
+pending_colin_qs: [Q1: drive letter default, Q2: protected folders, Q3: frequency, Q4: cutoff default]
+
+---
+
 2026-04-19T12:30:00-06:00 sprint=4 chunk=null doc=docs/sprint-4/plan.md
 cited_principles: [CHUNK-ORDERING, plan-ratification]
 trigger_match_evidence: Plan ratification escalated per coordinator.md Phase 1 step 5. Colin reviewed plan end-to-end and returned two edits: D parallel-eligible after A (not strictly fourth), Chunk B cost-basis decision must land in Phase 2 not plan phase. Plan approved as edited.

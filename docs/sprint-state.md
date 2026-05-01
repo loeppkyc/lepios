@@ -280,10 +280,32 @@ hardening_h3:
   audit_finding: "FIFO ordering is correct — root cause is 429 serialization + daily cron. Part A=immediate unclaim on 429. Part B=hourly cron (Colin approved)."
   root_causes:
     - "429_limbo: fireCoordinator 429 leaves task in claimed state for 15-min stale window, burning retry_count"
-    - "daily_cron: task-pickup runs once per day (0 0 * * *), max 24h claim latency"
+    - "daily_cron: task-pickup runs once day (0 0 * * *), max 24h claim latency"
   part_a_status: "shipped — pickup-runner.ts immediately unclears task on 429, no retry_count burn, Telegram alert fires"
   part_b_status: "shipped — vercel.json cron changed to 0 * * * * (hourly, Colin approved Hobby slot usage)"
   branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
   pr: "33"
   opened_at: "2026-04-27T00:00:00Z"
   last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+# Dropbox Archiver — Streamlit port (sprint-5 parallel track)
+# task_id: 8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47
+# ============================================================
+
+dropbox_archiver_chunk:
+  status: "awaiting-colin-approval"
+  task_id: "8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47"
+  source_module: "pages/97_Dropbox_Archiver.py"
+  study_doc: "docs/sprint-5/dropbox-archiver-streamlit-study.md"
+  acceptance_doc: "docs/sprint-5/dropbox-archiver-acceptance.md"
+  branch: "harness/task-8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47"
+  scope: "Hybrid A+D — Dropbox stats tile (used GB, quota, pct, root count, oldest folder) + copy-to-clipboard command reference for Stage 2/3"
+  pending_colin_questions:
+    - "Q1: Drive letter default for Stage 3 transfer command? (coordinator assumed D per Streamlit hardcode)"
+    - "Q2: Other protected Dropbox folders besides /Hubdoc/Uploads?"
+    - "Q3: (optional) Frequency of use — informs whether to add last-run tracker"
+    - "Q4: Preferred default cutoff: 90 days? (coordinator used Streamlit default)"
+  twin_status: "unreachable from build env — all questions to Colin"
+  opened_at: "2026-05-01T00:00:00Z"
+  last_updated_at: "2026-05-01T00:00:00Z"
