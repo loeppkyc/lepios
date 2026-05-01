@@ -89,6 +89,23 @@ Capture every Amazon reselling decision as structured training data. Unique sign
 
 - Hard problem: source data acquisition (no public completed-job feeds, scraping ToS-fragile, Fiverr Pro gated)
 
+### square_webhook_ingestion (T2, sales ingestion — deferred from local_sales v1)
+
+In-person sales via Colin's Square debit machine. Separate component from the
+Stripe webhook ingestion (`local_sales`).
+
+- **Trigger:** Square sends webhooks on `payment.completed` events
+- **Schema:** Extend `local_sales` with `channel = 'in_person'` rows, or a
+  separate `square_sales` table — decide at spec time
+- **Env vars needed:** `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_ACCESS_TOKEN`
+- **Endpoint:** `app/api/webhooks/square/route.ts` — signature verification via
+  HMAC-SHA256 (Square's method, not Stripe-style)
+- **Gates on:** `local_sales` Stripe webhook (migration 0062) merged to main
+- **Status:** 0% — not started
+- **Captured:** 2026-05-01 during local_sales acceptance doc authorship (PB-3)
+
+---
+
 ### Open from this session
 
 - "GitHackers" — Colin mentioned, name unclear. Possibly GitHub trending, HN jobs, or something else. Capture name if it resurfaces.
