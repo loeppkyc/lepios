@@ -59,8 +59,8 @@ plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
 
-cache_match_enabled: false
-cache_match_reason: "Sprint 4 baseline"
+cache_match_enabled: true
+cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 
 # Sprint metadata (set at intake, read-only after)
 
@@ -106,8 +106,8 @@ chunks_rolled_back: []
 sprint_5:
 sprint_id: "sprint-5"
 status: "in-build"
-cache_match_enabled: false
-cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
+cache_match_enabled: true
+cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 opened_at: "2026-04-24T00:00:00Z"
 last_updated_at: "2026-04-27T00:40:00Z"
 

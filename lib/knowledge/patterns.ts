@@ -153,27 +153,49 @@ function analyzeCoachQuality(events: AgentEventRow[]): KnowledgeCandidate[] {
 
 // ── Analyzer 5: Failed approaches ─────────────────────────────────────────────
 // Failures with no subsequent success = unresolved, archive for retrospective.
+//
+// Aggregates by (domain::action::entity) key — one candidate per unique failure
+// pattern, not one per event. Without this, a recurring failure (e.g. Ollama
+// unreachable across 31 nights) emits 31 byte-identical candidates that collapse
+// into 31 duplicate knowledge rows. The most-recent failure provides the
+// problem text; all event IDs are collected into sourceEvents.
 
-function analyzeFailedApproaches(events: AgentEventRow[]): KnowledgeCandidate[] {
+export function analyzeFailedApproaches(events: AgentEventRow[]): KnowledgeCandidate[] {
   const successKeys = new Set(
     events
       .filter((e) => e.status === 'success')
       .map((e) => `${e.domain}::${e.action}::${e.entity ?? ''}`),
   )
 
-  return events
-    .filter((e) => e.status === 'failure' || e.status === 'error')
-    .filter((e) => !successKeys.has(`${e.domain}::${e.action}::${e.entity ?? ''}`))
-    .map((fail) => ({
+  // Group unresolved failures by (domain::action::entity).
+  const groups = new Map<string, { events: AgentEventRow[] }>()
+  for (const e of events) {
+    if (e.status !== 'failure' && e.status !== 'error') continue
+    const key = `${e.domain}::${e.action}::${e.entity ?? ''}`
+    if (successKeys.has(key)) continue
+    const existing = groups.get(key)
+    if (existing) {
+      existing.events.push(e)
+    } else {
+      groups.set(key, { events: [e] })
+    }
+  }
+
+  return Array.from(groups.values()).map(({ events: group }) => {
+    // Most-recent failure drives the problem text; events are already ordered
+    // ascending by occurred_at (getEventsSince sort), so last = most recent.
+    const latest = group[group.length - 1]
+    return {
       category: 'failed_approach' as const,
-      domain: fail.domain,
-      title: `Unresolved: ${fail.action} failed`,
-      problem: (fail.error_message ?? fail.input_summary ?? '').slice(0, 300),
+      domain: latest.domain,
+      title: `Unresolved: ${latest.action} failed`,
+      problem: (latest.error_message ?? latest.input_summary ?? '').slice(0, 300),
       solution: undefined,
       context: 'This failure was not resolved in this session',
-      sourceEvents: [fail.id],
+      sourceEvents: group.map((e) => e.id),
       confidence: 0.3,
-    }))
+    }
+  })
 }
 
 // ── Analyzer 6: Translation accuracy ─────────────────────────────────────────
