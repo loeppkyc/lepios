@@ -48,8 +48,7 @@ function analyzeErrorFixPairs(events: AgentEventRow[]): KnowledgeCandidate[] {
     const key = `${fail.domain}::${fail.action}::${fail.entity ?? ''}`
     const fix = successes.find(
       (s) =>
-        `${s.domain}::${s.action}::${s.entity ?? ''}` === key &&
-        s.occurred_at > fail.occurred_at,
+        `${s.domain}::${s.action}::${s.entity ?? ''}` === key && s.occurred_at > fail.occurred_at
     )
     if (fix) {
       results.push({
@@ -114,7 +113,9 @@ function analyzeSuccessfulWorkflows(events: AgentEventRow[]): KnowledgeCandidate
   return Array.from(sessions.values())
     .filter((chain) => chain.length >= 3)
     .map((chain) => {
-      const steps = chain.map((e) => `${e.action} (${(e.output_summary ?? '').slice(0, 50)})`).join(' → ')
+      const steps = chain
+        .map((e) => `${e.action} (${(e.output_summary ?? '').slice(0, 50)})`)
+        .join(' → ')
       return {
         category: 'workflow' as const,
         domain: chain[0].domain,
@@ -131,9 +132,7 @@ function analyzeSuccessfulWorkflows(events: AgentEventRow[]): KnowledgeCandidate
 // Low-confidence AI answers flag topics needing more data or better routing.
 
 function analyzeCoachQuality(events: AgentEventRow[]): KnowledgeCandidate[] {
-  const coachEvents = events.filter(
-    (e) => e.domain === 'ai' && e.action === 'coach.ask',
-  )
+  const coachEvents = events.filter((e) => e.domain === 'ai' && e.action === 'coach.ask')
   const poor = coachEvents.filter((e) => e.confidence != null && e.confidence < 0.3)
 
   if (poor.length < 2) return []
@@ -153,40 +152,64 @@ function analyzeCoachQuality(events: AgentEventRow[]): KnowledgeCandidate[] {
 
 // ── Analyzer 5: Failed approaches ─────────────────────────────────────────────
 // Failures with no subsequent success = unresolved, archive for retrospective.
+//
+// Aggregates by (domain::action::entity) key — one candidate per unique failure
+// pattern, not one per event. Without this, a recurring failure (e.g. Ollama
+// unreachable across 31 nights) emits 31 byte-identical candidates that collapse
+// into 31 duplicate knowledge rows. The most-recent failure provides the
+// problem text; all event IDs are collected into sourceEvents.
 
-function analyzeFailedApproaches(events: AgentEventRow[]): KnowledgeCandidate[] {
+export function analyzeFailedApproaches(events: AgentEventRow[]): KnowledgeCandidate[] {
   const successKeys = new Set(
     events
       .filter((e) => e.status === 'success')
-      .map((e) => `${e.domain}::${e.action}::${e.entity ?? ''}`),
+      .map((e) => `${e.domain}::${e.action}::${e.entity ?? ''}`)
   )
 
-  return events
-    .filter((e) => e.status === 'failure' || e.status === 'error')
-    .filter((e) => !successKeys.has(`${e.domain}::${e.action}::${e.entity ?? ''}`))
-    .map((fail) => ({
+  // Group unresolved failures by (domain::action::entity).
+  const groups = new Map<string, { events: AgentEventRow[] }>()
+  for (const e of events) {
+    if (e.status !== 'failure' && e.status !== 'error') continue
+    const key = `${e.domain}::${e.action}::${e.entity ?? ''}`
+    if (successKeys.has(key)) continue
+    const existing = groups.get(key)
+    if (existing) {
+      existing.events.push(e)
+    } else {
+      groups.set(key, { events: [e] })
+    }
+  }
+
+  return Array.from(groups.values()).map(({ events: group }) => {
+    // Most-recent failure drives the problem text; events are already ordered
+    // ascending by occurred_at (getEventsSince sort), so last = most recent.
+    const latest = group[group.length - 1]
+    return {
       category: 'failed_approach' as const,
-      domain: fail.domain,
-      title: `Unresolved: ${fail.action} failed`,
-      problem: (fail.error_message ?? fail.input_summary ?? '').slice(0, 300),
+      domain: latest.domain,
+      title: `Unresolved: ${latest.action} failed`,
+      problem: (latest.error_message ?? latest.input_summary ?? '').slice(0, 300),
       solution: undefined,
       context: 'This failure was not resolved in this session',
-      sourceEvents: [fail.id],
+      sourceEvents: group.map((e) => e.id),
       confidence: 0.3,
-    }))
+    }
+  })
 }
 
 // ── Analyzer 6: Translation accuracy ─────────────────────────────────────────
 // Accept/reject patterns teach which inputs need better keyword coverage.
 
 function analyzeTranslationAccuracy(events: AgentEventRow[]): KnowledgeCandidate[] {
-  const transEvents = events.filter(
-    (e) => e.domain === 'translator' && e.action === 'translate',
-  )
+  const transEvents = events.filter((e) => e.domain === 'translator' && e.action === 'translate')
   if (!transEvents.length) return []
 
-  const accepted = transEvents.filter((e) => e.status === 'success' || e.status === 'accepted' as string)
-  const rejected = transEvents.filter((e) => e.status === 'failure' || e.status === 'rejected' as string)
+  const accepted = transEvents.filter(
+    (e) => e.status === 'success' || e.status === ('accepted' as string)
+  )
+  const rejected = transEvents.filter(
+    (e) => e.status === 'failure' || e.status === ('rejected' as string)
+  )
   const total = transEvents.length
   const rate = accepted.length / total
 
@@ -232,7 +255,12 @@ function analyzeTranslationAccuracy(events: AgentEventRow[]): KnowledgeCandidate
 // Groups by domain+category; merges pairs sharing 3+ title words.
 
 function titleWords(title: string): Set<string> {
-  return new Set(title.split(/\s+/).filter((w) => w.length >= 3).map((w) => w.toLowerCase()))
+  return new Set(
+    title
+      .split(/\s+/)
+      .filter((w) => w.length >= 3)
+      .map((w) => w.toLowerCase())
+  )
 }
 
 async function consolidateKnowledge(): Promise<{ merged: number }> {
@@ -277,17 +305,18 @@ async function consolidateKnowledge(): Promise<{ merged: number }> {
           if (shared.length < 3) continue
 
           // Merge b into a (a has higher confidence — sorted DESC)
-          const mergedSolution = [a.solution, b.solution]
-            .filter(Boolean)
-            .join('\n---\n')
-            .trim() || null
+          const mergedSolution =
+            [a.solution, b.solution].filter(Boolean).join('\n---\n').trim() || null
 
-          await supabase.from('knowledge').update({
-            solution: mergedSolution,
-            times_used: (a.times_used ?? 0) + (b.times_used ?? 0),
-            times_helpful: (a.times_helpful ?? 0) + (b.times_helpful ?? 0),
-            updated_at: new Date().toISOString(),
-          }).eq('id', a.id)
+          await supabase
+            .from('knowledge')
+            .update({
+              solution: mergedSolution,
+              times_used: (a.times_used ?? 0) + (b.times_used ?? 0),
+              times_helpful: (a.times_helpful ?? 0) + (b.times_helpful ?? 0),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', a.id)
 
           toDelete.push(b.id)
           used.add(b.id)
@@ -346,14 +375,17 @@ async function saveDailyMetrics(events: AgentEventRow[]): Promise<void> {
     }
 
     // Knowledge base health
-    const { data: kb } = await supabase
-      .from('knowledge')
-      .select('confidence')
+    const { data: kb } = await supabase.from('knowledge').select('confidence')
     if (kb) {
       const avgConf = kb.reduce((s, r) => s + r.confidence, 0) / (kb.length || 1)
       const stale = kb.filter((r) => r.confidence < 0.2).length
       metrics.push({ date: today, domain: 'all', metric: 'knowledge_total', value: kb.length })
-      metrics.push({ date: today, domain: 'all', metric: 'knowledge_avg_confidence', value: Math.round(avgConf * 1000) / 1000 })
+      metrics.push({
+        date: today,
+        domain: 'all',
+        metric: 'knowledge_avg_confidence',
+        value: Math.round(avgConf * 1000) / 1000,
+      })
       metrics.push({ date: today, domain: 'all', metric: 'knowledge_stale_count', value: stale })
     }
 

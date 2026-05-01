@@ -59,8 +59,8 @@ plan_written_at: "2026-04-19T12:00:00-06:00"
 
 # Cache-match governance (set by coordinator Phase 0)
 
-cache_match_enabled: false
-cache_match_reason: "Sprint 4 baseline"
+cache_match_enabled: true
+cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 
 # Sprint metadata (set at intake, read-only after)
 
@@ -106,8 +106,8 @@ chunks_rolled_back: []
 sprint_5:
 sprint_id: "sprint-5"
 status: "in-build"
-cache_match_enabled: false
-cache_match_reason: "Sprint 4 baseline carries forward; every acceptance doc escalates to Colin"
+cache_match_enabled: true
+cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 opened_at: "2026-04-24T00:00:00Z"
 last_updated_at: "2026-04-27T00:40:00Z"
 
@@ -142,14 +142,15 @@ chunks_awaiting_grounding:
 - "task-pickup-100"
 
 utility_tracker_chunk:
-  status: "awaiting-colin-approval"
-  task_id: "8b3d7030-a873-431a-b82f-6dbd4ceda83d"
-  study_doc: "docs/sprint-5/utility-tracker-streamlit-study.md"
-  acceptance_doc: "docs/sprint-5/utility-tracker-acceptance.md"
-  source_module: "pages/52_Utility_Tracker.py"
-  started_at: "2026-04-27T04:17:00Z"
-  acceptance_doc_ready_at: "2026-04-27T04:25:00Z"
-  chunks_awaiting_grounding_stall_alert:
+status: "awaiting-colin-approval"
+task_id: "8b3d7030-a873-431a-b82f-6dbd4ceda83d"
+study_doc: "docs/sprint-5/utility-tracker-streamlit-study.md"
+acceptance_doc: "docs/sprint-5/utility-tracker-acceptance.md"
+source_module: "pages/52_Utility_Tracker.py"
+started_at: "2026-04-27T04:17:00Z"
+acceptance_doc_ready_at: "2026-04-27T04:25:00Z"
+chunks_awaiting_grounding_stall_alert:
+
 - "stall-alert"
 
 active_chunk: "utility-tracker"
@@ -224,9 +225,10 @@ build_complete_at: "2026-04-26T01:21:00Z"
 commit: "ea4f826"
 tests: "600 passing, 8 pre-existing failing (next/server env, not caused by this chunk)"
 grounding_checkpoints:
-  - "INSERT duplicate correlation_id into outbound_notifications — confirm unique-violation error (23505)"
-  - "Confirm /api/harness/notifications-drain cron appears in Vercel Cron Jobs tab after deploy to main"
-  - "SELECT meta FROM agent_events WHERE action='notification_delivered' ORDER BY occurred_at DESC LIMIT 3 — expect delivery_latency_ms > 0"
+
+- "INSERT duplicate correlation_id into outbound_notifications — confirm unique-violation error (23505)"
+- "Confirm /api/harness/notifications-drain cron appears in Vercel Cron Jobs tab after deploy to main"
+- "SELECT meta FROM agent_events WHERE action='notification_delivered' ORDER BY occurred_at DESC LIMIT 3 — expect delivery_latency_ms > 0"
 
 # Grounding checkpoints still pending for completed-build chunks
 
@@ -251,39 +253,34 @@ grounding_checkpoints:
 # ============================================================
 
 hardening_h1:
-  hardening_id: "H1"
-  task_id: "8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
-  source_label: "postmortem_915d1fee"
-  status: "awaiting_grounding"
-  description: "Fix coordinator drain 403 — notification delivery broken"
-  study_doc: "docs/sprint-5/drain-403-study.md"
-  acceptance_doc: "docs/sprint-5/drain-403-acceptance.md"
-  root_causes:
-    - "host_not_in_allowlist: lepios-one.vercel.app blocked in coordinator bash"
-    - "cron_secret_unset: CRON_SECRET not in bash env (no .env.local)"
-    - "parse_mode_bug: Markdown parse_mode fails on arbitrary text"
-  notification_row_id: "5708c92d-1210-45f5-b64e-8c0852620139"
-  awaiting_colin_approval_for: "acceptance doc — 3 open questions, see acceptance doc"
-  branch: "harness/task-8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
-  commit: "b617167"
-  opened_at: "2026-04-27T00:26:00Z"
-  last_updated_at: "2026-04-27T00:40:00Z"
+hardening_id: "H1"
+task_id: "8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
+source_label: "postmortem_915d1fee"
+status: "awaiting_grounding"
+description: "Fix coordinator drain 403 — notification delivery broken"
+study_doc: "docs/sprint-5/drain-403-study.md"
+acceptance_doc: "docs/sprint-5/drain-403-acceptance.md"
+root_causes: - "host_not_in_allowlist: lepios-one.vercel.app blocked in coordinator bash" - "cron_secret_unset: CRON_SECRET not in bash env (no .env.local)" - "parse_mode_bug: Markdown parse_mode fails on arbitrary text"
+notification_row_id: "5708c92d-1210-45f5-b64e-8c0852620139"
+awaiting_colin_approval_for: "acceptance doc — 3 open questions, see acceptance doc"
+branch: "harness/task-8a9dcb62-bcca-4e1f-8381-f502a165d3ae"
+commit: "b617167"
+opened_at: "2026-04-27T00:26:00Z"
+last_updated_at: "2026-04-27T00:40:00Z"
 
 hardening_h3:
-  hardening_id: "H3"
-  task_id: "9b95359e-828d-46d9-8514-1a1ff16f4c31"
-  source_label: "postmortem_915d1fee"
-  status: "awaiting_grounding"
-  description: "Pickup ordering — FIFO guarantee + coordinator-busy unclaim"
-  study_doc: "docs/sprint-5/h3-pickup-ordering-study.md"
-  acceptance_doc: "docs/sprint-5/h3-pickup-ordering-acceptance.md"
-  audit_finding: "FIFO ordering is correct — root cause is 429 serialization + daily cron. Part A=immediate unclaim on 429. Part B=hourly cron (Colin approved)."
-  root_causes:
-    - "429_limbo: fireCoordinator 429 leaves task in claimed state for 15-min stale window, burning retry_count"
-    - "daily_cron: task-pickup runs once per day (0 0 * * *), max 24h claim latency"
-  part_a_status: "shipped — pickup-runner.ts immediately unclears task on 429, no retry_count burn, Telegram alert fires"
-  part_b_status: "shipped — vercel.json cron changed to 0 * * * * (hourly, Colin approved Hobby slot usage)"
-  branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
-  pr: "33"
-  opened_at: "2026-04-27T00:00:00Z"
-  last_updated_at: "2026-04-27T00:14:00Z"
+hardening_id: "H3"
+task_id: "9b95359e-828d-46d9-8514-1a1ff16f4c31"
+source_label: "postmortem_915d1fee"
+status: "awaiting_grounding"
+description: "Pickup ordering — FIFO guarantee + coordinator-busy unclaim"
+study_doc: "docs/sprint-5/h3-pickup-ordering-study.md"
+acceptance_doc: "docs/sprint-5/h3-pickup-ordering-acceptance.md"
+audit_finding: "FIFO ordering is correct — root cause is 429 serialization + daily cron. Part A=immediate unclaim on 429. Part B=hourly cron (Colin approved)."
+root_causes: - "429_limbo: fireCoordinator 429 leaves task in claimed state for 15-min stale window, burning retry_count" - "daily_cron: task-pickup runs once per day (0 0 \* \* _), max 24h claim latency"
+part_a_status: "shipped — pickup-runner.ts immediately unclears task on 429, no retry_count burn, Telegram alert fires"
+part_b_status: "shipped — vercel.json cron changed to 0 _ \* \* \* (hourly, Colin approved Hobby slot usage)"
+branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
+pr: "33"
+opened_at: "2026-04-27T00:00:00Z"
+last_updated_at: "2026-04-27T00:14:00Z"

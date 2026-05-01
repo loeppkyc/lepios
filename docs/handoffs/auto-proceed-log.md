@@ -5,21 +5,21 @@ reversibility_check: Plan is a document — fully reversible via git. No code ch
 confidence: high
 outcome: approved-with-edits-applied
 
-last_reviewed_by_colin_at: 2026-04-22
+last_reviewed_by_colin_at: 2026-05-01
 
 ---
 
 2026-04-27T00:00:00Z sprint=5 chunk=H3 doc=docs/sprint-5/h3-pickup-ordering-acceptance.md
 cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
 trigger_match_evidence: |
-  cache_match_enabled: false per sprint-state.md sprint_5.cache_match_reason = "Sprint 4 baseline
-  carries forward; every acceptance doc escalates to Colin". Phase 0 rule 4: explicit override
-  in sprint-state.md → honor regardless of audit state. Cache-match not attempted.
+cache_match_enabled: false per sprint-state.md sprint_5.cache_match_reason = "Sprint 4 baseline
+carries forward; every acceptance doc escalates to Colin". Phase 0 rule 4: explicit override
+in sprint-state.md → honor regardless of audit state. Cache-match not attempted.
 reversibility_check: |
-  Acceptance doc: new file, fully reversible (delete or edit).
-  Part A (unclaim logic in pickup-runner.ts): reversible — revert file, no schema change.
-  Part B (vercel.json cron change): reversible — change schedule back to 0 0 * * *.
-  No schema migrations, no destructive operations.
+Acceptance doc: new file, fully reversible (delete or edit).
+Part A (unclaim logic in pickup-runner.ts): reversible — revert file, no schema change.
+Part B (vercel.json cron change): reversible — change schedule back to 0 0 \* \* \*.
+No schema migrations, no destructive operations.
 confidence: n/a (cache-match disabled)
 outcome: escalated-mandatory (cache_match_enabled=false)
 
@@ -144,22 +144,22 @@ escalation_reasons:
 2026-04-25T23:24:00Z sprint=5 chunk=coordinator-env doc=docs/sprint-5/coordinator-env-acceptance.md
 cited_principles: ["19 (destructive ops — not applicable, migration is additive)", "3 (FK over copy)", "17 (no speculative infrastructure)", "META-C"]
 trigger_match_evidence: |
-  META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
-  Therefore META-C does NOT apply. This entry is logged per the schema requirement that
-  escalations are also logged with the same schema.
-  
-  The doc proceeds NOT via cache-match but via direct Colin ratification:
-  task_queue row 87bc8578-6eb8-4f84-b522-00c4804a2398, review_action="approved",
-  review_received_at="2026-04-25T23:05:19Z". This is the equivalent of Phase 2 step 5
-  "escalate to Colin" — Colin has already responded.
+META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
+Therefore META-C does NOT apply. This entry is logged per the schema requirement that
+escalations are also logged with the same schema.
+
+The doc proceeds NOT via cache-match but via direct Colin ratification:
+task_queue row 87bc8578-6eb8-4f84-b522-00c4804a2398, review_action="approved",
+review_received_at="2026-04-25T23:05:19Z". This is the equivalent of Phase 2 step 5
+"escalate to Colin" — Colin has already responded.
 reversibility_check: |
-  Migration 0029 (CREATE TABLE harness_config): reversible — DROP TABLE harness_config is a
-  clean rollback. Table has no FKs to other tables and no other tables FK to it.
-  Seeds (two INSERT rows): reversible — DELETE FROM harness_config is the rollback.
-  coordinator.md startup block: reversible — remove the added section to revert.
-  coordinator.md notification template update: reversible — restore original ${TELEGRAM_CHAT_ID} line.
-  sprint-state.md update: reversible via git.
-  All decisions: LOW cost to reverse.
+Migration 0029 (CREATE TABLE harness_config): reversible — DROP TABLE harness_config is a
+clean rollback. Table has no FKs to other tables and no other tables FK to it.
+Seeds (two INSERT rows): reversible — DELETE FROM harness_config is the rollback.
+coordinator.md startup block: reversible — remove the added section to revert.
+coordinator.md notification template update: reversible — restore original ${TELEGRAM_CHAT_ID} line.
+sprint-state.md update: reversible via git.
+All decisions: LOW cost to reverse.
 confidence: high (direct Colin ratification, not cache-match; escalation is procedurally correct)
 outcome: proceeding_to_builder_on_colin_direct_ratification
 proceed_reason: "Colin approved via callback at 2026-04-25T23:05:19Z — direct ratification, not cache-match"
@@ -169,22 +169,22 @@ proceed_reason: "Colin approved via callback at 2026-04-25T23:05:19Z — direct 
 2026-04-26T01:16:00Z sprint=5 chunk=notification-drain-dedup doc=docs/sprint-5/notification-drain-dedup-acceptance.md
 cited_principles: ["19 (destructive ops — not applicable, migration is additive index change)", "17 (no speculative infrastructure — all 3 improvements have explicit Colin approval)", "F18 (measurement required — latency logging is the F18 artifact)", "META-C"]
 trigger_match_evidence: |
-  META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
-  Therefore META-C does NOT apply. This entry is logged per the schema requirement that
-  escalations are also logged with the same schema.
+META-C conditions: cache_match_enabled = false (Sprint 5 explicit override per Phase 0 rule 4).
+Therefore META-C does NOT apply. This entry is logged per the schema requirement that
+escalations are also logged with the same schema.
 
-  The doc proceeds NOT via cache-match but via direct Colin ratification:
-  task_queue row c622d367-704d-4838-83bf-15a196c8c074, review_action="approved",
-  review_received_at="2026-04-26T00:08:12.684723Z". All 3 pending questions answered:
-  Q1 (dedup via UNIQUE constraint), Q2 (daily safety-net cron), Q3 (latency logging).
+The doc proceeds NOT via cache-match but via direct Colin ratification:
+task_queue row c622d367-704d-4838-83bf-15a196c8c074, review_action="approved",
+review_received_at="2026-04-26T00:08:12.684723Z". All 3 pending questions answered:
+Q1 (dedup via UNIQUE constraint), Q2 (daily safety-net cron), Q3 (latency logging).
 reversibility_check: |
-  Migration 0030 (DROP old INDEX + CREATE UNIQUE INDEX): reversible — DROP the unique index
-  and recreate the non-unique one. No data is deleted.
-  route.ts change (add agent_events insert): reversible — remove the insert block.
-  vercel.json change (add cron): reversible — remove the cron entry.
-  study + acceptance docs: new files, fully reversible (delete or rewrite).
-  sprint-state.md update: reversible via git.
-  All decisions: LOW cost to reverse.
+Migration 0030 (DROP old INDEX + CREATE UNIQUE INDEX): reversible — DROP the unique index
+and recreate the non-unique one. No data is deleted.
+route.ts change (add agent_events insert): reversible — remove the insert block.
+vercel.json change (add cron): reversible — remove the cron entry.
+study + acceptance docs: new files, fully reversible (delete or rewrite).
+sprint-state.md update: reversible via git.
+All decisions: LOW cost to reverse.
 confidence: high (direct Colin ratification, not cache-match; all 3 improvements explicitly approved)
 outcome: proceeding_to_builder_on_colin_direct_ratification
 proceed_reason: "Colin approved all 3 Q answers via task_queue metadata at 2026-04-26T00:08:12Z"
@@ -194,25 +194,26 @@ proceed_reason: "Colin approved all 3 Q answers via task_queue metadata at 2026-
 2026-04-27T04:25:00Z sprint=5 chunk=utility-tracker doc=docs/sprint-5/utility-tracker-acceptance.md
 cited_principles: [cache_match_enabled: false — Phase 0 explicit override, Sprint 4 baseline carry-forward]
 trigger_match_evidence: |
-  cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
-  Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
-  META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
-  Task is a standalone module port (52_Utility_Tracker.py → Supabase-backed Next.js page).
-  Source recovered from knowledge corpus (knowledge table, domain='streamlit_source').
-  Twin endpoint unreachable from this environment; all 4 Phase 1b questions resolved by design
-  decision (see study doc Twin Q&A section). No questions surfaced to Colin.
+cache_match_enabled = false per sprint-state.md explicit override (cache_match_reason: "Sprint 4 baseline").
+Phase 0 rule 4: explicit sprint-state.md override honored regardless of audit-log date.
+META-C not applied — cache-match is disabled sprint-wide. No trigger-match attempted.
+Task is a standalone module port (52_Utility_Tracker.py → Supabase-backed Next.js page).
+Source recovered from knowledge corpus (knowledge table, domain='streamlit_source').
+Twin endpoint unreachable from this environment; all 4 Phase 1b questions resolved by design
+decision (see study doc Twin Q&A section). No questions surfaced to Colin.
 reversibility_check: |
-  Study doc: new file at docs/sprint-5/utility-tracker-streamlit-study.md — fully reversible.
-  Acceptance doc: new file at docs/sprint-5/utility-tracker-acceptance.md — fully reversible.
-  Migration 0039_utility_bills.sql: not yet written; will be fully reversible (DROP TABLE).
-  Migration 0040_register_utility_tracker_component.sql: additive INSERT; reversible (DELETE row).
-  New page app/(cockpit)/utility/: not yet written; fully reversible (delete files).
-  sprint-state.md update: document only, no code/schema effect.
-  cost-log.md append: append-only log, reversible via git.
-  auto-proceed-log.md append: this entry — append-only, reversible via git.
-  All decisions: LOW cost to reverse.
+Study doc: new file at docs/sprint-5/utility-tracker-streamlit-study.md — fully reversible.
+Acceptance doc: new file at docs/sprint-5/utility-tracker-acceptance.md — fully reversible.
+Migration 0039_utility_bills.sql: not yet written; will be fully reversible (DROP TABLE).
+Migration 0040_register_utility_tracker_component.sql: additive INSERT; reversible (DELETE row).
+New page app/(cockpit)/utility/: not yet written; fully reversible (delete files).
+sprint-state.md update: document only, no code/schema effect.
+cost-log.md append: append-only log, reversible via git.
+auto-proceed-log.md append: this entry — append-only, reversible via git.
+All decisions: LOW cost to reverse.
 confidence: high (escalation is correct and unambiguous; cache-match disabled sprint-wide)
 outcome: escalated
 escalation_reasons:
-  - cache_match_disabled_sprint_override
-  - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+- cache_match_disabled_sprint_override
+- standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
