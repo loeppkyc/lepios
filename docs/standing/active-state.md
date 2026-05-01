@@ -1,6 +1,6 @@
 # LepiOS Active State
 
-**Last updated:** 2026-05-01 (session — BBV audit + standing doc build)
+**Last updated:** 2026-05-01 (session — migrations 0041–0051 prod-state audit)
 **Updated by:** end-of-session write; read this first when starting any new chat
 
 ---
@@ -21,7 +21,7 @@ End of every session: update this doc before closing. The next session starts he
 - **Repo:** lepios (Next.js 16, Supabase, Vercel, Tailwind, shadcn/ui)
 - **Path:** `C:/Users/Colin/Downloads/Claude_Code_Workspace_TEMPLATE (1)/lepios`
 - **Deploy:** https://lepios-one.vercel.app
-- **Main HEAD:** `7e50fb7 feat(charts): adopt shadcn/ui Chart (Recharts) as chart library (#37)`
+- **Main HEAD:** `4208b81 feat(status): status page v2 — 90-day bars, incident log, dual timezone, nav link (#36)`
 
 ---
 
@@ -85,19 +85,32 @@ stash@{1} and stash@{4} are likely safe to drop (PRs merged or exist). Verify be
 ## Migrations on main (latest 10)
 
 ```
-0038_streamlit_module_scanner_component.sql
-0039_utility_bills.sql
-0040_register_utility_tracker_component.sql
+0041_pending_drain_triggers.sql
+0043_harness_foundation_renormalize.sql
+0044_memory_layer_decisions_log.sql
+0045_security_layer_schema.sql
+0046_decisions_log_updated_at_trigger.sql
+0047_knowledge_dedupe_audit.sql
+0048_knowledge_dedupe_audit_executed_column.sql
+0049_knowledge_content_hash.sql
+0050_enable_rls_gmail_window_sessions.sql
+0051_enable_rls_harness_internal.sql
 0052_build_metrics.sql
 0053_build_metrics_security_invoker.sql
 0054_cogs_entries.sql
+0055_gmail_classifiers.sql
+0056_gst_columns.sql
+0057_amazon_financial_events.sql
+0058_gmail_daily_scan_runs.sql
 0060_pallet_invoices.sql
 0061_cogs_drop_pallet_mode.sql
 0100_chunk_h_promote.sql
 ```
 
 **0036 collision:** two files share prefix `0036` — logged in `docs/follow-ups/2026-04-30-0036-migration-collision.md`.
-**Next available slot:** check `ls supabase/migrations/ | sort | tail -5` before creating any new migration — there are gaps (0041–0051, 0055–0059 appear unused on main; PRs #39/#40 claim 0055/0056).
+**0041–0051 status (audited 2026-05-01):** all 11 already APPLIED to prod — the schema artifacts (tables, indexes, triggers, RLS, content_hash column, dedupe execute) are all live. Do NOT re-apply. Re-running 0043 in particular would `DELETE FROM harness_components` and wipe live `completion_pct` drift. See `docs/follow-ups/2026-05-01-migration-ledger-reconcile.md`.
+**0042 missing:** intentional gap (`feature/orb-chat-orphan-recovery` claimed it; not on main). Treat 0042 as reserved.
+**Next available slot:** check `ls supabase/migrations/ | sort | tail -5` before creating any new migration — gap remains at 0059 (PR-claimed but not on main).
 
 ---
 
@@ -140,6 +153,14 @@ See `docs/lepios/amazon-pipeline-rollup.md` for the full component table.
 
 ---
 
+## Harness rollup (live from `harness_components`, 2026-05-01)
+
+**Rollup: 58.38% (58.38/100) — denominator now 100, not 120.**
+
+Migration 0043 reseated `harness_components` from 24 drifted rows (SUM=112) to 21 spec rows (SUM=100), and moved 7 product rows out to `product_components`. Any prior rollup citing a 112 or 120 denominator is stale. Live rollup recomputes from `SUM(weight_pct * completion_pct) / SUM(weight_pct)` on `harness_components`.
+
+---
+
 ## Recent session handoffs
 
 - `docs/handoffs/2026-04-30-evening-session.md`
@@ -152,6 +173,7 @@ See `docs/lepios/amazon-pipeline-rollup.md` for the full component table.
 
 ## Open follow-ups (newest first)
 
+- `docs/follow-ups/2026-05-01-migration-ledger-reconcile.md`
 - `docs/follow-ups/2026-04-30-pallet-total-cost.md`
 - `docs/follow-ups/2026-04-30-0036-migration-collision.md`
 - `docs/follow-ups/2026-04-30-0036-investigation.md`
