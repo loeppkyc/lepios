@@ -1,6 +1,6 @@
 # LepiOS Amazon Pipeline — Component Rollup
 
-Last recomputed: 2026-04-30
+Last recomputed: 2026-04-30 (updated)
 Owner: Colin
 Cadence: recompute after each PR merge or meaningful state change
 
@@ -21,7 +21,7 @@ Reconciliation is the keystone — without it the pipeline is disconnected inges
 | 4 | Gmail invoice classifier | 6 | 70% | 4.20 | PR #40 open, 41 tests pass, prod validation deferred |
 | 5 | Gmail receipt classifier | 6 | 70% | 4.20 | shipped with #40 |
 | 6 | Gmail OAuth + Vercel env wiring | 4 | 0% | 0.00 | blocker for #40 validation |
-| 7 | Gmail daily scanner (cron + ingest) | 8 | 0% | 0.00 | not started |
+| 7 | Gmail daily scanner (cron + ingest) | 8 | 60% | 4.80 | PR #44 open (audit + watermark), statement classifier already on main |
 | 8 | SP-API financial events parser | 8 | 70% | 5.60 | PR #43 open, 34 tests pass |
 | 9 | SP-API backfill script | 4 | 70% | 2.80 | shipped in PR #43, $0.01 gate |
 | 10 | Financial events migration (0057) | 2 | 70% | 1.40 | shipped in PR #43, pure DDL |
@@ -34,9 +34,9 @@ Reconciliation is the keystone — without it the pipeline is disconnected inges
 | 17 | Anomaly detection (refunds, fees, missing COGS) | 8 | 0% | 0.00 | not started |
 | 18 | Historical product intel (SP-API + Keepa re-source) | 6 | 0% | 0.00 | backlog |
 | 19 | Per-component metrics + benchmarks (F18) | 4 | 20% | 0.80 | build_metrics shipped, Amazon-specific not wired |
-| **Total** | | **110** | | **32.20** | |
+| **Total** | | **110** | | **37.00** | |
 
-**Rollup: 29.3% complete · 77.80 points remaining**
+**Rollup: 33.6% complete · 73.00 points remaining**
 
 ## Notes
 
@@ -49,3 +49,4 @@ Reconciliation is the keystone — without it the pipeline is disconnected inges
 ## History
 
 - 2026-04-30: v1 created. 29.3% rollup. PRs #38/#39/#40/#42/#43 open, none merged.
+- 2026-04-30 (later): row 7 corrected from 0% (was missing pre-existing statement classifier) + PR #44 audit/watermark = 60%. Rollup 33.6%.
