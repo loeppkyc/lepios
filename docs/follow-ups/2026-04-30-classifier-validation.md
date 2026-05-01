@@ -2,7 +2,36 @@
 
 **Created:** 2026-04-30
 **Branch:** feature/gmail-classifiers-week1
-**Status:** PENDING — blocked on Gmail OAuth setup in Vercel
+**Status:** PARTIALLY RESOLVED 2026-05-01 — OAuth configured; classifier quality check open
+
+---
+
+## Resolution log — 2026-05-01
+
+**Step 1 (Gmail OAuth) — COMPLETE.**
+Root cause: `client_id`, `client_secret`, `refresh_token` were stored in Vercel under the wrong
+names (raw secrets.toml field names, not the `GOOGLE_` prefix the code expects). Values were
+also empty. Fixed by sourcing from `streamlit_app/.streamlit/secrets.toml` and adding as
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`. F15 CRLF artifact present
+(2 extra bytes per var) but `.trim()` in `lib/gmail/client.ts:19-21` handles it. Redeployed to
+production (`dpl_AGZHXA3rQd2iEoeW2WGM8jWcGHNM`).
+
+Cron smoke test: `{"ok":true,"scanned":3,"new_messages":3,"status":"ok"}` — Gmail authenticated.
+
+**Step 2 dry-run — OPEN. Classifier quality below acceptance bar.**
+Dry-run (2026-04-01 to 2026-05-01, 43 messages):
+- Invoices: 0 high, 0 medium, 0 low — FAIL (bar: ≥1 high + ≥1 medium)
+- Receipts: 11 high, 19 medium — count PASS; spot-check ~6/10 — FAIL (bar: ≥8/10)
+- False positives in HIGH bucket: Cineplex password-reset, Walmart marketplace reactivation email
+- False positives in MEDIUM bucket: Santevia shipment notification, Walmart order-on-the-way
+
+Per the acceptance blocker rule: do NOT merge `feature/gmail-classifiers-week1` to main and
+do NOT wire invoice/receipt classifiers into the production cron until false-positive patterns
+are investigated. Rows 4+5 in the Amazon pipeline stay at 90%.
+
+**Next action for Colin:** review false-positive patterns in the receipt classifier
+(`lib/gmail/classifiers/receipt.ts`) — Cineplex and Walmart reactivation should not hit HIGH
+confidence. Check keyword/sender rules that caused these to score high.
 
 ---
 

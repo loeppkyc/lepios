@@ -16,12 +16,12 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 | Rollup | Value | Basis |
 |---|---|---|
-| **Strategic** | **45.7%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
-| **Total scope** | **14.6%** | 4,724 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 52.5%. |
+| **Strategic** | **47.0%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
+| **Total scope** | **14.9%** | 4,824 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 53.6%. |
 
-Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×49.0=19.60 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×67.0=10.05 · **sum=45.73**
+Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×52.3=20.92 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×67.0=10.05 · **sum=47.05**
 
-Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,724 · 4724÷324=**14.6%**
+Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,824 · 4824÷324=**14.9%**
 
 ---
 
@@ -31,7 +31,7 @@ Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · 
 |---|---|---|---|---|---|
 | 1 | Autonomous Harness | 21 components | **58.4%** | 20% | `harness_components` — live DB, queried 2026-05-01 |
 | 1b | Product Components | 7 components | **88.0%** | 5% | `product_components` — live DB, queried 2026-05-01 |
-| 2 | Amazon Pipeline | 21 components | **49.0%** | 40% | `docs/lepios/amazon-pipeline-rollup.md` |
+| 2 | Amazon Pipeline | 21 components | **52.3%** | 40% | `docs/lepios/amazon-pipeline-rollup.md` |
 | 3 | Local Sales | 3 items | **0%** | 5% | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built) |
 | 4 | Streamlit Port Backlog | 234 modules | **0%** | 15% | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
 | 5 | GPU Day Readiness | 27 line items | **67.0%** | 15% | `docs/gpu-day-readiness.md` |
@@ -116,7 +116,7 @@ These were migrated from `harness_components` via migration 0043. Denominator is
 
 ## T2 — Amazon Pipeline
 
-**Rollup: 49.0% · 58.80 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01
+**Rollup: 52.3% · 62.80 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01; row 6 updated 2026-05-01
 
 Pipeline purpose: COGS → Gmail scanner → financial events → reconciliation → tax outputs → anomaly detection.
 Reconciliation (row 11) is the keystone — without it the pipeline is disconnected ingestion.
@@ -128,7 +128,7 @@ Reconciliation (row 11) is the keystone — without it the pipeline is disconnec
 | 3 | COGS recompute / backfill | 4 | 90% | 3.60 | merged #42; prod data untested |
 | 4 | Gmail invoice classifier | 6 | 90% | 5.40 | merged #40; prod validation pending OAuth row 6 |
 | 5 | Gmail receipt classifier | 6 | 90% | 5.40 | merged #40; same gate as row 4 |
-| 6 | Gmail OAuth + Vercel env wiring | 4 | **0%** | 0.00 | **BLOCKER** for rows 4 + 5 prod validation |
+| 6 | Gmail OAuth + Vercel env wiring | 4 | **100%** | 4.00 | env vars configured 2026-05-01 (`dpl_AGZHXA3rQd2iEoeW2WGM8jWcGHNM`); rows 4+5 classifier quality open |
 | 7 | Gmail daily scanner (cron + ingest) | 8 | 75% | 6.00 | merged #44; classifier integration pending |
 | 8 | SP-API financial events parser | 8 | 100% | 8.00 | merged #43; 34 tests pass |
 | 9 | SP-API backfill script | 4 | 100% | 4.00 | merged #43; $0.01 gate passed |
@@ -146,7 +146,7 @@ Reconciliation (row 11) is the keystone — without it the pipeline is disconnec
 | 21 | COGS v2 — Pallet invoices | 4 | 90% | 3.60 | merged #45; awaiting first prod entry |
 | **Total** | | **120** | | **58.80** | |
 
-**Remaining: 61.20 points across 8 unstarted + 5 partial components**
+**Remaining: 57.20 points across 7 unstarted + 5 partial components**
 
 ---
 
