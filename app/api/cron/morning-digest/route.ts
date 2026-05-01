@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { sendMorningDigest } from '@/lib/orchestrator/digest'
 
 export const dynamic = 'force-dynamic'
 
-const CRON_SECRET = process.env.CRON_SECRET
-
-function isAuthorized(request: Request): boolean {
-  if (!CRON_SECRET) return true
-  return request.headers.get('authorization') === `Bearer ${CRON_SECRET}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   try {
     const status = await sendMorningDigest()

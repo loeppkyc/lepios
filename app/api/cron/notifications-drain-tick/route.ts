@@ -1,20 +1,16 @@
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { GET as drainGET } from '@/app/api/harness/notifications-drain/route'
 
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 async function tick(request: Request): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
   // Delegate to the actual drain — pass through authorization so the drain handler
   // can also validate (double-validation; both use the same CRON_SECRET).
+  // eslint-disable-next-line no-restricted-syntax -- forwarding bearer to internal handler, not auth validation
   const secret = process.env.CRON_SECRET ?? ''
   const internalReq = new Request('http://internal/api/harness/notifications-drain', {
     method: 'GET',

@@ -1,6 +1,7 @@
 // F17: gmail.scan events feed behavioral ingestion; statement_arrivals feed financial state
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { createGmailService, GmailNotConfiguredError } from '@/lib/gmail/client'
 import { scanMessages, filterNewMessages, insertMessages } from '@/lib/gmail/scan'
@@ -13,16 +14,10 @@ import { recordAttribution } from '@/lib/attribution/writer'
 
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const startTime = Date.now()
   const runId = crypto.randomUUID()

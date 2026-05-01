@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 
 export const dynamic = 'force-dynamic'
@@ -11,16 +12,10 @@ const InvokeSchema = z.object({
   run_id: z.string().min(1, 'run_id must be non-empty'),
 })
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   let body: unknown
   try {

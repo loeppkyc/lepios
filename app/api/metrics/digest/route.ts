@@ -10,10 +10,14 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getAutonomousRunSummary, getTopErrorTypes, getKnowledgeHealth, getDailySuccessRate } from '@/lib/metrics/rollups'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
+import {
+  getAutonomousRunSummary,
+  getTopErrorTypes,
+  getKnowledgeHealth,
+  getDailySuccessRate,
+} from '@/lib/metrics/rollups'
 import { logEvent } from '@/lib/knowledge/client'
-
-const CRON_SECRET = process.env.CRON_SECRET
 
 // ── Telegram send ─────────────────────────────────────────────────────────────
 
@@ -58,9 +62,7 @@ async function buildDigest(): Promise<{ message: string; data: Record<string, un
 
   // Build top errors string
   const errorStr =
-    topErrors.length === 0
-      ? 'none'
-      : topErrors.map((e) => `${e.error_type} ×${e.count}`).join(', ')
+    topErrors.length === 0 ? 'none' : topErrors.map((e) => `${e.error_type} ×${e.count}`).join(', ')
 
   // Safety flags (yesterday blocking)
   const safetyStr =
@@ -102,12 +104,9 @@ async function buildDigest(): Promise<{ message: string; data: Record<string, un
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 async function handler(request: Request) {
-  if (CRON_SECRET) {
-    const auth = request.headers.get('authorization')
-    if (auth !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const startMs = Date.now()
   const { message, data } = await buildDigest()

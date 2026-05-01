@@ -2,22 +2,17 @@
 // F18: metrics → fetched/inserted/skipped/errors/net_total per run; benchmark = ~2 groups/month (biweekly payout)
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { syncSettlementsForRange } from '@/lib/amazon/settlements-sync'
 import { spApiConfigured } from '@/lib/amazon/client'
 
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const startTime = Date.now()
   const runId = crypto.randomUUID()

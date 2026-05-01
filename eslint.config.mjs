@@ -34,6 +34,25 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-unused-vars': 'off',
     },
   },
+  {
+    // F22 — Cron-secret auth via shared helper. No inline auth gates in app/api/**.
+    // Use requireCronSecret() from @/lib/auth/cron-secret instead of reading
+    // process.env.CRON_SECRET directly. Helper itself lives in lib/auth/ so it
+    // is exempt by file scope. The notifications-drain-tick forwarding case
+    // gets an inline eslint-disable-next-line with a justifying comment.
+    files: ['app/api/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'][property.name='CRON_SECRET']",
+          message:
+            'Use requireCronSecret() from @/lib/auth/cron-secret instead of reading process.env.CRON_SECRET directly. (F22)',
+        },
+      ],
+    },
+  },
 ])
 
 export default eslintConfig

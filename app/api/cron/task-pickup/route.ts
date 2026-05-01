@@ -1,21 +1,16 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { runPickup } from '@/lib/harness/pickup-runner'
 import { runStallCheck } from '@/lib/harness/stall-check'
 import { checkPurposeReviewTimeouts } from '@/lib/purpose-review/timeout'
 
 export const dynamic = 'force-dynamic'
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true // dev: no secret configured
-  return request.headers.get('authorization') === `Bearer ${secret}`
-}
-
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // auth: see lib/auth/cron-secret.ts
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   if (!process.env.TASK_PICKUP_ENABLED) {
     return NextResponse.json({ ok: false, reason: 'task-pickup-disabled', duration_ms: 0 })
