@@ -252,8 +252,10 @@ describe('gmail-scan cron route — error handling contract', () => {
     vi.stubEnv('GOOGLE_REFRESH_TOKEN', '')
 
     const agentEventsInsert = vi.fn().mockResolvedValue({ error: null })
+    const eqMock = vi.fn().mockResolvedValue({ error: null })
+    const updateMock = vi.fn().mockReturnValue({ eq: eqMock })
     const mockDb = {
-      from: vi.fn().mockReturnValue({ insert: agentEventsInsert }),
+      from: vi.fn().mockReturnValue({ insert: agentEventsInsert, update: updateMock }),
       rpc: vi.fn().mockResolvedValue({ error: null }),
     }
     vi.mocked(createServiceClient).mockReturnValue(

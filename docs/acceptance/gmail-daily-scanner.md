@@ -243,3 +243,22 @@ No new files in `lib/gmail/` — all classifier functions come from PR #40.
    store PII from email content.
 6. The `knownSenders` Map must be built with the full row before the message loop —
    one DB query per cron run, not per message.
+
+---
+
+## Deferred to Follow-Up PR
+
+The following items were scoped out of this PR because they require
+`feature/gmail-classifiers-week1-v2` (PR #40) to merge first —
+the imports would not compile against main without it.
+
+- **`classifyInvoice` / `classifyReceipt` imports** — live in
+  `lib/gmail/classifiers/invoice.ts` and `receipt.ts`, not yet on main
+- **`Promise.allSettled` multi-classifier loop** — the per-message parallel
+  classifier pattern specified in AC-6; requires the above imports
+- **`knownSenders` Map upgrade** — `classifyInvoice` and `classifyReceipt`
+  need `Map<string, KnownSender>` (trust_level + sender_type); the current
+  `Set<string>` is sufficient for statement-arrivals only
+- **`invoices_classified` / `receipts_classified` counts** — columns exist
+  in `gmail_daily_scan_runs` (migration 0058) and are written as `0` on
+  every run this PR ships; non-zero values follow in the post-#40 PR
