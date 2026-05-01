@@ -1,5 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
 
+export class KeepaNetworkError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'KeepaNetworkError'
+  }
+}
+
+export class KeepaHttpError extends Error {
+  readonly status: number
+  readonly asin: string
+  constructor(status: number, asin: string) {
+    super(`Keepa returned HTTP ${status} for ASIN ${asin}`)
+    this.name = 'KeepaHttpError'
+    this.status = status
+    this.asin = asin
+  }
+}
+
+export class KeepaParseError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'KeepaParseError'
+  }
+}
+
 const KEEPA_BASE = 'https://api.keepa.com'
 // Keepa timestamps are minutes since 2011-01-01T00:00:00Z
 const KEEPA_EPOCH_MS = Date.UTC(2011, 0, 1)
@@ -59,12 +84,12 @@ async function fetchFromKeepa(
     res = await fetch(url.toString())
   } catch (e) {
     console.error('[getBsrHistory] network error:', e)
-    return { points: [], tokensLeft: null }
+    throw new KeepaNetworkError(e instanceof Error ? e.message : String(e))
   }
 
   if (!res.ok) {
     console.error(`[getBsrHistory] Keepa ${res.status} for ASIN ${asin}`)
-    return { points: [], tokensLeft: null }
+    throw new KeepaHttpError(res.status, asin)
   }
 
   let data: { products?: { csv?: (number[] | null)[] }[]; tokensLeft?: number }
@@ -72,7 +97,7 @@ async function fetchFromKeepa(
     data = await res.json()
   } catch (e) {
     console.error('[getBsrHistory] JSON parse error:', e)
-    return { points: [], tokensLeft: null }
+    throw new KeepaParseError(e instanceof Error ? e.message : String(e))
   }
 
   const product = data.products?.[0]
