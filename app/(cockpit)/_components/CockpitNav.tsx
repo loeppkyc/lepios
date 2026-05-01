@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/hit-lists', label: 'Lists' },
   { href: '/autonomous', label: 'Autonomous' },
   { href: '/business-review', label: 'Business Review' },
+  { href: '/cogs', label: 'COGS' },
   { href: '/utility', label: 'Utility' },
 ]
 
