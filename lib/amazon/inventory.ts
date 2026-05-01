@@ -47,6 +47,71 @@ export interface FbaInventoryResult {
   fetchedAt: string
 }
 
+export interface FbaInventoryItem {
+  asin: string
+  sku: string
+  fulfillable_quantity: number
+  product_name: string | null
+}
+
+// ── Shared fetch ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all active FBA inventory summaries (90-day window) and return
+ * the raw InventorySummary array. Used by both public functions below.
+ */
+async function fetchAllSummaries(): Promise<InventorySummary[]> {
+  const startDateTime = daysAgoIso(90)
+
+  const baseParams: Record<string, string> = {
+    details: 'true',
+    granularityType: 'Marketplace',
+    granularityId: MARKETPLACE_CA,
+    marketplaceIds: MARKETPLACE_CA,
+    startDateTime,
+  }
+
+  const all: InventorySummary[] = []
+  let nextToken: string | undefined = undefined
+  let isFirstPage = true
+
+  while (true) {
+    const params: Record<string, string> = { ...baseParams }
+    if (nextToken) params.nextToken = nextToken
+
+    if (!isFirstPage) await sleep(700)
+    isFirstPage = false
+
+    let data: InventorySummariesResponse | null = null
+    let attempts = 0
+    while (attempts < 4) {
+      try {
+        data = await spFetch<InventorySummariesResponse>(
+          '/fba/inventory/v1/summaries',
+          { method: 'GET', params }
+        )
+        break
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (message.includes('429') && attempts < 3) {
+          attempts++
+          await sleep(2000)
+          continue
+        }
+        throw err
+      }
+    }
+
+    if (!data) break
+    all.push(...(data.payload?.inventorySummaries ?? []))
+
+    nextToken = data.pagination?.nextToken
+    if (!nextToken) break
+  }
+
+  return all
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
@@ -75,68 +140,41 @@ function daysAgoIso(days: number): string {
  * Constraint B-7: use inventoryDetails.fulfillableQuantity, not totalQuantity.
  */
 export async function fetchFbaInventory(): Promise<FbaInventoryResult> {
-  const startDateTime = daysAgoIso(90)
-
-  // Base params — must be sent on every page (Constraint B-4)
-  const baseParams: Record<string, string> = {
-    details: 'true',
-    granularityType: 'Marketplace',
-    granularityId: MARKETPLACE_CA,
-    marketplaceIds: MARKETPLACE_CA,
-    startDateTime,
-  }
-
+  const summaries = await fetchAllSummaries()
   let fulfillableUnits = 0
-  let nextToken: string | undefined = undefined
-  let isFirstPage = true
+  for (const summary of summaries) {
+    fulfillableUnits += summary.inventoryDetails?.fulfillableQuantity ?? 0
+  }
+  return { fulfillableUnits, fetchedAt: new Date().toISOString() }
+}
 
-  while (true) {
-    const params: Record<string, string> = { ...baseParams }
-    if (nextToken) {
-      params.nextToken = nextToken
-    }
+/**
+ * Fetch all active FBA inventory SKUs (90-day window) and return per-ASIN detail.
+ * Multiple SKUs for the same ASIN are collapsed: fulfillable_quantity summed,
+ * product_name taken from the first non-null hit.
+ */
+export async function fetchFbaInventoryDetailed(): Promise<FbaInventoryItem[]> {
+  const summaries = await fetchAllSummaries()
 
-    // Rate-limit: 700ms delay between pages (Constraint B-6) — skip on first page
-    if (!isFirstPage) {
-      await sleep(700)
-    }
-    isFirstPage = false
-
-    // 429 retry logic (Constraint B-6)
-    let data: InventorySummariesResponse | null = null
-    let attempts = 0
-    while (attempts < 4) {
-      try {
-        data = await spFetch<InventorySummariesResponse>(
-          '/fba/inventory/v1/summaries',
-          { method: 'GET', params }
-        )
-        break
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        if (message.includes('429') && attempts < 3) {
-          attempts++
-          await sleep(2000)
-          continue
-        }
-        throw err
+  const byAsin = new Map<string, FbaInventoryItem>()
+  for (const s of summaries) {
+    if (!s.asin) continue
+    const qty = s.inventoryDetails?.fulfillableQuantity ?? 0
+    const existing = byAsin.get(s.asin)
+    if (existing) {
+      existing.fulfillable_quantity += qty
+      if (!existing.product_name && s.productName) {
+        existing.product_name = s.productName
       }
+    } else {
+      byAsin.set(s.asin, {
+        asin: s.asin,
+        sku: s.sellerSku ?? '',
+        fulfillable_quantity: qty,
+        product_name: s.productName ?? null,
+      })
     }
-
-    if (!data) break
-
-    const summaries = data.payload?.inventorySummaries ?? []
-    for (const summary of summaries) {
-      fulfillableUnits += summary.inventoryDetails?.fulfillableQuantity ?? 0
-    }
-
-    // Constraint B-5: nextToken is at body.pagination.nextToken (top-level)
-    nextToken = data.pagination?.nextToken
-    if (!nextToken) break
   }
 
-  return {
-    fulfillableUnits,
-    fetchedAt: new Date().toISOString(),
-  }
+  return Array.from(byAsin.values())
 }
