@@ -1,0 +1,61 @@
+{
+  "chunk_id": "cogs-v2",
+  "acceptance_doc": "docs/sprint-5/chunk-cogs-v2-acceptance.md",
+  "commit": "49783ef",
+  "branch": "feature/cogs-v2",
+  "pr": "https://github.com/loeppkyc/lepios/pull/45",
+  "status": "built",
+  "tests": {
+    "total_passing": 1433,
+    "new_tests": 25,
+    "failures": 4,
+    "failure_note": "pre-existing recharts failures in tests/chart-migration.test.ts — not introduced by this chunk"
+  },
+  "files_delivered": [
+    "supabase/migrations/0060_pallet_invoices.sql",
+    "supabase/migrations/0061_cogs_drop_pallet_mode.sql",
+    "lib/cogs/fifo.ts",
+    "lib/pallets/types.ts",
+    "lib/pallets/validation.ts",
+    "lib/pallets/queries.ts",
+    "lib/amazon/inventory.ts",
+    "app/(cockpit)/pallets/page.tsx",
+    "app/(cockpit)/pallets/actions.ts",
+    "app/(cockpit)/pallets/_components/PalletInvoiceForm.tsx",
+    "app/(cockpit)/pallets/_components/PalletInvoiceTable.tsx",
+    "app/(cockpit)/inventory/page.tsx",
+    "app/(cockpit)/inventory/actions.ts",
+    "app/(cockpit)/inventory/_components/InventoryTable.tsx",
+    "app/(cockpit)/_components/CockpitNav.tsx",
+    "tests/fifo.test.ts",
+    "tests/pallet-queries.test.ts"
+  ],
+  "ac_coverage": {
+    "AC-P1": "auth-gated via createClient() redirect",
+    "AC-P2": "PalletInvoiceForm — month picker, vendor, pallets_count, total, gst_amount (auto 5%), notes",
+    "AC-P3": "PalletInvoiceTable — last 24 months via listPalletInvoices(24)",
+    "AC-P4": "last-12-month total tile via sumPalletSpendLast12Months()",
+    "AC-P5": "CockpitNav — COGS renamed to Pallets (/pallets)",
+    "AC-I1": "auth-gated via createClient() redirect",
+    "AC-I2": "fetchFbaInventoryDetailed() called on page load, graceful error banner on failure",
+    "AC-I3": "InventoryTable — asin, sku, title, fulfillable_qty; cost input + Save per row; COGS history link",
+    "AC-I4": "saveCostEntry() server action — creates cogs_entries row source=manual, pricing_model=per_unit",
+    "AC-I5": "computeInventoryValue() FIFO walk, cogs_entries fetched for all FBA ASINs",
+    "AC-I6": "FIFO total value tile at top of InventoryTable",
+    "AC-I7": "digit-first ASIN = book, shown with 'book' label, excluded from total",
+    "AC-I8": "Inventory added between Lists and Autonomous in NAV_LINKS"
+  },
+  "unknowns": [
+    "migrations 0060 + 0061 not yet applied to production — must be applied before /pallets or /inventory can write data",
+    "/inventory requires SP-API credentials (LWA) in Vercel env — page degrades gracefully if unavailable",
+    "fetchFbaInventoryDetailed() collapses multi-SKU ASINs by summing fulfillable_quantity; product_name taken from first non-null hit",
+    "FIFO total excludes books per AC-I7; uncosted units (no cost layers) shown as 'x / total' in Costed/Total column"
+  ],
+  "grounding_checkpoint_required": [
+    "Apply migrations 0060 + 0061 to production Supabase",
+    "Navigate /pallets, add a pallet invoice, verify table + total tile update",
+    "Navigate /inventory, verify FBA items load or graceful error shown",
+    "Save a cost for one ASIN, verify FIFO total tile updates on refresh"
+  ],
+  "built_at": "2026-04-30"
+}
