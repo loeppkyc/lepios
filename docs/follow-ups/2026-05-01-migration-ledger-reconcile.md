@@ -1,8 +1,27 @@
 # Follow-up: reconcile migration file prefixes with `supabase_migrations.schema_migrations`
 
 **Logged:** 2026-05-01
+**Resolved:** 2026-05-01
 **Owner:** unassigned
 **Severity:** medium (will bite anyone running `supabase db push` or `supabase migration list`)
+**Status:** ✅ RESOLVED
+
+## Resolution (2026-05-01)
+
+Supabase CLI was not available in the build environment (`command not found`), so Option 2
+(`supabase migration repair`) was replaced with the equivalent direct SQL via MCP:
+
+1. **10 file-prefix INSERTs** into `supabase_migrations.schema_migrations` — one row per
+   migration file (versions `0041`, `0043`–`0051`), `name` set to the filename stem,
+   `statements` set to `'{}'` (empty array). Used `ON CONFLICT (version) DO NOTHING` as safety.
+
+2. **10 orphan timestamp DELETEs** — removed the stale timestamp-versioned rows
+   (`20260427171606` through `20260429134436`) that the MCP `apply_migration` calls had
+   originally created. Names matched the file-prefix rows exactly before deletion.
+
+**Verified:** `SELECT version, name FROM supabase_migrations.schema_migrations WHERE version IN ('0041','0043','0044','0045','0046','0047','0048','0049','0050','0051')` returned all 10 rows in file-prefix format. No timestamp orphans remain for this range.
+
+**Note:** The older pre-0041 entries remain timestamp-versioned (they predate the file-prefix era and were applied via CLI — leave them alone).
 
 ## What
 
