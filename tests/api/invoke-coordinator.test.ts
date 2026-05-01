@@ -206,6 +206,16 @@ describe('POST /api/harness/invoke-coordinator — happy path', () => {
     expect(sentBody.text).toBe(`task_id: ${VALID_TASK_ID}\nrun_id: ${VALID_RUN_ID}`)
   })
 
+  it('fire body contains only { text } — no branch field (Routines API ignores it)', async () => {
+    const req = makeRequest(VALID_BODY)
+    await POST(req)
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    const sentBody = JSON.parse(options.body as string) as Record<string, unknown>
+    expect(Object.keys(sentBody)).toEqual(['text'])
+    expect('branch' in sentBody).toBe(false)
+  })
+
   it('writes coordinator_invoked event with status=success', async () => {
     const agentEventsBuilder = makeInsertBuilder()
     const attributionBuilder = makeInsertBuilder()

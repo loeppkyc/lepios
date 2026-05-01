@@ -49,7 +49,7 @@ gated on a clean week of overnight runs.
 ## 2 — Stack (locked, from ARCHITECTURE.md §9)
 
 - **Framework:** Next.js App Router, TypeScript
-- **Database/Auth:** Supabase (RLS enforced — Safety Agent reviews all migrations)
+- **Database/Auth:** Supabase (RLS enforced — coordinator reviews all migration PRs before apply; `scripts/verify-safety.ts` handles static secret scanning)
 - **Payments:** Stripe (not v1-critical)
 - **Hosting:** Vercel
 - **UI:** React + Tailwind v4 + shadcn/ui — heavily customized per Design Council; no generic SaaS look
@@ -108,6 +108,8 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ## 8 — Capabilities (LepiOS-specific)
 
+**GPU Day readiness:** see [`docs/gpu-day-readiness.md`](docs/gpu-day-readiness.md) — weighted tracker, updated every relevant window close.
+
 ### Chart Conventions
 
 - **Charts:** use shadcn/ui Chart (`ChartContainer` + Recharts primitives). See `components/ui/chart.tsx`.
@@ -138,14 +140,75 @@ Local dev equivalents: replace `https://lepios-one.vercel.app` with `http://loca
 
 ### LepiOS MCP Tools
 
-| Tool                                               | When to use in this project                                                                    |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `mcp__claude_ai_Supabase__execute_sql`             | Read `harness_config`, query `agent_events`, inspect `task_queue` — primary DB inspection tool |
-| `mcp__claude_ai_Supabase__apply_migration`         | Apply schema migrations during sprint builds (builder only)                                    |
-| `mcp__claude_ai_Supabase__list_migrations`         | Verify migration was applied; cross-check against `supabase/migrations/`                       |
-| `mcp__claude_ai_Vercel__list_deployments`          | Confirm a deploy landed before marking a chunk complete                                        |
-| `mcp__claude_ai_Vercel__get_runtime_logs`          | Diagnose production errors that don't appear in local logs                                     |
-| `mcp__claude_ai_Vercel__get_deployment_build_logs` | Debug failed builds when Vercel CLI output is truncated                                        |
+**Supabase** (`mcp__claude_ai_Supabase__*`)
+
+| Tool              | When to use                                                                                                                | Never use for                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `execute_sql`     | Read `harness_config`, query `agent_events`, `task_queue`, `outbound_notifications`; check column names before writing SQL | Schema changes — use `apply_migration` |
+| `apply_migration` | Apply schema migrations (builder only, after acceptance doc approval)                                                      | Read queries                           |
+| `list_migrations` | Verify a migration landed; cross-check against `supabase/migrations/`                                                      | —                                      |
+| `list_tables`     | Confirm table exists before writing SQL that references it — prevents F-L3 drift                                           | —                                      |
+| `get_project`     | Get project URL and region                                                                                                 | —                                      |
+
+**Vercel** (`mcp__claude_ai_Vercel__*`)
+
+| Tool                        | When to use                                             | Never use for |
+| --------------------------- | ------------------------------------------------------- | ------------- |
+| `list_deployments`          | Confirm a deploy landed before marking a chunk complete | —             |
+| `get_runtime_logs`          | Diagnose production errors absent from local logs       | —             |
+| `get_deployment_build_logs` | Debug failed builds when CLI output is truncated        | —             |
+
+**Sentry** (`mcp__claude_ai_Sentry__*`)
+
+| Tool                  | When to use                                        | Never use for                           |
+| --------------------- | -------------------------------------------------- | --------------------------------------- |
+| `search_issues`       | Find production errors by component/route          | Liveness checks — use `GET /api/health` |
+| `get_sentry_resource` | Full error details + stack trace for a known issue | —                                       |
+
+**Puppeteer** (`mcp__puppeteer__*`)
+
+| Tool                                          | When to use                                                  | Never use for                            |
+| --------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| `puppeteer_navigate` + `puppeteer_screenshot` | Post-deploy smoke test, E2E flow verification, UI regression | Pages with a JSON API — use curl instead |
+
+**Google Sheets** (`mcp__google-sheets__*`)
+
+| Tool         | When to use                                        | Never use for                          |
+| ------------ | -------------------------------------------------- | -------------------------------------- |
+| `read_sheet` | Read Streamlit baseline data for porting reference | Large reads (>500 rows) — download CSV |
+
+### Global Skills Available
+
+Skills are invoked via `/skill-name`. No project-level skills dir; all are global (`~/.claude/skills/`).
+
+| Skill                   | When to trigger in LepiOS                                                     |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `/deploy-verify`        | After any PR merged to main — smoke-checks live Vercel routes                 |
+| `/env-audit`            | Before any deploy that introduces new env vars                                |
+| `/incident-runbook`     | Any production incident: build failing, Supabase unreachable, Telegram silent |
+| `/api-budget`           | Before any multi-agent run or bulk Keepa/SP-API scan                          |
+| `/telegram-dispatch`    | Routing harness alerts to the correct bot                                     |
+| `/stochastic-consensus` | Architecture decisions needing adversarial validation                         |
+| `/schedule`             | Creating/managing cron-scheduled remote agents                                |
+| `/loop`                 | Polling tasks: watching a deploy, checking cron output                        |
+| `/simplify`             | After builder ships a chunk — code quality pass                               |
+
+### Sub-agent Types
+
+| Type              | Use for                                                         | Don't use for                                        |
+| ----------------- | --------------------------------------------------------------- | ---------------------------------------------------- |
+| `Explore`         | Open-ended codebase search when scope is uncertain (>3 queries) | Code review, cross-file analysis — it reads excerpts |
+| `Plan`            | Architecture decisions, multi-file design before coding         | Tasks where the file and change are already known    |
+| `general-purpose` | Research, multi-step tasks, anything not fitting Explore/Plan   | Simple lookups — use Grep/Read directly              |
+
+### Harness Components (not Claude agents)
+
+| Component            | What it is                                                                         | Spec                                      |
+| -------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Deploy Gate**      | Vercel preview → Telegram approve/reject → production promote pipeline             | `docs/harness-component-6-deploy-gate.md` |
+| **Task Pickup Cron** | Daily (or hourly when Hobby slot available) cron that claims and fires coordinator | `docs/harness-component-5-task-pickup.md` |
+
+> Safety Agent (mentioned in §2) is performed by Colin or coordinator in person — no agent file exists. Target: Sprint 5+.
 
 ### Runtime Config Pattern
 
@@ -286,5 +349,14 @@ Caught table-name drift, timezone handling bugs, and scope ambiguity before buil
 **S-L1: `harness_config` as DB-resident runtime config (14c7809, 2026-04-20)**
 Eliminated the "env var missing at coordinator runtime" failure class. Config survives Vercel env rotation. Coordinator reads at startup; no process.env dependency.
 → Autonomous agent runtime values → `harness_config`. App runtime values → Vercel env. Never cross the boundary.
+
+### Overflow logs (F-N / S-N series — post F-L15)
+
+Entries added after F-L15 live in separate files to keep this section scannable:
+
+- **Failures:** [`docs/claude-md/failures.md`](docs/claude-md/failures.md) — F-N1 through current
+- **Successes:** [`docs/claude-md/successes.md`](docs/claude-md/successes.md) — S-N1 through current
+
+Add new entries to those files, not to this section. Update this pointer when the F-N / S-N count changes significantly.
 
 @AGENTS.md

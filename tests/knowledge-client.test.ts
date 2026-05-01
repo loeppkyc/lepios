@@ -61,6 +61,47 @@ function makeInsertBuilder(result: { data: unknown; error: unknown }) {
   return { insert, select, single }
 }
 
+/**
+ * saveKnowledge now does:
+ *   1. lookup:   from('knowledge').select(...).eq().limit(1).eq|is().maybeSingle()
+ *   2a. on hit:  from('knowledge').update({...}).eq('id', ...)
+ *   2b. on miss: from('knowledge').insert({...}).select('id').single()
+ *
+ * This builder serves all three chains via the same `from()` return value.
+ */
+function makeKnowledgeBuilder(opts: {
+  lookup?: { data: unknown; error: unknown }
+  insertResult?: { data: unknown; error: unknown }
+  updateResult?: { data: unknown; error: unknown }
+}) {
+  const maybeSingle = vi.fn().mockResolvedValue(opts.lookup ?? { data: null, error: null })
+  const insertSingle = vi
+    .fn()
+    .mockResolvedValue(opts.insertResult ?? { data: { id: 'mock-id' }, error: null })
+  const updateEq = vi
+    .fn()
+    .mockResolvedValue(opts.updateResult ?? { data: null, error: null })
+
+  // Lookup chain: select().eq().limit().eq|is().maybeSingle()
+  const selectStage: Record<string, unknown> = { maybeSingle }
+  selectStage.eq = vi.fn().mockReturnValue(selectStage)
+  selectStage.limit = vi.fn().mockReturnValue(selectStage)
+  selectStage.is = vi.fn().mockReturnValue(selectStage)
+
+  // Insert chain: insert().select().single()
+  const insertSelectStage = { single: insertSingle }
+  const insertStage = { select: vi.fn().mockReturnValue(insertSelectStage) }
+
+  // Update chain: update().eq() — eq() is awaited directly
+  const updateStage = { eq: updateEq }
+
+  const select = vi.fn().mockReturnValue(selectStage)
+  const insert = vi.fn().mockReturnValue(insertStage)
+  const update = vi.fn().mockReturnValue(updateStage)
+
+  return { select, insert, update, maybeSingle, insertSingle, updateEq }
+}
+
 function makeSelectBuilder(result: { data: unknown; error: unknown; count?: number | null }) {
   const resolved = vi.fn().mockResolvedValue(result)
   const builder = {
@@ -176,7 +217,7 @@ describe('logSuccess', () => {
 
 describe('saveKnowledge', () => {
   it('returns knowledge id on success', async () => {
-    const b = makeInsertBuilder({ data: { id: 'know-1' }, error: null })
+    const b = makeKnowledgeBuilder({ insertResult: { data: { id: 'know-1' }, error: null } })
     mockFrom.mockReturnValue(b)
 
     const id = await saveKnowledge('error_fix', 'pageprofit', 'Keepa token exhaustion')
@@ -192,7 +233,7 @@ describe('saveKnowledge', () => {
   })
 
   it('returns null on Supabase error — never throws', async () => {
-    const b = makeInsertBuilder({ data: null, error: { message: 'fail' } })
+    const b = makeKnowledgeBuilder({ insertResult: { data: null, error: { message: 'fail' } } })
     mockFrom.mockReturnValue(b)
 
     const id = await saveKnowledge('tip', 'system', 'Test')
@@ -200,7 +241,7 @@ describe('saveKnowledge', () => {
   })
 
   it('defaults confidence to 0.5 when not provided', async () => {
-    const b = makeInsertBuilder({ data: { id: 'k' }, error: null })
+    const b = makeKnowledgeBuilder({ insertResult: { data: { id: 'k' }, error: null } })
     mockFrom.mockReturnValue(b)
 
     await saveKnowledge('tip', 'system', 'Test')
@@ -208,11 +249,115 @@ describe('saveKnowledge', () => {
   })
 
   it('truncates title to 300 chars', async () => {
-    const b = makeInsertBuilder({ data: { id: 'k' }, error: null })
+    const b = makeKnowledgeBuilder({ insertResult: { data: { id: 'k' }, error: null } })
     mockFrom.mockReturnValue(b)
 
     await saveKnowledge('tip', 'system', 'T'.repeat(400))
     expect(b.insert.mock.calls[0][0].title).toHaveLength(300)
+  })
+})
+
+// ── saveKnowledge — content_hash dedupe guard (migration 0049) ────────────────
+
+describe('saveKnowledge — content_hash dedupe guard', () => {
+  it('on hit with NULL entity: returns existing id, no INSERT, source_events grows by 1', async () => {
+    const b = makeKnowledgeBuilder({
+      lookup: {
+        data: { id: 'k-existing', source_events: ['old-uuid'], times_used: 0 },
+        error: null,
+      },
+    })
+    mockFrom.mockReturnValue(b)
+
+    const id = await saveKnowledge(
+      'failed_approach',
+      'ollama',
+      'Unresolved: ollama.generate failed',
+      {
+        problem: 'Ollama unreachable',
+        context: 'This failure was not resolved in this session',
+        confidence: 0.3,
+        sourceEvents: ['new-uuid'],
+        // entity omitted → NULL
+      },
+    )
+
+    expect(id).toBe('k-existing')
+    expect(b.insert).not.toHaveBeenCalled()
+    expect(b.update).toHaveBeenCalledTimes(1)
+
+    const updatePayload = b.update.mock.calls[0][0] as Record<string, unknown>
+    expect(updatePayload.source_events).toEqual(['old-uuid', 'new-uuid'])
+    expect(updatePayload.times_used).toBe(1)
+    // NULL-entity branch must use .is('entity', null), not .eq('entity', ...)
+    const selectStageCalls = (b.select.mock.results[0]?.value ?? {}) as {
+      is: ReturnType<typeof vi.fn>
+    }
+    expect(selectStageCalls.is).toHaveBeenCalledWith('entity', null)
+  })
+
+  it('on hit with same non-null entity: returns existing id, no INSERT, source_events grows by 1', async () => {
+    const b = makeKnowledgeBuilder({
+      lookup: {
+        data: { id: 'k-cra', source_events: ['evt-1'], times_used: 2 },
+        error: null,
+      },
+    })
+    mockFrom.mockReturnValue(b)
+
+    const id = await saveKnowledge(
+      'tip',
+      'personal',
+      'Address changed - Canada Revenue Agency',
+      {
+        entity: 'Canada Revenue Agency',
+        context: 'page in My Account to ensure it is correct.',
+        sourceEvents: ['evt-2'],
+      },
+    )
+
+    expect(id).toBe('k-cra')
+    expect(b.insert).not.toHaveBeenCalled()
+    expect(b.update).toHaveBeenCalledTimes(1)
+
+    const updatePayload = b.update.mock.calls[0][0] as Record<string, unknown>
+    expect(updatePayload.source_events).toEqual(['evt-1', 'evt-2'])
+    expect(updatePayload.times_used).toBe(3)
+  })
+
+  it('miss path: lookup returns no row, INSERT proceeds, distinct entity → distinct row', async () => {
+    // Identical content but different entity — lookup returns null, INSERT happens.
+    const b = makeKnowledgeBuilder({
+      lookup: { data: null, error: null },
+      insertResult: { data: { id: 'k-new' }, error: null },
+    })
+    mockFrom.mockReturnValue(b)
+
+    const id = await saveKnowledge(
+      'tip',
+      'personal',
+      'Address changed - Canada Revenue Agency',
+      {
+        entity: 'Different Agency', // different from a prior CRA row with identical content
+        context: 'page in My Account to ensure it is correct.',
+      },
+    )
+
+    expect(id).toBe('k-new')
+    expect(b.update).not.toHaveBeenCalled()
+    expect(b.insert).toHaveBeenCalledTimes(1)
+    expect(b.insert.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        entity: 'Different Agency',
+        title: 'Address changed - Canada Revenue Agency',
+      }),
+    )
+    // Non-null entity must use .eq('entity', value), not .is('entity', null)
+    const selectStage = b.select.mock.results[0]?.value as {
+      eq: ReturnType<typeof vi.fn>
+    }
+    const eqCalls = selectStage.eq.mock.calls.map((c: unknown[]) => c[0])
+    expect(eqCalls).toContain('entity')
   })
 })
 
@@ -457,7 +602,7 @@ describe('saveKnowledge — auto-embed (Step 5)', () => {
   it('stores embedding when Ollama is reachable', async () => {
     mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
 
-    const b = makeInsertBuilder({ data: { id: 'k-new' }, error: null })
+    const b = makeKnowledgeBuilder({ insertResult: { data: { id: 'k-new' }, error: null } })
     mockFrom.mockReturnValue(b)
 
     await saveKnowledge('tip', 'system', 'Test knowledge entry')
@@ -472,7 +617,7 @@ describe('saveKnowledge — auto-embed (Step 5)', () => {
     const { OllamaUnreachableError } = await import('@/lib/ollama/client')
     mockEmbed.mockRejectedValue(new OllamaUnreachableError())
 
-    const b = makeInsertBuilder({ data: { id: 'k-new' }, error: null })
+    const b = makeKnowledgeBuilder({ insertResult: { data: { id: 'k-new' }, error: null } })
     mockFrom.mockReturnValue(b)
 
     const id = await saveKnowledge('tip', 'system', 'Test knowledge entry')
@@ -486,7 +631,7 @@ describe('saveKnowledge — auto-embed (Step 5)', () => {
   it('returns null on Supabase insert error even when embed succeeds', async () => {
     mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
 
-    const b = makeInsertBuilder({ data: null, error: { message: 'insert failed' } })
+    const b = makeKnowledgeBuilder({ insertResult: { data: null, error: { message: 'insert failed' } } })
     mockFrom.mockReturnValue(b)
 
     const id = await saveKnowledge('tip', 'system', 'Test')

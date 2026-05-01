@@ -50,11 +50,14 @@ function makeSelectChain(rows: PendingRow[]) {
   return chain
 }
 
-// Wires mockFrom: first call → task_queue (improvement engine trigger — returns empty),
-// second call → outbound_notifications select chain, subsequent calls → update builder
-// or agent_events insert builder (matched by table name).
-// Returns update/updateEq spies and agentEventsInsert spy for assertions.
-function setupDrainMock(rows: PendingRow[]) {
+// Wires mockFrom by table name:
+//   agent_events          → insert spy
+//   pending_drain_triggers → select chain (returns pendingTriggerRows) + update spy
+//   task_queue            → empty select chain (improvement engine trigger)
+//   outbound_notifications → select chain (rows) + update builder
+//
+// Returns update/updateEq spies, agentEventsInsert spy, and drainTriggerUpdate spy.
+function setupDrainMock(rows: PendingRow[], pendingTriggerRows: { id: string }[] = []) {
   const updateEq = vi.fn().mockResolvedValue({ data: null, error: null })
   const update = vi.fn().mockReturnValue({ eq: updateEq })
   const selectChain = makeSelectChain(rows)
@@ -75,16 +78,26 @@ function setupDrainMock(rows: PendingRow[]) {
     emptyTaskQueueChain[m] = vi.fn().mockReturnValue(emptyTaskQueueChain)
   }
 
+  // Chain for pending_drain_triggers select
+  const drainTriggerSelectChain = makeSelectChain(pendingTriggerRows)
+  const drainTriggerUpdateIn = vi.fn().mockResolvedValue({ data: null, error: null })
+  const drainTriggerUpdate = vi.fn().mockReturnValue({ in: drainTriggerUpdateIn })
+
   let fromCallCount = 0
   mockFrom.mockImplementation((table: string) => {
     if (table === 'agent_events') return { insert: agentEventsInsert }
+    if (table === 'pending_drain_triggers')
+      return {
+        select: vi.fn().mockReturnValue(drainTriggerSelectChain),
+        update: drainTriggerUpdate,
+      }
     fromCallCount++
     if (fromCallCount === 1) return { select: vi.fn().mockReturnValue(emptyTaskQueueChain) } // task_queue trigger
     if (fromCallCount === 2) return selectChain // outbound_notifications select
     return { update } // outbound_notifications update
   })
 
-  return { update, updateEq, agentEventsInsert }
+  return { update, updateEq, agentEventsInsert, drainTriggerUpdate, drainTriggerUpdateIn }
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -366,5 +379,41 @@ describe('GET /api/harness/notifications-drain — queue processing', () => {
     expect(meta.drained).toBe(0)
     expect(meta.failed).toBe(0)
     expect(meta.batch_queued).toBe(0)
+  })
+})
+
+// ── H1-B Stage 2: pending_drain_triggers ─────────────────────────────────────
+
+describe('GET /api/harness/notifications-drain — pending_drain_triggers', () => {
+  it('marks pending trigger rows as processed after drain completes', async () => {
+    const { drainTriggerUpdate, drainTriggerUpdateIn } = setupDrainMock(
+      [],
+      [{ id: 'trigger-id-1' }, { id: 'trigger-id-2' }]
+    )
+
+    const res = await GET(makeAuthorizedRequest())
+    expect(res.status).toBe(200)
+
+    expect(drainTriggerUpdate).toHaveBeenCalledOnce()
+    const updatePayload = drainTriggerUpdate.mock.calls[0][0] as Record<string, unknown>
+    expect(updatePayload.status).toBe('processed')
+    expect(typeof updatePayload.processed_at).toBe('string')
+
+    // Must target the correct row IDs
+    expect(drainTriggerUpdateIn).toHaveBeenCalledOnce()
+    const inCall = drainTriggerUpdateIn.mock.calls[0] as [string, string[]]
+    expect(inCall[0]).toBe('id')
+    expect(inCall[1]).toContain('trigger-id-1')
+    expect(inCall[1]).toContain('trigger-id-2')
+  })
+
+  it('skips update when no pending triggers exist', async () => {
+    const { drainTriggerUpdate } = setupDrainMock([], [])
+
+    const res = await GET(makeAuthorizedRequest())
+    expect(res.status).toBe(200)
+
+    // update must not be called if select returns empty
+    expect(drainTriggerUpdate).not.toHaveBeenCalled()
   })
 })

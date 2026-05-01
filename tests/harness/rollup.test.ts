@@ -116,34 +116,49 @@ describe('computeHarnessRollup', () => {
     expect(result?.complete_count).toBe(1) // only one is 100%
   })
 
-  it('seeds math: 18 components from 0032 seed give ~84.6%', async () => {
-    // Full seed from migration 0032 — regression baseline
+  it('seeds math: 21 components from 0043 seed give 58.4% (post-recompute 2026-04-28)', async () => {
+    // Full seed from migration 0043, with the 2026-04-28 rollup recompute applied.
+    // Source of truth: docs/harness/HARNESS_FOUNDATION_SPEC.md (Draft 2 + recompute log).
+    // Five row-level rescores landed 2026-04-28: chat_ui 0→26, digital_twin 85→62,
+    // specialized_agents 40→55, telegram_outbound 50→75, attribution 30→55.
+    // security_layer stays at 30 per the SECURITY_LAYER_SPEC completion-pct rubric
+    // (schema landed via 0045 ≠ runtime capability landed; only 30 is correct until
+    // lib/security/ modules ship).
     const rows = makeComponents([
-      { weight_pct: 18, completion_pct: 100 },
-      { weight_pct: 9, completion_pct: 100 },
-      { weight_pct: 9, completion_pct: 100 },
-      { weight_pct: 9, completion_pct: 100 },
-      { weight_pct: 7, completion_pct: 100 },
-      { weight_pct: 6, completion_pct: 100 },
-      { weight_pct: 5, completion_pct: 100 },
-      { weight_pct: 3, completion_pct: 100 },
-      { weight_pct: 2, completion_pct: 100 },
-      { weight_pct: 5, completion_pct: 100 },
-      { weight_pct: 4, completion_pct: 100 },
-      { weight_pct: 4, completion_pct: 100 },
-      { weight_pct: 4, completion_pct: 0 }, // twin_ollama
-      { weight_pct: 2, completion_pct: 100 },
-      { weight_pct: 2, completion_pct: 0 }, // telegram_drain_hourly
-      { weight_pct: 6, completion_pct: 0 }, // telegram_remaining
-      { weight_pct: 3, completion_pct: 30 }, // smoke_test_framework
-      { weight_pct: 2, completion_pct: 33 }, // prestaged_tasks
+      // T1 — Core orchestration (24 weight, all shipped)
+      { weight_pct: 12, completion_pct: 100 }, // coordinator_loop
+      { weight_pct: 5, completion_pct: 100 }, // task_pickup
+      { weight_pct: 4, completion_pct: 100 }, // remote_invocation
+      { weight_pct: 3, completion_pct: 100 }, // deploy_gate
+      // T2 — Observability + improvement (16 weight)
+      { weight_pct: 3, completion_pct: 100 }, // stall_detection
+      { weight_pct: 3, completion_pct: 100 }, // notification_drain
+      { weight_pct: 3, completion_pct: 100 }, // f18_surfacing
+      { weight_pct: 4, completion_pct: 100 }, // improvement_loop
+      { weight_pct: 3, completion_pct: 90 }, // smoke_test_framework
+      // T3 — Agentic capabilities (45 weight)
+      { weight_pct: 9, completion_pct: 30 }, // arms_legs
+      { weight_pct: 7, completion_pct: 0 }, // sandbox
+      { weight_pct: 7, completion_pct: 30 }, // security_layer
+      { weight_pct: 6, completion_pct: 0 }, // self_repair
+      { weight_pct: 6, completion_pct: 62 }, // digital_twin (rescored 85→62)
+      { weight_pct: 5, completion_pct: 55 }, // specialized_agents (40→55)
+      { weight_pct: 3, completion_pct: 0 }, // push_bash_automation
+      { weight_pct: 2, completion_pct: 10 }, // debate_consensus
+      // T4 — Interfaces + attribution (15 weight)
+      { weight_pct: 6, completion_pct: 26 }, // chat_ui (0→26)
+      { weight_pct: 4, completion_pct: 75 }, // telegram_outbound (50→75)
+      { weight_pct: 3, completion_pct: 55 }, // attribution (30→55)
+      { weight_pct: 2, completion_pct: 50 }, // ollama_daytime
     ])
     mockFrom.mockReturnValueOnce(makeComponentsBuilder(rows))
     const result = await computeHarnessRollup()
-    // weighted sum: 83 complete + 0.9 (3×0.3) + 0.66 (2×0.33) = 84.56 → 84.6
-    expect(result?.rollup_pct).toBe(84.6)
-    expect(result?.complete_count).toBe(13) // 13 components at 100%
-    expect(result?.total_count).toBe(18)
+    // T1=24.0 + T2=15.7 + T3=11.47 + T4=7.21 = 58.38 → rounded 58.4
+    expect(result?.rollup_pct).toBe(58.4)
+    expect(result?.complete_count).toBe(8) // 8 components at 100% (unchanged)
+    expect(result?.total_count).toBe(21)
+    // Sum of weights = 100, so points_remaining = 100 - 58.4 = 41.6
+    expect(result?.points_remaining).toBe(41.6)
   })
 })
 

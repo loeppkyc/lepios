@@ -42,11 +42,15 @@ interface RetrievalResult {
 
 // Expanded in P3 to include coordinator rule/principle chunks ingested from
 // CLAUDE.md. Without these categories the twin corpus is only raw emails.
+// 'decision' added 2026-04-28 (memory layer chunk #1) so decisions_log rows
+// mirrored into knowledge are retrievable; 'idea' reserved for chunk #2.
 const SEARCHABLE_CATEGORIES = [
   'personal_correspondence',
   'personal_knowledge_base',
   'principle',
   'rule',
+  'decision',
+  'idea',
 ]
 
 const SYSTEM_PROMPT =

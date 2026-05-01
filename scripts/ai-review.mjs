@@ -19,49 +19,50 @@ const MODEL = 'claude-sonnet-4-6'
 // Usage: AI_REVIEW_DRY_RUN="BLOCK: hardcoded secret\nWARN: TODO marker" node scripts/ai-review.mjs
 const DRY_RUN_RESPONSE = process.env.AI_REVIEW_DRY_RUN
 
-// ── Get staged diff ────────────────────────────────────────────────────────────
-let diff
-try {
-  diff = execSync('git diff --cached', { encoding: 'utf8', maxBuffer: 512 * 1024 })
-} catch {
-  console.error('[review] Failed to get staged diff — skipping AI review')
-  process.exit(0)
-}
-
-if (!diff.trim()) {
-  console.log('[review] No staged changes — skipping AI review')
-  process.exit(0)
-}
-
-// Flag oversized diffs for manual review
-if (diff.length > 40_000) {
-  console.warn('[review] WARN: diff exceeds 400 lines — flagged for manual review')
-  console.warn('[review] Commit proceeds but large diffs risk missing issues.')
-}
-
-// ── Call Sonnet (or use dry-run) ──────────────────────────────────────────────
-let response
-
-if (DRY_RUN_RESPONSE !== undefined) {
-  console.warn('[review] DRY RUN MODE — using simulated AI response')
-  response = DRY_RUN_RESPONSE.replace(/\\n/g, '\n')
-} else {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    console.error('')
-    console.error('[review] ✗ BLOCKED — ANTHROPIC_API_KEY not set in environment.')
-    console.error('[review]   The Reviewer Agent cannot run without it.')
-    console.error('[review]   Fix: add to your shell profile and reload:')
-    console.error('[review]     export ANTHROPIC_API_KEY=sk-ant-...')
-    console.error('[review]   Bypass (logs reason): ./scripts/commit-skip.sh "reason"')
-    console.error('[review]   Raw bypass (no log):  git commit --no-verify')
-    console.error('')
-    process.exit(1)
+async function main() {
+  // ── Get staged diff ──────────────────────────────────────────────────────────
+  let diff
+  try {
+    diff = execSync('git diff --cached', { encoding: 'utf8', maxBuffer: 512 * 1024 })
+  } catch {
+    console.error('[review] Failed to get staged diff — skipping AI review')
+    return 0
   }
 
-  const client = new Anthropic({ apiKey })
+  if (!diff.trim()) {
+    console.log('[review] No staged changes — skipping AI review')
+    return 0
+  }
 
-  const SYSTEM = `You are a strict code reviewer for a Next.js 16 + TypeScript + Supabase project.
+  // Flag oversized diffs for manual review
+  if (diff.length > 40_000) {
+    console.warn('[review] WARN: diff exceeds 400 lines — flagged for manual review')
+    console.warn('[review] Commit proceeds but large diffs risk missing issues.')
+  }
+
+  // ── Call Sonnet (or use dry-run) ────────────────────────────────────────────
+  let response
+
+  if (DRY_RUN_RESPONSE !== undefined) {
+    console.warn('[review] DRY RUN MODE — using simulated AI response')
+    response = DRY_RUN_RESPONSE.replace(/\\n/g, '\n')
+  } else {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.error('')
+      console.error('[review] ✗ BLOCKED — ANTHROPIC_API_KEY not set in environment.')
+      console.error('[review]   The Reviewer Agent cannot run without it.')
+      console.error('[review]   Fix: add to your shell profile and reload:')
+      console.error('[review]     export ANTHROPIC_API_KEY=sk-ant-...')
+      console.error('[review]   Bypass (logs reason): ./scripts/commit-skip.sh "reason"')
+      console.error('[review]   Raw bypass (no log):  git commit --no-verify')
+      console.error('')
+      return 1
+    }
+
+    const client = new Anthropic({ apiKey })
+
+    const SYSTEM = `You are a strict code reviewer for a Next.js 16 + TypeScript + Supabase project.
 Review the staged git diff and output findings.
 
 For each issue found, output exactly one line in this format:
@@ -87,48 +88,55 @@ Checklist — check ALL of these:
 Output only the finding lines. No preamble, no markdown, no explanations beyond the finding line itself.
 Minimum one line of output. If nothing is wrong: "PASS: diff looks clean"`
 
-  try {
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 512,
-      system: SYSTEM,
-      messages: [
-        {
-          role: 'user',
-          content: `Review this staged diff:\n\n\`\`\`diff\n${diff.slice(0, 32_000)}\n\`\`\``,
-        },
-      ],
-    })
-    response = msg.content[0].type === 'text' ? msg.content[0].text : ''
-  } catch (err) {
-    console.warn('[review] AI review call failed — skipping Layer 2:', err.message)
-    process.exit(0)
+    try {
+      const msg = await client.messages.create({
+        model: MODEL,
+        max_tokens: 512,
+        system: SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Review this staged diff:\n\n\`\`\`diff\n${diff.slice(0, 32_000)}\n\`\`\``,
+          },
+        ],
+      })
+      response = msg.content[0].type === 'text' ? msg.content[0].text : ''
+    } catch (err) {
+      console.warn('[review] AI review call failed — skipping Layer 2:', err.message)
+      return 0
+    }
   }
-}
 
-// ── Parse and display findings ─────────────────────────────────────────────────
-const lines = response.trim().split('\n').filter(Boolean)
-let hasBlock = false
+  // ── Parse and display findings ──────────────────────────────────────────────
+  const lines = response.trim().split('\n').filter(Boolean)
+  let hasBlock = false
 
-console.log('\n[review] ── Reviewer Agent findings ──')
-for (const line of lines) {
-  if (line.startsWith('BLOCK:')) {
-    console.error(`  ❌ ${line}`)
-    hasBlock = true
-  } else if (line.startsWith('WARN:')) {
-    console.warn(`  ⚠️  ${line}`)
-  } else if (line.startsWith('PASS:')) {
-    console.log(`  ✓  ${line}`)
-  } else {
-    console.log(`     ${line}`)
+  console.log('\n[review] ── Reviewer Agent findings ──')
+  for (const line of lines) {
+    if (line.startsWith('BLOCK:')) {
+      console.error(`  ❌ ${line}`)
+      hasBlock = true
+    } else if (line.startsWith('WARN:')) {
+      console.warn(`  ⚠️  ${line}`)
+    } else if (line.startsWith('PASS:')) {
+      console.log(`  ✓  ${line}`)
+    } else {
+      console.log(`     ${line}`)
+    }
   }
-}
-console.log('[review] ──────────────────────────────\n')
+  console.log('[review] ──────────────────────────────\n')
 
-if (hasBlock) {
-  console.error('[review] BLOCKED — fix the issues above before committing.')
-  console.error('[review] To bypass (and log the skip): SKIP_AI_REVIEW=1 git commit')
-  process.exit(1)
+  if (hasBlock) {
+    console.error('[review] BLOCKED — fix the issues above before committing.')
+    console.error('[review] To bypass (and log the skip): SKIP_AI_REVIEW=1 git commit')
+    return 1
+  }
+
+  return 0
 }
 
-process.exit(0)
+// Use exitCode (not process.exit) — lets Node drain open handles cleanly
+// (Anthropic SDK keep-alive sockets) before shutdown, avoiding the libuv
+// UV_HANDLE_CLOSING assertion on Windows. Same precedent as
+// scripts/verify-task-queue.ts:175. See docs/review-skips.md rows 234-235, 242-243.
+process.exitCode = await main()
