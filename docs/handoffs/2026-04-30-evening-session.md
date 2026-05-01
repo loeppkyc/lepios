@@ -86,3 +86,14 @@ BLOCKED. build_metrics (migrations 0052+0053) is on feature/auth-fail-closed-har
 
 ## Rollup status
 Amazon pipeline: 33.6% (37.0/110), see docs/lepios/amazon-pipeline-rollup.md
+
+## Merge order constraints (discovered late)
+
+### #38 before #36
+Both PRs carry byte-identical migrations 0052_build_metrics.sql + 0053_build_metrics_seed.sql + tests/migrations/0052-build-metrics.test.ts. Merge #38 first (smaller, surgical), then resolve #36 by removing the duplicate files from its branch before merging.
+
+### #37 chart files vs main working tree
+Disk versions of components/ui/card.tsx, components/ui/chart.tsx, tests/chart-migration.test.ts differ from the #37 branch versions. Diff before merging — disk may contain real edits worth preserving, or may be noise to discard.
+
+### #37 recharts dependency
+recharts ^3.8.0 is in #37's package.json but not installed in main's node_modules. The 4 failing chart-migration tests on main are this leak's footprint. Merging #37 + npm install resolves both.
