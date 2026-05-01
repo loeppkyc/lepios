@@ -72,6 +72,7 @@ gated on a clean week of overnight runs.
 9. **F19 — Continuous improvement (process layer):** Every system, process, and workflow is continuously evaluated for "how can this be 20% faster, cheaper, or better?" Companion to F17 and F18 — extends the module-level 20% Better loop to the build process itself. Scope: (a) build process (parallelization, batching, idle resource detection); (b) module quality (original 20% Better loop scope); (c) communication patterns (paste blocks, friction signals, repeated clarifications); (d) resource utilization (Claude Code windows, coordinator quota, Ollama vs frontier routing); (e) Colin-time vs autonomous-time ratio — should trend toward autonomous. Implementation: every module ships with F18 metrics; every build cycle ends with a "what would have made this 20% faster?" reflection logged to CLAUDE.md §9; 20% Better loop runs nightly across all signals, surfaces top 3 actionable suggestions in morning_digest; any signal >20% inefficiency vs benchmark auto-queues a task. Process-layer instrumentation shipped 2026-04-26 in `lib/harness/process-efficiency.ts` (4 signals: queue throughput, pickup latency, queue depth, friction index).
 10. **F20 — Design system enforcement:** Every port chunk must use shadcn/ui components and Tailwind utility classes only. No inline `style={}` attributes in TSX files. No ad-hoc CSS files. All shared components in `app/components/` or `components/ui/`. Builder acceptance tests must grep new TSX files for `style=` and fail if found. See `docs/sprint-5/purpose-review-acceptance.md §9`.
 11. **F22 — Cron-secret auth via shared helper:** Every route under `app/api/**` that requires CRON_SECRET auth must call `requireCronSecret(request)` from `lib/auth/cron-secret.ts`. Inline `if (CRON_SECRET)` checks or local `isAuthorized()` helpers are forbidden — they re-introduce the fail-open bug (open endpoint when env var is missing). Enforced by `no-restricted-syntax` in `eslint.config.mjs` (scoped to `app/api/**`) and by reviewer-agent. Helper returns `null` on success, 500 if env unset, 401 on bad bearer. See `lib/rules/registry.ts` and `tests/auth/cron-secret.test.ts`.
+12. **F23 — GPU Day readiness tracker updated on every relevant window close:** `docs/gpu-day-readiness.md` is a living doc. Any window that ships or confirms a line item must recompute the total and bump "Last updated" before closing. Do not report a line item complete without updating the tracker.
 
 ---
 
@@ -106,6 +107,14 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 ---
 
 ## 8 — Capabilities (LepiOS-specific)
+
+### Chart Conventions
+
+- **Charts:** use shadcn/ui Chart (`ChartContainer` + Recharts primitives). See `components/ui/chart.tsx`.
+- **Sparklines (small inline):** raw SVG — see `QualityTrends.tsx` `Sparkline` function as the pattern.
+- **Reference implementation:** `app/(cockpit)/amazon/_components/AmazonDailyChart.tsx` — BarChart with dual series + ChartTooltipContent.
+- **ChartConfig colors:** pass LepiOS CSS vars directly (`color: 'var(--color-pillar-money)'`). `ChartStyle` injects them as scoped `--color-{key}` vars; use `fill="var(--color-{key})"` on Recharts elements.
+- **Decision record:** `docs/decisions/chart-library-strategy.md`
 
 ### Autonomous Harness Agents
 
