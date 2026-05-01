@@ -97,3 +97,10 @@ Disk versions of components/ui/card.tsx, components/ui/chart.tsx, tests/chart-mi
 
 ### #37 recharts dependency
 recharts ^3.8.0 is in #37's package.json but not installed in main's node_modules. The 4 failing chart-migration tests on main are this leak's footprint. Merging #37 + npm install resolves both.
+
+## #37 disk vs branch verdict (resolved)
+All three disk files are Prettier/whitespace noise vs branch versions. No real edits to preserve. Merge #37 as-is — branch wins for all three files.
+- components/ui/card.tsx: single→double quote, Tailwind reorder. Noise.
+- components/ui/chart.tsx: same pattern. Noise.
+- tests/chart-migration.test.ts: alignment whitespace. Noise.
+Action: merge #37 + npm install resolves the leak and the 4 failing tests in one shot.
