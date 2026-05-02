@@ -81,21 +81,34 @@ function edmontonDateString(d: Date): string {
 }
 
 /**
- * Build orderId → { revenue, tax } map from ALL orders (confirmed + pending).
- * Pending orders are included so their revenue can be surfaced as a sub-line
- * alongside the confirmed totals, matching the "(X pending)" pattern on the
- * Today panel.
+ * Build orderId → { revenue, tax } map.
+ * Pending orders use OrderTotal directly — SP-API returns empty items for them
+ * anyway and aggregateDay already falls back to OrderTotal, so the API call
+ * is wasted quota. Only confirmed orders fetch orderItems.
  */
 async function buildFinanceMap(
   orders: SpOrder[]
 ): Promise<Map<string, { revenue: number; tax: number }>> {
+  const map = new Map<string, { revenue: number; tax: number }>()
+
+  // Pending: use OrderTotal directly, no API call needed
+  for (const order of orders) {
+    if (order.OrderStatus === 'Pending') {
+      map.set(order.AmazonOrderId, {
+        revenue: Number(order.OrderTotal?.Amount ?? 0),
+        tax: 0,
+      })
+    }
+  }
+
+  // Confirmed: fetch actual item-level prices
+  const confirmedOrders = orders.filter((o) => o.OrderStatus !== 'Pending')
   const allItems = await Promise.all(
-    orders.map((o) =>
+    confirmedOrders.map((o) =>
       fetchOrderItems(o.AmazonOrderId).then((items) => ({ id: o.AmazonOrderId, items }))
     )
   )
 
-  const map = new Map<string, { revenue: number; tax: number }>()
   for (const { id, items } of allItems) {
     let revenue = 0
     let tax = 0
@@ -140,8 +153,7 @@ function aggregateDay(
       // For consumer Pending orders, OrderTotal includes tax (~5-15% overestimate) but
       // the sub-line is already labeled "pending" implying it is approximate.
       const itemsRevenue = finance.revenue
-      pendingRevenueCad +=
-        itemsRevenue > 0 ? itemsRevenue : Number(order.OrderTotal?.Amount ?? 0)
+      pendingRevenueCad += itemsRevenue > 0 ? itemsRevenue : Number(order.OrderTotal?.Amount ?? 0)
       pendingUnits += orderUnits
     } else {
       confirmedCount++
