@@ -53,10 +53,10 @@ export async function fetchAllFinancialEventGroups(
   }
 
   while (true) {
-    const data = await spFetch<FinancialEventGroupsResponse>(
-      '/finances/v0/financialEventGroups',
-      { method: 'GET', params: currentParams }
-    )
+    const data = await spFetch<FinancialEventGroupsResponse>('/finances/v0/financialEventGroups', {
+      method: 'GET',
+      params: currentParams,
+    })
 
     const page = data.payload?.FinancialEventGroupList ?? []
     groups.push(...page)
@@ -71,28 +71,21 @@ export async function fetchAllFinancialEventGroups(
 
 /**
  * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
- * for CAD groups not yet deposited to the bank.
+ * for open CAD groups.
  *
- * Includes: absent status (accumulating), null, "Initiated", "Pending", "Failed".
- * Excludes: "Transferred", "Successful" (already paid out).
- * Matches Seller Central "Payments > Total Balance".
+ * "Open" = FundTransferStatus field is absent (Constraint B-1).
  * CAD filter required (Constraint B-2): at least one open group has MXN $0.
  * Constraint B-9: no caching — caller's route uses force-dynamic.
  */
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups = await fetchAllFinancialEventGroups(180)
 
-  // Include any CAD group where money has NOT yet been deposited to the bank.
-  // "Transferred" / "Successful" = already paid out. Everything else (absent,
-  // null, "Initiated", "Pending", "Failed") still counts as owed.
-  // Matches Seller Central "Payments > Total Balance".
-  const PAID_OUT = new Set(['Transferred', 'Successful'])
+  // Filter: open (no FundTransferStatus) AND CAD (Constraint B-1, B-2)
   let total = 0
   for (const group of groups) {
-    const status = group.FundTransferStatus
-    const isOwed = !status || !PAID_OUT.has(status)
+    const isOpen = !('FundTransferStatus' in group) || group.FundTransferStatus === undefined
     const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
-    if (isOwed && isCad) {
+    if (isOpen && isCad) {
       total += group.OriginalTotal?.CurrencyAmount ?? 0
     }
   }
