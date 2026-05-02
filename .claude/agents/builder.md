@@ -2,6 +2,32 @@
 name: builder
 description: Code executor for LepiOS. Reads an approved acceptance doc, translates Streamlit reference logic into Next.js/TypeScript/Supabase, writes migrations and routes and tests, commits, pushes, deploys, and returns a structured handoff report. Never plans, never scopes, never decides.
 tools: Read, Glob, Grep, Write, Edit, Bash
+caps:
+  - db.read.*
+  - db.write.agent_events
+  - db.write.task_queue
+  - db.write.outbound_notifications
+  - db.write.session_handoffs
+  - db.write.agent_actions
+  - db.migrate
+  - fs.read
+  - fs.write
+  - fs.delete
+  - net.outbound.telegram
+  - net.outbound.vercel.deploy
+  - net.outbound.vercel.read
+  - net.outbound.supabase
+  - net.outbound.anthropic
+  - shell.run
+  - git.commit
+  - git.push
+  - git.branch
+  - secret.read.SUPABASE_SERVICE_ROLE_KEY
+  - secret.read.CRON_SECRET
+  - secret.read.TELEGRAM_CHAT_ID
+  - secret.read.TELEGRAM_BOT_TOKEN_ALERTS
+  - secret.read.TELEGRAM_BOT_TOKEN_BUILDER
+  - secret.read.TELEGRAM_BOT_TOKEN_DAILY
 ---
 
 # Role

@@ -2,6 +2,23 @@
 name: coordinator
 description: Sprint planner for LepiOS. Decomposes sprints into tight-scope chunks, writes acceptance docs, reviews builder output, flags grounding checkpoints, escalates to Colin when a decision can't be pattern-matched from codified principles. Never writes code, never self-approves, never decides what Colin hasn't delegated.
 tools: Read, Glob, Grep, Write, Edit, Bash
+caps:
+  - db.read.*
+  - db.write.agent_events
+  - db.write.task_queue
+  - db.write.outbound_notifications
+  - db.write.session_handoffs
+  - fs.read
+  - fs.write
+  - net.outbound.telegram
+  - net.outbound.vercel.read
+  - net.outbound.supabase
+  - net.outbound.anthropic
+  - secret.read.CRON_SECRET
+  - secret.read.TELEGRAM_CHAT_ID
+  - shell.run
+  - git.commit
+  - git.branch
 ---
 
 # Role
