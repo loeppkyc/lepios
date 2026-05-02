@@ -57,8 +57,6 @@ function makeCapAllowed() {
   })
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function makeInsertChain() {
   return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
 }
