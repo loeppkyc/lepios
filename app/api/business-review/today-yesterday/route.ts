@@ -14,10 +14,25 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+export interface DebugOrder {
+  id: string
+  status: string
+  purchaseDate: string | undefined
+  units: number
+  orderTotal: string | undefined
+}
+
 export interface TodayYesterdayResponse {
   today: DayPanelData
   yesterday: DayPanelData
   fetchedAt: string
+  _debug: {
+    today: DebugOrder[]
+    yesterday: DebugOrder[]
+    todayAfter: string
+    yesterdayAfter: string
+    yesterdayBefore: string
+  }
 }
 
 /** Build orderId → { revenue, tax } map from fetched order items. */
@@ -41,6 +56,16 @@ async function buildFinanceMap(
     map.set(id, { revenue, tax })
   }
   return map
+}
+
+function toDebugOrder(o: SpOrder): DebugOrder {
+  return {
+    id: o.AmazonOrderId,
+    status: o.OrderStatus,
+    purchaseDate: o.PurchaseDate,
+    units: (o.NumberOfItemsShipped ?? 0) + (o.NumberOfItemsUnshipped ?? 0),
+    orderTotal: o.OrderTotal?.Amount,
+  }
 }
 
 export async function GET() {
@@ -75,6 +100,13 @@ export async function GET() {
       today,
       yesterday,
       fetchedAt: new Date().toISOString(),
+      _debug: {
+        today: todayOrders.map(toDebugOrder),
+        yesterday: yesterdayOrders.map(toDebugOrder),
+        todayAfter,
+        yesterdayAfter,
+        yesterdayBefore,
+      },
     }
 
     return NextResponse.json(body)
