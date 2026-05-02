@@ -53,10 +53,10 @@ export async function fetchAllFinancialEventGroups(
   }
 
   while (true) {
-    const data = await spFetch<FinancialEventGroupsResponse>(
-      '/finances/v0/financialEventGroups',
-      { method: 'GET', params: currentParams }
-    )
+    const data = await spFetch<FinancialEventGroupsResponse>('/finances/v0/financialEventGroups', {
+      method: 'GET',
+      params: currentParams,
+    })
 
     const page = data.payload?.FinancialEventGroupList ?? []
     groups.push(...page)
@@ -82,17 +82,13 @@ export async function fetchAllFinancialEventGroups(
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups = await fetchAllFinancialEventGroups(180)
 
-  // Include any CAD group where money has NOT yet been deposited to the bank.
-  // "Transferred" / "Successful" = already paid out. Everything else (absent,
-  // null, "Initiated", "Pending", "Failed") still counts as owed.
-  // Matches Seller Central "Payments > Total Balance".
-  const PAID_OUT = new Set(['Transferred', 'Successful'])
+  // Open group = FundTransferStatus field is absent (not set at all).
+  // Reverted to original conservative filter pending raw data investigation.
   let total = 0
   for (const group of groups) {
-    const status = group.FundTransferStatus
-    const isOwed = !status || !PAID_OUT.has(status)
+    const isOpen = !('FundTransferStatus' in group) || group.FundTransferStatus === undefined
     const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
-    if (isOwed && isCad) {
+    if (isOpen && isCad) {
       total += group.OriginalTotal?.CurrencyAmount ?? 0
     }
   }
