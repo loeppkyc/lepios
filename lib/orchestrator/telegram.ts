@@ -1,3 +1,5 @@
+import { getSecret } from '@/lib/security/secrets'
+
 export class MissingTelegramConfigError extends Error {
   override readonly name = 'MissingTelegramConfigError'
   constructor() {
@@ -6,7 +8,10 @@ export class MissingTelegramConfigError extends Error {
 }
 
 export async function postMessage(text: string): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN
+  // getSecret provides capability audit trail; falls back to process.env on DB unavailability
+  const token = await getSecret('TELEGRAM_BOT_TOKEN', { agentId: 'system' }).catch(
+    () => process.env.TELEGRAM_BOT_TOKEN
+  )
   const chatId = process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) throw new MissingTelegramConfigError()
 

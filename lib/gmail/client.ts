@@ -2,6 +2,7 @@
 // Auth: OAuth2 refresh_token flow via googleapis npm package.
 import { google } from 'googleapis'
 import type { gmail_v1 } from 'googleapis'
+import { getSecret } from '@/lib/security/secrets'
 
 export class GmailNotConfiguredError extends Error {
   constructor() {
@@ -17,8 +18,17 @@ export class GmailNotConfiguredError extends Error {
  */
 export async function createGmailService(): Promise<gmail_v1.Gmail> {
   const clientId = (process.env.GOOGLE_CLIENT_ID ?? '').trim()
-  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET ?? '').trim()
-  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN ?? '').trim()
+  // getSecret provides capability audit trail; falls back to process.env on DB unavailability
+  const clientSecret = (
+    (await getSecret('GOOGLE_CLIENT_SECRET', { agentId: 'system' }).catch(
+      () => process.env.GOOGLE_CLIENT_SECRET
+    )) ?? ''
+  ).trim()
+  const refreshToken = (
+    (await getSecret('GOOGLE_REFRESH_TOKEN', { agentId: 'system' }).catch(
+      () => process.env.GOOGLE_REFRESH_TOKEN
+    )) ?? ''
+  ).trim()
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new GmailNotConfiguredError()
