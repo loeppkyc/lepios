@@ -12,7 +12,7 @@ import {
   type DayPanelData,
 } from '@/lib/amazon/orders'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 export interface DebugOrder {
   id: string
