@@ -56,7 +56,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
 
-  if (process.env.SANDBOX_SPIKE_ENABLED !== '1') {
+  if (process.env.SANDBOX_SPIKE_ENABLED?.trim() !== '1') {
     return NextResponse.json(
       { error: 'Spike disabled. Set SANDBOX_SPIKE_ENABLED=1 to enable.' },
       { status: 410 }
