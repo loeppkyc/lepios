@@ -1,15 +1,39 @@
 import { NextResponse } from 'next/server'
 import { spApiConfigured } from '@/lib/amazon/client'
-import { fetchSettlementBalance, type SettlementBalance } from '@/lib/amazon/finances'
+import {
+  fetchSettlementBalance,
+  fetchAllFinancialEventGroups,
+  type SettlementBalance,
+} from '@/lib/amazon/finances'
 
 // Constraint B-9: fast route — no caching; finances returns one page (~82 groups), sub-second
 export const dynamic = 'force-dynamic'
 
 export type SettlementResponse = SettlementBalance
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!spApiConfigured()) {
     return NextResponse.json({ error: 'SP-API credentials not configured' }, { status: 503 })
+  }
+
+  // LOCAL DEBUG ONLY — do not deploy with ?debug=1 active
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    new URL(request.url).searchParams.get('debug') === '1'
+  ) {
+    const groups = await fetchAllFinancialEventGroups(180)
+    return NextResponse.json({
+      total: groups.length,
+      groups: groups.map((g) => ({
+        id: g.FinancialEventGroupId,
+        status: g.FundTransferStatus ?? null,
+        transferDate: g.FundTransferDate ?? null,
+        currency: g.OriginalTotal?.CurrencyCode ?? null,
+        amount: g.OriginalTotal?.CurrencyAmount ?? null,
+        start: g.FinancialEventGroupStart ?? null,
+        end: g.FinancialEventGroupEnd ?? null,
+      })),
+    })
   }
 
   try {

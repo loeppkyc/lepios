@@ -156,4 +156,57 @@ describe('fetchSettlementBalance', () => {
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(99.99)
   })
+
+  it('puts InProgress groups into deferredCad', async () => {
+    const open = makeGroup({ id: 'FEG-OPEN', amount: 1052.46, currencyCode: 'CAD' })
+    const deferred = makeGroup({
+      id: 'FEG-DEF',
+      fundTransferStatus: 'InProgress',
+      amount: 5378.72,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([open, deferred]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(1052.46)
+    expect(result.deferredCad).toBe(5378.72)
+    expect(result.totalBalanceCad).toBe(6431.18)
+  })
+
+  it('excludes Transferred groups from both open and deferred', async () => {
+    const transferred = makeGroup({
+      id: 'FEG-T',
+      fundTransferStatus: 'Transferred',
+      amount: 999.0,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([transferred]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(0)
+    expect(result.deferredCad).toBe(0)
+    expect(result.totalBalanceCad).toBe(0)
+  })
+
+  it('totalBalanceCad = grossPendingCad + deferredCad', async () => {
+    const open = makeGroup({ id: 'FEG-1', amount: 100.0, currencyCode: 'CAD' })
+    const def1 = makeGroup({
+      id: 'FEG-2',
+      fundTransferStatus: 'InProgress',
+      amount: 200.0,
+      currencyCode: 'CAD',
+    })
+    const def2 = makeGroup({
+      id: 'FEG-3',
+      fundTransferStatus: 'Pending',
+      amount: 50.0,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([open, def1, def2]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(100.0)
+    expect(result.deferredCad).toBe(250.0)
+    expect(result.totalBalanceCad).toBe(350.0)
+  })
 })

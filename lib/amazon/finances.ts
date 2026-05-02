@@ -29,8 +29,12 @@ interface FinancialEventGroupsResponse {
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface SettlementBalance {
-  /** Sum of OriginalTotal.CurrencyAmount for open CAD financial event groups */
+  /** Open CAD groups (no FundTransferStatus) = Standard orders Total Balance */
   grossPendingCad: number
+  /** Deferred CAD groups (FundTransferStatus set but not "Transferred") = Deferred transactions */
+  deferredCad: number
+  /** Total Amazon owes you: grossPendingCad + deferredCad = All Accounts Total Balance */
+  totalBalanceCad: number
   /** ISO timestamp when the data was fetched */
   fetchedAt: string
 }
@@ -80,22 +84,33 @@ export async function fetchAllFinancialEventGroups(
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups = await fetchAllFinancialEventGroups(180)
 
-  // Open group = FundTransferStatus field is absent (not set at all).
-  // Reverted to original conservative filter pending raw data investigation.
-  let total = 0
+  let open = 0
+  let deferred = 0
+
   for (const group of groups) {
-    const isOpen = !('FundTransferStatus' in group) || group.FundTransferStatus === undefined
     const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
-    if (isOpen && isCad) {
-      total += group.OriginalTotal?.CurrencyAmount ?? 0
+    if (!isCad) continue
+
+    const amount = group.OriginalTotal?.CurrencyAmount ?? 0
+    const hasStatus = 'FundTransferStatus' in group && group.FundTransferStatus !== undefined
+
+    if (!hasStatus) {
+      // Open group (no FundTransferStatus) = Standard orders Total Balance
+      open += amount
+    } else if (group.FundTransferStatus !== 'Transferred') {
+      // Status set but not yet transferred = Deferred transactions
+      deferred += amount
     }
+    // Transferred = already paid out, skip
   }
 
-  // Round to 2 decimal places to avoid float drift
-  total = Math.round(total * 100) / 100
+  open = Math.round(open * 100) / 100
+  deferred = Math.round(deferred * 100) / 100
 
   return {
-    grossPendingCad: total,
+    grossPendingCad: open,
+    deferredCad: deferred,
+    totalBalanceCad: Math.round((open + deferred) * 100) / 100,
     fetchedAt: new Date().toISOString(),
   }
 }

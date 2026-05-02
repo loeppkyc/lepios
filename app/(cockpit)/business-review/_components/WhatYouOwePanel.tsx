@@ -9,6 +9,8 @@ import { DebugSection } from '@/components/cockpit/DebugSection'
 // server-only modules into the client bundle, silently breaking the component.
 interface SettlementResponse {
   grossPendingCad: number
+  deferredCad: number
+  totalBalanceCad: number
   fetchedAt: string
 }
 
@@ -160,13 +162,22 @@ export function WhatYouOwePanel() {
     return <PanelSkeleton />
   }
 
-  // Settlement value — Principle 6 honest label: "Gross pending (before reserve)"
-  const settlementValue = settlementLoading
+  const fmt = (n: number) => `$${n.toFixed(2)}`
+
+  const totalBalanceValue = settlementLoading
     ? 'Loading…'
     : settlementError
       ? '—'
       : settlement
-        ? `$${settlement.grossPendingCad.toFixed(2)}`
+        ? fmt(settlement.totalBalanceCad)
+        : '—'
+
+  const openBalanceValue = settlementLoading
+    ? 'Loading…'
+    : settlementError
+      ? '—'
+      : settlement
+        ? fmt(settlement.grossPendingCad)
         : '—'
 
   // FBA units — fulfillable only (Constraint B-7)
@@ -204,32 +215,37 @@ export function WhatYouOwePanel() {
         What You&apos;re Owed
       </span>
 
-      {/* 3-stat grid */}
+      {/* 4-stat grid */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
+          gridTemplateColumns: '1fr 1fr 1fr 1fr',
           gap: '16px 24px',
         }}
       >
-        {/* Stat 1 — Gross pending settlement (Principle 6: honest label) */}
-        <StatCell
-          label="Gross pending (before reserve)"
-          value={settlementValue}
-          sub={settlementSubLabel}
-        />
+        {/* Stat 1 — All Accounts Total Balance (open + deferred) */}
+        <StatCell label="Total Balance" value={totalBalanceValue} sub={settlementSubLabel} />
 
-        {/* Stat 2 — FBA units (fulfillable only, Constraint B-7) */}
+        {/* Stat 2 — Standard orders open balance (requestable now, before Amazon reserve) */}
+        <StatCell label="Open (Standard)" value={openBalanceValue} />
+
+        {/* Stat 3 — FBA units (fulfillable only, Constraint B-7) */}
         <StatCell label="FBA Units" value={fbaValue} sub={fbaSubLabel} />
 
-        {/* Stat 3 — Avg Cost / Unit: static placeholder per acceptance doc */}
-        {/* No number. No fabrication. No env-var override. */}
+        {/* Stat 4 — Avg Cost / Unit: static placeholder per acceptance doc */}
         <StatCell label="Avg Cost / Unit" value="—" sub="Coming in Sprint 5" />
       </div>
 
       {devMode && (
         <DebugSection heading="Debug — What You're Owed">
-          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <pre
+            style={{
+              color: 'var(--color-text-primary)',
+              fontSize: 'var(--text-nano)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
             {JSON.stringify({ settlement, fbaInventory }, null, 2)}
           </pre>
         </DebugSection>
