@@ -1,7 +1,7 @@
 # Master Rollup — LepiOS
 
-**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52) + row 17 acceptance doc (PR #55) + sandbox acceptance doc (PR #57)
-**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%; row 17 0%→25% (T2 54.4%→56.1%); Strategic 48.5%→49.2%; sandbox 0%→25% (T1 58.38%→60.13%); Strategic 49.2%→49.5%
+**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52) + row 17 acceptance doc (PR #55) + sandbox acceptance doc (PR #57) + self_repair acceptance doc (PR #59)
+**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%; row 17 0%→25% (T2 54.4%→56.1%); Strategic 48.5%→49.2%; sandbox 0%→25% (T1 58.38%→60.13%); Strategic 49.2%→49.5%; self_repair 0%→25% (T1 60.13%→61.63%); Strategic 49.5%→49.8%
 **Recompute protocol:** update this file after every PR merge or meaningful state change
 
 ---
@@ -16,12 +16,12 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 | Rollup          | Value     | Basis                                                                                                     |
 | --------------- | --------- | --------------------------------------------------------------------------------------------------------- |
-| **Strategic**   | **49.5%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
-| **Total scope** | **15.3%** | 4,949 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 55.0%.            |
+| **Strategic**   | **49.8%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
+| **Total scope** | **15.4%** | 4,974 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 55.3%.            |
 
-Strategic rollup math: T1 20%×60.13=12.03 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=49.52**
+Strategic rollup math: T1 20%×61.63=12.33 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=49.82**
 
-Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,949 · 4949÷324=**15.3%** · without T4: 4949÷90=**55.0%**
+Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,974 · 4974÷324=**15.4%** · without T4: 4974÷90=**55.3%**
 
 ---
 
@@ -29,7 +29,7 @@ Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · 
 
 | #   | Track                    | Items         | %            | Strategic weight | Source                                                                            |
 | --- | ------------------------ | ------------- | ------------ | ---------------- | --------------------------------------------------------------------------------- |
-| 1   | Autonomous Harness       | 21 components | **60.1%**    | 20%              | `harness_components` — live DB, queried 2026-05-01                                |
+| 1   | Autonomous Harness       | 21 components | **61.6%**    | 20%              | `harness_components` — live DB, queried 2026-05-01                                |
 | 1b  | Product Components       | 7 components  | **88.0%**    | 5%               | `product_components` — live DB, queried 2026-05-01                                |
 | 2   | Amazon Pipeline          | 21 components | **56.1%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
 | 3   | Local Sales              | 3 items       | **0%**       | 5%               | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
@@ -42,7 +42,7 @@ Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · 
 
 ## T1 — Autonomous Harness
 
-**Rollup: 60.13 / 100** · source: `harness_components`, live Supabase, queried 2026-05-01; sandbox acceptance doc landed 2026-05-01 (PR #57)
+**Rollup: 61.63 / 100** · source: `harness_components`, live Supabase, queried 2026-05-01; sandbox acceptance doc landed 2026-05-01 (PR #57); self_repair acceptance doc landed 2026-05-01 (PR #59)
 
 Tier labels derived from spec weight bands (no tier column exists in DB):
 
@@ -74,12 +74,12 @@ Tier labels derived from spec weight bands (no tier column exists in DB):
 | arms_legs            | Arms & legs (file/shell/HTTP/browser) | 9      | 30%     | 2.70      | Needs unified contract under `lib/harness/arms-legs/*`                                   |
 | sandbox              | Sandbox (isolated execution)          | 7      | **25%** | **1.75**  | **acceptance doc landed (PR #57); builder gated on Slice 0 spike + security_layer 0045** |
 | security_layer       | Security layer (capability + audit)   | 7      | 30%     | 2.10      | Missing capability scope + audit trail                                                   |
-| self_repair          | Self-repair loop                      | 6      | **0%**  | 0.00      | Gated on sandbox + security_layer                                                        |
+| self_repair          | Self-repair loop                      | 6      | **25%** | **1.50**  | **acceptance doc landed (PR #59); builder gated on sandbox+security_layer+arms_legs**    |
 | digital_twin         | Digital Twin Q&A                      | 6      | 62%     | 3.72      | F-L14 corpus gap; idea_inbox + session_digest pending                                    |
 | specialized_agents   | Specialized agents                    | 5      | 55%     | 2.75      | coordinator + builder shipped; reviewer/planner pending                                  |
 | push_bash_automation | Push/bash auto-decide                 | 3      | **0%**  | 0.00      | Gated on sandbox + security_layer                                                        |
 | debate_consensus     | Debate / consensus before action      | 2      | 10%     | 0.20      | Skill exists; not wired into harness decision points                                     |
-| **Subtotal**         |                                       | **45** | **29%** | **13.22** |                                                                                          |
+| **Subtotal**         |                                       | **45** | **33%** | **14.72** |                                                                                          |
 
 ### T1-D — Communication + Intelligence (weight 15 / 100)
 
@@ -91,7 +91,7 @@ Tier labels derived from spec weight bands (no tier column exists in DB):
 | ollama_daytime    | Ollama daytime tick             | 2      | 50%     | 1.00     | Tunnel live; scheduler + work-routing pending |
 | **Subtotal**      |                                 | **15** | **48%** | **7.21** |                                               |
 
-**Harness total: 24.00 + 15.70 + 13.22 + 7.21 = 60.13 / 100**
+**Harness total: 24.00 + 15.70 + 14.72 + 7.21 = 61.63 / 100**
 
 ---
 
@@ -259,7 +259,7 @@ This is the answer to "biggest progress per paste."
 | ------ | -------------------------------------------- | ----- | -------------- | ---------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | **1**  | Reconciliation engine (row 11)               | T2    | Large build    | 7.5        | Row 12 (6 pts) + entire pipeline becomes trustworthy                            | Keystone; acceptance doc landed — builder is the next action             |
 | **2**  | B4 — Cloudflare Access policy fix (50% done) | T5    | Config ~30 min | 4.0 GPU    | Completes B4; unlocks ollama_daytime (T1, 1 pt remaining) + prod Ollama traffic | Tunnel is live; Access policy / service token is the only remaining gate |
-| **3**  | Harness sandbox (T1-C)                       | T1    | Medium build   | 5.25       | Enables self_repair (6 pts) + push_bash_automation (3 pts)                      | Acceptance doc landed (PR #57); builder gated on Slice 0 spike + 0045    |
+| **3**  | Harness sandbox (T1-C)                       | T1    | Medium build   | 5.25       | Enables self_repair (4.5 pts remaining) + push_bash_automation (3 pts)          | Acceptance doc landed (PR #57); builder gated on Slice 0 spike + 0045    |
 | **4**  | Harness security_layer (T1-C, 30→100%)       | T1    | Medium build   | 4.9        | Required for sandbox → chains to self_repair + push_bash                        | Multiplier: completing it unlocks 16 pts of downstream                   |
 | **5**  | Harness arms_legs (T1-C, 30→100%)            | T1    | Medium build   | 6.3        | Unblocks chat_ui (4.44 pts remaining)                                           | Second-largest remaining T1-C component                                  |
 | **6**  | Local sales Stripe webhook                   | T3    | Small build    | —          | First real local revenue signal in DB                                           | Acceptance doc ready; fast to builder                                    |
@@ -272,7 +272,7 @@ This is the answer to "biggest progress per paste."
 
 **Highest single-action impact:** Reconciliation engine (rank 1) — makes the entire Amazon pipeline trustworthy; without it all data is disconnected ingestion.
 
-**Biggest unlock chain:** Harness security_layer → sandbox → self_repair + push_bash_automation (ranks 3+4) — completing both adds ~21 pts and enables the autonomous self-healing layer.
+**Biggest unlock chain:** Harness security_layer → sandbox → self_repair + push_bash_automation (ranks 3+4) — completing the chain adds ~18 pts and enables the autonomous self-healing layer (self_repair now 25% from acceptance doc).
 
 ---
 
