@@ -219,8 +219,10 @@ export interface DayPanelData {
   taxCad: number
   /** Sum of NumberOfItemsShipped + NumberOfItemsUnshipped across confirmed orders */
   unitsSold: number
-  /** Count of Pending orders — drives indicator only, not headline numbers */
+  /** Count of Pending orders */
   pendingCount: number
+  /** Sum of NumberOfItemsShipped + NumberOfItemsUnshipped across Pending orders */
+  pendingUnits: number
 }
 
 /**
@@ -242,10 +244,12 @@ export function aggregateOrders(
   let taxCad = 0
   let unitsSold = 0
   let pendingCount = 0
+  let pendingUnits = 0
 
   for (const order of orders) {
     if (order.OrderStatus === 'Pending') {
       pendingCount++
+      pendingUnits += (order.NumberOfItemsShipped ?? 0) + (order.NumberOfItemsUnshipped ?? 0)
       continue
     }
     if (CONFIRMED_STATUSES.has(order.OrderStatus)) {
@@ -259,5 +263,5 @@ export function aggregateOrders(
 
   revenueCad = Math.round(revenueCad * 100) / 100
   taxCad = Math.round(taxCad * 100) / 100
-  return { confirmedCount, revenueCad, taxCad, unitsSold, pendingCount }
+  return { confirmedCount, revenueCad, taxCad, unitsSold, pendingCount, pendingUnits }
 }

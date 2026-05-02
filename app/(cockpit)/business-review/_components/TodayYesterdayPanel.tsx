@@ -56,12 +56,38 @@ function DayPanel({
 }: {
   heading: string
   data: DayPanelData
-  /** Only Today panel shows pending indicator when confirmed = 0 and pending > 0 */
+  /** Today panel includes pending orders in headline counts */
   showPendingIndicator: boolean
 }) {
-  const pendingLabel =
+  // Today: count all orders including pending so "0 orders" never shows on an active day
+  const displayOrders = showPendingIndicator
+    ? data.confirmedCount + data.pendingCount
+    : data.confirmedCount
+
+  // Today: include pending units when there are no confirmed ones yet
+  const displayUnits =
     showPendingIndicator && data.confirmedCount === 0 && data.pendingCount > 0
-      ? `(${data.pendingCount} pending not shown)`
+      ? data.pendingUnits
+      : data.unitsSold
+
+  // Revenue: show dollar amount for confirmed orders, "N pending" label otherwise
+  const revenueValue =
+    data.confirmedCount > 0
+      ? `$${data.revenueCad.toFixed(2)}`
+      : showPendingIndicator && data.pendingCount > 0
+        ? `${data.pendingCount} pending`
+        : '—'
+
+  const revenueSub =
+    data.confirmedCount > 0 && data.taxCad > 0
+      ? `+ $${data.taxCad.toFixed(2)} tax`
+      : data.confirmedCount > 0 && showPendingIndicator && data.pendingCount > 0
+        ? `+ ${data.pendingCount} pending`
+        : undefined
+
+  const ordersSub =
+    showPendingIndicator && data.confirmedCount > 0 && data.pendingCount > 0
+      ? `${data.confirmedCount} confirmed + ${data.pendingCount} pending`
       : undefined
 
   return (
@@ -90,17 +116,9 @@ function DayPanel({
           gap: '16px 24px',
         }}
       >
-        <StatRow label="Orders" value={data.confirmedCount.toString()} sub={pendingLabel} />
-        <StatRow
-          label="Revenue"
-          value={data.confirmedCount > 0 ? `$${data.revenueCad.toFixed(2)}` : '—'}
-          sub={
-            data.confirmedCount > 0 && data.taxCad > 0
-              ? `+ $${data.taxCad.toFixed(2)} tax`
-              : undefined
-          }
-        />
-        <StatRow label="Units" value={data.confirmedCount > 0 ? data.unitsSold.toString() : '—'} />
+        <StatRow label="Orders" value={displayOrders.toString()} sub={ordersSub} />
+        <StatRow label="Revenue" value={revenueValue} sub={revenueSub} />
+        <StatRow label="Units" value={displayOrders > 0 ? displayUnits.toString() : '—'} />
         {/* Constraint 6: static payout label — no number */}
         <StatRow label="Payout" value="—" sub="Full payout estimate in Sprint 5" />
       </div>

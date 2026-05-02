@@ -95,12 +95,13 @@ describe('aggregateOrders', () => {
     expect(result.pendingCount).toBe(2)
   })
 
-  it('sums units (shipped + unshipped) across confirmed orders only', () => {
+  it('sums units across confirmed orders only; pendingUnits tracked separately', () => {
     const o1 = makeOrder('Shipped', 2, 0)
     const o2 = makeOrder('Unshipped', 0, 3)
-    const o3 = makeOrder('Pending', 10, 10) // must not contribute
+    const o3 = makeOrder('Pending', 10, 10)
     const result = aggregateOrders([o1, o2, o3], new Map())
-    expect(result.unitsSold).toBe(5) // 2 + 0 + 0 + 3
+    expect(result.unitsSold).toBe(5) // confirmed only: 2 + 3
+    expect(result.pendingUnits).toBe(20) // pending: 10 + 10
   })
 
   it('handles missing finance map entry gracefully (treats as $0 revenue and $0 tax)', () => {
@@ -154,6 +155,7 @@ describe('aggregateOrders', () => {
     expect(result.taxCad).toBe(0)
     expect(result.unitsSold).toBe(0)
     expect(result.pendingCount).toBe(0)
+    expect(result.pendingUnits).toBe(0)
   })
 
   it('pending indicator: shows when confirmedCount = 0 and pendingCount > 0', () => {
