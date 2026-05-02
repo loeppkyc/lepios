@@ -31,3 +31,4 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 2026-04-27T00:40:00Z coordinator sprint=5 chunk=h1-drain-fix phase=1a+2 tokens_in=~38000 tokens_out=~9000 escalated=true auto_proceeded=false task_id=8a9dcb62
 2026-04-27T04:20:00Z coordinator sprint=N/A chunk=streamlit_rebuild_dropbox_archiver phase=0 tokens_in=~8000 tokens_out=~3000 escalated=true auto_proceeded=false task_id=8ab362ac reason=new_terrain block=streamlit_os_not_accessible_in_cloud
 2026-05-01T00:00:00Z coordinator sprint=5 chunk=dropbox-archiver phase=1a-1d tokens_in=~28000 tokens_out=~9000 escalated=true auto_proceeded=false task_id=8ab362ac
+2026-05-02T00:30:00Z coordinator sprint=5 chunk=dropbox-archiver phase=resume tokens_in=~18000 tokens_out=~4000 escalated=true auto_proceeded=false task_id=8ab362ac note=re-run_recovered_existing_doc_refreshed_notification_set_awaiting_review

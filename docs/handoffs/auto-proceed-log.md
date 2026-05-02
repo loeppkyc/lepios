@@ -233,3 +233,22 @@ outcome: escalated
 escalation_reasons:
   - cache_match_disabled_sprint_override
   - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-02T00:30:00Z sprint=5 chunk=dropbox-archiver doc=docs/sprint-5/dropbox-archiver-acceptance.md run_id=226616eb
+cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
+trigger_match_evidence: |
+  Re-run of task 8ab362ac. Previous coordinator session (2026-05-01) wrote acceptance doc and
+  study doc on branch harness/task-8ab362ac. PR #41 created. Telegram notification (7aca86e5)
+  was inserted but never delivered (status=pending since 2026-05-01). This run recovered the
+  existing docs, refreshed the notification row payload, and set task to awaiting_review.
+  No new decisions made. All 4 Colin questions resolved via task_metadata spec_decisions
+  (colin_manual 2026-04-27). Cache-match still disabled sprint-wide.
+reversibility_check: |
+  sprint-state.md update: document only, fully reversible.
+  cost-log.md append: append-only, reversible via git.
+  Notification row: updated payload, still pending — reversible (DELETE from outbound_notifications).
+  task_queue status: awaiting_review — reversible (UPDATE status).
+confidence: high (escalation correct; cache-match disabled; notification refresh non-destructive)
+outcome: escalated-mandatory (re-run recovery — acceptance doc from prior session forwarded to Colin)

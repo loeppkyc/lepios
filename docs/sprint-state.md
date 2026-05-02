@@ -289,6 +289,35 @@ hardening_h3:
   last_updated_at: "2026-04-27T00:14:00Z"
 
 # ============================================================
+
+# dropbox-archiver chunk (sprint-5 parallel track)
+
+# ============================================================
+
+dropbox_archiver_chunk:
+  chunk_id: "dropbox-archiver"
+  task_id: "8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47"
+  status: "awaiting_review"
+  description: "Port 97_Dropbox_Archiver.py — /dropbox stats tile + Stage 2/3 command reference"
+  source_module: "pages/97_Dropbox_Archiver.py"
+  scope: "Hybrid A+D per Colin spec_decisions 2026-04-27: (A) Dropbox stats tile via OAuth API, (D) Stage 2/3 copy-to-clipboard command reference"
+  acceptance_doc: "docs/sprint-5/dropbox-archiver-acceptance.md"
+  study_doc: "docs/sprint-5/dropbox-archiver-streamlit-study.md"
+  branch: "harness/task-8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47"
+  pr: 41
+  notification_id: "7aca86e5-fe3a-44f8-af0b-894bc4abf7ac"
+  notification_status: "pending (refreshed 2026-05-02 — drain 403, will deliver on next cron)"
+  phase_1_completed_at: "2026-05-01T00:46:00Z"
+  phase_1_run_id: "prior_session"
+  current_run_id: "226616eb-a0a8-4fe2-add2-60088ed199d5"
+  awaiting_colin: "acceptance_doc_approval"
+  colin_questions: "all 4 resolved via task metadata spec_decisions (colin_manual 2026-04-27)"
+  migration_note: "acceptance doc uses 0062; local repo max is 0040; builder must verify slot at build time"
+  prerequisites: "DONE — DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN verified in Vercel env 2026-04-27"
+  opened_at: "2026-04-27T04:12:28Z"
+  last_updated_at: "2026-05-02T00:30:00Z"
+
+# ============================================================
 # Dropbox Archiver — Streamlit port (sprint-5 parallel track)
 # task_id: 8ab362ac-cde9-42fd-b0bc-d5fde8f9ea47
 # ============================================================
