@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// Mock getSecret so postMessage tests don't require a live DB connection.
+// The mock mirrors getSecret's process.env fallback: resolves to the env value,
+// or resolves to undefined when the env var is absent (preserving null-check behavior).
+vi.mock('@/lib/security/secrets', () => ({
+  getSecret: vi.fn().mockImplementation((key: string) =>
+    Promise.resolve(process.env[key])
+  ),
+}))
+
 import { postMessage, MissingTelegramConfigError } from '@/lib/orchestrator/telegram'
 
 describe('MissingTelegramConfigError', () => {
