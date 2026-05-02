@@ -1,7 +1,7 @@
 # Master Rollup — LepiOS
 
-**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52)
-**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%
+**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52) + row 17 acceptance doc (PR #55)
+**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%; row 17 0%→25% (T2 54.4%→56.1%); Strategic 48.5%→49.2%
 **Recompute protocol:** update this file after every PR merge or meaningful state change
 
 ---
@@ -16,12 +16,12 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 | Rollup          | Value     | Basis                                                                                                     |
 | --------------- | --------- | --------------------------------------------------------------------------------------------------------- |
-| **Strategic**   | **48.5%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
-| **Total scope** | **15.1%** | 4,899 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 54.4%.            |
+| **Strategic**   | **49.2%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
+| **Total scope** | **15.2%** | 4,924 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 54.7%.            |
 
-Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×54.4=21.76 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=48.49**
+Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=49.17**
 
-Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,899 · 4899÷324=**15.1%** · without T4: 4899÷90=**54.4%**
+Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,924 · 4924÷324=**15.2%** · without T4: 4924÷90=**54.7%**
 
 ---
 
@@ -31,7 +31,7 @@ Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · 
 | --- | ------------------------ | ------------- | ------------ | ---------------- | --------------------------------------------------------------------------------- |
 | 1   | Autonomous Harness       | 21 components | **58.4%**    | 20%              | `harness_components` — live DB, queried 2026-05-01                                |
 | 1b  | Product Components       | 7 components  | **88.0%**    | 5%               | `product_components` — live DB, queried 2026-05-01                                |
-| 2   | Amazon Pipeline          | 21 components | **54.4%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
+| 2   | Amazon Pipeline          | 21 components | **56.1%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
 | 3   | Local Sales              | 3 items       | **0%**       | 5%               | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
 | 4   | Streamlit Port Backlog   | 234 modules   | **0%**       | 15%              | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
 | 5   | GPU Day Readiness        | 27 line items | **71.0%**    | 15%              | `docs/gpu-day-readiness.md`                                                       |
@@ -116,7 +116,7 @@ These were migrated from `harness_components` via migration 0043. Denominator is
 
 ## T2 — Amazon Pipeline
 
-**Rollup: 54.4% · 65.30 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01; row 11 acceptance doc landed 2026-05-01 (PR #52)
+**Rollup: 56.1% · 67.30 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01; row 11 acceptance doc landed 2026-05-01 (PR #52); row 17 acceptance doc landed 2026-05-01 (PR #55)
 
 Pipeline purpose: COGS → Gmail scanner → financial events → reconciliation → tax outputs → anomaly detection.
 Reconciliation (row 11) is the keystone — without it the pipeline is disconnected ingestion.
@@ -139,14 +139,14 @@ Reconciliation (row 11) is the keystone — without it the pipeline is disconnec
 | 14        | GST UI / business-review surfacing                 | 4       | 10%      | 0.40      | partial; low-contrast bug open                                     |
 | 15        | Income tax / CPP projection                        | 6       | 0%       | 0.00      | baseline ~$2,100; no module                                        |
 | 16        | Tax export / filing outputs                        | 4       | 0%       | 0.00      | not started                                                        |
-| 17        | Anomaly detection (refunds, fees, missing COGS)    | 8       | 0%       | 0.00      | not started                                                        |
+| 17        | Anomaly detection (refunds, fees, missing COGS)    | 8       | **25%**  | **2.00**  | **acceptance doc landed (PR #55); builder gated on row 11**        |
 | 18        | Historical product intel (SP-API + Keepa)          | 6       | 0%       | 0.00      | backlog                                                            |
 | 19        | Per-component F18 metrics                          | 4       | 40%      | 1.60      | build_metrics live; Amazon-specific not wired                      |
 | 20        | COGS v2 — Inventory (live FBA + FIFO)              | 6       | 80%      | 4.80      | merged #45; FBA QTY bug under investigation                        |
 | 21        | COGS v2 — Pallet invoices                          | 4       | 90%      | 3.60      | merged #45; awaiting first prod entry                              |
-| **Total** |                                                    | **120** |          | **65.30** |                                                                    |
+| **Total** |                                                    | **120** |          | **67.30** |                                                                    |
 
-**Remaining: 54.70 points across 6 unstarted + 9 partial components**
+**Remaining: 52.70 points across 5 unstarted + 10 partial components**
 
 ---
 
@@ -264,7 +264,7 @@ This is the answer to "biggest progress per paste."
 | **5**  | Harness arms_legs (T1-C, 30→100%)            | T1    | Medium build   | 6.3        | Unblocks chat_ui (4.44 pts remaining)                                           | Second-largest remaining T1-C component                                  |
 | **6**  | Local sales Stripe webhook                   | T3    | Small build    | —          | First real local revenue signal in DB                                           | Acceptance doc ready; fast to builder                                    |
 | **7**  | GST UI / business-review surfacing (row 14)  | T2    | Small build    | 3.6        | Closes Sprint 4 kill criterion gap                                              | Low effort; high visibility; low-contrast bug is the blocker             |
-| **8**  | Anomaly detection (row 17)                   | T2    | Large build    | 8.0        | Pipeline quality; catches fee / refund / COGS gaps                              | 0% on 8-weight component; no prereqs                                     |
+| **8**  | Anomaly detection (row 17)                   | T2    | Large build    | 6.0        | Pipeline quality; catches fee / refund / COGS gaps                              | Acceptance doc landed (PR #55); builder gated on row 11                  |
 | **9**  | Income tax / CPP projection (row 15)         | T2    | Medium build   | 6.0        | Tax output chain                                                                | 0% on 6-weight component with clear Streamlit baseline                   |
 | **10** | Tax export / filing outputs (row 16)         | T2    | Medium build   | 4.0        | Completes tax output chain; gates CPP filing prep                               | 0% on 4-weight component; natural follow-on to row 15                    |
 
