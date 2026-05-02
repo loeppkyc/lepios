@@ -1,7 +1,7 @@
 # Master Rollup — LepiOS
 
-**Last updated:** 2026-05-01 (B4 partial credit + Cloudflare Access blocker)
-**Updated by:** B4 scored 50% partial; Cloudflare Access policy gap logged as active blocker; rollups recomputed
+**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52)
+**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%
 **Recompute protocol:** update this file after every PR merge or meaningful state change
 
 ---
@@ -16,12 +16,12 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 | Rollup          | Value     | Basis                                                                                                     |
 | --------------- | --------- | --------------------------------------------------------------------------------------------------------- |
-| **Strategic**   | **47.6%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
-| **Total scope** | **15.0%** | 4,874 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 54.2%.            |
+| **Strategic**   | **48.5%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
+| **Total scope** | **15.1%** | 4,899 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 54.4%.            |
 
-Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×52.3=20.92 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=47.65**
+Strategic rollup math: T1 20%×58.38=11.68 · T1b 5%×88.0=4.40 · T2 40%×54.4=21.76 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=48.49**
 
-Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,874 · 4874÷324=**15.0%**
+Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,899 · 4899÷324=**15.1%** · without T4: 4899÷90=**54.4%**
 
 ---
 
@@ -31,7 +31,7 @@ Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · 
 | --- | ------------------------ | ------------- | ------------ | ---------------- | --------------------------------------------------------------------------------- |
 | 1   | Autonomous Harness       | 21 components | **58.4%**    | 20%              | `harness_components` — live DB, queried 2026-05-01                                |
 | 1b  | Product Components       | 7 components  | **88.0%**    | 5%               | `product_components` — live DB, queried 2026-05-01                                |
-| 2   | Amazon Pipeline          | 21 components | **52.3%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
+| 2   | Amazon Pipeline          | 21 components | **54.4%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
 | 3   | Local Sales              | 3 items       | **0%**       | 5%               | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
 | 4   | Streamlit Port Backlog   | 234 modules   | **0%**       | 15%              | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
 | 5   | GPU Day Readiness        | 27 line items | **71.0%**    | 15%              | `docs/gpu-day-readiness.md`                                                       |
@@ -116,37 +116,37 @@ These were migrated from `harness_components` via migration 0043. Denominator is
 
 ## T2 — Amazon Pipeline
 
-**Rollup: 52.3% · 62.80 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01; row 6 updated 2026-05-01
+**Rollup: 54.4% · 65.30 / 120** · source: `docs/lepios/amazon-pipeline-rollup.md`, recomputed 2026-05-01; row 11 acceptance doc landed 2026-05-01 (PR #52)
 
 Pipeline purpose: COGS → Gmail scanner → financial events → reconciliation → tax outputs → anomaly detection.
 Reconciliation (row 11) is the keystone — without it the pipeline is disconnected ingestion.
 
-| #         | Component                                          | Weight  | %        | Pts       | Status                                                                                                |
-| --------- | -------------------------------------------------- | ------- | -------- | --------- | ----------------------------------------------------------------------------------------------------- |
-| 1         | COGS backend (table, API, lib, actions)            | 8       | 100%     | 8.00      | merged #42                                                                                            |
-| 2         | COGS UI (superseded by row 20)                     | 6       | 0%       | 0.00      | superseded by COGS v2 (#45)                                                                           |
-| 3         | COGS recompute / backfill                          | 4       | 90%      | 3.60      | merged #42; prod data untested                                                                        |
-| 4         | Gmail invoice classifier                           | 6       | 90%      | 5.40      | merged #40; prod validation pending OAuth row 6                                                       |
-| 5         | Gmail receipt classifier                           | 6       | 90%      | 5.40      | merged #40; same gate as row 4                                                                        |
-| 6         | Gmail OAuth + Vercel env wiring                    | 4       | **100%** | 4.00      | env vars configured 2026-05-01 (`dpl_AGZHXA3rQd2iEoeW2WGM8jWcGHNM`); rows 4+5 classifier quality open |
-| 7         | Gmail daily scanner (cron + ingest)                | 8       | 75%      | 6.00      | merged #44; classifier integration pending                                                            |
-| 8         | SP-API financial events parser                     | 8       | 100%     | 8.00      | merged #43; 34 tests pass                                                                             |
-| 9         | SP-API backfill script                             | 4       | 100%     | 4.00      | merged #43; $0.01 gate passed                                                                         |
-| 10        | Financial events migration (0057)                  | 2       | 100%     | 2.00      | merged #43; pure DDL                                                                                  |
-| 11        | **Reconciliation engine (orders ↔ events ↔ COGS)** | **10**  | **0%**   | **0.00**  | **KEYSTONE — not started**                                                                            |
-| 12        | Reconciliation UI / drift report                   | 6       | 0%       | 0.00      | not started; depends on row 11                                                                        |
-| 13        | GST calc module                                    | 6       | 100%     | 6.00      | merged #39; 68 tests; $0 drift                                                                        |
-| 14        | GST UI / business-review surfacing                 | 4       | 10%      | 0.40      | partial; low-contrast bug open                                                                        |
-| 15        | Income tax / CPP projection                        | 6       | 0%       | 0.00      | baseline ~$2,100; no module                                                                           |
-| 16        | Tax export / filing outputs                        | 4       | 0%       | 0.00      | not started                                                                                           |
-| 17        | Anomaly detection (refunds, fees, missing COGS)    | 8       | 0%       | 0.00      | not started                                                                                           |
-| 18        | Historical product intel (SP-API + Keepa)          | 6       | 0%       | 0.00      | backlog                                                                                               |
-| 19        | Per-component F18 metrics                          | 4       | 40%      | 1.60      | build_metrics live; Amazon-specific not wired                                                         |
-| 20        | COGS v2 — Inventory (live FBA + FIFO)              | 6       | 80%      | 4.80      | merged #45; FBA QTY bug under investigation                                                           |
-| 21        | COGS v2 — Pallet invoices                          | 4       | 90%      | 3.60      | merged #45; awaiting first prod entry                                                                 |
-| **Total** |                                                    | **120** |          | **58.80** |                                                                                                       |
+| #         | Component                                          | Weight  | %        | Pts       | Status                                                             |
+| --------- | -------------------------------------------------- | ------- | -------- | --------- | ------------------------------------------------------------------ |
+| 1         | COGS backend (table, API, lib, actions)            | 8       | 100%     | 8.00      | merged #42                                                         |
+| 2         | COGS UI (superseded by row 20)                     | 6       | 0%       | 0.00      | superseded by COGS v2 (#45)                                        |
+| 3         | COGS recompute / backfill                          | 4       | 90%      | 3.60      | merged #42; prod data untested                                     |
+| 4         | Gmail invoice classifier                           | 6       | 90%      | 5.40      | merged #40; prod validation pending OAuth row 6                    |
+| 5         | Gmail receipt classifier                           | 6       | 90%      | 5.40      | merged #40; same gate as row 4                                     |
+| 6         | Gmail OAuth + Vercel env wiring                    | 4       | **100%** | 4.00      | env vars configured 2026-05-01; rows 4+5 classifier quality open   |
+| 7         | Gmail daily scanner (cron + ingest)                | 8       | 75%      | 6.00      | merged #44; classifier integration pending                         |
+| 8         | SP-API financial events parser                     | 8       | 100%     | 8.00      | merged #43; 34 tests pass                                          |
+| 9         | SP-API backfill script                             | 4       | 100%     | 4.00      | merged #43; $0.01 gate passed                                      |
+| 10        | Financial events migration (0057)                  | 2       | 100%     | 2.00      | merged #43; pure DDL                                               |
+| 11        | **Reconciliation engine (orders ↔ events ↔ COGS)** | **10**  | **25%**  | **2.50**  | **KEYSTONE — acceptance doc landed (PR #52); builder not started** |
+| 12        | Reconciliation UI / drift report                   | 6       | 0%       | 0.00      | not started; depends on row 11                                     |
+| 13        | GST calc module                                    | 6       | 100%     | 6.00      | merged #39; 68 tests; $0 drift                                     |
+| 14        | GST UI / business-review surfacing                 | 4       | 10%      | 0.40      | partial; low-contrast bug open                                     |
+| 15        | Income tax / CPP projection                        | 6       | 0%       | 0.00      | baseline ~$2,100; no module                                        |
+| 16        | Tax export / filing outputs                        | 4       | 0%       | 0.00      | not started                                                        |
+| 17        | Anomaly detection (refunds, fees, missing COGS)    | 8       | 0%       | 0.00      | not started                                                        |
+| 18        | Historical product intel (SP-API + Keepa)          | 6       | 0%       | 0.00      | backlog                                                            |
+| 19        | Per-component F18 metrics                          | 4       | 40%      | 1.60      | build_metrics live; Amazon-specific not wired                      |
+| 20        | COGS v2 — Inventory (live FBA + FIFO)              | 6       | 80%      | 4.80      | merged #45; FBA QTY bug under investigation                        |
+| 21        | COGS v2 — Pallet invoices                          | 4       | 90%      | 3.60      | merged #45; awaiting first prod entry                              |
+| **Total** |                                                    | **120** |          | **65.30** |                                                                    |
 
-**Remaining: 57.20 points across 7 unstarted + 5 partial components**
+**Remaining: 54.70 points across 6 unstarted + 9 partial components**
 
 ---
 
@@ -255,24 +255,24 @@ Ranked by: (direct points recoverable) × (downstream unlock multiplier) × (eff
 Items that unblock other items score higher even if their direct points are smaller.
 This is the answer to "biggest progress per paste."
 
-| Rank   | Action                                       | Track | Effort                | Direct pts | Downstream unlock                                                               | Why it ranks here                                                        |
-| ------ | -------------------------------------------- | ----- | --------------------- | ---------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **1**  | Gmail OAuth + Vercel env (row 6)             | T2    | Config only (~30 min) | 4.0        | Validates rows 4+5 (12 pts already earned)                                      | Fastest unlock in the system — env var config, not a build               |
-| **2**  | Reconciliation engine (row 11)               | T2    | Large build           | 10.0       | Row 12 (6 pts) + entire pipeline becomes trustworthy                            | Keystone; without it all ingestion is disconnected                       |
-| **3**  | B4 — Cloudflare Access policy fix (50% done) | T5    | Config ~30 min        | 4.0 GPU    | Completes B4; unlocks ollama_daytime (T1, 1 pt remaining) + prod Ollama traffic | Tunnel is live; Access policy / service token is the only remaining gate |
-| **4**  | Harness sandbox (T1-C)                       | T1    | Medium build          | 7.0        | Enables self_repair (6 pts) + push_bash_automation (3 pts)                      | Gate for 9 pts of gated components                                       |
-| **5**  | Harness security_layer (T1-C, 30→100%)       | T1    | Medium build          | 4.9        | Required for sandbox → chains to self_repair + push_bash                        | Multiplier: completing it unlocks 16 pts of downstream                   |
-| **6**  | Harness arms_legs (T1-C, 30→100%)            | T1    | Medium build          | 6.3        | Unblocks chat_ui (4.44 pts remaining)                                           | Second-largest remaining T1-C component                                  |
-| **7**  | Local sales Stripe webhook                   | T3    | Small build           | —          | First real local revenue signal in DB                                           | Acceptance doc ready; fast to builder                                    |
-| **8**  | GST UI / business-review surfacing (row 14)  | T2    | Small build           | 3.6        | Closes Sprint 4 kill criterion gap                                              | Low effort; high visibility; low-contrast bug is the blocker             |
-| **9**  | Anomaly detection (row 17)                   | T2    | Large build           | 8.0        | Pipeline quality; catches fee / refund / COGS gaps                              | 0% on 8-weight component; no prereqs                                     |
-| **10** | Income tax / CPP projection (row 15)         | T2    | Medium build          | 6.0        | Tax output chain                                                                | 0% on 6-weight component with clear Streamlit baseline                   |
+| Rank   | Action                                       | Track | Effort         | Direct pts | Downstream unlock                                                               | Why it ranks here                                                        |
+| ------ | -------------------------------------------- | ----- | -------------- | ---------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **1**  | Reconciliation engine (row 11)               | T2    | Large build    | 7.5        | Row 12 (6 pts) + entire pipeline becomes trustworthy                            | Keystone; acceptance doc landed — builder is the next action             |
+| **2**  | B4 — Cloudflare Access policy fix (50% done) | T5    | Config ~30 min | 4.0 GPU    | Completes B4; unlocks ollama_daytime (T1, 1 pt remaining) + prod Ollama traffic | Tunnel is live; Access policy / service token is the only remaining gate |
+| **3**  | Harness sandbox (T1-C)                       | T1    | Medium build   | 7.0        | Enables self_repair (6 pts) + push_bash_automation (3 pts)                      | Gate for 9 pts of gated components                                       |
+| **4**  | Harness security_layer (T1-C, 30→100%)       | T1    | Medium build   | 4.9        | Required for sandbox → chains to self_repair + push_bash                        | Multiplier: completing it unlocks 16 pts of downstream                   |
+| **5**  | Harness arms_legs (T1-C, 30→100%)            | T1    | Medium build   | 6.3        | Unblocks chat_ui (4.44 pts remaining)                                           | Second-largest remaining T1-C component                                  |
+| **6**  | Local sales Stripe webhook                   | T3    | Small build    | —          | First real local revenue signal in DB                                           | Acceptance doc ready; fast to builder                                    |
+| **7**  | GST UI / business-review surfacing (row 14)  | T2    | Small build    | 3.6        | Closes Sprint 4 kill criterion gap                                              | Low effort; high visibility; low-contrast bug is the blocker             |
+| **8**  | Anomaly detection (row 17)                   | T2    | Large build    | 8.0        | Pipeline quality; catches fee / refund / COGS gaps                              | 0% on 8-weight component; no prereqs                                     |
+| **9**  | Income tax / CPP projection (row 15)         | T2    | Medium build   | 6.0        | Tax output chain                                                                | 0% on 6-weight component with clear Streamlit baseline                   |
+| **10** | Tax export / filing outputs (row 16)         | T2    | Medium build   | 4.0        | Completes tax output chain; gates CPP filing prep                               | 0% on 4-weight component; natural follow-on to row 15                    |
 
-**Fastest single win:** Gmail OAuth (rank 1) — validates 12 already-built points for the cost of adding env vars in Vercel.
+**Fastest single win:** B4 Cloudflare Access fix (rank 2) — Config ~30 min in CF dashboard; tunnel already live, Access policy is the only remaining gate.
 
-**Highest single-action impact:** Reconciliation engine (rank 2) — makes the entire Amazon pipeline trustworthy; without it all data is disconnected ingestion.
+**Highest single-action impact:** Reconciliation engine (rank 1) — makes the entire Amazon pipeline trustworthy; without it all data is disconnected ingestion.
 
-**Biggest unlock chain:** Harness security_layer → sandbox → self_repair + push_bash_automation (ranks 4+5) — completing both adds ~21 pts and enables the autonomous self-healing layer.
+**Biggest unlock chain:** Harness security_layer → sandbox → self_repair + push_bash_automation (ranks 3+4) — completing both adds ~21 pts and enables the autonomous self-healing layer.
 
 ---
 
