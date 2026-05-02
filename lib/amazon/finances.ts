@@ -71,21 +71,28 @@ export async function fetchAllFinancialEventGroups(
 
 /**
  * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
- * for open CAD groups.
+ * for CAD groups not yet deposited to the bank.
  *
- * "Open" = FundTransferStatus field is absent (Constraint B-1).
+ * Includes: absent status (accumulating), null, "Initiated", "Pending", "Failed".
+ * Excludes: "Transferred", "Successful" (already paid out).
+ * Matches Seller Central "Payments > Total Balance".
  * CAD filter required (Constraint B-2): at least one open group has MXN $0.
  * Constraint B-9: no caching — caller's route uses force-dynamic.
  */
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups = await fetchAllFinancialEventGroups(180)
 
-  // Filter: open (no FundTransferStatus) AND CAD (Constraint B-1, B-2)
+  // Include any CAD group where money has NOT yet been deposited to the bank.
+  // "Transferred" / "Successful" = already paid out. Everything else (absent,
+  // null, "Initiated", "Pending", "Failed") still counts as owed.
+  // Matches Seller Central "Payments > Total Balance".
+  const PAID_OUT = new Set(['Transferred', 'Successful'])
   let total = 0
   for (const group of groups) {
-    const isOpen = !('FundTransferStatus' in group) || group.FundTransferStatus === undefined
+    const status = group.FundTransferStatus
+    const isOwed = !status || !PAID_OUT.has(status)
     const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
-    if (isOpen && isCad) {
+    if (isOwed && isCad) {
       total += group.OriginalTotal?.CurrencyAmount ?? 0
     }
   }

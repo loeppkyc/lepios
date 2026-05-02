@@ -151,4 +151,42 @@ describe('fetchSettlementBalance', () => {
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(99.99)
   })
+
+  it('includes groups with FundTransferStatus = null (SP-API returns null for pending transfer)', async () => {
+    const group = {
+      FinancialEventGroupId: 'FEG-NULL',
+      FundTransferStatus: null,
+      OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 5327.12 },
+    }
+    mockSpFetch.mockResolvedValueOnce({ payload: { FinancialEventGroupList: [group] } })
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(5327.12)
+  })
+
+  it('includes groups with FundTransferStatus = "Initiated" (transfer in-flight)', async () => {
+    const group = makeGroup({ id: 'FEG-INIT', fundTransferStatus: 'Initiated', amount: 4000.0 })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([group]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(4000.0)
+  })
+
+  it('excludes groups with FundTransferStatus = "Successful"', async () => {
+    const group = makeGroup({ id: 'FEG-OK', fundTransferStatus: 'Successful', amount: 999.0 })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([group]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(0)
+  })
+
+  it('sums open + in-flight groups, excludes paid-out groups', async () => {
+    const open = makeGroup({ id: 'FEG-OPEN', amount: 1052.46 })
+    const inFlight = makeGroup({ id: 'FEG-FLY', fundTransferStatus: 'Initiated', amount: 5327.12 })
+    const paidOut = makeGroup({ id: 'FEG-DONE', fundTransferStatus: 'Transferred', amount: 800.0 })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([open, inFlight, paidOut]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(6379.58)
+  })
 })
