@@ -1,4 +1,8 @@
+'use client'
+
 import type { PalletInvoice } from '@/lib/pallets/types'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 interface Props {
   invoices: PalletInvoice[]
@@ -26,6 +30,7 @@ const tdStyle: React.CSSProperties = {
 }
 
 export function PalletInvoiceTable({ invoices, last12Total }: Props) {
+  const [devMode] = useDevMode()
   return (
     <div>
       {/* Total spend tile */}
@@ -139,6 +144,14 @@ export function PalletInvoiceTable({ invoices, last12Total }: Props) {
             </table>
           </div>
         </div>
+      )}
+
+      {devMode && (
+        <DebugSection heading="Debug — Pallet Invoices">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify({ last12Total, invoiceCount: invoices.length, invoices }, null, 2)}
+          </pre>
+        </DebugSection>
       )}
     </div>
   )

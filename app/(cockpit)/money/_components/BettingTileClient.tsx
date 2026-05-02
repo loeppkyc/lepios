@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { LogBetForm } from './LogBetForm'
 import { SettleBetForm } from './SettleBetForm'
 import { rollingRoiSignal, SIGNAL_WINDOW, type EdgeSignal } from '@/lib/betting-signals'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 const BANNER_KEY = 'lepios:bets-fresh-start-banner-dismissed'
 const SUPABASE_SQL_URL = 'https://supabase.com/dashboard/project/xpanlbcjueimeofgsara/sql/new'
@@ -317,6 +319,7 @@ export function BettingTileClient({
   const [showLogForm, setShowLogForm] = useState(false)
   const [settlingId, setSettlingId] = useState<string | null>(null)
   const [settleModalBetId, setSettleModalBetId] = useState<string | null>(null)
+  const [devMode] = useDevMode()
 
   const winRate = settledCount > 0 ? wins / settledCount : null
   const rolling30Roi =
@@ -658,6 +661,16 @@ export function BettingTileClient({
       {/* ── Instructional Settle Modal ────────────────────────────────── */}
       {settleModalBetId && (
         <SettleModal betId={settleModalBetId} onClose={() => setSettleModalBetId(null)} />
+      )}
+
+      {devMode && (
+        <div style={{ padding: '0 20px 16px' }}>
+          <DebugSection heading="Debug — Betting Tile">
+            <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              {JSON.stringify({ pendingCount: pending.length, completed30Count: completed30.length, settledCount, totalPnl, wins, losses, pending, completed30 }, null, 2)}
+            </pre>
+          </DebugSection>
+        </div>
       )}
     </div>
   )

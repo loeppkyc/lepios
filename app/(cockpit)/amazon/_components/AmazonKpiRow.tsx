@@ -1,6 +1,8 @@
 'use client'
 
 import type { KpiRowData } from '@/lib/amazon/reports'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // ── Delta badge ───────────────────────────────────────────────────────────────
 
@@ -178,36 +180,46 @@ function KpiCell({
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function AmazonKpiRow({ data }: { data: KpiRowData }) {
+  const [devMode] = useDevMode()
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 16,
-      }}
-    >
-      <KpiCell
-        label="Orders (30d)"
-        value={data.totalOrders.toString()}
-        delta={data.deltas.totalOrders}
-      />
-      <KpiCell
-        label="Gross Revenue (CAD)"
-        value={`$${data.grossRevenue.toFixed(2)}`}
-        delta={data.deltas.grossRevenue}
-        isCurrency
-      />
-      <KpiCell
-        label="Units Shipped"
-        value={data.unitsShipped.toString()}
-        delta={data.deltas.unitsShipped}
-      />
-      <KpiCell
-        label="Net Payout (35d)"
-        value={data.netPayout > 0 ? `$${data.netPayout.toFixed(2)}` : '—'}
-        delta={data.deltas.netPayout}
-        isCurrency
-      />
+    <div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 16,
+        }}
+      >
+        <KpiCell
+          label="Orders (30d)"
+          value={data.totalOrders.toString()}
+          delta={data.deltas.totalOrders}
+        />
+        <KpiCell
+          label="Gross Revenue (CAD)"
+          value={`$${data.grossRevenue.toFixed(2)}`}
+          delta={data.deltas.grossRevenue}
+          isCurrency
+        />
+        <KpiCell
+          label="Units Shipped"
+          value={data.unitsShipped.toString()}
+          delta={data.deltas.unitsShipped}
+        />
+        <KpiCell
+          label="Net Payout (35d)"
+          value={data.netPayout > 0 ? `$${data.netPayout.toFixed(2)}` : '—'}
+          delta={data.deltas.netPayout}
+          isCurrency
+        />
+      </div>
+      {devMode && (
+        <DebugSection heading="Debug — Amazon KPI Row">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </DebugSection>
+      )}
     </div>
   )
 }

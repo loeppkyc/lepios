@@ -5,6 +5,8 @@ import { CockpitInput } from '@/components/cockpit/CockpitInput'
 import { BsrSparkline } from '@/components/cockpit/BsrSparkline'
 import type { VelocityBadge } from '@/lib/keepa/product'
 import type { BsrPoint } from '@/lib/keepa/history'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 interface KeepaData {
   bsr: number | null
@@ -103,6 +105,7 @@ export function ScannerClient() {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [devMode] = useDevMode()
 
   const [sparkOpen, setSparkOpen] = useState(false)
   const [sparkLoading, setSparkLoading] = useState(false)
@@ -703,6 +706,14 @@ export function ScannerClient() {
             </div>
           )}
         </div>
+      )}
+
+      {devMode && result !== null && (
+        <DebugSection heading="Debug — Scanner Result">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </DebugSection>
       )}
     </div>
   )

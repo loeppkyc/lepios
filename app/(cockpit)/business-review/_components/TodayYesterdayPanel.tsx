@@ -6,6 +6,8 @@ import type {
   DebugOrder,
 } from '@/app/api/business-review/today-yesterday/route'
 import type { DayPanelData } from '@/lib/amazon/orders'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // ── Primitive: single stat row ────────────────────────────────────────────────
 
@@ -129,123 +131,87 @@ function DayPanel({
   )
 }
 
-// ── Debug section (dev mode only) ────────────────────────────────────────────
+// ── Debug order table (used inside shared DebugSection) ──────────────────────
 
-function DebugSection({
-  heading,
+function DebugOrderTable({
   orders,
   windowStart,
   windowEnd,
 }: {
-  heading: string
   orders: DebugOrder[]
   windowStart: string
   windowEnd: string
 }) {
-  const [open, setOpen] = useState(false)
   return (
-    <div
-      style={{
-        marginTop: 8,
-        backgroundColor: 'var(--color-surface-2)',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--color-border)',
-        fontSize: 'var(--text-nano)',
-        fontFamily: 'var(--font-mono)',
-      }}
-    >
-      <button
-        onClick={() => setOpen((v) => !v)}
+    <>
+      <div style={{ color: 'var(--color-text-disabled)', marginBottom: 6 }}>
+        Window: {windowStart} → {windowEnd}
+      </div>
+      <table
         style={{
           width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '6px 10px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--color-text-muted)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--text-nano)',
-          textAlign: 'left',
+          borderCollapse: 'collapse',
+          color: 'var(--color-text-primary)',
         }}
       >
-        <span style={{ fontSize: '0.6rem' }}>{open ? '▾' : '▸'}</span>
-        {'🔍 ' + heading}
-      </button>
-      {open && (
-        <div style={{ padding: '0 10px 8px' }}>
-          <div style={{ color: 'var(--color-text-disabled)', marginBottom: 6 }}>
-            Window: {windowStart} → {windowEnd}
-          </div>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            <thead>
-              <tr>
-                {['Order ID', 'Status', 'Date (UTC)', 'Units', 'OrderTotal'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '2px 6px',
-                      textAlign: 'left',
-                      borderBottom: '1px solid var(--color-border)',
-                      color: 'var(--color-text-disabled)',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{ padding: '4px 6px', color: 'var(--color-text-disabled)' }}
-                  >
-                    No orders in window
-                  </td>
-                </tr>
-              )}
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>
-                    {'…' + o.id.slice(-10)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '2px 6px',
-                      color:
-                        o.status === 'Pending'
-                          ? 'var(--color-text-muted)'
-                          : 'var(--color-text-primary)',
-                    }}
-                  >
-                    {o.status}
-                  </td>
-                  <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>
-                    {o.purchaseDate ? o.purchaseDate.replace('T', ' ').slice(0, 19) : '—'}
-                  </td>
-                  <td style={{ padding: '2px 6px', textAlign: 'right' }}>{o.units}</td>
-                  <td style={{ padding: '2px 6px', textAlign: 'right' }}>
-                    {o.orderTotal ? `$${o.orderTotal}` : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+        <thead>
+          <tr>
+            {['Order ID', 'Status', 'Date (UTC)', 'Units', 'OrderTotal'].map((h) => (
+              <th
+                key={h}
+                style={{
+                  padding: '2px 6px',
+                  textAlign: 'left',
+                  borderBottom: '1px solid var(--color-border)',
+                  color: 'var(--color-text-disabled)',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {orders.length === 0 && (
+            <tr>
+              <td
+                colSpan={5}
+                style={{ padding: '4px 6px', color: 'var(--color-text-disabled)' }}
+              >
+                No orders in window
+              </td>
+            </tr>
+          )}
+          {orders.map((o) => (
+            <tr key={o.id}>
+              <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>
+                {'…' + o.id.slice(-10)}
+              </td>
+              <td
+                style={{
+                  padding: '2px 6px',
+                  color:
+                    o.status === 'Pending'
+                      ? 'var(--color-text-muted)'
+                      : 'var(--color-text-primary)',
+                }}
+              >
+                {o.status}
+              </td>
+              <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>
+                {o.purchaseDate ? o.purchaseDate.replace('T', ' ').slice(0, 19) : '—'}
+              </td>
+              <td style={{ padding: '2px 6px', textAlign: 'right' }}>{o.units}</td>
+              <td style={{ padding: '2px 6px', textAlign: 'right' }}>
+                {o.orderTotal ? `$${o.orderTotal}` : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }
 
@@ -287,14 +253,7 @@ export function TodayYesterdayPanel() {
   const [data, setData] = useState<TodayYesterdayResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [devMode, setDevMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    try {
-      return localStorage.getItem('br_dev_mode') === '1'
-    } catch {
-      return false
-    }
-  })
+  const [devMode] = useDevMode()
 
   useEffect(() => {
     fetch('/api/business-review/today-yesterday')
@@ -314,14 +273,6 @@ export function TodayYesterdayPanel() {
         setLoading(false)
       })
   }, [])
-
-  function toggleDevMode() {
-    const next = !devMode
-    setDevMode(next)
-    try {
-      localStorage.setItem('br_dev_mode', next ? '1' : '0')
-    } catch {}
-  }
 
   if (loading) {
     return (
@@ -354,36 +305,6 @@ export function TodayYesterdayPanel() {
 
   return (
     <div>
-      {/* Dev Mode toggle */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          marginBottom: 8,
-        }}
-      >
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-nano)',
-            color: devMode ? 'var(--color-text-muted)' : 'var(--color-text-disabled)',
-            userSelect: 'none',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={devMode}
-            onChange={toggleDevMode}
-            style={{ accentColor: 'var(--color-accent-gold)', cursor: 'pointer' }}
-          />
-          Dev Mode
-        </label>
-      </div>
-
       {/* Panels row */}
       <div style={{ display: 'flex', gap: 16 }}>
         <DayPanel heading="Today" data={data.today} showPendingIndicator={true} />
@@ -394,20 +315,22 @@ export function TodayYesterdayPanel() {
       {devMode && data._debug && (
         <div style={{ display: 'flex', gap: 16, marginTop: 0 }}>
           <div style={{ flex: 1 }}>
-            <DebugSection
-              heading="Debug — Today Live Sales"
-              orders={data._debug.today}
-              windowStart={data._debug.todayAfter}
-              windowEnd="(now)"
-            />
+            <DebugSection heading="Debug — Today Live Sales">
+              <DebugOrderTable
+                orders={data._debug.today}
+                windowStart={data._debug.todayAfter}
+                windowEnd="(now)"
+              />
+            </DebugSection>
           </div>
           <div style={{ flex: 1 }}>
-            <DebugSection
-              heading="Debug — Yesterday Sales"
-              orders={data._debug.yesterday}
-              windowStart={data._debug.yesterdayAfter}
-              windowEnd={data._debug.yesterdayBefore}
-            />
+            <DebugSection heading="Debug — Yesterday Sales">
+              <DebugOrderTable
+                orders={data._debug.yesterday}
+                windowStart={data._debug.yesterdayAfter}
+                windowEnd={data._debug.yesterdayBefore}
+              />
+            </DebugSection>
           </div>
         </div>
       )}

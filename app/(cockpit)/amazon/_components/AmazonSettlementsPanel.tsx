@@ -1,6 +1,8 @@
 'use client'
 
 import type { SettlementRow } from '@/lib/amazon/reports'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // ── Format date range ─────────────────────────────────────────────────────────
 
@@ -15,6 +17,7 @@ function formatDateShort(isoTs: string | null): string {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function AmazonSettlementsPanel({ data }: { data: SettlementRow[] }) {
+  const [devMode] = useDevMode()
   // Show last 5 settlements (most recent first)
   const recent = [...data]
     .sort((a, b) => {
@@ -147,6 +150,14 @@ export function AmazonSettlementsPanel({ data }: { data: SettlementRow[] }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {devMode && (
+        <DebugSection heading="Debug — Amazon Settlements">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </DebugSection>
       )}
     </div>
   )

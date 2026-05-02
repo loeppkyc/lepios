@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { saveCostEntry } from '../actions'
 import type { FbaInventoryItem } from '@/lib/amazon/inventory'
 import type { FifoResult } from '@/lib/cogs/fifo'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 interface Props {
   items: FbaInventoryItem[]
@@ -41,6 +43,7 @@ const tdStyle: React.CSSProperties = {
 export function InventoryTable({ items, fifo, today }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [devMode] = useDevMode()
 
   // Per-row cost input state: asin → cost string
   const [costInputs, setCostInputs] = useState<Record<string, string>>(() =>
@@ -292,6 +295,14 @@ export function InventoryTable({ items, fifo, today }: Props) {
             </table>
           </div>
         </div>
+      )}
+
+      {devMode && (
+        <DebugSection heading="Debug — Inventory Table">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify({ itemCount: items.length, fifoTotalValueCad: fifo.total, items: items.slice(0, 5) }, null, 2)}
+          </pre>
+        </DebugSection>
       )}
     </div>
   )

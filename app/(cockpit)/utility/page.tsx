@@ -13,6 +13,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { UtilityEntryForm } from './_components/UtilityEntryForm'
+import { UtilityDebugPanel } from './_components/UtilityDebugPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -542,6 +543,12 @@ export default async function UtilityPage() {
 
       {/* ── Add / Update form ────────────────────────────────────────────── */}
       <UtilityEntryForm />
+
+      {/* ── Debug panel (dev mode only) ──────────────────────────────────── */}
+      <UtilityDebugPanel
+        bills={bills}
+        summary={{ totalBilled, avgMonthlyCost, avgMonthlyKwh, latestDelta, billCount: bills.length }}
+      />
     </div>
   )
 }

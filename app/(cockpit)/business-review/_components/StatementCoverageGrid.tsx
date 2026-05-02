@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // Inline types — do NOT import from route files. Route handlers may import
 // server-only modules that Turbopack would leak into the client bundle.
@@ -187,6 +189,7 @@ export function StatementCoverageGrid() {
   const [data, setData] = useState<StatementCoverageResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [devMode] = useDevMode()
 
   useEffect(() => {
     fetch('/api/business-review/statement-coverage')
@@ -301,6 +304,14 @@ export function StatementCoverageGrid() {
         Fetched:{' '}
         {new Date(data.fetchedAt).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })} MT
       </span>
+
+      {devMode && (
+        <DebugSection heading="Debug — Statement Coverage">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </DebugSection>
+      )}
     </div>
   )
 }

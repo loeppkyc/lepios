@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useDevMode } from '@/lib/hooks/useDevMode'
 
 interface NavItem {
   label: string
@@ -180,6 +181,7 @@ export function CockpitSidebar() {
   })
   const [email, setEmail] = useState<string | null>(null)
   const [signingOut, setSigningOut] = useState(false)
+  const [devMode, toggleDevMode] = useDevMode()
 
   useEffect(() => {
     const supabase = createClient()
@@ -433,6 +435,27 @@ export function CockpitSidebar() {
                 {email}
               </div>
             )}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: devMode ? 'var(--color-text-muted)' : 'var(--color-text-disabled)',
+                userSelect: 'none',
+                marginBottom: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={devMode}
+                onChange={toggleDevMode}
+                style={{ accentColor: 'var(--color-accent-gold)', cursor: 'pointer' }}
+              />
+              Dev Mode
+            </label>
             <button
               onClick={handleSignOut}
               disabled={signingOut}

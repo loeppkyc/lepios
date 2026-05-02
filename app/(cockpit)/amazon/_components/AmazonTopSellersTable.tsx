@@ -1,10 +1,13 @@
 'use client'
 
 import type { TopSellerRow } from '@/lib/amazon/reports'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function AmazonTopSellersTable({ data }: { data: TopSellerRow[] }) {
+  const [devMode] = useDevMode()
   return (
     <div
       style={{
@@ -165,6 +168,14 @@ export function AmazonTopSellersTable({ data }: { data: TopSellerRow[] }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {devMode && (
+        <DebugSection heading="Debug — Amazon Top Sellers">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </DebugSection>
       )}
     </div>
   )

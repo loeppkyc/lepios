@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // Inline types — do NOT import from route files. Route handlers import lib/amazon/client
 // which uses Node.js `crypto`. Turbopack traverses the import type graph and leaks
@@ -102,6 +104,7 @@ export function RecentDaysTable() {
   const [data, setData] = useState<RecentDaysResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [devMode] = useDevMode()
 
   useEffect(() => {
     fetch('/api/business-review/recent-days')
@@ -167,6 +170,15 @@ export function RecentDaysTable() {
         >
           Error: {error}
         </div>
+      )}
+
+      {/* Debug section */}
+      {devMode && data && (
+        <DebugSection heading="Debug — Recent Days Table">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </DebugSection>
       )}
 
       {/* Table */}

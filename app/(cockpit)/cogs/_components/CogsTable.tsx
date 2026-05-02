@@ -1,4 +1,8 @@
+'use client'
+
 import type { CogsEntry, CogsPerAsin } from '@/lib/cogs/types'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 interface Props {
   entries: CogsEntry[]
@@ -27,6 +31,7 @@ const thStyle: React.CSSProperties = {
 }
 
 export function CogsTable({ entries, summary }: Props) {
+  const [devMode] = useDevMode()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Recent entries */}
@@ -156,6 +161,14 @@ export function CogsTable({ entries, summary }: Props) {
           </div>
         )}
       </div>
+
+      {devMode && (
+        <DebugSection heading="Debug — COGS Table">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify({ entryCount: entries.length, entries: entries.slice(0, 5), summaryCount: summary.length, summary }, null, 2)}
+          </pre>
+        </DebugSection>
+      )}
 
       {/* Per-ASIN summary */}
       <div

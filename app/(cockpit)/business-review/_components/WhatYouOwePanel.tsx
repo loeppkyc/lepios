@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useDevMode } from '@/lib/hooks/useDevMode'
+import { DebugSection } from '@/components/cockpit/DebugSection'
 
 // Inline types — do NOT import from route files. Route handlers import lib/amazon/client
 // which uses Node.js `crypto`. Turbopack traverses the import type graph and leaks
@@ -112,6 +114,7 @@ export function WhatYouOwePanel() {
 
   const [settlementLoading, setSettlementLoading] = useState(true)
   const [fbaLoading, setFbaLoading] = useState(true)
+  const [devMode] = useDevMode()
 
   // Fetch both routes independently — Constraint B-9: settlement renders immediately
   // without waiting for the 30-min-cached FBA route
@@ -223,6 +226,14 @@ export function WhatYouOwePanel() {
         {/* No number. No fabrication. No env-var override. */}
         <StatCell label="Avg Cost / Unit" value="—" sub="Coming in Sprint 5" />
       </div>
+
+      {devMode && (
+        <DebugSection heading="Debug — What You're Owed">
+          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify({ settlement, fbaInventory }, null, 2)}
+          </pre>
+        </DebugSection>
+      )}
     </div>
   )
 }
