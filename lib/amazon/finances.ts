@@ -80,7 +80,8 @@ export async function fetchAllFinancialEventGroups(
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const groups = await fetchAllFinancialEventGroups(180)
 
-  // Filter: open (no FundTransferStatus) AND CAD (Constraint B-1, B-2)
+  // Open group = FundTransferStatus field is absent (not set at all).
+  // Reverted to original conservative filter pending raw data investigation.
   let total = 0
   for (const group of groups) {
     const isOpen = !('FundTransferStatus' in group) || group.FundTransferStatus === undefined
