@@ -229,7 +229,6 @@ export default function LoginPage() {
                 border: '1px solid var(--color-border)',
                 fontFamily: 'var(--font-ui)',
                 color: 'var(--color-text-primary)',
-                ringColor: 'var(--color-accent-gold)',
               }}
             />
           </div>
