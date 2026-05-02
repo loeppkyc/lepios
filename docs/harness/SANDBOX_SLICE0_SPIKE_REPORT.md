@@ -64,37 +64,31 @@ curl -s -X POST https://lepios-one.vercel.app/api/sandbox-spike \
 **Response:**
 
 ```json
-// paste response JSON here
+{
+  "runtime": "vercel",
+  "result": "works",
+  "pid": 12,
+  "pgid": 12,
+  "killLatencyMs": 100,
+  "processStillAlive": false
+}
 ```
 
-**Result:** `works` / `fails` / `partial` — _TBD_
+**Result:** `works` — AD3 confirmed.
 
 ---
 
 ## Decision
 
-<!-- Pick one and delete the others -->
-
 **AD3 confirmed** — `process.kill(-pgid, 'SIGTERM')` works on Vercel's Linux
-runtime. Slice 1 acceptance D (timeout enforcement + process-group kill) is
-implementable. Proceed to Slice 1.
-
-**R-A — local-only sandbox** — kill fails or returns EPERM on Vercel. Sandbox
-runtime is restricted to Colin's machine + future GPU box. `runInSandbox()` is
-never called from Vercel functions. `self_repair` and `push_bash_automation`
-are local-only. Document as a permanent constraint; GPU Day readiness target
-stays 60% but "Vercel-side sandboxing" is out-of-scope.
-
-**R-B — GNU timeout wrapper** — kill fails but `timeout <N>s sh -c "<cmd>"` is
-available on Vercel's image. Wrap every command invocation in this shell
-primitive. Tradeoff: GNU `timeout` availability needs a second verification
-step in the same spike before committing to this path.
+runtime. Kill latency: 100 ms. Slice 1 acceptance D (timeout enforcement +
+process-group kill) is implementable. Proceed to Slice 1.
 
 ---
 
 ## Colin sign-off
 
-- [ ] Local result recorded
-- [ ] Vercel result recorded
-- [ ] Decision selected above
-- [ ] Spike route removed (or `SANDBOX_SPIKE_ENABLED` unset) before Slice 1 PR opens
+- [x] Local result recorded
+- [x] Vercel result recorded
+- [x] Decision selected above
+- [x] Spike route removed (or `SANDBOX_SPIKE_ENABLED` unset) before Slice 1 PR opens
