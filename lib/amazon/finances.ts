@@ -71,11 +71,9 @@ export async function fetchAllFinancialEventGroups(
 
 /**
  * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
- * for CAD groups not yet deposited to the bank.
+ * for open CAD groups.
  *
- * Includes: absent status (accumulating), null, "Initiated", "Pending", "Failed".
- * Excludes: "Transferred", "Successful" (already paid out).
- * Matches Seller Central "Payments > Total Balance".
+ * "Open" = FundTransferStatus field is absent (Constraint B-1).
  * CAD filter required (Constraint B-2): at least one open group has MXN $0.
  * Constraint B-9: no caching — caller's route uses force-dynamic.
  */
