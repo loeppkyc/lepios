@@ -22,6 +22,7 @@ const {
   mockBuildAmazonSettlementsSyncLine,
   mockBuildOllamaTunnelHealthLine,
   mockBuildUtilityBillSavedLine,
+  mockBuildSecurityDigestLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -42,6 +43,7 @@ const {
   mockBuildAmazonSettlementsSyncLine: vi.fn(),
   mockBuildOllamaTunnelHealthLine: vi.fn(),
   mockBuildUtilityBillSavedLine: vi.fn(),
+  mockBuildSecurityDigestLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -133,6 +135,11 @@ vi.mock('@/lib/harness/ollama-tunnel-stats', () => ({
 // Mock utility-digest so buildUtilityBillSavedLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/utility-digest', () => ({
   buildUtilityBillSavedLine: mockBuildUtilityBillSavedLine,
+}))
+
+// Mock security-digest so buildSecurityDigestLine does not consume mockFrom slots.
+vi.mock('@/lib/security/security-digest', () => ({
+  buildSecurityDigestLine: mockBuildSecurityDigestLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -253,6 +260,8 @@ beforeEach(() => {
   mockBuildOllamaTunnelHealthLine.mockResolvedValue('Ollama tunnel: no smoke data (last 24h)')
   // Default: no utility bills saved yet (idle state)
   mockBuildUtilityBillSavedLine.mockResolvedValue('Utility bills saved (24h): 0')
+  // Default: security layer clean — no denials in 24h
+  mockBuildSecurityDigestLine.mockResolvedValue('Security (24h): 0 actions, 0 denied ✅')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
