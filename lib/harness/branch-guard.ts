@@ -1,5 +1,6 @@
 import { execSync } from 'child_process'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireCapability } from '@/lib/security/capability'
 
 export function getExpectedBranch(taskId: string): string {
   return `harness/task-${taskId}`
@@ -9,13 +10,18 @@ export function getCurrentBranch(): string {
   return execSync('git branch --show-current', { encoding: 'utf8' }).trim()
 }
 
-export async function assertCorrectBranch(taskId: string): Promise<void> {
+export async function assertCorrectBranch(
+  taskId: string,
+  opts?: { agentId?: string }
+): Promise<void> {
   if (!taskId) {
     throw new Error(
       'branch-guard: task_id is required — cannot verify branch without it.\n' +
         'The coordinator must be invoked with a valid task_id from task_queue.'
     )
   }
+
+  await requireCapability({ agentId: opts?.agentId ?? 'coordinator', capability: 'shell.run' })
 
   const expected = getExpectedBranch(taskId)
   const current = getCurrentBranch()

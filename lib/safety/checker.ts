@@ -16,6 +16,7 @@
  */
 
 import { logEvent } from '@/lib/knowledge/client'
+import { requireCapability } from '@/lib/security/capability'
 import type {
   SafetyCheck,
   SafetyReport,
@@ -29,10 +30,22 @@ import type {
 const DESTRUCTIVE_SQL_PATTERNS: Array<{ re: RegExp; id: string; label: string }> = [
   { re: /\bDROP\s+TABLE\b/i, id: 'drop_table', label: 'DROP TABLE' },
   { re: /\bTRUNCATE\b/i, id: 'truncate', label: 'TRUNCATE' },
-  { re: /\bDELETE\s+FROM\s+\w+\s*(?:;|$|\n)(?!\s*WHERE)/im, id: 'delete_no_where', label: 'DELETE without WHERE' },
-  { re: /\bDELETE\s+FROM\s+\w+\s*\n\s*(?!WHERE)/im, id: 'delete_no_where_newline', label: 'DELETE without WHERE' },
+  {
+    re: /\bDELETE\s+FROM\s+\w+\s*(?:;|$|\n)(?!\s*WHERE)/im,
+    id: 'delete_no_where',
+    label: 'DELETE without WHERE',
+  },
+  {
+    re: /\bDELETE\s+FROM\s+\w+\s*\n\s*(?!WHERE)/im,
+    id: 'delete_no_where_newline',
+    label: 'DELETE without WHERE',
+  },
   { re: /\bALTER\s+TABLE\b.+\bDROP\s+COLUMN\b/i, id: 'drop_column', label: 'DROP COLUMN' },
-  { re: /\bALTER\s+TABLE\b.+\bDROP\s+NOT\s+NULL\b/i, id: 'drop_not_null', label: 'DROP NOT NULL constraint' },
+  {
+    re: /\bALTER\s+TABLE\b.+\bDROP\s+NOT\s+NULL\b/i,
+    id: 'drop_not_null',
+    label: 'DROP NOT NULL constraint',
+  },
 ]
 
 /** Strip SQL comment lines before scanning for destructive patterns */
@@ -55,7 +68,8 @@ function checkDestructiveSql(migrations: ProposedMigration[]): SafetyCheck[] {
           severity: 'critical',
           category: 'destructive_operation',
           message: `Migration "${m.name}" contains ${label}`,
-          suggestion: 'Use a soft-delete or rename pattern instead. If intentional, document the rollback plan and get Colin approval.',
+          suggestion:
+            'Use a soft-delete or rename pattern instead. If intentional, document the rollback plan and get Colin approval.',
           file: `supabase/migrations/${m.name}.sql`,
           excerpt: match[0].trim(),
         })
@@ -65,7 +79,10 @@ function checkDestructiveSql(migrations: ProposedMigration[]): SafetyCheck[] {
     const deleteMatch = /\bDELETE\s+FROM\s+(\w+)([^;]*?)(;|$)/gim.exec(sql)
     if (deleteMatch) {
       const stmt = deleteMatch[0]
-      if (!/\bWHERE\b/i.test(stmt) && !checks.some((c) => c.id === 'destructive_sql_delete_no_where')) {
+      if (
+        !/\bWHERE\b/i.test(stmt) &&
+        !checks.some((c) => c.id === 'destructive_sql_delete_no_where')
+      ) {
         checks.push({
           id: 'destructive_sql_delete_no_where',
           severity: 'critical',
@@ -89,9 +106,21 @@ const SECRET_PATTERNS: Array<{ re: RegExp; id: string; label: string }> = [
   { re: /sk_live_[a-zA-Z0-9]{20,}/g, id: 'stripe_live_key', label: 'Stripe live secret key' },
   { re: /sk_test_[a-zA-Z0-9]{20,}/g, id: 'stripe_test_key', label: 'Stripe test secret key' },
   { re: /whsec_[a-zA-Z0-9]{20,}/g, id: 'stripe_webhook_secret', label: 'Stripe webhook secret' },
-  { re: /sb_secret_[a-zA-Z0-9_]{20,}/g, id: 'supabase_service_key', label: 'Supabase service role key' },
-  { re: /eyJ[a-zA-Z0-9_-]{30,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g, id: 'jwt_token', label: 'JWT token' },
-  { re: /(?:postgres|postgresql|mysql|mongodb):\/\/[^:]+:[^@\s'"]{6,}@/gi, id: 'db_connection_string', label: 'database connection string with credentials' },
+  {
+    re: /sb_secret_[a-zA-Z0-9_]{20,}/g,
+    id: 'supabase_service_key',
+    label: 'Supabase service role key',
+  },
+  {
+    re: /eyJ[a-zA-Z0-9_-]{30,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g,
+    id: 'jwt_token',
+    label: 'JWT token',
+  },
+  {
+    re: /(?:postgres|postgresql|mysql|mongodb):\/\/[^:]+:[^@\s'"]{6,}@/gi,
+    id: 'db_connection_string',
+    label: 'database connection string with credentials',
+  },
   // Long hex strings adjacent to an assignment (e.g. const SECRET = "abcd1234..." not in an import or comment)
   {
     re: /(?:=\s*["']|:\s*["'])[0-9a-f]{48,}["']/gi,
@@ -163,7 +192,9 @@ function testSlugFor(filePath: string): string {
   // lib/foo/bar.ts → foo-bar; app/api/foo/route.ts → foo-api
   const withoutExt = filePath.replace(/\.tsx?$/, '')
   if (withoutExt.startsWith('app/api/')) {
-    const parts = withoutExt.split('/').filter((p) => p && p !== 'app' && p !== 'api' && p !== 'route' && p !== '[id]')
+    const parts = withoutExt
+      .split('/')
+      .filter((p) => p && p !== 'app' && p !== 'api' && p !== 'route' && p !== '[id]')
     return parts.join('-') + (parts[parts.length - 1] !== 'api' ? '-api' : '')
   }
   if (withoutExt.startsWith('lib/')) {
@@ -173,7 +204,10 @@ function testSlugFor(filePath: string): string {
   return ''
 }
 
-function checkMissingTests(fileChanges: ProposedFileChange[], knownTests: Set<string>): SafetyCheck[] {
+function checkMissingTests(
+  fileChanges: ProposedFileChange[],
+  knownTests: Set<string>
+): SafetyCheck[] {
   const checks: SafetyCheck[] = []
   for (const f of fileChanges) {
     if (!f.isNew) continue
@@ -203,7 +237,10 @@ function matchesScope(filePath: string, declaredScope: string[]): boolean {
   return declaredScope.some((prefix) => filePath.startsWith(prefix) || filePath === prefix)
 }
 
-function checkScopeCreep(fileChanges: ProposedFileChange[], declaredScope: string[]): SafetyCheck[] {
+function checkScopeCreep(
+  fileChanges: ProposedFileChange[],
+  declaredScope: string[]
+): SafetyCheck[] {
   if (!declaredScope.length) return []
   const checks: SafetyCheck[] = []
   for (const f of fileChanges) {
@@ -244,7 +281,8 @@ function checkMissingRollback(migrations: ProposedMigration[]): SafetyCheck[] {
         severity: 'high',
         category: 'missing_rollback',
         message: `Migration "${m.name}" has no documented rollback path`,
-        suggestion: 'Add a "-- Rollback: DROP TABLE ..." comment or equivalent at the bottom of the migration.',
+        suggestion:
+          'Add a "-- Rollback: DROP TABLE ..." comment or equivalent at the bottom of the migration.',
         file: `supabase/migrations/${m.name}.sql`,
       })
     }
@@ -256,16 +294,19 @@ function checkMissingRollback(migrations: ProposedMigration[]): SafetyCheck[] {
 
 // Routes that legitimately have no body input (safe to skip Zod check)
 const BODY_EXEMPT_ROUTE_PATTERNS = [
-  /\/nightly\//,   // cron-triggered, no body
-  /\/health\//,    // health checks
-  /\/webhooks\//,  // Stripe webhooks use raw body, not JSON
+  /\/nightly\//, // cron-triggered, no body
+  /\/health\//, // health checks
+  /\/webhooks\//, // Stripe webhooks use raw body, not JSON
 ]
 
 function isBodyExempt(routePath: string): boolean {
   return BODY_EXEMPT_ROUTE_PATTERNS.some((re) => re.test(routePath))
 }
 
-function checkZodCoverage(fileChanges: ProposedFileChange[], newApiRoutes: string[]): SafetyCheck[] {
+function checkZodCoverage(
+  fileChanges: ProposedFileChange[],
+  newApiRoutes: string[]
+): SafetyCheck[] {
   const checks: SafetyCheck[] = []
   for (const routePath of newApiRoutes) {
     if (isBodyExempt(routePath)) continue
@@ -273,14 +314,18 @@ function checkZodCoverage(fileChanges: ProposedFileChange[], newApiRoutes: strin
     const fileChange = fileChanges.find((f) => f.path === routePath)
     if (!fileChange) continue
 
-    const hasZod = /from ['"]zod['"]|from ['"]@\/lib\/schemas|z\.object|z\.string|z\.number|ZodSchema/.test(fileChange.diff)
+    const hasZod =
+      /from ['"]zod['"]|from ['"]@\/lib\/schemas|z\.object|z\.string|z\.number|ZodSchema/.test(
+        fileChange.diff
+      )
     if (!hasZod) {
       checks.push({
         id: `missing_zod_${routePath.replace(/[^a-zA-Z0-9]/g, '_')}`,
         severity: 'high',
         category: 'schema_validation',
         message: `New API route "${routePath}" appears to have no Zod input validation`,
-        suggestion: 'Add a Zod schema for the request body/query and call schema.parse() or schema.safeParse() at the top of the handler.',
+        suggestion:
+          'Add a Zod schema for the request body/query and call schema.parse() or schema.safeParse() at the top of the handler.',
         file: routePath,
       })
     }
@@ -296,7 +341,7 @@ function checkZodCoverage(fileChanges: ProposedFileChange[], newApiRoutes: strin
  */
 export function runSafetyChecks(
   input: SafetyCheckInput,
-  knownTests: Set<string> = EXISTING_TESTS,
+  knownTests: Set<string> = EXISTING_TESTS
 ): SafetyReport {
   const allChecks: SafetyCheck[] = [
     ...checkDestructiveSql(input.migrations ?? []),
@@ -336,7 +381,10 @@ export function runSafetyChecks(
 export async function validateProposedChanges(
   input: SafetyCheckInput,
   knownTests?: Set<string>,
+  opts?: { agentId?: string }
 ): Promise<SafetyReport> {
+  await requireCapability({ agentId: opts?.agentId ?? 'coordinator', capability: 'shell.run' })
+
   const report = runSafetyChecks(input, knownTests)
 
   // Log to agent_events for scoring trail

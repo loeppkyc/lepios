@@ -27,14 +27,35 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
+// ── Mock requireCapability ────────────────────────────────────────────────────
+
+const { mockRequireCapability } = vi.hoisted(() => ({
+  mockRequireCapability: vi.fn(),
+}))
+
+vi.mock('@/lib/security/capability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/security/capability')>()
+  return { ...actual, requireCapability: mockRequireCapability }
+})
+
 import {
   getExpectedBranch,
   getCurrentBranch,
   assertCorrectBranch,
   buildBranchGuardLine,
 } from '@/lib/harness/branch-guard'
+import { CapabilityDeniedError } from '@/lib/security/capability'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeCapAllowed() {
+  mockRequireCapability.mockResolvedValue({
+    allowed: true,
+    reason: 'in_scope',
+    enforcement_mode: 'log_only',
+    audit_id: 'test-audit-id',
+  })
+}
 
 function makeInsertChain() {
   return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
@@ -78,12 +99,13 @@ describe('getCurrentBranch', () => {
 // ── assertCorrectBranch — missing task_id ─────────────────────────────────────
 
 describe('assertCorrectBranch — missing task_id', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    makeCapAllowed()
+  })
 
   it('throws explicit error when task_id is empty string', async () => {
-    await expect(assertCorrectBranch('')).rejects.toThrow(
-      /task_id is required/
-    )
+    await expect(assertCorrectBranch('')).rejects.toThrow(/task_id is required/)
   })
 
   it('does not call git when task_id is missing', async () => {
@@ -95,7 +117,10 @@ describe('assertCorrectBranch — missing task_id', () => {
 // ── assertCorrectBranch — correct branch ─────────────────────────────────────
 
 describe('assertCorrectBranch — already on correct branch', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    makeCapAllowed()
+  })
 
   it('resolves without throwing when on correct branch', async () => {
     mockExecSync.mockReturnValue('harness/task-abc123\n')
@@ -119,7 +144,10 @@ describe('assertCorrectBranch — already on correct branch', () => {
 // ── assertCorrectBranch — wrong branch ───────────────────────────────────────
 
 describe('assertCorrectBranch — wrong branch', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    makeCapAllowed()
+  })
 
   it('throws with a message naming the current and expected branches', async () => {
     mockExecSync.mockReturnValue('main\n')
@@ -197,10 +225,7 @@ describe('buildBranchGuardLine', () => {
   it('deduplicates task_ids in the output', async () => {
     mockFrom.mockReturnValue(
       makeSelectChain({
-        data: [
-          { meta: { task_id: 'abc123' } },
-          { meta: { task_id: 'abc123' } },
-        ],
+        data: [{ meta: { task_id: 'abc123' } }, { meta: { task_id: 'abc123' } }],
         error: null,
       })
     )
@@ -234,5 +259,53 @@ describe('buildBranchGuardLine', () => {
     })
     const line = await buildBranchGuardLine()
     expect(line).toBe('Branch guard: status unavailable')
+  })
+})
+
+// ── assertCorrectBranch — capability gate ─────────────────────────────────────
+
+describe('assertCorrectBranch — capability gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExecSync.mockReturnValue('harness/task-abc123\n')
+    mockFrom.mockReturnValue({ insert: vi.fn().mockResolvedValue({ data: null, error: null }) })
+    makeCapAllowed()
+  })
+
+  it('calls requireCapability with shell.run and default agentId coordinator', async () => {
+    await assertCorrectBranch('abc123')
+
+    expect(mockRequireCapability).toHaveBeenCalledOnce()
+    expect(mockRequireCapability).toHaveBeenCalledWith({
+      agentId: 'coordinator',
+      capability: 'shell.run',
+    })
+  })
+
+  it('passes custom agentId to requireCapability', async () => {
+    await assertCorrectBranch('abc123', { agentId: 'builder' })
+
+    expect(mockRequireCapability).toHaveBeenCalledWith({
+      agentId: 'builder',
+      capability: 'shell.run',
+    })
+  })
+
+  it('re-throws CapabilityDeniedError when capability is denied', async () => {
+    mockRequireCapability.mockRejectedValue(
+      new CapabilityDeniedError('coordinator', 'shell.run', 'no_grant_for_agent')
+    )
+
+    await expect(assertCorrectBranch('abc123')).rejects.toThrow(CapabilityDeniedError)
+  })
+
+  it('does not call git when capability is denied', async () => {
+    mockRequireCapability.mockRejectedValue(
+      new CapabilityDeniedError('coordinator', 'shell.run', 'no_grant_for_agent')
+    )
+
+    await assertCorrectBranch('abc123').catch(() => {})
+
+    expect(mockExecSync).not.toHaveBeenCalled()
   })
 })
