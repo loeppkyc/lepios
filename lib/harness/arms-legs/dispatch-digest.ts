@@ -50,8 +50,6 @@ export async function buildArmsLegsDispatchLine(): Promise<string> {
 
     const p95 = computePercentile(okLatencies, 0.95)
 
-    // Overhead breach: p95 > 50ms benchmark
-    const overheadBreach = okLatencies.filter((ms) => ms > 50).length
     const breachFlag = p95 !== null && p95 > 50 ? ' ⚠️ p95 >50ms benchmark' : ''
 
     const parts: string[] = [
@@ -64,9 +62,6 @@ export async function buildArmsLegsDispatchLine(): Promise<string> {
     if (errors > 0 || timeouts > 0) {
       parts.push(`${errors} err ${timeouts} timeout`)
     }
-
-    // Suppress unused variable warning
-    void overheadBreach
 
     return parts.join(' | ')
   } catch {
