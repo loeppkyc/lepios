@@ -88,11 +88,8 @@ export function cellStatus(
   cellMonth: number,
   nowYear: number,
   nowMonth: number,
-  nowDay: number,
 ): 'pending' | 'missing' {
   if (cellYear === nowYear && cellMonth === nowMonth) return 'pending'
-  const prev = previousMonth(nowYear, nowMonth)
-  if (cellYear === prev.year && cellMonth === prev.month && nowDay <= 15) return 'pending'
   return 'missing'
 }
 
@@ -272,7 +269,7 @@ export async function GET() {
   }
 
   // Today in Edmonton — needed for pending/missing determination
-  const { year: nowYear, month: nowMonth, day: nowDay } = currentEdmontonDate()
+  const { year: nowYear, month: nowMonth } = currentEdmontonDate()
 
   // Build coverage maps
   const accounts = ACCOUNTS.map((account, i) => {
@@ -299,7 +296,7 @@ export async function GET() {
       for (const month of allMonths) {
         if (coverage[month] !== 'filed') {
           const [y, m] = month.split('-').map(Number)
-          coverage[month] = cellStatus(y, m, nowYear, nowMonth, nowDay)
+          coverage[month] = cellStatus(y, m, nowYear, nowMonth)
         }
       }
     } else {

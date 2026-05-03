@@ -112,43 +112,24 @@ describe('previousMonth', () => {
 // ── cellStatus: pending / missing determination ────────────────────────────────
 
 describe('cellStatus', () => {
-  it('current month is always pending', () => {
-    // Today = 2026-05-03 (day 3)
-    expect(cellStatus(2026, 5, 2026, 5, 3)).toBe('pending')
+  it('current month is pending', () => {
+    expect(cellStatus(2026, 5, 2026, 5)).toBe('pending')
   })
 
-  it('current month is pending even on day 1', () => {
-    expect(cellStatus(2026, 5, 2026, 5, 1)).toBe('pending')
+  it('previous month with no upload is always missing', () => {
+    expect(cellStatus(2026, 4, 2026, 5)).toBe('missing')
   })
 
-  it('previous month is pending when today <= day 15', () => {
-    // Today = 2026-05-03: April is still in the grace window
-    expect(cellStatus(2026, 4, 2026, 5, 3)).toBe('pending')
+  it('two months ago is missing', () => {
+    expect(cellStatus(2026, 3, 2026, 5)).toBe('missing')
   })
 
-  it('previous month is pending on exactly day 15', () => {
-    expect(cellStatus(2026, 4, 2026, 5, 15)).toBe('pending')
+  it('past year is missing', () => {
+    expect(cellStatus(2025, 1, 2026, 5)).toBe('missing')
   })
 
-  it('previous month is missing when today > day 15', () => {
-    expect(cellStatus(2026, 4, 2026, 5, 16)).toBe('missing')
-  })
-
-  it('two months ago is always missing', () => {
-    expect(cellStatus(2026, 3, 2026, 5, 3)).toBe('missing')
-  })
-
-  it('past year is always missing', () => {
-    expect(cellStatus(2025, 1, 2026, 5, 3)).toBe('missing')
-  })
-
-  it('year-boundary: January is pending when previous month (Dec) and today <= 15', () => {
-    // today = 2026-01-10: December 2025 is in grace window
-    expect(cellStatus(2025, 12, 2026, 1, 10)).toBe('pending')
-  })
-
-  it('year-boundary: December is missing when today > 15 in January', () => {
-    expect(cellStatus(2025, 12, 2026, 1, 16)).toBe('missing')
+  it('year-boundary: previous month (Dec) is missing in January', () => {
+    expect(cellStatus(2025, 12, 2026, 1)).toBe('missing')
   })
 })
 
