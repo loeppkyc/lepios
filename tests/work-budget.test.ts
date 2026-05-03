@@ -62,6 +62,58 @@ vi.mock('path', async (importOriginal) => {
   return { ...actual, join: vi.fn((...args: string[]) => args.join('/')) }
 })
 
+// ── Mock arms-legs httpRequest — bypass capability gate + audit logging ───────
+vi.mock('@/lib/harness/arms-legs/http', () => ({
+  httpRequest: vi.fn(
+    async (args: {
+      url: string
+      method: string
+      body?: unknown
+      headers?: Record<string, string>
+    }) => {
+      const hdrs: Record<string, string> = { ...(args.headers ?? {}) }
+      let fetchBody: string | null = null
+      if (args.body != null) {
+        fetchBody = JSON.stringify(args.body)
+        if (!hdrs['Content-Type']) hdrs['Content-Type'] = 'application/json'
+      }
+      try {
+        const res = (await fetch(args.url, {
+          method: args.method,
+          headers: hdrs,
+          body: fetchBody,
+        })) as {
+          ok: boolean
+          status?: number
+          text?: () => Promise<string>
+          headers?: { forEach?: (cb: (v: string, k: string) => void) => void }
+        }
+        const text = typeof res.text === 'function' ? await res.text() : ''
+        const resHeaders: Record<string, string> = {}
+        res.headers?.forEach?.((v, k) => {
+          resHeaders[k] = v
+        })
+        return {
+          ok: Boolean(res.ok),
+          status: res.status ?? (res.ok ? 200 : 500),
+          body: text,
+          headers: resHeaders,
+          durationMs: 0,
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          status: 0,
+          body: '',
+          headers: {},
+          durationMs: 0,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      }
+    }
+  ),
+}))
+
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { parseBudgetCommand, handleBudgetCommand } from '@/lib/work-budget/parser'

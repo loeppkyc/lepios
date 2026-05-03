@@ -5,11 +5,13 @@ Date: 2026-05-01
 Author: Coordinator (draft for Colin review)
 Branch: TBD (create `harness/sandbox-slice-1` from main before builder picks up)
 
-**Builder gate — hard prerequisites (all must be live in production before writing any code):**
+**Builder gate — prerequisites status (as of 2026-05-03):**
 
-1. Migration 0045 (`security_layer_schema`) applied — provides `agent_actions` table (FK target for `sandbox_runs.audit_action_id`) and `capability_registry` + `agent_capabilities`.
-2. `lib/security/sandbox-contract.ts` shipped — provides `SandboxScope`, `SandboxCheckRequest`, `checkSandboxAction()` interface (security_layer slice 6).
-3. Slice 0 spike result signed off by Colin — see §Slice 0 Spike below.
+1. ✅ Migration 0045 (`security_layer_schema`) applied — `agent_actions`, `capability_registry`, `agent_capabilities` all live in production (security_layer 100%).
+2. ✅ Slice 0 spike signed off — AD3 confirmed on Vercel (kill latency 100ms, `processStillAlive: false`). See `docs/harness/SANDBOX_SLICE0_SPIKE_REPORT.md`.
+3. `lib/security/sandbox-contract.ts` — **NOT shipped yet, but only the `SandboxScope` type is needed for Slice 1**. Builder creates it as a types-only stub (no `checkSandboxAction()` implementation — that is Slice 2). See §Interface Specification below.
+
+All prerequisites for Slice 1 are met. Builder may start immediately.
 
 **Scope of this acceptance doc:** Slice 1 only (workspace isolation + audit trail). Slice 2 (capability enforcement wiring) and Slice 3+ (process isolation / Docker) are out of scope. Slice 1 lands the sandbox at **~50%** completion, not 60%.
 
@@ -85,19 +87,19 @@ Three options considered:
 
 Verified against `supabase/migrations/` on main as of 2026-05-01.
 
-| Table / file         | Migration                 | Status                                                       | Role                                                             |
-| -------------------- | ------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `agent_actions`      | 0045 (security_layer)     | **PENDING** (security_layer at 30% = pre-migration baseline) | FK target for `sandbox_runs.audit_action_id`; audit log          |
-| `agent_events`       | 0005                      | Applied                                                      | F18 morning digest query target                                  |
-| `harness_components` | 0043                      | Applied                                                      | Contains `harness:sandbox` row at 0%; UPDATE after slice 1 ships |
-| `sandbox_runs`       | **0046** (this component) | **Not yet written**                                          | New table — one row per `runInSandbox()` invocation              |
+| Table / file         | Migration                 | Status                                             | Role                                                             |
+| -------------------- | ------------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `agent_actions`      | 0045 (security_layer)     | **Applied** (security_layer 100% as of 2026-05-03) | FK target for `sandbox_runs.audit_action_id`; audit log          |
+| `agent_events`       | 0005                      | Applied                                            | F18 morning digest query target                                  |
+| `harness_components` | 0043                      | Applied                                            | Contains `harness:sandbox` row at 0%; UPDATE after slice 1 ships |
+| `sandbox_runs`       | **0067** (this component) | **Not yet written**                                | New table — one row per `runInSandbox()` invocation              |
 
-**Migration dependency constraint:** 0046 must be applied AFTER 0045. Builder must confirm
+**Migration dependency constraint:** 0067 must be applied AFTER 0045. Builder must confirm
 `SELECT id FROM harness_components WHERE id = 'harness:sandbox'` returns a row AND
-`SELECT 1 FROM agent_actions LIMIT 1` succeeds before writing migration 0046.
+`SELECT 1 FROM agent_actions LIMIT 1` succeeds before writing migration 0067.
 
-**Next available migration slot:** 0064 (0062/0063 claimed by reconciliation engine; 0046 is
-sandbox's reserved slot per `SANDBOX_LAYER_SPEC.md` — confirm no other PR has claimed it).
+**Next available migration slot:** 0067. Slots 0046–0066 are all taken; 0100 also exists.
+Builder must verify no concurrent PR claims 0067 before writing.
 
 ---
 
@@ -130,7 +132,7 @@ known from documentation alone.
 ## Schema Proposal — Migration 0046
 
 ```sql
--- 0046_sandbox_layer_schema.sql
+-- 0067_sandbox_layer_schema.sql
 -- Depends on 0045 (agent_actions table must exist before this runs)
 
 CREATE TABLE public.sandbox_runs (
@@ -188,7 +190,7 @@ SET    completion_pct = 50,  -- honest: slice 1 only; slice 2 lifts to 65
 WHERE  id = 'harness:sandbox';
 ```
 
-**Rollback:** `DROP TABLE IF EXISTS sandbox_runs CASCADE; REVOKE GRANT changes; UPDATE harness_components SET completion_pct = 0 WHERE id = 'harness:sandbox';`
+**Rollback:** `DROP TABLE IF EXISTS public.sandbox_runs CASCADE; UPDATE harness_components SET completion_pct = 0 WHERE id = 'harness:sandbox';`
 
 ---
 
@@ -279,14 +281,15 @@ Edge: if `cmd` ran `git commit`, diff is empty vs HEAD but non-empty vs `baseSha
 
 ## New Files
 
-| File                                                | Purpose                                                                      |
-| --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `lib/harness/sandbox/runtime.ts`                    | `runInSandbox()` + `cleanupSandbox()` — worktree lifecycle + spawn + timeout |
-| `lib/harness/sandbox/fs-diff.ts`                    | `captureFsDiff()` — git-diff-based filesystem change capture                 |
-| `lib/harness/sandbox/digest.ts`                     | `buildSandboxDigestLine()` — F18 morning digest line                         |
-| `supabase/migrations/0046_sandbox_layer_schema.sql` | `sandbox_runs` table + RLS + AD7 GRANT lockdown + rollup bump                |
-| `tests/sandbox/runtime.test.ts`                     | Unit tests: round-trip, fs-diff, timeout, warnings                           |
-| `tests/sandbox/ad7-runtime.test.ts`                 | Grant enforcement: INSERT succeeds, DELETE from service_role fails           |
+| File                                                | Purpose                                                                                               |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `lib/security/sandbox-contract.ts`                  | Types-only stub: `SandboxScope` type (Slice 1 only — no `checkSandboxAction()` impl; that is Slice 2) |
+| `lib/harness/sandbox/runtime.ts`                    | `runInSandbox()` + `cleanupSandbox()` — worktree lifecycle + spawn + timeout                          |
+| `lib/harness/sandbox/fs-diff.ts`                    | `captureFsDiff()` — git-diff-based filesystem change capture                                          |
+| `lib/harness/sandbox/digest.ts`                     | `buildSandboxDigestLine()` — F18 morning digest line                                                  |
+| `supabase/migrations/0067_sandbox_layer_schema.sql` | `sandbox_runs` table + RLS + AD7 GRANT lockdown + rollup bump                                         |
+| `tests/sandbox/runtime.test.ts`                     | Unit tests: round-trip, fs-diff, timeout, warnings                                                    |
+| `tests/sandbox/ad7-runtime.test.ts`                 | Grant enforcement: INSERT succeeds, DELETE from service_role fails                                    |
 
 No new React components. No new API route in slice 1 (in-process library only).
 
@@ -335,8 +338,8 @@ Builder must pass all of the following before handoff. Each is deterministic.
     Every call to `runInSandbox()` in slice 1 includes `'process_isolation_not_enforced'` in `result.warnings` and in the DB row.
 
 11. **Audit row written:**
-    After any successful `runInSandbox()` call where security_layer 0045 is live: one `agent_actions` row with `action_type = 'sandbox_check'` exists, and `sandbox_runs.audit_action_id` references it.
-    _If security_layer 0045 is not yet applied:_ `audit_action_id` is NULL; test is skipped with a comment noting the gate.
+    After any successful `runInSandbox()` call where security*layer 0045 is live: one `agent_actions` row with `action_type = 'sandbox_check'` exists, and `sandbox_runs.audit_action_id` references it.
+    \_If security_layer 0045 is not yet applied:* `audit_action_id` is NULL; test is skipped with a comment noting the gate.
 
 12. **Morning digest line:**
     `buildSandboxDigestLine()` called when no run in last 24h returns `'Sandbox: no run in last 24h'`.
@@ -372,14 +375,14 @@ Added to `composeMorningDigest` in `lib/orchestrator/digest.ts`. One import, one
 
 ## Dependencies — What Must Be Live Before Builder Starts
 
-| Dependency               | What sandbox needs                                                          | Status today                            | Builder gate                                                                |
-| ------------------------ | --------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
-| `security_layer` slice 1 | `agent_actions` table (migration 0045)                                      | **NOT APPLIED** — security_layer at 30% | Hard block                                                                  |
-| `security_layer` slice 2 | `capability_registry` + `agent_capabilities` seeded                         | **NOT APPLIED**                         | Hard block for slice 2; soft for slice 1 (audit_action_id will be NULL)     |
-| `security_layer` slice 6 | `lib/security/sandbox-contract.ts` — `SandboxScope`, `checkSandboxAction()` | Not shipped                             | Hard block for slice 2 `boundary_check_wired`; slice 1 skips the check call |
-| Slice 0 spike            | Vercel POSIX kill surface confirmed                                         | Not done                                | Hard block                                                                  |
+| Dependency               | What sandbox needs                                                          | Status today                         | Builder gate                                                                   |
+| ------------------------ | --------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| `security_layer` slice 1 | `agent_actions` table (migration 0045)                                      | ✅ **Applied** (security_layer 100%) | Met                                                                            |
+| `security_layer` slice 2 | `capability_registry` + `agent_capabilities` seeded                         | ✅ **Applied** (security_layer 100%) | Met; audit_action_id will be non-NULL for Slice 1 runs                         |
+| `security_layer` slice 6 | `lib/security/sandbox-contract.ts` — `SandboxScope`, `checkSandboxAction()` | Types-only stub created in this PR   | Hard block for slice 2 `boundary_check_wired`; slice 1 creates types-only stub |
+| Slice 0 spike            | Vercel POSIX kill surface confirmed                                         | ✅ **Signed off** (AD3, 2026-05-02)  | Met                                                                            |
 
-**Slice 1 can start immediately after:** 0045 applied + Slice 0 spike signed off. Slice 2 (`boundary_check_wired`) waits for security_layer slice 6.
+**Slice 1 can start immediately.** All prerequisites met. Slice 2 (`boundary_check_wired`) waits for `checkSandboxAction()` implementation (security_layer slice 6 — deferred).
 
 ---
 

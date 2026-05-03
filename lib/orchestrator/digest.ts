@@ -19,6 +19,7 @@ import { buildOllamaTunnelHealthLine } from '@/lib/harness/ollama-tunnel-stats'
 import { buildUtilityBillSavedLine } from '@/lib/harness/utility-digest'
 import { buildSecurityDigestLine } from '@/lib/security/security-digest'
 import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-digest'
+import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -284,6 +285,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Arms legs dispatch — success rate + p95 latency vs 50ms benchmark ──
   const armsLegsDispatchLine = await buildArmsLegsDispatchLine()
   messageToSend = `${messageToSend}\n${armsLegsDispatchLine}`
+
+  // ── F18: Sandbox layer — runs/denies/timeouts in last 24h ─────────────────
+  const sandboxDigestLine = await buildSandboxDigestLine()
+  messageToSend = `${messageToSend}\n${sandboxDigestLine}`
 
   characterCount = messageToSend.length
 
