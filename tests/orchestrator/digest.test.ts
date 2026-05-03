@@ -25,6 +25,7 @@ const {
   mockBuildSecurityDigestLine,
   mockBuildArmsLegsDispatchLine,
   mockBuildSandboxDigestLine,
+  mockBuildChatUiDigestLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -48,6 +49,7 @@ const {
   mockBuildSecurityDigestLine: vi.fn(),
   mockBuildArmsLegsDispatchLine: vi.fn(),
   mockBuildSandboxDigestLine: vi.fn(),
+  mockBuildChatUiDigestLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -154,6 +156,11 @@ vi.mock('@/lib/harness/arms-legs/dispatch-digest', () => ({
 // Mock sandbox digest so buildSandboxDigestLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/sandbox/digest', () => ({
   buildSandboxDigestLine: mockBuildSandboxDigestLine,
+}))
+
+// Mock chat-ui digest so buildChatUiDigestLine does not consume mockFrom slots.
+vi.mock('@/lib/orb/tools/chat-ui-digest', () => ({
+  buildChatUiDigestLine: mockBuildChatUiDigestLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -280,6 +287,8 @@ beforeEach(() => {
   mockBuildArmsLegsDispatchLine.mockResolvedValue('Arms legs dispatch: no calls in last 24h')
   // Default: sandbox no run in last 24h (idle state)
   mockBuildSandboxDigestLine.mockResolvedValue('Sandbox: no run in last 24h')
+  // Default: chat ui no tool calls yet (first run after deploy)
+  mockBuildChatUiDigestLine.mockResolvedValue('Chat UI (24h): no tool calls')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
