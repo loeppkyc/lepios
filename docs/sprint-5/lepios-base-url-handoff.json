@@ -1,0 +1,38 @@
+{
+  "task_id": "b93658c2-5f31-4a8f-853c-f1a469dc1af1",
+  "chunk_id": "lepios-base-url",
+  "sprint": 5,
+  "status": "complete",
+  "commit": "c95b7ec9dbbc0ccdd5eaa679b3786218b578478d",
+  "files_changed": [
+    "supabase/migrations/0101_lepios_base_url.sql",
+    ".claude/agents/coordinator.md",
+    "docs/sprint-5/lepios-base-url-acceptance.md",
+    "docs/sprint-state.md"
+  ],
+  "tests": {
+    "passing": 0,
+    "failing": 0,
+    "new": 0,
+    "note": "Test runner (vitest) crashes with bus error (exit 135) in this environment — pre-existing constraint unrelated to this chunk. Chunk modifies only coordinator.md (markdown, no TypeScript) and a SQL migration; no TypeScript logic changed. Coordinator drain auth tests at tests/harness/coordinator-drain-auth.test.ts cover the drain auth behavior and do not need updating."
+  },
+  "migrations_applied": ["supabase/migrations/0101_lepios_base_url.sql"],
+  "deploy_url": "pending — branch pushed to origin/harness/task-b93658c2-5f31-4a8f-853c-f1a469dc1af1; deploy happens when PR merged to main",
+  "grounding_checkpoint_required": [
+    "1. Apply migration 0101 to production Supabase via MCP apply_migration.",
+    "2. Seed the real value: UPDATE harness_config SET value = 'https://lepios-one.vercel.app' WHERE key = 'LEPIOS_BASE_URL';",
+    "3. Confirm all three keys populated: SELECT key, length(value) as len FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID', 'LEPIOS_BASE_URL'); — expect all three rows with non-zero lengths.",
+    "4. Trigger a coordinator session (manual pickup curl).",
+    "5. Confirm agent_events contains no new drain_trigger_failed rows after the session: SELECT action, status, occurred_at FROM agent_events WHERE action IN ('drain_trigger_success', 'drain_trigger_failed') ORDER BY occurred_at DESC LIMIT 5;",
+    "6. Confirm any pending notifications drained successfully during the session (check outbound_notifications rows moved to status='delivered')."
+  ],
+  "unknowns": [
+    "Test runner crashes with bus error (exit 135) in this build environment — pre-existing, not caused by this chunk. Coordinator reports prior chunks as '600 passing, 8 pre-existing failing'. Cannot confirm test counts from this session."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0101 must be applied to production before coordinator can read LEPIOS_BASE_URL from harness_config. Until applied, the bash block writes an empty string to /tmp/coordinator-base-url and the drain falls back to hardcoded 'https://lepios-one.vercel.app' (runtime safety net per acceptance doc)."
+  ],
+  "notes": "All 5 edits to coordinator.md were verified in the diff: (A) startup SQL extended to include LEPIOS_BASE_URL; (B) bullet added to working-context list; (C) _BU bash write block added after _S block; (D) missing_keys failure fallback updated; (E) drain call updated to use ${_BU} with /tmp/coordinator-base-url fallback. Migration 0101 inserts LEPIOS_BASE_URL with empty value — Colin must seed the real value post-migration per the SQL in grounding checkpoint step 2. The drain fallback to hardcoded URL in Edit E is intentional per acceptance doc — it prevents complete drain failure when /tmp/coordinator-base-url is absent (bootstrap safety net only).",
+  "tokens_used": 8200,
+  "timestamp": "2026-05-03T00:45:00Z"
+}
