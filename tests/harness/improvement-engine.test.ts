@@ -16,6 +16,14 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
+// Mock arms-legs fs — bypass capability gate so fsExists() returns true without DB calls
+vi.mock('@/lib/harness/arms-legs/fs', () => ({
+  fsExists: vi.fn().mockResolvedValue(true),
+  fsRead: vi.fn(),
+  fsWrite: vi.fn(),
+  fsDelete: vi.fn(),
+}))
+
 // Mock fs module for acceptance_doc_found checks
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
@@ -64,7 +72,18 @@ function makeCleanAudit(overrides: Partial<ChunkAudit> = {}): ChunkAudit {
  */
 function makeSelectChain(finalResult: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {}
-  const methods = ['select', 'eq', 'filter', 'in', 'gte', 'lte', 'limit', 'order', 'lt', 'maybeSingle']
+  const methods = [
+    'select',
+    'eq',
+    'filter',
+    'in',
+    'gte',
+    'lte',
+    'limit',
+    'order',
+    'lt',
+    'maybeSingle',
+  ]
   for (const m of methods) {
     chain[m] = vi.fn().mockReturnValue(chain)
   }
@@ -115,12 +134,42 @@ describe('analyzeChunk', () => {
     }
 
     const agentEvents = [
-      { action: 'coordinator.escalate_to_colin', status: 'success', task_type: 'escalate_to_colin', meta: { task_id: TASK_ID } },
-      { action: 'coordinator.escalate_to_colin', status: 'success', task_type: 'escalate_to_colin', meta: { task_id: TASK_ID } },
-      { action: 'twin.ask', status: 'success', task_type: 'twin_ask', meta: { task_id: TASK_ID, escalate: true } },
-      { action: 'twin.ask', status: 'success', task_type: 'twin_ask', meta: { task_id: TASK_ID, escalate: true } },
-      { action: 'twin.ask', status: 'success', task_type: 'twin_ask', meta: { task_id: TASK_ID, escalate: true } },
-      { action: 'grounding.mismatch', status: 'success', task_type: 'grounding_mismatch', meta: { task_id: TASK_ID } },
+      {
+        action: 'coordinator.escalate_to_colin',
+        status: 'success',
+        task_type: 'escalate_to_colin',
+        meta: { task_id: TASK_ID },
+      },
+      {
+        action: 'coordinator.escalate_to_colin',
+        status: 'success',
+        task_type: 'escalate_to_colin',
+        meta: { task_id: TASK_ID },
+      },
+      {
+        action: 'twin.ask',
+        status: 'success',
+        task_type: 'twin_ask',
+        meta: { task_id: TASK_ID, escalate: true },
+      },
+      {
+        action: 'twin.ask',
+        status: 'success',
+        task_type: 'twin_ask',
+        meta: { task_id: TASK_ID, escalate: true },
+      },
+      {
+        action: 'twin.ask',
+        status: 'success',
+        task_type: 'twin_ask',
+        meta: { task_id: TASK_ID, escalate: true },
+      },
+      {
+        action: 'grounding.mismatch',
+        status: 'success',
+        task_type: 'grounding_mismatch',
+        meta: { task_id: TASK_ID },
+      },
     ]
 
     let callCount = 0
@@ -128,7 +177,13 @@ describe('analyzeChunk', () => {
       callCount++
       if (callCount === 1) {
         // agent_events insert (triggered log)
-        return makeInsertChain({ data: { id: 'evt-1' }, error: null }).insert({ select: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { id: 'evt-1' }, error: null }) }) })
+        return makeInsertChain({ data: { id: 'evt-1' }, error: null }).insert({
+          select: vi
+            .fn()
+            .mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: 'evt-1' }, error: null }),
+            }),
+        })
       }
       if (callCount === 2) {
         // task_queue select
@@ -136,19 +191,28 @@ describe('analyzeChunk', () => {
         return { select: vi.fn().mockReturnValue(chain) }
       }
       if (callCount === 3) {
-        // agent_events for task_id
+        // agent_events for task_id — .filter() is the terminal call here
         const chain = makeSelectChain({ data: agentEvents, error: null })
-        ;(chain.limit as ReturnType<typeof vi.fn>).mockResolvedValue({ data: agentEvents, error: null })
+        ;(chain.filter as ReturnType<typeof vi.fn>).mockResolvedValue({
+          data: agentEvents,
+          error: null,
+        })
         return { select: vi.fn().mockReturnValue(chain) }
       }
       if (callCount === 4) {
-        // agent_events for chunk_id
+        // agent_events for chunk_id — .filter() is the terminal call here
         const chain = makeSelectChain({ data: [], error: null })
-        ;(chain.limit as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [], error: null })
+        ;(chain.filter as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [], error: null })
         return { select: vi.fn().mockReturnValue(chain) }
       }
       // agent_events insert (audit_complete log)
-      return makeInsertChain({ data: { id: 'evt-2' }, error: null }).insert({ select: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { id: 'evt-2' }, error: null }) }) })
+      return makeInsertChain({ data: { id: 'evt-2' }, error: null }).insert({
+        select: vi
+          .fn()
+          .mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { id: 'evt-2' }, error: null }),
+          }),
+      })
     })
 
     const audit = await analyzeChunk(TASK_ID)
@@ -158,7 +222,9 @@ describe('analyzeChunk', () => {
     expect(typeof audit.chunk_id).toBe('string')
     expect(typeof audit.sprint_id).toBe('string')
     expect(typeof audit.acceptance_doc_found).toBe('boolean')
-    expect(['passed', 'passed_with_limitation', 'failed', 'not_yet']).toContain(audit.grounding_status)
+    expect(['passed', 'passed_with_limitation', 'failed', 'not_yet']).toContain(
+      audit.grounding_status
+    )
     expect(typeof audit.grounding_mismatches).toBe('number')
     expect(typeof audit.escalations_to_colin).toBe('number')
     expect(typeof audit.twin_escalations).toBe('number')
@@ -184,7 +250,17 @@ describe('generateProposals', () => {
     // Mock agent_events insert for proposal_rejected (none will be rejected in this case)
     mockFrom.mockImplementation(() => {
       const chain = makeInsertChain({ data: { id: 'evt-x' }, error: null })
-      return { insert: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null }) }) }) }
+      return {
+        insert: vi
+          .fn()
+          .mockReturnValue({
+            select: vi
+              .fn()
+              .mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null }),
+              }),
+          }),
+      }
     })
 
     const audit = makeCleanAudit({ grounding_mismatches: 3 })
@@ -202,9 +278,9 @@ describe('generateProposals', () => {
     mockFrom.mockImplementation(() => ({
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null })
-        })
-      })
+          single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null }),
+        }),
+      }),
     }))
 
     const audit = makeCleanAudit({ ollama_failures: 5 })
@@ -228,9 +304,9 @@ describe('generateProposals', () => {
     mockFrom.mockImplementation(() => ({
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null })
-        })
-      })
+          single: vi.fn().mockResolvedValue({ data: { id: 'evt-x' }, error: null }),
+        }),
+      }),
     }))
 
     const audit = makeCleanAudit({ grounding_mismatches: 2, ollama_failures: 5 })
@@ -238,9 +314,15 @@ describe('generateProposals', () => {
 
     for (const p of proposals) {
       // Each accepted proposal should have a file/path reference and a verb
-      const hasFileRef = /[./§]/.test(p.concrete_action) ||
-        /\b(migration|table|column|cron|route|hook|endpoint|function|module|script|doc|policy|config|index|constraint)\b/i.test(p.concrete_action)
-      const hasVerb = /\b(add|update|export|wire|remove|create|insert|extend|require|enforce|source|set|enable|check|log|alert|include|replace|move|rename|delete|refactor|fix|configure)\b/i.test(p.concrete_action)
+      const hasFileRef =
+        /[./§]/.test(p.concrete_action) ||
+        /\b(migration|table|column|cron|route|hook|endpoint|function|module|script|doc|policy|config|index|constraint)\b/i.test(
+          p.concrete_action
+        )
+      const hasVerb =
+        /\b(add|update|export|wire|remove|create|insert|extend|require|enforce|source|set|enable|check|log|alert|include|replace|move|rename|delete|refactor|fix|configure)\b/i.test(
+          p.concrete_action
+        )
       expect(hasFileRef, `proposal missing file ref: "${p.concrete_action}"`).toBe(true)
       expect(hasVerb, `proposal missing verb: "${p.concrete_action}"`).toBe(true)
     }
@@ -279,7 +361,8 @@ describe('deduplicateAndQueue', () => {
       {
         category: 'doc_gap',
         severity: 'nice_to_have',
-        concrete_action: 'Add field definition table to docs/sprint-5/chunk-e1-acceptance.md §fields',
+        concrete_action:
+          'Add field definition table to docs/sprint-5/chunk-e1-acceptance.md §fields',
         engine_signal: 'test signal',
         measurement: 'mismatches: before=2, target=0',
         source_chunk_id: CHUNK_ID,
@@ -298,7 +381,10 @@ describe('deduplicateAndQueue', () => {
           const chain: Record<string, unknown> = {}
           const methods = ['in', 'filter', 'limit', 'maybeSingle', 'eq', 'order']
           for (const m of methods) chain[m] = vi.fn().mockReturnValue(chain)
-          ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null })
+          ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({
+            data: null,
+            error: null,
+          })
           return chain
         }),
         insert: vi.fn().mockImplementation(() => {
@@ -365,7 +451,8 @@ describe('deduplicateAndQueue', () => {
       {
         category: 'doc_gap',
         severity: 'nice_to_have',
-        concrete_action: 'Add field definition to docs/sprint-5/chunk-e1-acceptance.md §fields section',
+        concrete_action:
+          'Add field definition to docs/sprint-5/chunk-e1-acceptance.md §fields section',
         engine_signal: 'signal',
         measurement: 'metric',
         source_chunk_id: CHUNK_ID,
@@ -435,7 +522,8 @@ describe('deduplicateAndQueue', () => {
 
     await deduplicateAndQueue(proposals, CHUNK_ID)
 
-    const updatedMeta = (updatePayload as unknown as { metadata?: Record<string, unknown> } | null)?.metadata
+    const updatedMeta = (updatePayload as unknown as { metadata?: Record<string, unknown> } | null)
+      ?.metadata
     expect(updatedMeta?.recurrence_count).toBe(2)
     expect(updatedMeta?.needs_root_cause_review).toBe(true)
     expect(updatedMeta?.severity).toBe('blocking') // recurrence_count=2 → blocking
@@ -491,7 +579,9 @@ describe('notifyProposals', () => {
     // Must NOT have parse_mode: Markdown (per hard stops)
     expect(payload.parse_mode).toBeUndefined()
     // Must have inline keyboard with approve_all, review, dismiss
-    const keyboard = (payload.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] })?.inline_keyboard
+    const keyboard = (
+      payload.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }
+    )?.inline_keyboard
     expect(keyboard).toBeDefined()
     const buttons = keyboard[0]
     const cbDatas = buttons.map((b) => b.callback_data)
@@ -515,7 +605,10 @@ describe('checkAutoProceed', () => {
         const chain: Record<string, unknown> = {}
         const methods = ['select', 'eq', 'gte', 'maybeSingle']
         for (const m of methods) chain[m] = vi.fn().mockReturnValue(chain)
-        ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: patternRow, error: null })
+        ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({
+          data: patternRow,
+          error: null,
+        })
         return chain
       }
       if (table === 'task_queue') {
@@ -542,7 +635,8 @@ describe('checkAutoProceed', () => {
     const proposal: ImprovementProposal = {
       category: 'tooling',
       severity: 'nice_to_have',
-      concrete_action: 'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
+      concrete_action:
+        'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
       engine_signal: 'signal',
       measurement: 'metric',
       source_chunk_id: CHUNK_ID,
@@ -562,7 +656,8 @@ describe('checkAutoProceed', () => {
     const proposal: ImprovementProposal = {
       category: 'tooling',
       severity: 'blocking', // fails criterion 2
-      concrete_action: 'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
+      concrete_action:
+        'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
       engine_signal: 'signal',
       measurement: 'metric',
       source_chunk_id: CHUNK_ID,
@@ -595,7 +690,8 @@ describe('checkAutoProceed', () => {
     const proposal: ImprovementProposal = {
       category: 'tooling',
       severity: 'nice_to_have',
-      concrete_action: 'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
+      concrete_action:
+        'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
       engine_signal: 'signal',
       measurement: 'metric',
       source_chunk_id: CHUNK_ID,
@@ -613,7 +709,10 @@ describe('checkAutoProceed', () => {
         const chain: Record<string, unknown> = {}
         const methods = ['select', 'eq', 'gte', 'maybeSingle']
         for (const m of methods) chain[m] = vi.fn().mockReturnValue(chain)
-        ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null })
+        ;(chain.maybeSingle as ReturnType<typeof vi.fn>).mockResolvedValue({
+          data: null,
+          error: null,
+        })
         return chain
       }
       return {}
@@ -622,7 +721,8 @@ describe('checkAutoProceed', () => {
     const proposal: ImprovementProposal = {
       category: 'tooling',
       severity: 'nice_to_have',
-      concrete_action: 'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
+      concrete_action:
+        'Export ANTHROPIC_API_KEY from .env.local into .husky/pre-commit hook sourcing line',
       engine_signal: 'signal',
       measurement: 'metric',
       source_chunk_id: CHUNK_ID,

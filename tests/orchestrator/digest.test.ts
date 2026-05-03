@@ -24,6 +24,7 @@ const {
   mockBuildUtilityBillSavedLine,
   mockBuildSecurityDigestLine,
   mockBuildArmsLegsDispatchLine,
+  mockBuildSandboxDigestLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -46,6 +47,7 @@ const {
   mockBuildUtilityBillSavedLine: vi.fn(),
   mockBuildSecurityDigestLine: vi.fn(),
   mockBuildArmsLegsDispatchLine: vi.fn(),
+  mockBuildSandboxDigestLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -147,6 +149,11 @@ vi.mock('@/lib/security/security-digest', () => ({
 // Mock arms-legs dispatch-digest so buildArmsLegsDispatchLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/arms-legs/dispatch-digest', () => ({
   buildArmsLegsDispatchLine: mockBuildArmsLegsDispatchLine,
+}))
+
+// Mock sandbox digest so buildSandboxDigestLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/sandbox/digest', () => ({
+  buildSandboxDigestLine: mockBuildSandboxDigestLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -271,6 +278,8 @@ beforeEach(() => {
   mockBuildSecurityDigestLine.mockResolvedValue('Security (24h): 0 actions, 0 denied ✅')
   // Default: arms legs dispatch no calls yet (first run after deploy)
   mockBuildArmsLegsDispatchLine.mockResolvedValue('Arms legs dispatch: no calls in last 24h')
+  // Default: sandbox no run in last 24h (idle state)
+  mockBuildSandboxDigestLine.mockResolvedValue('Sandbox: no run in last 24h')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
