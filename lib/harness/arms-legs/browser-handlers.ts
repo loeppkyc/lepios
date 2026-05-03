@@ -165,3 +165,11 @@ registerHandler<BrowserFillPayload, BrowserFillResult>('browser.fill', async (pa
     return { filled: true as const }
   })
 })
+
+// browser.evaluate is registered as a permanent rejection so the dead capability
+// entry in the DB doesn't silently fall through to 'no_handler'.
+registerHandler('browser.evaluate', async () => {
+  throw new Error(
+    'browser.evaluate is permanently disabled — arbitrary JS execution from an agent string is an RCE vector'
+  )
+})
