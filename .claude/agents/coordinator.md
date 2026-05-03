@@ -74,18 +74,19 @@ Before any other action — before Phase 0, before reading ARCHITECTURE.md — r
 coordinator's runtime config from `harness_config` via `mcp__Supabase__execute_sql`:
 
 ```sql
-SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID');
+SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHAT_ID', 'LEPIOS_BASE_URL');
 ```
 
 Store the results in your working context:
 
 - `CRON_SECRET` — used as the Bearer token in every heartbeat and drain-trigger curl
 - `TELEGRAM_CHAT_ID` — used as `chat_id` in every `outbound_notifications` insert
+- `LEPIOS_BASE_URL` — used as the base for all self-trigger API calls
 
 If the query fails (table missing or row absent):
 
 1. Log `agent_events` row: `action='config_read_failed', status='warning',
-meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID']`
+meta.missing_keys=['CRON_SECRET'|'TELEGRAM_CHAT_ID'|'LEPIOS_BASE_URL']`
 2. Continue — heartbeat is skipped per Non-negotiable #6; notifications insert with null
    `chat_id` (drain fallback covers delivery)
 
@@ -105,6 +106,13 @@ _S=$(curl -s \
   python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['value'] if d else '',end='')" 2>/dev/null)
 [ -n "$_S" ] && printf '%s' "$_S" > /tmp/coordinator-secret && chmod 600 /tmp/coordinator-secret
 unset _S
+_BU=$(curl -s \
+  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/harness_config?key=eq.LEPIOS_BASE_URL&select=value" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" | \
+  python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['value'] if d else '',end='')" 2>/dev/null)
+[ -n "$_BU" ] && printf '%s' "$_BU" > /tmp/coordinator-base-url && chmod 600 /tmp/coordinator-base-url
+unset _BU
 ```
 
 If the curl fails (Supabase creds not in bash env), the temp file is absent — heartbeat and drain
@@ -574,12 +582,14 @@ If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notificatio
 
 ```bash
 # CRON_SECRET is in /tmp/coordinator-secret — written at session start from harness_config.
+# LEPIOS_BASE_URL is in /tmp/coordinator-base-url — written at session start from harness_config.
 # Do NOT use ${CRON_SECRET} bare or grep .env.local — both absent in cloud coordinator sandbox.
 _CS=$(cat /tmp/coordinator-secret 2>/dev/null || echo "")
+_BU=$(cat /tmp/coordinator-base-url 2>/dev/null || echo "https://lepios-one.vercel.app")
 DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
+  -X POST "${_BU}/api/harness/notifications-drain" \
   -H "Authorization: Bearer ${_CS}" 2>/dev/null || echo "000")
-unset _CS
+unset _CS _BU
 ```
 
 On failure:
