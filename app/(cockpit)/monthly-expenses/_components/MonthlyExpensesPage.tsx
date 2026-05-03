@@ -25,9 +25,7 @@ function currentMonthStr(): string {
 }
 
 function allMonthsForYear(year: number): string[] {
-  return Array.from({ length: 12 }, (_, i) =>
-    `${year}-${String(i + 1).padStart(2, '0')}`
-  )
+  return Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
 }
 
 function monthLabel(yyyyMM: string): string {
@@ -226,7 +224,14 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
   }
 
   function handleBusModeChange(mode: 'full' | 'mixed' | 'personal') {
-    const pct = mode === 'full' ? 100 : mode === 'personal' ? 0 : f.businessUsePct < 1 || f.businessUsePct >= 100 ? 33 : f.businessUsePct
+    const pct =
+      mode === 'full'
+        ? 100
+        : mode === 'personal'
+          ? 0
+          : f.businessUsePct < 1 || f.businessUsePct >= 100
+            ? 33
+            : f.businessUsePct
     setF((prev) => ({ ...prev, busMode: mode, businessUsePct: pct }))
   }
 
@@ -234,8 +239,14 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
     e.preventDefault()
     setErr(null)
     const pretaxNum = parseFloat(f.pretax)
-    if (!f.vendor.trim()) { setErr('Vendor is required.'); return }
-    if (isNaN(pretaxNum) || pretaxNum <= 0) { setErr('Pre-Tax must be a positive number.'); return }
+    if (!f.vendor.trim()) {
+      setErr('Vendor is required.')
+      return
+    }
+    if (isNaN(pretaxNum) || pretaxNum <= 0) {
+      setErr('Pre-Tax must be a positive number.')
+      return
+    }
     await onSubmit(f)
   }
 
@@ -245,12 +256,23 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
   const bizPortion = pretaxNum * (f.businessUsePct / 100)
 
   const gridTwo: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
-  const gridThree: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }
+  const gridThree: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: 12,
+  }
 
   return (
     <form onSubmit={handleSubmit} noValidate>
       {err && (
-        <div style={{ color: 'var(--color-critical)', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', marginBottom: 12 }}>
+        <div
+          style={{
+            color: 'var(--color-critical)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            marginBottom: 12,
+          }}
+        >
           {err}
         </div>
       )}
@@ -282,8 +304,16 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
       {/* Category */}
       <div style={{ marginBottom: 12 }}>
         <label style={s.label}>Category</label>
-        <select value={f.category} onChange={(e) => handleCategoryChange(e.target.value)} style={s.select}>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        <select
+          value={f.category}
+          onChange={(e) => handleCategoryChange(e.target.value)}
+          style={s.select}
+        >
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -303,8 +333,16 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
         </div>
         <div>
           <label style={s.label}>Tax Rate</label>
-          <select value={f.taxRateKey} onChange={(e) => handleRateChange(e.target.value)} style={s.select}>
-            {TAX_RATE_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
+          <select
+            value={f.taxRateKey}
+            onChange={(e) => handleRateChange(e.target.value)}
+            style={s.select}
+          >
+            {TAX_RATE_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -322,10 +360,23 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
 
       {/* Total display */}
       <div style={{ marginBottom: 12 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-muted)',
+          }}
+        >
           Total:&nbsp;
         </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-body)', color: 'var(--color-text-primary)', fontWeight: 700 }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-body)',
+            color: 'var(--color-text-primary)',
+            fontWeight: 700,
+          }}
+        >
           ${fmt(total)}
         </span>
       </div>
@@ -334,8 +385,16 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
       <div style={{ ...gridTwo, marginBottom: 12 }}>
         <div>
           <label style={s.label}>Payment Method</label>
-          <select value={f.paymentMethod} onChange={(e) => set('paymentMethod', e.target.value as typeof f.paymentMethod)} style={s.select}>
-            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+          <select
+            value={f.paymentMethod}
+            onChange={(e) => set('paymentMethod', e.target.value as typeof f.paymentMethod)}
+            style={s.select}
+          >
+            {PAYMENT_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -348,7 +407,15 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
               onChange={(e) => set('hubdoc', e.target.checked)}
               style={{ accentColor: 'var(--color-pillar-money)', cursor: 'pointer' }}
             />
-            <label htmlFor="hubdoc" style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+            <label
+              htmlFor="hubdoc"
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
               Yes
             </label>
           </div>
@@ -373,7 +440,15 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
           {(['full', 'mixed', 'personal'] as const).map((mode) => (
             <label
               key={mode}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-secondary)' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-secondary)',
+              }}
             >
               <input
                 type="radio"
@@ -396,12 +471,28 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
               max={99}
               step={1}
               value={f.businessUsePct}
-              onChange={(e) => set('businessUsePct', Math.min(99, Math.max(1, parseInt(e.target.value) || 33)))}
+              onChange={(e) =>
+                set('businessUsePct', Math.min(99, Math.max(1, parseInt(e.target.value) || 33)))
+              }
               style={{ ...s.input, width: 80 }}
             />
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>%</span>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              %
+            </span>
             {pretaxNum > 0 && (
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
                 → ${fmt(bizPortion)} of ${fmt(pretaxNum)}
               </span>
             )}
@@ -409,7 +500,14 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
         )}
 
         {f.busMode === 'personal' && (
-          <div style={{ marginTop: 4, fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>
+          <div
+            style={{
+              marginTop: 4,
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
             Tracked but excluded from P&L
           </div>
         )}
@@ -420,14 +518,34 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
         <div style={{ marginBottom: 16 }}>
           <label style={s.label}>Frequency</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {([
-              ['one-time', 'One-time'],
-              ['monthly', pretaxNum > 0 ? `Monthly (rest of year) — $${fmt(pretaxNum)}/mo` : 'Monthly (rest of year)'],
-              ['annual', pretaxNum > 0 ? `Annual ÷ 12 — $${fmt(Math.round(pretaxNum / 12 * 100) / 100)}/mo` : 'Annual ÷ 12, all 12 months'],
-            ] as [Frequency, string][]).map(([val, label]) => (
+            {(
+              [
+                ['one-time', 'One-time'],
+                [
+                  'monthly',
+                  pretaxNum > 0
+                    ? `Monthly (rest of year) — $${fmt(pretaxNum)}/mo`
+                    : 'Monthly (rest of year)',
+                ],
+                [
+                  'annual',
+                  pretaxNum > 0
+                    ? `Annual ÷ 12 — $${fmt(Math.round((pretaxNum / 12) * 100) / 100)}/mo`
+                    : 'Annual ÷ 12, all 12 months',
+                ],
+              ] as [Frequency, string][]
+            ).map(([val, label]) => (
               <label
                 key={val}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-secondary)' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-secondary)',
+                }}
               >
                 <input
                   type="radio"
@@ -446,7 +564,11 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="submit" disabled={submitting} style={{ ...s.btnPrimary, opacity: submitting ? 0.6 : 1 }}>
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{ ...s.btnPrimary, opacity: submitting ? 0.6 : 1 }}
+        >
           {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Expense'}
         </button>
         <button type="button" onClick={onCancel} style={s.btnSecondary}>
@@ -479,20 +601,29 @@ export function MonthlyExpensesPage() {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setFetchError(null)
-    fetch(`/api/expenses?month=${month}`)
-      .then(async (res) => {
+
+    async function load() {
+      setLoading(true)
+      setFetchError(null)
+      try {
+        const res = await fetch(`/api/expenses?month=${month}`)
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string }
           throw new Error(body.error ?? `HTTP ${res.status}`)
         }
-        return res.json() as Promise<{ expenses: BusinessExpense[] }>
-      })
-      .then((data) => { if (!cancelled) setExpenses(data.expenses) })
-      .catch((e: unknown) => { if (!cancelled) setFetchError(e instanceof Error ? e.message : String(e)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+        const data = (await res.json()) as { expenses: BusinessExpense[] }
+        if (!cancelled) setExpenses(data.expenses)
+      } catch (e: unknown) {
+        if (!cancelled) setFetchError(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [month, refetchKey])
 
   function flash(msg: string) {
@@ -581,26 +712,48 @@ export function MonthlyExpensesPage() {
   // Sorting
   const sorted = [...expenses].sort((a, b) => {
     switch (sortOrder) {
-      case 'date-asc':  return a.date.localeCompare(b.date)
-      case 'date-desc': return b.date.localeCompare(a.date)
-      case 'vendor':    return a.vendor.toLowerCase().localeCompare(b.vendor.toLowerCase())
-      case 'amount-desc': return (b.pretax + b.tax_amount) - (a.pretax + a.tax_amount)
-      default: return 0
+      case 'date-asc':
+        return a.date.localeCompare(b.date)
+      case 'date-desc':
+        return b.date.localeCompare(a.date)
+      case 'vendor':
+        return a.vendor.toLowerCase().localeCompare(b.vendor.toLowerCase())
+      case 'amount-desc':
+        return b.pretax + b.tax_amount - (a.pretax + a.tax_amount)
+      default:
+        return 0
     }
   })
 
   // Summary
-  const totalPretax     = expenses.reduce((acc, e) => acc + e.pretax, 0)
-  const totalTax        = expenses.reduce((acc, e) => acc + e.tax_amount, 0)
-  const businessPortion = expenses.reduce((acc, e) => acc + e.pretax * (e.business_use_pct / 100), 0)
+  const totalPretax = expenses.reduce((acc, e) => acc + e.pretax, 0)
+  const totalTax = expenses.reduce((acc, e) => acc + e.tax_amount, 0)
+  const businessPortion = expenses.reduce(
+    (acc, e) => acc + e.pretax * (e.business_use_pct / 100),
+    0
+  )
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 960, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 20,
+        }}
+      >
         <span
           className="label-caps"
-          style={{ color: 'var(--color-pillar-money)', fontSize: 'var(--text-small)', fontFamily: 'var(--font-ui)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}
+          style={{
+            color: 'var(--color-pillar-money)',
+            fontSize: 'var(--text-small)',
+            fontFamily: 'var(--font-ui)',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+          }}
         >
           Monthly Expenses
         </span>
@@ -608,27 +761,35 @@ export function MonthlyExpensesPage() {
         {/* Month selector */}
         <select
           value={month}
-          onChange={(e) => { setMonth(e.target.value); setShowAddForm(false); setEditingId(null) }}
+          onChange={(e) => {
+            setMonth(e.target.value)
+            setShowAddForm(false)
+            setEditingId(null)
+          }}
           style={{ ...s.select, width: 200 }}
         >
           {months.map((m) => (
-            <option key={m} value={m}>{monthLabel(m)}</option>
+            <option key={m} value={m}>
+              {monthLabel(m)}
+            </option>
           ))}
         </select>
       </div>
 
       {/* Flash message */}
       {flashMsg && (
-        <div style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 'var(--text-small)',
-          color: 'var(--color-positive, #4caf50)',
-          background: 'color-mix(in srgb, var(--color-positive, #4caf50) 10%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-positive, #4caf50) 30%, transparent)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '6px 12px',
-          marginBottom: 16,
-        }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-positive, #4caf50)',
+            background: 'color-mix(in srgb, var(--color-positive, #4caf50) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-positive, #4caf50) 30%, transparent)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '6px 12px',
+            marginBottom: 16,
+          }}
+        >
           {flashMsg}
         </div>
       )}
@@ -644,10 +805,26 @@ export function MonthlyExpensesPage() {
             ['Business Portion', `$${fmt(businessPortion)}`],
           ].map(([label, val]) => (
             <div key={label}>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 2,
+                }}
+              >
                 {label}
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-body)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-body)',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
                 {val}
               </div>
             </div>
@@ -657,12 +834,34 @@ export function MonthlyExpensesPage() {
 
       {/* Add Expense form */}
       <div style={{ ...s.card, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showAddForm ? 16 : 0 }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: showAddForm ? 16 : 0,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-text-muted)',
+            }}
+          >
             Add Expense
           </span>
           {!showAddForm && (
-            <button onClick={() => { setShowAddForm(true); setEditingId(null) }} style={s.btnPrimary}>
+            <button
+              onClick={() => {
+                setShowAddForm(true)
+                setEditingId(null)
+              }}
+              style={s.btnPrimary}
+            >
               + New
             </button>
           )}
@@ -684,8 +883,20 @@ export function MonthlyExpensesPage() {
         {/* Sort control */}
         {expenses.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>Sort:</span>
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)} style={{ ...s.select, width: 180 }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-disabled)',
+              }}
+            >
+              Sort:
+            </span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              style={{ ...s.select, width: 180 }}
+            >
               <option value="date-desc">Newest first</option>
               <option value="date-asc">Oldest first</option>
               <option value="vendor">By vendor</option>
@@ -696,13 +907,35 @@ export function MonthlyExpensesPage() {
 
         {/* States */}
         {loading && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>Loading…</div>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            Loading…
+          </div>
         )}
         {fetchError && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-critical)' }}>Error: {fetchError}</div>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-critical)',
+            }}
+          >
+            Error: {fetchError}
+          </div>
         )}
         {!loading && !fetchError && expenses.length === 0 && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
             No expenses logged for {monthLabel(month)} — use the form above to add some.
           </div>
         )}
@@ -712,7 +945,17 @@ export function MonthlyExpensesPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Date', 'Vendor', 'Category', 'Pre-Tax', 'Tax', 'Total', 'Bus%', 'Hubdoc', ''].map((h) => (
+                {[
+                  'Date',
+                  'Vendor',
+                  'Category',
+                  'Pre-Tax',
+                  'Tax',
+                  'Total',
+                  'Bus%',
+                  'Hubdoc',
+                  '',
+                ].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -736,31 +979,121 @@ export function MonthlyExpensesPage() {
               {sorted.map((e) => (
                 <Fragment key={e.id}>
                   <tr>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-small)',
+                        color: 'var(--color-text-muted)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                      }}
+                    >
                       {e.date}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-small)',
+                        color: 'var(--color-text-primary)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        maxWidth: 160,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {e.vendor}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-small)',
+                        color: 'var(--color-text-muted)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        maxWidth: 160,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {e.category}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-small)',
+                        color: 'var(--color-text-primary)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'right',
+                      }}
+                    >
                       ${fmt(e.pretax)}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-small)',
+                        color: 'var(--color-text-muted)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'right',
+                      }}
+                    >
                       ${fmt(e.tax_amount)}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', fontWeight: 700, color: 'var(--color-text-primary)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-small)',
+                        fontWeight: 700,
+                        color: 'var(--color-text-primary)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'right',
+                      }}
+                    >
                       ${fmt(e.pretax + e.tax_amount)}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: e.business_use_pct < 100 ? 'var(--color-text-muted)' : 'var(--color-text-disabled)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-small)',
+                        color:
+                          e.business_use_pct < 100
+                            ? 'var(--color-text-muted)'
+                            : 'var(--color-text-disabled)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'right',
+                      }}
+                    >
                       {e.business_use_pct}%
                     </td>
-                    <td style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: e.hubdoc ? 'var(--color-positive, #4caf50)' : 'var(--color-text-disabled)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'center' }}>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-small)',
+                        color: e.hubdoc
+                          ? 'var(--color-positive, #4caf50)'
+                          : 'var(--color-text-disabled)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'center',
+                      }}
+                    >
                       {e.hubdoc ? '✓' : '–'}
                     </td>
-                    <td style={{ padding: '8px 0', borderBottom: '1px solid var(--color-border)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td
+                      style={{
+                        padding: '8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       <button
                         onClick={() => setEditingId(editingId === e.id ? null : e.id)}
                         style={{ ...s.btnIcon, marginRight: 4 }}
@@ -776,8 +1109,17 @@ export function MonthlyExpensesPage() {
                   {/* Inline edit row */}
                   {editingId === e.id && (
                     <tr key={`edit-${e.id}`}>
-                      <td colSpan={9} style={{ padding: '16px 0', borderBottom: '1px solid var(--color-border)' }}>
-                        <div style={{ backgroundColor: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', padding: '16px 20px' }}>
+                      <td
+                        colSpan={9}
+                        style={{ padding: '16px 0', borderBottom: '1px solid var(--color-border)' }}
+                      >
+                        <div
+                          style={{
+                            backgroundColor: 'var(--color-surface-2)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '16px 20px',
+                          }}
+                        >
                           <ExpenseForm
                             initial={formFromExpense(e)}
                             isEdit={true}
