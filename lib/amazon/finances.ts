@@ -4,10 +4,12 @@ import { spFetch } from './client'
 
 export interface FinancialEventGroup {
   FinancialEventGroupId: string
+  /** "Open" while accumulating transactions, "Closed" when the period has ended. */
+  ProcessingStatus?: string
   /**
-   * Absent on open (not-yet-transferred) groups.
-   * Closed groups have this set to e.g. "Transferred".
-   * Constraint B-1: check field presence, not value.
+   * Set only when a fund transfer has been initiated or completed.
+   * Absent on all pending groups (Open or deferred-Closed).
+   * Constraint B-1: exclude any group where this field is truthy.
    */
   FundTransferStatus?: string
   FundTransferDate?: string
@@ -29,12 +31,14 @@ interface FinancialEventGroupsResponse {
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface SettlementBalance {
-  /** Open CAD groups (no FundTransferStatus) = Standard orders Total Balance */
+  /** ProcessingStatus="Open" + no FundTransferStatus = currently accumulating */
   grossPendingCad: number
-  /** Deferred CAD groups (FundTransferStatus set but not "Transferred") = Deferred transactions */
+  /** ProcessingStatus="Closed" + no FundTransferStatus = period ended, not yet disbursed */
   deferredCad: number
-  /** Total Amazon owes you: grossPendingCad + deferredCad = All Accounts Total Balance */
+  /** grossPendingCad + deferredCad */
   totalBalanceCad: number
+  openGroupsCount: number
+  deferredGroupsCount: number
   /** ISO timestamp when the data was fetched */
   fetchedAt: string
 }
@@ -86,22 +90,27 @@ export async function fetchSettlementBalance(): Promise<SettlementBalance> {
 
   let open = 0
   let deferred = 0
+  let openCount = 0
+  let deferredCount = 0
 
   for (const group of groups) {
     const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
     if (!isCad) continue
 
-    const amount = group.OriginalTotal?.CurrencyAmount ?? 0
-    const hasStatus = 'FundTransferStatus' in group && group.FundTransferStatus !== undefined
+    // Exclude any group where a fund transfer has been initiated or completed.
+    // Matches Streamlit baseline: `if not g.get("FundTransferStatus")`.
+    if (group.FundTransferStatus) continue
 
-    if (!hasStatus) {
-      // Open group (no FundTransferStatus) = Standard orders Total Balance
+    const amount = group.OriginalTotal?.CurrencyAmount ?? 0
+
+    if (group.ProcessingStatus === 'Open') {
       open += amount
-    } else if (group.FundTransferStatus !== 'Transferred') {
-      // Status set but not yet transferred = Deferred transactions
+      openCount++
+    } else {
+      // Closed + no FundTransferStatus = period ended, not yet disbursed
       deferred += amount
+      deferredCount++
     }
-    // Transferred = already paid out, skip
   }
 
   open = Math.round(open * 100) / 100
@@ -111,6 +120,8 @@ export async function fetchSettlementBalance(): Promise<SettlementBalance> {
     grossPendingCad: open,
     deferredCad: deferred,
     totalBalanceCad: Math.round((open + deferred) * 100) / 100,
+    openGroupsCount: openCount,
+    deferredGroupsCount: deferredCount,
     fetchedAt: new Date().toISOString(),
   }
 }

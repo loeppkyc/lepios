@@ -16,6 +16,7 @@ const mockSpFetch = vi.mocked(spFetch)
 
 function makeGroup(overrides: {
   id?: string
+  processingStatus?: string
   fundTransferStatus?: string
   currencyCode?: string
   amount?: number
@@ -26,6 +27,9 @@ function makeGroup(overrides: {
       CurrencyCode: overrides.currencyCode ?? 'CAD',
       CurrencyAmount: overrides.amount ?? 0,
     },
+  }
+  if (overrides.processingStatus !== undefined) {
+    group.ProcessingStatus = overrides.processingStatus
   }
   if (overrides.fundTransferStatus !== undefined) {
     group.FundTransferStatus = overrides.fundTransferStatus
@@ -50,9 +54,14 @@ describe('fetchSettlementBalance', () => {
   })
 
   it('sums OriginalTotal.CurrencyAmount for open CAD groups only', async () => {
-    // open CAD group (no FundTransferStatus field)
-    const openCad = makeGroup({ id: 'FEG-001', amount: 928.17, currencyCode: 'CAD' })
-    // closed CAD group (FundTransferStatus present)
+    // open CAD group (ProcessingStatus=Open, no FundTransferStatus)
+    const openCad = makeGroup({
+      id: 'FEG-001',
+      processingStatus: 'Open',
+      amount: 928.17,
+      currencyCode: 'CAD',
+    })
+    // closed CAD group (FundTransferStatus present — excluded)
     const closedCad = makeGroup({
       id: 'FEG-002',
       fundTransferStatus: 'Transferred',
@@ -101,9 +110,24 @@ describe('fetchSettlementBalance', () => {
   })
 
   it('sums multiple open CAD groups', async () => {
-    const g1 = makeGroup({ id: 'FEG-1', amount: 100.0, currencyCode: 'CAD' })
-    const g2 = makeGroup({ id: 'FEG-2', amount: 250.5, currencyCode: 'CAD' })
-    const g3 = makeGroup({ id: 'FEG-3', amount: 75.25, currencyCode: 'CAD' })
+    const g1 = makeGroup({
+      id: 'FEG-1',
+      processingStatus: 'Open',
+      amount: 100.0,
+      currencyCode: 'CAD',
+    })
+    const g2 = makeGroup({
+      id: 'FEG-2',
+      processingStatus: 'Open',
+      amount: 250.5,
+      currencyCode: 'CAD',
+    })
+    const g3 = makeGroup({
+      id: 'FEG-3',
+      processingStatus: 'Open',
+      amount: 75.25,
+      currencyCode: 'CAD',
+    })
     mockSpFetch.mockResolvedValueOnce(makeResponse([g1, g2, g3]))
 
     const result = await fetchSettlementBalance()
@@ -111,8 +135,8 @@ describe('fetchSettlementBalance', () => {
   })
 
   it('rounds to 2 decimal places', async () => {
-    const g1 = makeGroup({ id: 'FEG-1', amount: 10.333 })
-    const g2 = makeGroup({ id: 'FEG-2', amount: 5.666 })
+    const g1 = makeGroup({ id: 'FEG-1', processingStatus: 'Open', amount: 10.333 })
+    const g2 = makeGroup({ id: 'FEG-2', processingStatus: 'Open', amount: 5.666 })
     mockSpFetch.mockResolvedValueOnce(makeResponse([g1, g2]))
 
     const result = await fetchSettlementBalance()
@@ -121,8 +145,8 @@ describe('fetchSettlementBalance', () => {
   })
 
   it('follows pagination — accumulates across pages', async () => {
-    const g1 = makeGroup({ id: 'FEG-P1', amount: 100.0 })
-    const g2 = makeGroup({ id: 'FEG-P2', amount: 200.0 })
+    const g1 = makeGroup({ id: 'FEG-P1', processingStatus: 'Open', amount: 100.0 })
+    const g2 = makeGroup({ id: 'FEG-P2', processingStatus: 'Open', amount: 200.0 })
 
     mockSpFetch
       .mockResolvedValueOnce(makeResponse([g1], 'TOKEN-1'))
@@ -144,10 +168,12 @@ describe('fetchSettlementBalance', () => {
     expect(result.fetchedAt <= after).toBe(true)
   })
 
-  it('treats group with FundTransferStatus = undefined as open', async () => {
-    // Explicit undefined on the field — same as absent per B-1
+  it('treats group with FundTransferStatus = undefined as pending (included in total)', async () => {
+    // Explicit undefined on FundTransferStatus — same as absent per B-1.
+    // With ProcessingStatus='Open', lands in grossPendingCad.
     const group = {
       FinancialEventGroupId: 'FEG-U',
+      ProcessingStatus: 'Open',
       FundTransferStatus: undefined,
       OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 99.99 },
     }
@@ -155,22 +181,44 @@ describe('fetchSettlementBalance', () => {
 
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(99.99)
+    expect(result.totalBalanceCad).toBe(99.99)
   })
 
-  it('puts InProgress groups into deferredCad', async () => {
-    const open = makeGroup({ id: 'FEG-OPEN', amount: 1052.46, currencyCode: 'CAD' })
-    const deferred = makeGroup({
-      id: 'FEG-DEF',
+  it('excludes InProgress groups — FundTransferStatus set means disbursement started', async () => {
+    // Streamlit baseline: `if not g.get("FundTransferStatus")` — any truthy status is excluded.
+    const open = makeGroup({
+      id: 'FEG-OPEN',
+      processingStatus: 'Open',
+      amount: 1052.46,
+      currencyCode: 'CAD',
+    })
+    const inProgress = makeGroup({
+      id: 'FEG-INP',
       fundTransferStatus: 'InProgress',
       amount: 5378.72,
       currencyCode: 'CAD',
     })
-    mockSpFetch.mockResolvedValueOnce(makeResponse([open, deferred]))
+    mockSpFetch.mockResolvedValueOnce(makeResponse([open, inProgress]))
 
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(1052.46)
-    expect(result.deferredCad).toBe(5378.72)
-    expect(result.totalBalanceCad).toBe(6431.18)
+    expect(result.deferredCad).toBe(0)
+    expect(result.totalBalanceCad).toBe(1052.46)
+  })
+
+  it('puts Closed groups with no FundTransferStatus into deferredCad', async () => {
+    const closed = makeGroup({
+      id: 'FEG-CL',
+      processingStatus: 'Closed',
+      amount: 3000.0,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([closed]))
+
+    const result = await fetchSettlementBalance()
+    expect(result.grossPendingCad).toBe(0)
+    expect(result.deferredCad).toBe(3000.0)
+    expect(result.totalBalanceCad).toBe(3000.0)
   })
 
   it('excludes Transferred groups from both open and deferred', async () => {
@@ -188,25 +236,39 @@ describe('fetchSettlementBalance', () => {
     expect(result.totalBalanceCad).toBe(0)
   })
 
-  it('totalBalanceCad = grossPendingCad + deferredCad', async () => {
-    const open = makeGroup({ id: 'FEG-1', amount: 100.0, currencyCode: 'CAD' })
+  it('totalBalanceCad = grossPendingCad + deferredCad (split by ProcessingStatus, both require no FundTransferStatus)', async () => {
+    const open = makeGroup({
+      id: 'FEG-1',
+      processingStatus: 'Open',
+      amount: 100.0,
+      currencyCode: 'CAD',
+    })
     const def1 = makeGroup({
       id: 'FEG-2',
-      fundTransferStatus: 'InProgress',
+      processingStatus: 'Closed',
       amount: 200.0,
       currencyCode: 'CAD',
     })
     const def2 = makeGroup({
       id: 'FEG-3',
-      fundTransferStatus: 'Pending',
+      processingStatus: 'Closed',
       amount: 50.0,
       currencyCode: 'CAD',
     })
-    mockSpFetch.mockResolvedValueOnce(makeResponse([open, def1, def2]))
+    // Groups with FundTransferStatus set must be excluded regardless of value
+    const inFlight = makeGroup({
+      id: 'FEG-4',
+      fundTransferStatus: 'InProgress',
+      amount: 999.0,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeResponse([open, def1, def2, inFlight]))
 
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(100.0)
     expect(result.deferredCad).toBe(250.0)
     expect(result.totalBalanceCad).toBe(350.0)
+    expect(result.openGroupsCount).toBe(1)
+    expect(result.deferredGroupsCount).toBe(2)
   })
 })

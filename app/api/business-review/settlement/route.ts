@@ -26,7 +26,8 @@ export async function GET(request: Request) {
       total: groups.length,
       groups: groups.map((g) => ({
         id: g.FinancialEventGroupId,
-        status: g.FundTransferStatus ?? null,
+        processingStatus: g.ProcessingStatus ?? null,
+        fundTransferStatus: g.FundTransferStatus ?? null,
         transferDate: g.FundTransferDate ?? null,
         currency: g.OriginalTotal?.CurrencyCode ?? null,
         amount: g.OriginalTotal?.CurrencyAmount ?? null,
