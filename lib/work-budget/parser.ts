@@ -11,6 +11,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { telegram } from '@/lib/harness/arms-legs/telegram'
 import { logEvent as logKnowledgeEvent } from '@/lib/knowledge/client'
 import { recordAttribution } from '@/lib/attribution/writer'
 import {
@@ -82,13 +83,7 @@ export function parseBudgetCommand(text: string): ParsedBudget | null {
 // ── Telegram reply helper ─────────────────────────────────────────────────────
 
 async function sendTelegramReply(chatId: number, text: string): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  if (!token) return
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  }).catch(() => {})
+  await telegram(text, { chatId: String(chatId), agentId: 'work_budget' }).catch(() => {})
 }
 
 // ── Self-generated work: doc gaps (§5 Phase 2) ────────────────────────────────
