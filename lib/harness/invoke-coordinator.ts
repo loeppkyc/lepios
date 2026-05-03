@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { recordAttribution } from '@/lib/attribution/writer'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 export type InvokeCoordinatorResult =
   | { ok: true; session_id: string; session_url: string }
@@ -55,25 +56,24 @@ export async function fireCoordinator(params: {
     }
   }
 
-  let fireRes: Response
-  try {
-    // Routines API /fire accepts only { text }. Branch selection happens
-    // inside the session via the guard in .claude/agents/coordinator.md.
-    // See decisions_log entry 2026-04-28 "Branch naming via in-session guard".
-    fireRes = await fetch(`https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${routineToken}`,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'experimental-cc-routine-2026-04-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: `task_id: ${task_id}\nrun_id: ${run_id}`,
-      }),
-    })
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : 'network error'
+  // Routines API /fire accepts only { text }. Branch selection happens
+  // inside the session via the guard in .claude/agents/coordinator.md.
+  // See decisions_log entry 2026-04-28 "Branch naming via in-session guard".
+  const fireRes = await httpRequest({
+    url: `https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`,
+    method: 'POST',
+    capability: 'net.outbound.anthropic',
+    agentId: 'harness',
+    headers: {
+      Authorization: `Bearer ${routineToken}`,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'experimental-cc-routine-2026-04-01',
+    },
+    body: { text: `task_id: ${task_id}\nrun_id: ${run_id}` },
+  })
+
+  if (fireRes.status === 0) {
+    const errMsg = fireRes.error ?? 'network error'
     await writeEvent({
       status: 'error',
       output_summary: `Network error calling Routines API: ${errMsg}`,
@@ -84,13 +84,13 @@ export async function fireCoordinator(params: {
 
   if (!fireRes.ok) {
     const upstreamStatus = fireRes.status
-    const retryAfter = fireRes.headers.get('retry-after')
+    const retryAfter = fireRes.headers['retry-after'] ?? null
 
     let upstreamError: unknown
     try {
-      upstreamError = await fireRes.json()
+      upstreamError = JSON.parse(fireRes.body)
     } catch {
-      upstreamError = await fireRes.text()
+      upstreamError = fireRes.body
     }
 
     const errMsg =
@@ -121,7 +121,7 @@ export async function fireCoordinator(params: {
     }
   }
 
-  const fireData = (await fireRes.json()) as {
+  const fireData = JSON.parse(fireRes.body) as {
     claude_code_session_id: string
     claude_code_session_url: string
   }

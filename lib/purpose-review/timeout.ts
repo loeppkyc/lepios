@@ -10,23 +10,15 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/lib/supabase/service'
+import { telegram } from '@/lib/harness/arms-legs/telegram'
 
 const REVIEW_TIMEOUT_HOURS = 72
 
 async function fireTimeoutAlert(modulePath: string, taskId: string): Promise<void> {
-  const token = process.env.TELEGRAM_ALERTS_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
-  if (!token || !chatId) return
-
   const text =
     `⏰ Review timeout: ${modulePath} — no reply in ${REVIEW_TIMEOUT_HOURS}h. ` +
     `Reply /review ${taskId} approve|skip to unblock.`
-
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  }).catch(() => {})
+  await telegram(text, { bot: 'alerts', agentId: 'purpose_review' }).catch(() => {})
 }
 
 /**
@@ -70,22 +62,20 @@ export async function checkPurposeReviewTimeouts(db?: SupabaseClient): Promise<n
     }
 
     // Log to agent_events
-    await client
-      .from('agent_events')
-      .insert({
-        domain: 'purpose_review',
-        action: 'purpose_review.timeout',
-        actor: 'system',
-        status: updateError ? 'error' : 'success',
-        task_type: 'purpose_review',
-        output_summary: `purpose review timed out after ${REVIEW_TIMEOUT_HOURS}h for ${modulePath}`,
-        meta: {
-          task_queue_id: row.id,
-          module_path: modulePath,
-          error: updateError?.message ?? null,
-        },
-        tags: ['purpose_review', 'harness', 'timeout'],
-      })
+    await client.from('agent_events').insert({
+      domain: 'purpose_review',
+      action: 'purpose_review.timeout',
+      actor: 'system',
+      status: updateError ? 'error' : 'success',
+      task_type: 'purpose_review',
+      output_summary: `purpose review timed out after ${REVIEW_TIMEOUT_HOURS}h for ${modulePath}`,
+      meta: {
+        task_queue_id: row.id,
+        module_path: modulePath,
+        error: updateError?.message ?? null,
+      },
+      tags: ['purpose_review', 'harness', 'timeout'],
+    })
 
     // Fire Telegram alert regardless of update outcome
     await fireTimeoutAlert(modulePath, row.id)

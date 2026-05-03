@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { deleteBranch } from '@/lib/harness/deploy-gate'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,19 +20,20 @@ async function editTimeoutMessage(messageId: number): Promise<void> {
   const chatId = process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) return
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+  const result = await httpRequest({
+    url: `https://api.telegram.org/bot${token}/editMessageText`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    capability: 'net.outbound.telegram',
+    agentId: 'deploy_gate',
+    body: {
       chat_id: chatId,
       message_id: messageId,
       text: '✅ kept in production (override window closed)',
       reply_markup: { inline_keyboard: [] },
-    }),
+    },
   })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  if (!result.ok) {
+    throw new Error(`Telegram editMessageText error ${result.status}: ${result.body}`)
   }
 }
 
@@ -47,19 +49,20 @@ async function editMigrationTimeoutMessage(messageId: number): Promise<void> {
     hour12: false,
   })
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+  const result = await httpRequest({
+    url: `https://api.telegram.org/bot${token}/editMessageText`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    capability: 'net.outbound.telegram',
+    agentId: 'deploy_gate',
+    body: {
       chat_id: chatId,
       message_id: messageId,
       text: `⏰ auto-aborted at ${timestamp} MT (30min no response) — no promotion`,
       reply_markup: { inline_keyboard: [] },
-    }),
+    },
   })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Telegram editMessageText error ${res.status}: ${body}`)
+  if (!result.ok) {
+    throw new Error(`Telegram editMessageText error ${result.status}: ${result.body}`)
   }
 }
 

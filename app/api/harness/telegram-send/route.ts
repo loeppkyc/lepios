@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
+import { telegram } from '@/lib/harness/arms-legs/telegram'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,12 +61,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
   }
 
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const defaultChatId = process.env.TELEGRAM_CHAT_ID
-  const chatId = parsed.data.chat_id ?? defaultChatId
+  const chatId = parsed.data.chat_id ?? process.env.TELEGRAM_CHAT_ID
   const { text } = parsed.data
 
-  if (!token) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
     return NextResponse.json(
       { ok: false, error: 'TELEGRAM_BOT_TOKEN is not configured' },
       { status: 500 }
@@ -79,39 +78,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const chatIdSuffix = chatId.slice(-4)
-  const url = `https://api.telegram.org/bot${token}/sendMessage`
+  const result = await telegram(text, { chatId, agentId: 'harness' })
 
-  let tgRes: Response
-  try {
-    tgRes = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    })
-  } catch (err) {
-    await logEvent('error', chatIdSuffix, text.length, { error: 'network_error' })
+  if (!result.ok) {
+    await logEvent('error', chatIdSuffix, text.length, { error: result.error })
+    const httpStatus = result.failure_type === 'network_error' ? 503 : 502
     return NextResponse.json(
-      { ok: false, error: 'Network error reaching Telegram API' },
-      { status: 503 }
+      { ok: false, error: result.error, upstream_description: result.description ?? null },
+      { status: httpStatus }
     )
   }
 
-  const tgBody = (await tgRes.json()) as {
-    ok: boolean
-    result?: { message_id: number }
-    description?: string
-  }
-
-  if (!tgRes.ok) {
-    const description = tgBody.description ?? `HTTP ${tgRes.status}`
-    await logEvent('error', chatIdSuffix, text.length, { error: description })
-    return NextResponse.json(
-      { ok: false, error: 'Telegram API error', upstream_description: description },
-      { status: 502 }
-    )
-  }
-
-  const messageId = tgBody.result?.message_id
-  await logEvent('success', chatIdSuffix, text.length, { message_id: messageId })
-  return NextResponse.json({ ok: true, message_id: messageId })
+  await logEvent('success', chatIdSuffix, text.length, { message_id: result.messageId })
+  return NextResponse.json({ ok: true, message_id: result.messageId })
 }

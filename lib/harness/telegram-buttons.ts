@@ -1,4 +1,5 @@
 import { postMessage } from '@/lib/orchestrator/telegram'
+import { telegram } from '@/lib/harness/arms-legs/telegram'
 
 export function buildCallbackData(action: 'up' | 'dn', agentEventId: string): string {
   return `tf:${action}:${agentEventId}`
@@ -85,24 +86,18 @@ export async function sendMessageWithButtons(agentEventId: string, text: string)
     return postMessage(text)
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '👍', callback_data: buildCallbackData('up', agentEventId) },
-            { text: '👎', callback_data: buildCallbackData('dn', agentEventId) },
-          ],
+  const result = await telegram(text, {
+    agentId: 'harness',
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: '👍', callback_data: buildCallbackData('up', agentEventId) },
+          { text: '👎', callback_data: buildCallbackData('dn', agentEventId) },
         ],
-      },
-    }),
+      ],
+    },
   })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Telegram API error ${res.status}: ${body}`)
+  if (!result.ok) {
+    throw new Error(`Telegram API error: ${result.error}`)
   }
 }

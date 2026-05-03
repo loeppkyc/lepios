@@ -11,21 +11,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { recordAttribution } from '@/lib/attribution/writer'
 import { createServiceClient } from '@/lib/supabase/service'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 // ── Telegram helpers (duplicated locally to avoid coupling to route.ts internals) ──
 
 async function editMessage(chatId: number, messageId: number, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) return
-  await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+  await httpRequest({
+    url: `https://api.telegram.org/bot${token}/editMessageText`,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      message_id: messageId,
-      text,
-      reply_markup: { inline_keyboard: [] },
-    }),
+    capability: 'net.outbound.telegram',
+    agentId: 'purpose_review',
+    body: { chat_id: chatId, message_id: messageId, text, reply_markup: { inline_keyboard: [] } },
   }).catch(() => {})
 }
 

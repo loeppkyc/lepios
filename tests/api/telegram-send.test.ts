@@ -10,6 +10,58 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
+// ── Mock arms-legs httpRequest — bypass capability gate + audit logging ───────
+vi.mock('@/lib/harness/arms-legs/http', () => ({
+  httpRequest: vi.fn(
+    async (args: {
+      url: string
+      method: string
+      body?: unknown
+      headers?: Record<string, string>
+    }) => {
+      const hdrs: Record<string, string> = { ...(args.headers ?? {}) }
+      let fetchBody: string | null = null
+      if (args.body != null) {
+        fetchBody = JSON.stringify(args.body)
+        if (!hdrs['Content-Type']) hdrs['Content-Type'] = 'application/json'
+      }
+      try {
+        const res = (await fetch(args.url, {
+          method: args.method,
+          headers: hdrs,
+          body: fetchBody,
+        })) as {
+          ok: boolean
+          status?: number
+          text?: () => Promise<string>
+          headers?: { forEach?: (cb: (v: string, k: string) => void) => void }
+        }
+        const text = typeof res.text === 'function' ? await res.text() : ''
+        const resHeaders: Record<string, string> = {}
+        res.headers?.forEach?.((v, k) => {
+          resHeaders[k] = v
+        })
+        return {
+          ok: Boolean(res.ok),
+          status: res.status ?? (res.ok ? 200 : 500),
+          body: text,
+          headers: resHeaders,
+          durationMs: 0,
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          status: 0,
+          body: '',
+          headers: {},
+          durationMs: 0,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      }
+    }
+  ),
+}))
+
 // ── Mock fetch ────────────────────────────────────────────────────────────────
 
 const mockFetch = vi.fn()
@@ -258,7 +310,11 @@ describe('POST /api/harness/telegram-send — chat_id fallback', () => {
 describe('POST /api/harness/telegram-send — upstream errors', () => {
   it('returns 502 when Telegram returns 400', async () => {
     mockFetch.mockResolvedValue(
-      makeTgResponse(400, { ok: false, error_code: 400, description: 'Bad Request: chat not found' })
+      makeTgResponse(400, {
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: chat not found',
+      })
     )
     const req = makeRequest(VALID_BODY)
     const res = await POST(req)
@@ -269,7 +325,11 @@ describe('POST /api/harness/telegram-send — upstream errors', () => {
 
   it('response body includes upstream_description on Telegram error', async () => {
     mockFetch.mockResolvedValue(
-      makeTgResponse(400, { ok: false, error_code: 400, description: 'Bad Request: chat not found' })
+      makeTgResponse(400, {
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: chat not found',
+      })
     )
     const req = makeRequest(VALID_BODY)
     const res = await POST(req)
@@ -281,7 +341,11 @@ describe('POST /api/harness/telegram-send — upstream errors', () => {
     const b = makeInsertBuilder()
     mockFrom.mockReturnValue(b)
     mockFetch.mockResolvedValue(
-      makeTgResponse(400, { ok: false, error_code: 400, description: 'Bad Request: chat not found' })
+      makeTgResponse(400, {
+        ok: false,
+        error_code: 400,
+        description: 'Bad Request: chat not found',
+      })
     )
     const req = makeRequest(VALID_BODY)
     await POST(req)
@@ -310,9 +374,7 @@ describe('POST /api/harness/telegram-send — upstream errors', () => {
   })
 
   it('calls fetch exactly once on failure — no retry', async () => {
-    mockFetch.mockResolvedValue(
-      makeTgResponse(400, { ok: false, description: 'Bad Request' })
-    )
+    mockFetch.mockResolvedValue(makeTgResponse(400, { ok: false, description: 'Bad Request' }))
     const req = makeRequest(VALID_BODY)
     await POST(req)
     expect(mockFetch).toHaveBeenCalledTimes(1)

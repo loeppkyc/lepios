@@ -19,6 +19,8 @@ export interface TelegramResult {
   ok: boolean
   messageId?: number
   error?: string
+  description?: string
+  failure_type?: 'network_error' | 'upstream_error'
 }
 
 export async function telegram(
@@ -56,7 +58,19 @@ export async function telegram(
   })
 
   if (!result.ok) {
-    return { ok: false, error: result.error ?? `Telegram API error ${result.status}` }
+    let description: string | undefined
+    try {
+      const errBody = JSON.parse(result.body) as { description?: string }
+      description = errBody.description
+    } catch {
+      /* ignore */
+    }
+    return {
+      ok: false,
+      error: result.error ?? `Telegram API error ${result.status}`,
+      description,
+      failure_type: result.status === 0 ? 'network_error' : 'upstream_error',
+    }
   }
 
   try {

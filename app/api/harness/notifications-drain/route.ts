@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,24 +100,27 @@ async function sendTelegram(
   chatId: string,
   payload: Record<string, unknown>
 ): Promise<{ ok: boolean; messageId?: number; error?: string }> {
-  let res: Response
+  const result = await httpRequest({
+    url: `https://api.telegram.org/bot${token}/sendMessage`,
+    method: 'POST',
+    capability: 'net.outbound.telegram',
+    agentId: 'notifications_drain',
+    body: { chat_id: chatId, ...payload },
+  })
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error ?? `Telegram ${result.status}: ${result.body.slice(0, 200)}`,
+    }
+  }
+
   try {
-    res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, ...payload }),
-    })
+    const data = JSON.parse(result.body) as { ok: boolean; result?: { message_id: number } }
+    return { ok: true, messageId: data.result?.message_id }
   } catch {
-    return { ok: false, error: 'network_error' }
+    return { ok: true }
   }
-
-  if (!res.ok) {
-    const body = await res.text()
-    return { ok: false, error: `Telegram ${res.status}: ${body.slice(0, 200)}` }
-  }
-
-  const data = (await res.json()) as { ok: boolean; result?: { message_id: number } }
-  return { ok: true, messageId: data.result?.message_id }
 }
 
 async function drain(request: Request): Promise<NextResponse> {

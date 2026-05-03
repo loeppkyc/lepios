@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import type { CheckResult, Flag } from '../types'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 function getBaseUrl(): string {
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL)
@@ -47,11 +48,15 @@ export async function checkSiteHealth(): Promise<CheckResult> {
 
   // (c) /api/health returns ok:true
   try {
-    const res = await fetch(`${getBaseUrl()}/api/health`, {
-      signal: AbortSignal.timeout(5_000),
+    const result = await httpRequest({
+      url: `${getBaseUrl()}/api/health`,
+      method: 'GET',
+      capability: 'net.outbound.vercel.read',
+      agentId: 'orchestrator',
+      timeoutMs: 5_000,
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const body = (await res.json()) as { ok?: boolean }
+    if (!result.ok) throw new Error(result.error ?? `HTTP ${result.status}`)
+    const body = JSON.parse(result.body) as { ok?: boolean }
     if (!body.ok) throw new Error('ok:false')
     counts.pass++
   } catch (err) {
