@@ -98,25 +98,12 @@ export function cellStatus(
 
 // ── Band generation ───────────────────────────────────────────────────────────
 
-/** Generates "YYYY-MM" strings for all 12 months of 2025. Fixed. */
-export function get2025Months(): string[] {
+/** Returns all 12 months of the current Edmonton year: "YYYY-01" through "YYYY-12". */
+export function getCurrentYearMonths(): string[] {
+  const { year } = currentEdmontonYearMonth()
   return Array.from({ length: 12 }, (_, i) => {
     const month = String(i + 1).padStart(2, '0')
-    return `2025-${month}`
-  })
-}
-
-/** Generates "YYYY-MM" strings from Jan 2026 through the current Edmonton month. */
-export function get2026YtdMonths(): string[] {
-  const { year, month } = currentEdmontonYearMonth()
-  // If somehow called before 2026, return empty (defensive)
-  if (year < 2026) return []
-  // If current year is beyond 2026, cap at full 12 months for 2026
-  // (this is purely defensive; the 2026 band grows month by month)
-  const endMonth = year === 2026 ? month : 12
-  return Array.from({ length: endMonth }, (_, i) => {
-    const m = String(i + 1).padStart(2, '0')
-    return `2026-${m}`
+    return `${year}-${month}`
   })
 }
 
@@ -254,9 +241,8 @@ export async function GET() {
     return NextResponse.json({ error: message }, { status: 502 })
   }
 
-  const months2025 = get2025Months()
-  const months2026 = get2026YtdMonths()
-  const allMonths = [...months2025, ...months2026]
+  const allMonths = getCurrentYearMonths()
+  const { year: currentYear } = currentEdmontonYearMonth()
 
   // Fetch all 8 folders in parallel
   const results = await Promise.allSettled(
@@ -340,10 +326,7 @@ export async function GET() {
   }
 
   const body: StatementCoverageResponse = {
-    bands: [
-      { label: '2025 · Tax Year', months: months2025 },
-      { label: '2026 · YTD', months: months2026 },
-    ],
+    bands: [{ label: String(currentYear), months: allMonths }],
     accounts: accounts as StatementCoverageResponse['accounts'],
     fetchedAt: new Date().toISOString(),
   }

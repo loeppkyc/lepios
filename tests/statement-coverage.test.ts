@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   utcToEdmontonYearMonth,
-  get2025Months,
-  get2026YtdMonths,
+  getCurrentYearMonths,
   previousMonth,
   cellStatus,
 } from '@/app/api/business-review/statement-coverage/route'
@@ -59,44 +58,34 @@ describe('utcToEdmontonYearMonth — additional cases', () => {
 
 // ── Band generation tests ─────────────────────────────────────────────────────
 
-describe('get2025Months', () => {
+describe('getCurrentYearMonths', () => {
   it('returns exactly 12 months', () => {
-    const months = get2025Months()
+    const months = getCurrentYearMonths()
     expect(months).toHaveLength(12)
   })
 
-  it('starts at 2025-01 and ends at 2025-12', () => {
-    const months = get2025Months()
-    expect(months[0]).toBe('2025-01')
-    expect(months[11]).toBe('2025-12')
-  })
-
-  it('contains all 12 months with zero-padded numbers', () => {
-    const months = get2025Months()
-    expect(months).toEqual([
-      '2025-01', '2025-02', '2025-03', '2025-04',
-      '2025-05', '2025-06', '2025-07', '2025-08',
-      '2025-09', '2025-10', '2025-11', '2025-12',
-    ])
-  })
-})
-
-describe('get2026YtdMonths', () => {
-  it('returns months starting at 2026-01', () => {
-    const months = get2026YtdMonths()
-    expect(months[0]).toBe('2026-01')
-  })
-
-  it('all months are in 2026 format', () => {
-    const months = get2026YtdMonths()
+  it('all entries match YYYY-MM format for the current year', () => {
+    const months = getCurrentYearMonths()
+    const year = new Date().getFullYear()
     for (const m of months) {
-      expect(m).toMatch(/^2026-\d{2}$/)
+      expect(m).toMatch(new RegExp(`^${year}-\\d{2}$`))
     }
   })
 
-  it('returns at least 1 month (Jan 2026 has passed)', () => {
-    const months = get2026YtdMonths()
-    expect(months.length).toBeGreaterThanOrEqual(1)
+  it('starts at January and ends at December of the current year', () => {
+    const months = getCurrentYearMonths()
+    const year = new Date().getFullYear()
+    expect(months[0]).toBe(`${year}-01`)
+    expect(months[11]).toBe(`${year}-12`)
+  })
+
+  it('months are zero-padded and sequential', () => {
+    const months = getCurrentYearMonths()
+    const year = new Date().getFullYear()
+    const expected = Array.from({ length: 12 }, (_, i) =>
+      `${year}-${String(i + 1).padStart(2, '0')}`
+    )
+    expect(months).toEqual(expected)
   })
 })
 
