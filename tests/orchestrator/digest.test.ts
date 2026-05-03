@@ -23,6 +23,7 @@ const {
   mockBuildOllamaTunnelHealthLine,
   mockBuildUtilityBillSavedLine,
   mockBuildSecurityDigestLine,
+  mockBuildArmsLegsDispatchLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -44,6 +45,7 @@ const {
   mockBuildOllamaTunnelHealthLine: vi.fn(),
   mockBuildUtilityBillSavedLine: vi.fn(),
   mockBuildSecurityDigestLine: vi.fn(),
+  mockBuildArmsLegsDispatchLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -140,6 +142,11 @@ vi.mock('@/lib/harness/utility-digest', () => ({
 // Mock security-digest so buildSecurityDigestLine does not consume mockFrom slots.
 vi.mock('@/lib/security/security-digest', () => ({
   buildSecurityDigestLine: mockBuildSecurityDigestLine,
+}))
+
+// Mock arms-legs dispatch-digest so buildArmsLegsDispatchLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/arms-legs/dispatch-digest', () => ({
+  buildArmsLegsDispatchLine: mockBuildArmsLegsDispatchLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -262,6 +269,8 @@ beforeEach(() => {
   mockBuildUtilityBillSavedLine.mockResolvedValue('Utility bills saved (24h): 0')
   // Default: security layer clean — no denials in 24h
   mockBuildSecurityDigestLine.mockResolvedValue('Security (24h): 0 actions, 0 denied ✅')
+  // Default: arms legs dispatch no calls yet (first run after deploy)
+  mockBuildArmsLegsDispatchLine.mockResolvedValue('Arms legs dispatch: no calls in last 24h')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────

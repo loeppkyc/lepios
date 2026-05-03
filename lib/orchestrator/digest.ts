@@ -18,6 +18,7 @@ import { buildAmazonSettlementsSyncLine } from '@/lib/amazon/settlements-digest'
 import { buildOllamaTunnelHealthLine } from '@/lib/harness/ollama-tunnel-stats'
 import { buildUtilityBillSavedLine } from '@/lib/harness/utility-digest'
 import { buildSecurityDigestLine } from '@/lib/security/security-digest'
+import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -279,6 +280,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── Slice 6: Security layer observability — agent_actions count + denials ───
   const securityDigestLine = await buildSecurityDigestLine()
   messageToSend = `${messageToSend}\n${securityDigestLine}`
+
+  // ── F18: Arms legs dispatch — success rate + p95 latency vs 50ms benchmark ──
+  const armsLegsDispatchLine = await buildArmsLegsDispatchLine()
+  messageToSend = `${messageToSend}\n${armsLegsDispatchLine}`
 
   characterCount = messageToSend.length
 
