@@ -4,6 +4,8 @@ import {
   getCurrentYearMonths,
   previousMonth,
   cellStatus,
+  monthFromAbbrev,
+  ACCOUNTS,
 } from '@/app/api/business-review/statement-coverage/route'
 
 // ── Required timezone boundary tests (from acceptance doc) ────────────────────
@@ -109,14 +111,14 @@ describe('previousMonth', () => {
   })
 })
 
-// ── cellStatus: pending / missing determination ────────────────────────────────
+// ── cellStatus: pending = current month only ──────────────────────────────────
 
 describe('cellStatus', () => {
   it('current month is pending', () => {
     expect(cellStatus(2026, 5, 2026, 5)).toBe('pending')
   })
 
-  it('previous month with no upload is always missing', () => {
+  it('previous month with no upload is missing', () => {
     expect(cellStatus(2026, 4, 2026, 5)).toBe('missing')
   })
 
@@ -128,8 +130,75 @@ describe('cellStatus', () => {
     expect(cellStatus(2025, 1, 2026, 5)).toBe('missing')
   })
 
-  it('year-boundary: previous month (Dec) is missing in January', () => {
+  it('year-boundary: December is missing in January', () => {
     expect(cellStatus(2025, 12, 2026, 1)).toBe('missing')
+  })
+})
+
+// ── monthFromAbbrev ───────────────────────────────────────────────────────────
+
+describe('monthFromAbbrev', () => {
+  it('recognizes all 12 lowercase abbreviations', () => {
+    expect(monthFromAbbrev('jan')).toBe(1)
+    expect(monthFromAbbrev('jun')).toBe(6)
+    expect(monthFromAbbrev('dec')).toBe(12)
+  })
+
+  it('is case-insensitive', () => {
+    expect(monthFromAbbrev('Jan')).toBe(1)
+    expect(monthFromAbbrev('OCT')).toBe(10)
+    expect(monthFromAbbrev('Feb')).toBe(2)
+  })
+
+  it('returns null for unrecognized strings', () => {
+    expect(monthFromAbbrev('xyz')).toBeNull()
+    expect(monthFromAbbrev('')).toBeNull()
+  })
+})
+
+// ── Per-account filename parsers ──────────────────────────────────────────────
+
+describe('filename parsers', () => {
+  it('TD Bank: period-end month, no M-1 (Oct_01-Oct_31_2025.pdf → Oct 2025)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'td_bank')!.filenameParser
+    expect(parser('Oct_01-Oct_31_2025.pdf')).toEqual({ year: 2025, month: 10, applyMinus1: false })
+  })
+
+  it('Amex: issue date, M-1 applies (2025-12-01.pdf → covered Nov 2025)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'amex')!.filenameParser
+    expect(parser('2025-12-01.pdf')).toEqual({ year: 2025, month: 12, applyMinus1: true })
+  })
+
+  it('CIBC dated: issue date, M-1 applies (onlineStatement_2026-01-14.pdf → covered Dec 2025)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'cibc')!.filenameParser
+    expect(parser('onlineStatement_2026-01-14.pdf')).toEqual({ year: 2026, month: 1, applyMinus1: true })
+  })
+
+  it('CIBC undated: returns null → server_modified fallback', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'cibc')!.filenameParser
+    expect(parser('onlineStatement.pdf')).toBeNull()
+    expect(parser('onlineStatement (1).pdf')).toBeNull()
+    expect(parser('onlineStatement (2).pdf')).toBeNull()
+  })
+
+  it('Capital One: MM+YYYY groups swapped (Statement_012025_abc.pdf → Jan 2025, covered Dec 2024)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'capital_one')!.filenameParser
+    expect(parser('Statement_012025_abc.pdf')).toEqual({ year: 2025, month: 1, applyMinus1: true })
+  })
+
+  it('TD Visa: month abbreviation parsed (TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf → covered Jan 2026)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'td_visa')!.filenameParser
+    expect(parser('TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf')).toEqual({ year: 2026, month: 2, applyMinus1: true })
+  })
+
+  it('Canadian Tire: date prefix parsed (2026-02-13-TriangleMC.pdf → covered Jan 2026)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'ct_card')!.filenameParser
+    expect(parser('2026-02-13-TriangleMC.pdf')).toEqual({ year: 2026, month: 2, applyMinus1: true })
+  })
+
+  it('TD USD: date parsed (View PDF Statement_2025-12-01.pdf → covered Nov 2025)', () => {
+    const parser = ACCOUNTS.find((a) => a.key === 'td_usd')!.filenameParser
+    expect(parser('View PDF Statement_2025-12-01.pdf')).toEqual({ year: 2025, month: 12, applyMinus1: true })
   })
 })
 

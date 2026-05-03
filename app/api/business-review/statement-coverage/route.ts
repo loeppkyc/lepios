@@ -2,18 +2,131 @@ import { NextResponse } from 'next/server'
 
 export const revalidate = 0
 
+// ── Month abbreviation helper ─────────────────────────────────────────────────
+
+const MONTH_ABBREVS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+}
+
+/** Converts a 3-letter month abbreviation (case-insensitive) to 1–12, or null if unrecognized. */
+export function monthFromAbbrev(abbrev: string): number | null {
+  return MONTH_ABBREVS[abbrev.toLowerCase()] ?? null
+}
+
 // ── Account definitions ───────────────────────────────────────────────────────
 
-const ACCOUNTS = [
-  { key: 'td_bank', label: 'TD Bank', path: '/Colin Loeppky (1)/TD Chequing -9150' },
-  { key: 'amex', label: 'Amex', path: '/Colin Loeppky (1)/american express statements' },
-  { key: 'cibc', label: 'CIBC', path: '/Colin Loeppky (1)/Costco Credit Card Statement' },
-  { key: 'ct_card', label: 'Canadian Tire CC', path: '/Colin Loeppky (1)/Canadian Tire MC - 6421' },
-  { key: 'amex_bonvoy', label: 'Amex Bonvoy', path: '/Colin Loeppky (1)/Amex Marriot Bonvoy' },
-  { key: 'capital_one', label: 'Capital One', path: '/Colin Loeppky (1)/Capital One MC - 3583' },
-  { key: 'td_visa', label: 'TD Visa', path: '/Colin Loeppky (1)/TD Visa' },
-  { key: 'td_usd', label: 'TD USD Chequing', path: '/Colin Loeppky (1)/TD USD Chequing - 9924' },
-] as const
+interface FilenameResult {
+  year: number
+  month: number
+  /** When true, apply previousMonth() to get covered period. False = month IS the covered period. */
+  applyMinus1: boolean
+}
+
+interface Account {
+  key: string
+  label: string
+  path: string
+  /** Returns the parsed date from a PDF filename, or null to fall back to server_modified. */
+  filenameParser: (name: string) => FilenameResult | null
+}
+
+export const ACCOUNTS: Account[] = [
+  {
+    key: 'td_bank',
+    label: 'TD Bank',
+    path: '/Colin Loeppky (1)/TD Chequing -9150',
+    // "Oct_01-Oct_31_2025.pdf" — period-end month = covered month, no M-1
+    filenameParser: (name) => {
+      const m = name.match(/[A-Za-z]{3}_\d{2}-([A-Za-z]{3})_\d{2}_(\d{4})\.pdf$/i)
+      if (!m) return null
+      const month = monthFromAbbrev(m[1])
+      if (!month) return null
+      return { year: Number(m[2]), month, applyMinus1: false }
+    },
+  },
+  {
+    key: 'amex',
+    label: 'Amex',
+    path: '/Colin Loeppky (1)/american express statements',
+    // "2025-12-01.pdf" — issue date, M-1 applies
+    filenameParser: (name) => {
+      const m = name.match(/^(\d{4})-(\d{2})-\d{2}\.pdf$/i)
+      if (!m) return null
+      return { year: Number(m[1]), month: Number(m[2]), applyMinus1: true }
+    },
+  },
+  {
+    key: 'cibc',
+    label: 'CIBC',
+    path: '/Colin Loeppky (1)/Costco Credit Card Statement',
+    // "onlineStatement_2026-01-14.pdf" — issue date, M-1 applies
+    // undated "onlineStatement.pdf" / "onlineStatement (1).pdf" → null → server_modified fallback
+    filenameParser: (name) => {
+      const m = name.match(/onlineStatement_(\d{4})-(\d{2})-\d{2}\.pdf$/i)
+      if (!m) return null
+      return { year: Number(m[1]), month: Number(m[2]), applyMinus1: true }
+    },
+  },
+  {
+    key: 'ct_card',
+    label: 'Canadian Tire CC',
+    path: '/Colin Loeppky (1)/Canadian Tire MC - 6421',
+    // "2026-02-13-TriangleMC.pdf" — issue date, M-1 applies
+    filenameParser: (name) => {
+      const m = name.match(/^(\d{4})-(\d{2})-\d{2}-Triangle/i)
+      if (!m) return null
+      return { year: Number(m[1]), month: Number(m[2]), applyMinus1: true }
+    },
+  },
+  {
+    key: 'amex_bonvoy',
+    label: 'Amex Bonvoy',
+    path: '/Colin Loeppky (1)/Amex Marriot Bonvoy',
+    // "2025-01-04.pdf" — issue date, M-1 applies
+    // older non-date filenames fall back to server_modified
+    filenameParser: (name) => {
+      const m = name.match(/^(\d{4})-(\d{2})-\d{2}\.pdf$/i)
+      if (!m) return null
+      return { year: Number(m[1]), month: Number(m[2]), applyMinus1: true }
+    },
+  },
+  {
+    key: 'capital_one',
+    label: 'Capital One',
+    path: '/Colin Loeppky (1)/Capital One MC - 3583',
+    // "Statement_012025_....pdf" — groups: [1]=MM [2]=YYYY, issue date, M-1 applies
+    filenameParser: (name) => {
+      const m = name.match(/^Statement_(\d{2})(\d{4})_/i)
+      if (!m) return null
+      return { year: Number(m[2]), month: Number(m[1]), applyMinus1: true }
+    },
+  },
+  {
+    key: 'td_visa',
+    label: 'TD Visa',
+    path: '/Colin Loeppky (1)/TD Visa',
+    // "TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf" — issue month, M-1 applies
+    filenameParser: (name) => {
+      const m = name.match(/TD_AEROPLAN_VISA_BUSINESS_\d+_([A-Za-z]{3})_\d{2}-(\d{4})\.pdf/i)
+      if (!m) return null
+      const month = monthFromAbbrev(m[1])
+      if (!month) return null
+      return { year: Number(m[2]), month, applyMinus1: true }
+    },
+  },
+  {
+    key: 'td_usd',
+    label: 'TD USD Chequing',
+    path: '/Colin Loeppky (1)/TD USD Chequing - 9924',
+    // "View PDF Statement_2025-12-01.pdf" — issue date, M-1 applies
+    filenameParser: (name) => {
+      const m = name.match(/View PDF Statement_(\d{4})-(\d{2})-\d{2}\.pdf$/i)
+      if (!m) return null
+      return { year: Number(m[1]), month: Number(m[2]), applyMinus1: true }
+    },
+  },
+]
 
 // ── Timezone helpers ──────────────────────────────────────────────────────────
 
@@ -76,12 +189,7 @@ export type CoverageStatus = 'filed' | 'pending' | 'missing'
 
 /**
  * Returns the status for a grid cell that has no uploaded statement.
- *
- * 'pending' — bank hasn't issued this statement yet:
- *   - current Edmonton month, OR
- *   - previous Edmonton month and today is on or before the 15th
- *     (banks typically issue between the 5th and 15th)
- * 'missing' — past the grace window, no statement uploaded
+ * 'pending' = current Edmonton month. 'missing' = everything else.
  */
 export function cellStatus(
   cellYear: number,
@@ -171,7 +279,7 @@ interface DropboxErrorResponse {
 async function listFolderPdfs(
   accessToken: string,
   folderPath: string
-): Promise<{ serverModified: string }[]> {
+): Promise<{ serverModified: string; name: string }[]> {
   const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
     method: 'POST',
     headers: {
@@ -203,7 +311,7 @@ async function listFolderPdfs(
         e.name.toLowerCase().endsWith('.pdf') &&
         typeof e.server_modified === 'string'
     )
-    .map((e) => ({ serverModified: e.server_modified! }))
+    .map((e) => ({ serverModified: e.server_modified!, name: e.name }))
 }
 
 // ── Response shape ────────────────────────────────────────────────────────────
@@ -276,23 +384,46 @@ export async function GET() {
     const result = results[i]
 
     // Initialize all cells as 'missing'; upload loop promotes to 'filed';
-    // finalization pass promotes current/recent cells to 'pending'.
+    // finalization pass promotes current month to 'pending'.
     const coverage: Record<string, CoverageStatus> = {}
     for (const month of allMonths) {
       coverage[month] = 'missing'
     }
 
     if (result.status === 'fulfilled') {
-      // A file uploaded in month M covers activity for month M-1 (off-by-one mapping).
-      for (const { serverModified } of result.value) {
-        const { year, month } = utcToEdmontonYearMonth(serverModified)
-        const prev = previousMonth(year, month)
-        const key = `${prev.year}-${String(prev.month).padStart(2, '0')}`
+      // Resolution order: filename parser → server_modified fallback.
+      // A file's date encodes the statement issue date; covered period is
+      // typically M-1 (except TD Bank, which encodes the period-end date directly).
+      for (const { serverModified, name } of result.value) {
+        let coveredYear: number
+        let coveredMonth: number
+
+        const parsed = account.filenameParser(name)
+        if (parsed) {
+          // Sanity-check: skip implausible dates
+          if (parsed.year < 2020 || parsed.year > currentYear + 1) continue
+          if (parsed.applyMinus1) {
+            const prev = previousMonth(parsed.year, parsed.month)
+            coveredYear = prev.year
+            coveredMonth = prev.month
+          } else {
+            coveredYear = parsed.year
+            coveredMonth = parsed.month
+          }
+        } else {
+          // Fallback: upload month M → covered month M-1
+          const { year, month } = utcToEdmontonYearMonth(serverModified)
+          const prev = previousMonth(year, month)
+          coveredYear = prev.year
+          coveredMonth = prev.month
+        }
+
+        const key = `${coveredYear}-${String(coveredMonth).padStart(2, '0')}`
         if (key in coverage) {
           coverage[key] = 'filed'
         }
       }
-      // Finalization: correct 'missing' → 'pending' for current / grace-window months.
+      // Finalization: correct 'missing' → 'pending' for the current month.
       for (const month of allMonths) {
         if (coverage[month] !== 'filed') {
           const [y, m] = month.split('-').map(Number)
@@ -300,7 +431,7 @@ export async function GET() {
         }
       }
     } else {
-      // Non-not_found errors: mark as fetch error — return error rather than fabricating absence
+      // Non-not_found errors: return error rather than fabricating absence
       const msg = result.reason instanceof Error ? result.reason.message : String(result.reason)
       return NextResponse.json(
         { error: `dropbox_list_failed for account "${account.key}": ${msg}` },
