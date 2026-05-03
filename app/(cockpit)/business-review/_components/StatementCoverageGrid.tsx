@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import { useDevMode } from '@/lib/hooks/useDevMode'
 import { DebugSection } from '@/components/cockpit/DebugSection'
 
@@ -42,11 +43,25 @@ function CoverageCell({ present }: { present: boolean }) {
         height: 28,
         padding: 0,
         border: '1px solid var(--color-border)',
-        backgroundColor: present ? 'var(--color-positive)' : 'var(--color-critical)',
-        opacity: present ? 1 : 0.7,
       }}
       title={present ? 'Statement present' : 'No statement found'}
-    />
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {present ? (
+          <Check size={14} className="text-emerald-500" />
+        ) : (
+          <X size={14} className="text-rose-500" />
+        )}
+      </div>
+    </td>
   )
 }
 
@@ -307,7 +322,14 @@ export function StatementCoverageGrid() {
 
       {devMode && (
         <DebugSection heading="Debug — Statement Coverage">
-          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <pre
+            style={{
+              color: 'var(--color-text-primary)',
+              fontSize: 'var(--text-nano)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
             {JSON.stringify(data, null, 2)}
           </pre>
         </DebugSection>
