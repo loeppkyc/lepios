@@ -1,5 +1,7 @@
-// Sandbox contract types — Slice 1 stub.
-// Only SandboxScope is needed for Slice 1. checkSandboxAction() is Slice 2 (security_layer slice 6).
+// Sandbox contract types — updated in Slice 2 to add checkSandboxAction().
+
+import { checkCapability } from '@/lib/security/capability'
+import type { CapabilityResult } from '@/lib/security/types'
 
 export interface SandboxFsScope {
   /** Paths the sandbox cmd is expected to read/write (advisory in slice 1 — not enforced). */
@@ -21,4 +23,32 @@ export interface SandboxNetScope {
 export interface SandboxScope {
   fs: SandboxFsScope
   net?: SandboxNetScope
+}
+
+export interface SandboxCheckRequest {
+  agentId: string
+  sandboxId: string
+  capability: string
+  scope: SandboxScope
+}
+
+export class SandboxDeniedError extends Error {
+  constructor(
+    public readonly agentId: string,
+    public readonly capability: string,
+    public readonly reason: string,
+    public readonly auditId: string
+  ) {
+    super(`Sandbox denied: ${agentId} → ${capability} (${reason})`)
+    this.name = 'SandboxDeniedError'
+  }
+}
+
+export async function checkSandboxAction(req: SandboxCheckRequest): Promise<CapabilityResult> {
+  return checkCapability({
+    agentId: req.agentId,
+    capability: req.capability,
+    target: req.sandboxId,
+    context: { sandboxId: req.sandboxId },
+  })
 }

@@ -166,7 +166,37 @@ export async function runInSandbox(
     runId = (insertedRow as { id: string }).id
   }
 
-  // Step 4: Slice 1 — skip checkSandboxAction() (Slice 2 wires security_layer)
+  // Step 4: Slice 2 — capability check
+  const { checkSandboxAction, SandboxDeniedError } = await import('@/lib/security/sandbox-contract')
+  const capResult = await checkSandboxAction({
+    agentId: opts.agentId,
+    sandboxId,
+    capability: opts.capability,
+    scope: opts.scope,
+  }).catch(async (err) => {
+    // Non-fatal infra failure — log and continue (don't block the run)
+    await writeInfraFailureEvent(sandboxId, runId, `checkSandboxAction threw: ${String(err)}`)
+    return {
+      allowed: true,
+      reason: 'infra_error_allow',
+      enforcement_mode: 'log_only' as const,
+      audit_id: '',
+    }
+  })
+
+  if (!capResult.allowed) {
+    await db
+      .from('sandbox_runs')
+      .update({ status: 'denied', ended_at: new Date().toISOString() })
+      .eq('id', runId)
+    await cleanupWorktree(worktreePath)
+    throw new SandboxDeniedError(
+      opts.agentId,
+      opts.capability,
+      capResult.reason,
+      capResult.audit_id
+    )
+  }
 
   // Step 5: insert agent_actions audit row — non-fatal if 0045 not applied
   let auditActionId: string | null = null
@@ -320,6 +350,25 @@ export async function runInSandbox(
     diffHash: fsDiff.diffHash,
     runId,
     warnings,
+  }
+}
+
+/**
+ * Internal helper — removes a worktree directory from git tracking and disk.
+ * Does NOT touch the DB. Used on denial (Step 4) so the worktree doesn't become an orphan.
+ */
+async function cleanupWorktree(worktreePath: string): Promise<void> {
+  try {
+    await execFileAsync('git', ['worktree', 'remove', '--force', worktreePath], {
+      cwd: REPO_ROOT,
+    })
+  } catch {
+    // If git worktree remove fails, try manual filesystem removal
+    try {
+      fs.rmSync(worktreePath, { recursive: true, force: true })
+    } catch {
+      // Best-effort cleanup
+    }
   }
 }
 
