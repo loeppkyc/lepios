@@ -14,7 +14,7 @@ ALTER TABLE capability_registry
   DROP CONSTRAINT IF EXISTS capability_registry_domain_check;
 ALTER TABLE capability_registry
   ADD CONSTRAINT capability_registry_domain_check
-    CHECK (domain IN ('fs','net','db','shell','git','secret','sandbox','tool'));
+    CHECK (domain IN ('fs','net','db','shell','git','secret','sandbox','browser','gmail','tool'));
 
 -- Seed the capability in the registry.
 INSERT INTO capability_registry (capability, domain, description, default_enforcement, destructive)
