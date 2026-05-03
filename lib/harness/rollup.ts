@@ -29,9 +29,18 @@ export interface HarnessRollup {
   complete_count: number
   total_count: number
   points_remaining: number
+  computed_at: string
 }
 
-export async function computeHarnessRollup(): Promise<HarnessRollup | null> {
+export interface HarnessRollupOptions {
+  /** Reserved for future tier-column filtering. Currently a no-op (no tier column). */
+  tier?: 'T1' | 'T2' | 'T3' | 'T4'
+}
+
+// opts.tier reserved for future tier-column filtering; no-op until harness_components.tier exists.
+export async function computeHarnessRollup(
+  _opts?: HarnessRollupOptions,
+): Promise<HarnessRollup | null> {
   const db = createServiceClient()
   const { data, error } = await db
     .from('harness_components')
@@ -54,7 +63,14 @@ export async function computeHarnessRollup(): Promise<HarnessRollup | null> {
   const total_count = components.length
   const points_remaining = Math.round((totalWeight - weightedSum) * 10) / 10
 
-  return { rollup_pct, components, complete_count, total_count, points_remaining }
+  return {
+    rollup_pct,
+    components,
+    complete_count,
+    total_count,
+    points_remaining,
+    computed_at: new Date().toISOString(),
+  }
 }
 
 // ── F18: morning_digest summary line ─────────────────────────────────────────

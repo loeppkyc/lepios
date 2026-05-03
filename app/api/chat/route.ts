@@ -9,6 +9,7 @@ import {
   getConversationOwner,
   type MessagePart,
 } from '@/lib/orb/persistence'
+import { buildTools } from '@/lib/orb/tools/registry'
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'
 const MODEL = process.env.OLLAMA_CHAT_MODEL ?? 'qwen2.5-coder:3b'
@@ -72,6 +73,13 @@ export async function POST(req: Request) {
       messages as Parameters<typeof convertToModelMessages>[0],
     ),
     temperature: 0.7,
+    tools: buildTools({
+      agentId: 'chat_ui',
+      conversationId,
+      userId: user.id,
+      toolCallId: '',
+    }),
+    toolChoice: 'auto',
     onFinish: async ({ text, usage, finishReason }) => {
       const totalTokens =
         (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) || undefined
