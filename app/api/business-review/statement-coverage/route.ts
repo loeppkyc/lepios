@@ -185,7 +185,7 @@ export function previousMonth(year: number, month: number): { year: number; mont
   return { year, month: month - 1 }
 }
 
-export type CoverageStatus = 'filed' | 'pending' | 'missing'
+export type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity'
 
 /**
  * Returns the status for a grid cell that has no uploaded statement.
@@ -328,6 +328,14 @@ export interface StatementCoverageResponse {
   fetchedAt: string
 }
 
+// ── No-activity overrides ─────────────────────────────────────────────────────
+
+// Add (accountKey, 'YYYY-MM') here when an account doesn't issue a statement
+// for that period (e.g. inactive credit card with zero balance).
+const NO_ACTIVITY: Record<string, string[]> = {
+  cibc: ['2026-03'],
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -425,9 +433,13 @@ export async function GET() {
           coverage[key] = 'filed'
         }
       }
-      // Finalization: correct 'missing' → 'pending' for the current month.
+      // Finalization: apply no_activity overrides first (they win over filed too),
+      // then correct 'missing' → 'pending' for current/future months.
+      const accountOverrides = NO_ACTIVITY[account.key] ?? []
       for (const month of allMonths) {
-        if (coverage[month] !== 'filed') {
+        if (accountOverrides.includes(month)) {
+          coverage[month] = 'no_activity'
+        } else if (coverage[month] !== 'filed') {
           const [y, m] = month.split('-').map(Number)
           coverage[month] = cellStatus(y, m, nowYear, nowMonth)
         }

@@ -12,7 +12,7 @@ interface StatementCoverageBand {
   months: string[] // "YYYY-MM" strings
 }
 
-type CoverageStatus = 'filed' | 'pending' | 'missing'
+type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity'
 
 interface StatementCoverageAccount {
   key: string
@@ -43,7 +43,9 @@ function CoverageCell({ status }: { status: CoverageStatus }) {
       ? 'Statement present'
       : status === 'pending'
         ? 'Not yet due'
-        : 'No statement found'
+        : status === 'no_activity'
+          ? 'No activity — no statement issued'
+          : 'No statement found'
   return (
     <td
       style={{
@@ -67,6 +69,11 @@ function CoverageCell({ status }: { status: CoverageStatus }) {
         {status === 'missing' && <X size={14} className="text-rose-500" />}
         {status === 'pending' && (
           <span style={{ color: 'var(--color-text-disabled)', fontSize: 12, lineHeight: 1 }}>
+            –
+          </span>
+        )}
+        {status === 'no_activity' && (
+          <span className="text-zinc-500" style={{ fontSize: 12, lineHeight: 1 }}>
             –
           </span>
         )}

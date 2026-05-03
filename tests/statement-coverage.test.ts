@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import {
   utcToEdmontonYearMonth,
   getCurrentYearMonths,
@@ -211,6 +211,62 @@ describe('filename parsers', () => {
   it('TD USD: date parsed (View PDF Statement_2025-12-01.pdf → covered Nov 2025)', () => {
     const parser = ACCOUNTS.find((a) => a.key === 'td_usd')!.filenameParser
     expect(parser('View PDF Statement_2025-12-01.pdf')).toEqual({ year: 2025, month: 12, applyMinus1: true })
+  })
+})
+
+// ── NO_ACTIVITY overrides ─────────────────────────────────────────────────────
+
+describe('NO_ACTIVITY overrides (GET-level)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  function mockDropbox(cibcEntries: unknown[] = []) {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).includes('oauth2/token')) {
+        return new Response(JSON.stringify({ access_token: 'test-token' }), { status: 200 })
+      }
+      // Route list_folder calls by path
+      const body = JSON.parse((init as RequestInit)?.body as string ?? '{}') as { path?: string }
+      if (typeof body.path === 'string' && body.path.includes('Costco')) {
+        return new Response(
+          JSON.stringify({ entries: cibcEntries, has_more: false }),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify({ entries: [], has_more: false }), { status: 200 })
+    })
+  }
+
+  it('override month shows no_activity when no file exists', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', 'key')
+    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
+    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
+    mockDropbox([])
+    const { GET } = await import('@/app/api/business-review/statement-coverage/route')
+    const res = await GET()
+    const body = await res.json()
+    const cibc = body.accounts.find((a: { key: string }) => a.key === 'cibc')
+    expect(cibc.coverage['2026-03']).toBe('no_activity')
+  })
+
+  it('override wins even when a file resolves to that month (override beats filed)', async () => {
+    vi.stubEnv('DROPBOX_APP_KEY', 'key')
+    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
+    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
+    // onlineStatement_2026-04-15.pdf → parser → year=2026, month=4, applyMinus1=true → covered 2026-03
+    mockDropbox([
+      { '.tag': 'file', name: 'onlineStatement_2026-04-15.pdf', server_modified: '2026-04-15T12:00:00Z' },
+    ])
+    const { GET } = await import('@/app/api/business-review/statement-coverage/route')
+    const res = await GET()
+    const body = await res.json()
+    const cibc = body.accounts.find((a: { key: string }) => a.key === 'cibc')
+    expect(cibc.coverage['2026-03']).toBe('no_activity')
   })
 })
 
