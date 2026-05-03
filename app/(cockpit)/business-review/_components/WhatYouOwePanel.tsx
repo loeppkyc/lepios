@@ -10,7 +10,11 @@ import { DebugSection } from '@/components/cockpit/DebugSection'
 interface SettlementResponse {
   grossPendingCad: number
   deferredCad: number
+  inTransitCad: number
   totalBalanceCad: number
+  inTransitGroupsCount: number
+  ddbrCad: number | null
+  ddbrAvailable: boolean
   fetchedAt: string
 }
 
@@ -180,6 +184,27 @@ export function WhatYouOwePanel() {
         ? fmt(settlement.grossPendingCad)
         : '—'
 
+  const inTransitValue = settlementLoading
+    ? 'Loading…'
+    : settlementError
+      ? '—'
+      : settlement
+        ? fmt(settlement.inTransitCad)
+        : '—'
+
+  const ddbrValue = settlementLoading
+    ? 'Loading…'
+    : settlementError
+      ? '—'
+      : settlement
+        ? settlement.ddbrAvailable && settlement.ddbrCad !== null
+          ? fmt(settlement.ddbrCad)
+          : '—'
+        : '—'
+
+  const ddbrSubLabel =
+    settlement && !settlement.ddbrAvailable ? 'Awaiting v2024-06-19 access' : undefined
+
   // FBA units — fulfillable only (Constraint B-7)
   const fbaValue = fbaLoading
     ? 'Loading…'
@@ -215,24 +240,22 @@ export function WhatYouOwePanel() {
         What You&apos;re Owed
       </span>
 
-      {/* 4-stat grid */}
+      {/* 6-stat grid: 2 rows × 3 columns */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr 1fr',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: '16px 24px',
         }}
       >
-        {/* Stat 1 — All Accounts Total Balance (open + deferred) */}
+        {/* Row 1 */}
         <StatCell label="Total Balance" value={totalBalanceValue} sub={settlementSubLabel} />
-
-        {/* Stat 2 — Standard orders open balance (requestable now, before Amazon reserve) */}
         <StatCell label="Open (Standard)" value={openBalanceValue} />
+        <StatCell label="In Transit" value={inTransitValue} />
 
-        {/* Stat 3 — FBA units (fulfillable only, Constraint B-7) */}
+        {/* Row 2 */}
+        <StatCell label="Deferred (DDBR)" value={ddbrValue} sub={ddbrSubLabel} />
         <StatCell label="FBA Units" value={fbaValue} sub={fbaSubLabel} />
-
-        {/* Stat 4 — Avg Cost / Unit: static placeholder per acceptance doc */}
         <StatCell label="Avg Cost / Unit" value="—" sub="Coming in Sprint 5" />
       </div>
 

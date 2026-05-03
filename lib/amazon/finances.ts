@@ -8,8 +8,8 @@ export interface FinancialEventGroup {
   ProcessingStatus?: string
   /**
    * Set only when a fund transfer has been initiated or completed.
+   * Real enum values observed in production: 'Processing' (in-transit), 'Succeeded' (paid out).
    * Absent on all pending groups (Open or deferred-Closed).
-   * Constraint B-1: exclude any group where this field is truthy.
    */
   FundTransferStatus?: string
   FundTransferDate?: string
@@ -28,6 +28,14 @@ interface FinancialEventGroupsResponse {
   }
 }
 
+interface ListTransactionsResponse {
+  transactions?: Array<{
+    transactionStatus?: string
+    totalAmount?: { currencyCode?: string; currencyAmount?: number }
+  }>
+  nextToken?: string
+}
+
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface SettlementBalance {
@@ -35,20 +43,28 @@ export interface SettlementBalance {
   grossPendingCad: number
   /** ProcessingStatus="Closed" + no FundTransferStatus = period ended, not yet disbursed */
   deferredCad: number
-  /** grossPendingCad + deferredCad */
+  /** FundTransferStatus="Processing" = transfer initiated, not yet landed in bank */
+  inTransitCad: number
+  /** grossPendingCad + deferredCad + inTransitCad + (ddbrCad ?? 0) */
   totalBalanceCad: number
   openGroupsCount: number
   deferredGroupsCount: number
-  /** ISO timestamp when the data was fetched */
+  inTransitGroupsCount: number
+  /**
+   * Delivery Date Based Reserve from v2024-06-19 listTransactions (DEFERRED+CAD).
+   * null when account is not yet migrated to that API (endpoint returns 0 transactions).
+   */
+  ddbrCad: number | null
+  /** true when v2024-06-19 returned ≥1 DEFERRED CAD transaction; false = unavailable */
+  ddbrAvailable: boolean
   fetchedAt: string
 }
 
-// ── Core fetch ────────────────────────────────────────────────────────────────
+// ── Core fetch helpers ────────────────────────────────────────────────────────
 
 /**
  * Fetch all financial event groups for the last `daysBack` days.
  * Returns every group regardless of currency or status — callers filter.
- * SP-API requires FinancialEventGroupStartedAfter — omitting it returns 400.
  */
 export async function fetchAllFinancialEventGroups(
   daysBack: number
@@ -78,50 +94,109 @@ export async function fetchAllFinancialEventGroups(
 }
 
 /**
- * Fetch all financial event groups and sum OriginalTotal.CurrencyAmount
- * for open CAD groups.
+ * Fetch DEFERRED transactions from v2024-06-19 listTransactions.
+ * Returns null + available=false when account is not yet migrated (empty response).
+ * Errors are swallowed — DDBR is best-effort enrichment.
+ */
+async function fetchDdbrBalance(): Promise<{ ddbrCad: number | null; ddbrAvailable: boolean }> {
+  try {
+    const postedAfter = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    let total = 0
+    let found = false
+    let params: Record<string, string> = {
+      transactionStatus: 'DEFERRED',
+      postedAfter,
+      maxResultsPerPage: '100',
+    }
+
+    while (true) {
+      const data = await spFetch<ListTransactionsResponse>('/finances/2024-06-19/transactions', {
+        method: 'GET',
+        params,
+      })
+
+      for (const t of data.transactions ?? []) {
+        if (
+          t.transactionStatus === 'DEFERRED' &&
+          t.totalAmount?.currencyCode === 'CAD' &&
+          typeof t.totalAmount.currencyAmount === 'number'
+        ) {
+          total += t.totalAmount.currencyAmount
+          found = true
+        }
+      }
+
+      const next = data.nextToken
+      if (!next) break
+      params = { nextToken: next, maxResultsPerPage: '100' }
+    }
+
+    return found
+      ? { ddbrCad: Math.round(total * 100) / 100, ddbrAvailable: true }
+      : { ddbrCad: null, ddbrAvailable: false }
+  } catch {
+    return { ddbrCad: null, ddbrAvailable: false }
+  }
+}
+
+/**
+ * Fetch settlement balance across three buckets plus optional DDBR.
  *
- * "Open" = FundTransferStatus field is absent (Constraint B-1).
- * CAD filter required (Constraint B-2): at least one open group has MXN $0.
+ * Bucket rules (real FundTransferStatus enum from production):
+ *   FTS absent   → grossPendingCad (Open) or deferredCad (Closed)
+ *   FTS='Processing' → inTransitCad (transfer initiated, not yet landed)
+ *   FTS='Succeeded'  → excluded (already paid out)
+ *   FTS=anything else → excluded (unknown disbursement state)
+ *
+ * Constraint B-2: only CAD groups included.
  * Constraint B-9: no caching — caller's route uses force-dynamic.
  */
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
-  const groups = await fetchAllFinancialEventGroups(180)
+  const [groups, ddbr] = await Promise.all([fetchAllFinancialEventGroups(180), fetchDdbrBalance()])
 
-  let open = 0
-  let deferred = 0
-  let openCount = 0
-  let deferredCount = 0
+  let open = 0,
+    deferred = 0,
+    inTransit = 0
+  let openCount = 0,
+    deferredCount = 0,
+    inTransitCount = 0
 
   for (const group of groups) {
-    const isCad = group.OriginalTotal?.CurrencyCode === 'CAD'
-    if (!isCad) continue
+    if (group.OriginalTotal?.CurrencyCode !== 'CAD') continue
 
-    // Exclude any group where a fund transfer has been initiated or completed.
-    // Matches Streamlit baseline: `if not g.get("FundTransferStatus")`.
-    if (group.FundTransferStatus) continue
+    const amount = group.OriginalTotal.CurrencyAmount ?? 0
+    const fts = group.FundTransferStatus
 
-    const amount = group.OriginalTotal?.CurrencyAmount ?? 0
-
-    if (group.ProcessingStatus === 'Open') {
-      open += amount
-      openCount++
-    } else {
-      // Closed + no FundTransferStatus = period ended, not yet disbursed
-      deferred += amount
-      deferredCount++
+    if (!fts) {
+      if (group.ProcessingStatus === 'Open') {
+        open += amount
+        openCount++
+      } else {
+        // Closed + no FTS = period ended, payment not yet initiated
+        deferred += amount
+        deferredCount++
+      }
+    } else if (fts === 'Processing') {
+      inTransit += amount
+      inTransitCount++
     }
+    // 'Succeeded' and any other truthy FTS → already disbursed, excluded
   }
 
   open = Math.round(open * 100) / 100
   deferred = Math.round(deferred * 100) / 100
+  inTransit = Math.round(inTransit * 100) / 100
 
   return {
     grossPendingCad: open,
     deferredCad: deferred,
-    totalBalanceCad: Math.round((open + deferred) * 100) / 100,
+    inTransitCad: inTransit,
+    totalBalanceCad: Math.round((open + deferred + inTransit + (ddbr.ddbrCad ?? 0)) * 100) / 100,
     openGroupsCount: openCount,
     deferredGroupsCount: deferredCount,
+    inTransitGroupsCount: inTransitCount,
+    ddbrCad: ddbr.ddbrCad,
+    ddbrAvailable: ddbr.ddbrAvailable,
     fetchedAt: new Date().toISOString(),
   }
 }
