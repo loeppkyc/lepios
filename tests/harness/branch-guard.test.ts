@@ -11,12 +11,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock child_process ────────────────────────────────────────────────────────
+// ── Mock shellRun ─────────────────────────────────────────────────────────────
 
-const { mockExecSync } = vi.hoisted(() => ({ mockExecSync: vi.fn() }))
+const { mockShellRun } = vi.hoisted(() => ({ mockShellRun: vi.fn() }))
 
-vi.mock('child_process', () => ({
-  execSync: mockExecSync,
+vi.mock('@/lib/harness/arms-legs/shell', () => ({
+  shellRun: mockShellRun,
 }))
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
@@ -89,10 +89,10 @@ describe('getExpectedBranch', () => {
 describe('getCurrentBranch', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns trimmed output of git branch --show-current', () => {
-    mockExecSync.mockReturnValue('harness/task-abc123\n')
-    expect(getCurrentBranch()).toBe('harness/task-abc123')
-    expect(mockExecSync).toHaveBeenCalledWith('git branch --show-current', { encoding: 'utf8' })
+  it('returns trimmed output of git branch --show-current', async () => {
+    mockShellRun.mockResolvedValue('harness/task-abc123\n')
+    expect(await getCurrentBranch()).toBe('harness/task-abc123')
+    expect(mockShellRun).toHaveBeenCalledWith('git branch --show-current', 'coordinator')
   })
 })
 
@@ -110,7 +110,7 @@ describe('assertCorrectBranch — missing task_id', () => {
 
   it('does not call git when task_id is missing', async () => {
     await expect(assertCorrectBranch('')).rejects.toThrow()
-    expect(mockExecSync).not.toHaveBeenCalled()
+    expect(mockShellRun).not.toHaveBeenCalled()
   })
 })
 
@@ -123,14 +123,14 @@ describe('assertCorrectBranch — already on correct branch', () => {
   })
 
   it('resolves without throwing when on correct branch', async () => {
-    mockExecSync.mockReturnValue('harness/task-abc123\n')
+    mockShellRun.mockResolvedValue('harness/task-abc123\n')
     mockFrom.mockReturnValue(makeInsertChain())
 
     await expect(assertCorrectBranch('abc123')).resolves.toBeUndefined()
   })
 
   it('does not log a branch_guard_triggered event on correct branch', async () => {
-    mockExecSync.mockReturnValue('harness/task-abc123\n')
+    mockShellRun.mockResolvedValue('harness/task-abc123\n')
     const insertChain = makeInsertChain()
     mockFrom.mockReturnValue(insertChain)
 
@@ -150,14 +150,14 @@ describe('assertCorrectBranch — wrong branch', () => {
   })
 
   it('throws with a message naming the current and expected branches', async () => {
-    mockExecSync.mockReturnValue('main\n')
+    mockShellRun.mockResolvedValue('main\n')
     mockFrom.mockReturnValue(makeInsertChain())
 
     await expect(assertCorrectBranch('abc123')).rejects.toThrow(/harness\/task-abc123/)
   })
 
   it('error message includes the git checkout command to fix it', async () => {
-    mockExecSync.mockReturnValue('claude/vibrant-heisenberg-LmXuK\n')
+    mockShellRun.mockResolvedValue('claude/vibrant-heisenberg-LmXuK\n')
     mockFrom.mockReturnValue(makeInsertChain())
 
     const err = await assertCorrectBranch('abc123').catch((e: Error) => e)
@@ -166,7 +166,7 @@ describe('assertCorrectBranch — wrong branch', () => {
   })
 
   it('logs branch_guard_triggered event with task_id and branches', async () => {
-    mockExecSync.mockReturnValue('main\n')
+    mockShellRun.mockResolvedValue('main\n')
     const insertChain = makeInsertChain()
     mockFrom.mockReturnValue(insertChain)
 
@@ -187,7 +187,7 @@ describe('assertCorrectBranch — wrong branch', () => {
   })
 
   it('still throws even if the F18 agent_events insert fails', async () => {
-    mockExecSync.mockReturnValue('main\n')
+    mockShellRun.mockResolvedValue('main\n')
     mockFrom.mockReturnValue({
       insert: vi.fn().mockRejectedValue(new Error('DB down')),
     })
@@ -267,7 +267,7 @@ describe('buildBranchGuardLine', () => {
 describe('assertCorrectBranch — capability gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockExecSync.mockReturnValue('harness/task-abc123\n')
+    mockShellRun.mockResolvedValue('harness/task-abc123\n')
     mockFrom.mockReturnValue({ insert: vi.fn().mockResolvedValue({ data: null, error: null }) })
     makeCapAllowed()
   })
@@ -306,6 +306,6 @@ describe('assertCorrectBranch — capability gate', () => {
 
     await assertCorrectBranch('abc123').catch(() => {})
 
-    expect(mockExecSync).not.toHaveBeenCalled()
+    expect(mockShellRun).not.toHaveBeenCalled()
   })
 })

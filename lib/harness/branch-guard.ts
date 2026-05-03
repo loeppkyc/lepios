@@ -1,13 +1,14 @@
-import { execSync } from 'child_process'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireCapability } from '@/lib/security/capability'
+import { shellRun } from '@/lib/harness/arms-legs/shell'
 
 export function getExpectedBranch(taskId: string): string {
   return `harness/task-${taskId}`
 }
 
-export function getCurrentBranch(): string {
-  return execSync('git branch --show-current', { encoding: 'utf8' }).trim()
+export async function getCurrentBranch(agentId = 'coordinator'): Promise<string> {
+  const stdout = await shellRun('git branch --show-current', agentId)
+  return stdout.trim()
 }
 
 export async function assertCorrectBranch(
@@ -21,10 +22,12 @@ export async function assertCorrectBranch(
     )
   }
 
+  // requireCapability provides early-termination with CapabilityDeniedError.
+  // shellRun inside getCurrentBranch also checks via dispatch (double-check, both log_only).
   await requireCapability({ agentId: opts?.agentId ?? 'coordinator', capability: 'shell.run' })
 
   const expected = getExpectedBranch(taskId)
-  const current = getCurrentBranch()
+  const current = await getCurrentBranch(opts?.agentId ?? 'coordinator')
 
   if (current !== expected) {
     await logBranchGuardTriggered(taskId, current, expected).catch(() => {

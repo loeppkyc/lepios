@@ -13,6 +13,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { telegram } from '@/lib/harness/arms-legs/telegram'
 import { fsRead, fsExists } from '@/lib/harness/arms-legs/fs'
+import { shellRun } from '@/lib/harness/arms-legs/shell'
 import { logEvent as logKnowledgeEvent } from '@/lib/knowledge/client'
 import { recordAttribution } from '@/lib/attribution/writer'
 import {
@@ -24,7 +25,6 @@ import {
 } from './tracker'
 import { runCalibration } from './calibrator'
 import { estimateTask } from './estimator'
-import { execSync } from 'child_process'
 import { join } from 'path'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -103,9 +103,10 @@ async function generateDocGapTasks(db: SupabaseClient): Promise<number> {
     const docsPath = join(process.cwd(), 'docs')
     let output = ''
     try {
-      output = execSync(
+      output = await shellRun(
         `grep -rl "TODO\\|PENDING\\|TBD\\|\\[ \\]" "${docsPath}" --include="*.md" 2>/dev/null`,
-        { encoding: 'utf8', timeout: 5000 }
+        'work_budget',
+        { timeoutMs: 5000 }
       )
     } catch {
       // grep exits non-zero when no matches
@@ -166,9 +167,10 @@ async function generateTestGapTasks(db: SupabaseClient): Promise<number> {
 
     let output = ''
     try {
-      output = execSync(
+      output = await shellRun(
         `git log --name-only --format='' -20 | grep '\\.ts$' | grep -v '\\.test\\.' | sort -u`,
-        { encoding: 'utf8', timeout: 5000, cwd: process.cwd() }
+        'work_budget',
+        { timeoutMs: 5000 }
       )
     } catch {
       return 0
