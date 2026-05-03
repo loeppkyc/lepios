@@ -1,4 +1,5 @@
 import { getSecret } from '@/lib/security/secrets'
+import { httpRequest } from '@/lib/harness/arms-legs/http'
 
 export class MissingTelegramConfigError extends Error {
   override readonly name = 'MissingTelegramConfigError'
@@ -16,13 +17,14 @@ export async function postMessage(text: string): Promise<void> {
   if (!token || !chatId) throw new MissingTelegramConfigError()
 
   const url = `https://api.telegram.org/bot${token}/sendMessage`
-  const res = await fetch(url, {
+  const result = await httpRequest({
+    url,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    capability: 'net.outbound.telegram',
+    agentId: 'orchestrator',
+    body: { chat_id: chatId, text },
   })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Telegram API error ${res.status}: ${body}`)
+  if (!result.ok) {
+    throw new Error(`Telegram API error ${result.status}: ${result.body}`)
   }
 }

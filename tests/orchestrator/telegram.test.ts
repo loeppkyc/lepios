@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+const { mockHttpRequest } = vi.hoisted(() => ({
+  mockHttpRequest: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/arms-legs/http', () => ({
+  httpRequest: mockHttpRequest,
+}))
+
 // Mock getSecret so postMessage tests don't require a live DB connection.
 // The mock mirrors getSecret's process.env fallback: resolves to the env value,
 // or resolves to undefined when the env var is absent (preserving null-check behavior).
 vi.mock('@/lib/security/secrets', () => ({
-  getSecret: vi.fn().mockImplementation((key: string) =>
-    Promise.resolve(process.env[key])
-  ),
+  getSecret: vi.fn().mockImplementation((key: string) => Promise.resolve(process.env[key])),
 }))
 
 import { postMessage, MissingTelegramConfigError } from '@/lib/orchestrator/telegram'
@@ -26,6 +32,7 @@ describe('postMessage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockHttpRequest.mockReset()
   })
 
   afterEach(() => {
@@ -56,14 +63,23 @@ describe('postMessage', () => {
     process.env.TELEGRAM_BOT_TOKEN = 'testtoken'
     process.env.TELEGRAM_CHAT_ID = 'chat123'
 
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', mockFetch)
+    mockHttpRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: '{}',
+      headers: {},
+      durationMs: 5,
+    })
 
     await postMessage('Hello World')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.telegram.org/bottesttoken/sendMessage',
-      expect.objectContaining({ method: 'POST' })
+    expect(mockHttpRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.telegram.org/bottesttoken/sendMessage',
+        method: 'POST',
+        capability: 'net.outbound.telegram',
+        agentId: 'orchestrator',
+      })
     )
   })
 
@@ -71,28 +87,34 @@ describe('postMessage', () => {
     process.env.TELEGRAM_BOT_TOKEN = 'tok'
     process.env.TELEGRAM_CHAT_ID = 'cid'
 
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', mockFetch)
+    mockHttpRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: '{}',
+      headers: {},
+      durationMs: 5,
+    })
 
     await postMessage('my message')
 
-    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string)
-    expect(body.chat_id).toBe('cid')
-    expect(body.text).toBe('my message')
+    expect(mockHttpRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: { chat_id: 'cid', text: 'my message' },
+      })
+    )
   })
 
   it('throws on non-ok Telegram API response', async () => {
     process.env.TELEGRAM_BOT_TOKEN = 'token'
     process.env.TELEGRAM_CHAT_ID = 'chat'
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: vi.fn().mockResolvedValue('Bad Request'),
-      })
-    )
+    mockHttpRequest.mockResolvedValue({
+      ok: false,
+      status: 400,
+      body: 'Bad Request',
+      headers: {},
+      durationMs: 5,
+    })
 
     await expect(postMessage('test')).rejects.toThrow('400')
   })
