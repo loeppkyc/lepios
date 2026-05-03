@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 0
 
@@ -185,7 +186,7 @@ export function previousMonth(year: number, month: number): { year: number; mont
   return { year, month: month - 1 }
 }
 
-export type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity'
+export type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity' | 'filed_override'
 
 /**
  * Returns the status for a grid cell that has no uploaded statement.
@@ -359,6 +360,20 @@ export async function GET() {
   const allMonths = getCurrentYearMonths()
   const { year: currentYear } = currentEdmontonYearMonth()
 
+  // Load manual overrides from DB; fail open (empty set) if unavailable.
+  let manualOverrides = new Set<string>()
+  try {
+    const supabase = await createClient()
+    const { data: rows } = await supabase
+      .from('statement_coverage_overrides')
+      .select('account_key, year_month')
+    for (const row of rows ?? []) {
+      manualOverrides.add(`${row.account_key}:${row.year_month}`)
+    }
+  } catch {
+    // Non-fatal — overrides unavailable, serve without them
+  }
+
   // Fetch all 8 folders in parallel
   const results = await Promise.allSettled(
     ACCOUNTS.map((account) => listFolderPdfs(accessToken, account.path))
@@ -433,13 +448,21 @@ export async function GET() {
           coverage[key] = 'filed'
         }
       }
-      // Finalization: apply no_activity overrides first (they win over filed too),
-      // then correct 'missing' → 'pending' for current/future months.
-      const accountOverrides = NO_ACTIVITY[account.key] ?? []
+      // Finalization — priority order (highest wins):
+      //   1. no_activity  — NO_ACTIVITY const (overrides everything incl. real files)
+      //   2. filed        — real file found via parser/server_modified
+      //   3. filed_override — manual DB override
+      //   4. pending      — current or future Edmonton month
+      //   5. missing      — past month, no file, no override
+      const noActivityMonths = NO_ACTIVITY[account.key] ?? []
       for (const month of allMonths) {
-        if (accountOverrides.includes(month)) {
+        if (noActivityMonths.includes(month)) {
           coverage[month] = 'no_activity'
-        } else if (coverage[month] !== 'filed') {
+        } else if (coverage[month] === 'filed') {
+          // real file — leave as-is
+        } else if (manualOverrides.has(`${account.key}:${month}`)) {
+          coverage[month] = 'filed_override'
+        } else {
           const [y, m] = month.split('-').map(Number)
           coverage[month] = cellStatus(y, m, nowYear, nowMonth)
         }

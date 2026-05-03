@@ -12,7 +12,7 @@ interface StatementCoverageBand {
   months: string[] // "YYYY-MM" strings
 }
 
-type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity'
+type CoverageStatus = 'filed' | 'pending' | 'missing' | 'no_activity' | 'filed_override'
 
 interface StatementCoverageAccount {
   key: string
@@ -37,15 +37,24 @@ function shortMonthLabel(yyyyMM: string): string {
 
 // ── Cell ──────────────────────────────────────────────────────────────────────
 
-function CoverageCell({ status }: { status: CoverageStatus }) {
+function CoverageCell({
+  status,
+  onClick,
+}: {
+  status: CoverageStatus
+  onClick?: () => void
+}) {
+  const clickable = status === 'missing' || status === 'filed_override'
   const title =
     status === 'filed'
       ? 'Statement present'
-      : status === 'pending'
-        ? 'Not yet due'
-        : status === 'no_activity'
-          ? 'No activity — no statement issued'
-          : 'No statement found'
+      : status === 'filed_override'
+        ? 'Manually marked filed — click to remove'
+        : status === 'pending'
+          ? 'Not yet due'
+          : status === 'no_activity'
+            ? 'No activity — no statement issued'
+            : 'No statement found — click to mark filed'
   return (
     <td
       style={{
@@ -53,8 +62,10 @@ function CoverageCell({ status }: { status: CoverageStatus }) {
         height: 28,
         padding: 0,
         border: '1px solid var(--color-border)',
+        cursor: clickable ? 'pointer' : 'default',
       }}
       title={title}
+      onClick={clickable ? onClick : undefined}
     >
       <div
         style={{
@@ -66,6 +77,7 @@ function CoverageCell({ status }: { status: CoverageStatus }) {
         }}
       >
         {status === 'filed' && <Check size={14} className="text-emerald-500" />}
+        {status === 'filed_override' && <Check size={14} className="text-emerald-400 opacity-70" />}
         {status === 'missing' && <X size={14} className="text-rose-500" />}
         {status === 'pending' && (
           <span style={{ color: 'var(--color-text-disabled)', fontSize: 12, lineHeight: 1 }}>
@@ -223,6 +235,46 @@ export function StatementCoverageGrid() {
   const [loading, setLoading] = useState(true)
   const [devMode] = useDevMode()
 
+  async function handleCellClick(accountKey: string, yearMonth: string, current: CoverageStatus) {
+    if (current !== 'missing' && current !== 'filed_override') return
+    const next: CoverageStatus = current === 'missing' ? 'filed_override' : 'missing'
+
+    // Optimistic update
+    setData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        accounts: prev.accounts.map((acc) =>
+          acc.key !== accountKey
+            ? acc
+            : { ...acc, coverage: { ...acc.coverage, [yearMonth]: next } }
+        ),
+      }
+    })
+
+    try {
+      const res = await fetch('/api/business-review/statement-coverage/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountKey, yearMonth }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      // Revert on failure
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          accounts: prev.accounts.map((acc) =>
+            acc.key !== accountKey
+              ? acc
+              : { ...acc, coverage: { ...acc.coverage, [yearMonth]: current } }
+          ),
+        }
+      })
+    }
+  }
+
   useEffect(() => {
     fetch('/api/business-review/statement-coverage')
       .then(async (res) => {
@@ -314,12 +366,16 @@ export function StatementCoverageGrid() {
               </td>
 
               {/* Coverage cells — one per month across all bands */}
-              {allMonths.map((yyyyMM) => (
-                <CoverageCell
-                  key={`${account.key}-${yyyyMM}`}
-                  status={account.coverage[yyyyMM] ?? 'missing'}
-                />
-              ))}
+              {allMonths.map((yyyyMM) => {
+                const status = account.coverage[yyyyMM] ?? 'missing'
+                return (
+                  <CoverageCell
+                    key={`${account.key}-${yyyyMM}`}
+                    status={status}
+                    onClick={() => handleCellClick(account.key, yyyyMM, status)}
+                  />
+                )
+              })}
             </tr>
           ))}
         </tbody>
