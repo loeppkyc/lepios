@@ -44,6 +44,58 @@ export function currentEdmontonYearMonth(): { year: number; month: number } {
   return utcToEdmontonYearMonth(new Date().toISOString())
 }
 
+/**
+ * Returns the current year, month, and day-of-month in the America/Edmonton timezone.
+ */
+export function currentEdmontonDate(): { year: number; month: number; day: number } {
+  const date = new Date()
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Edmonton',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = fmt.formatToParts(date)
+  return {
+    year: Number(parts.find((p) => p.type === 'year')?.value ?? '0'),
+    month: Number(parts.find((p) => p.type === 'month')?.value ?? '0'),
+    day: Number(parts.find((p) => p.type === 'day')?.value ?? '0'),
+  }
+}
+
+/**
+ * Returns the month immediately before (year, month), handling January → December rollback.
+ * Upload in month M covers activity for month M-1.
+ */
+export function previousMonth(year: number, month: number): { year: number; month: number } {
+  if (month === 1) return { year: year - 1, month: 12 }
+  return { year, month: month - 1 }
+}
+
+export type CoverageStatus = 'filed' | 'pending' | 'missing'
+
+/**
+ * Returns the status for a grid cell that has no uploaded statement.
+ *
+ * 'pending' — bank hasn't issued this statement yet:
+ *   - current Edmonton month, OR
+ *   - previous Edmonton month and today is on or before the 15th
+ *     (banks typically issue between the 5th and 15th)
+ * 'missing' — past the grace window, no statement uploaded
+ */
+export function cellStatus(
+  cellYear: number,
+  cellMonth: number,
+  nowYear: number,
+  nowMonth: number,
+  nowDay: number,
+): 'pending' | 'missing' {
+  if (cellYear === nowYear && cellMonth === nowMonth) return 'pending'
+  const prev = previousMonth(nowYear, nowMonth)
+  if (cellYear === prev.year && cellMonth === prev.month && nowDay <= 15) return 'pending'
+  return 'missing'
+}
+
 // ── Band generation ───────────────────────────────────────────────────────────
 
 /** Generates "YYYY-MM" strings for all 12 months of 2025. Fixed. */
@@ -177,7 +229,7 @@ export interface StatementCoverageResponse {
   accounts: Array<{
     key: string
     label: string
-    coverage: Record<string, boolean>
+    coverage: Record<string, CoverageStatus>
   }>
   fetchedAt: string
 }
@@ -233,21 +285,35 @@ export async function GET() {
     )
   }
 
+  // Today in Edmonton — needed for pending/missing determination
+  const { year: nowYear, month: nowMonth, day: nowDay } = currentEdmontonDate()
+
   // Build coverage maps
   const accounts = ACCOUNTS.map((account, i) => {
     const result = results[i]
 
-    const coverage: Record<string, boolean> = {}
+    // Initialize all cells as 'missing'; upload loop promotes to 'filed';
+    // finalization pass promotes current/recent cells to 'pending'.
+    const coverage: Record<string, CoverageStatus> = {}
     for (const month of allMonths) {
-      coverage[month] = false
+      coverage[month] = 'missing'
     }
 
     if (result.status === 'fulfilled') {
+      // A file uploaded in month M covers activity for month M-1 (off-by-one mapping).
       for (const { serverModified } of result.value) {
         const { year, month } = utcToEdmontonYearMonth(serverModified)
-        const key = `${year}-${String(month).padStart(2, '0')}`
+        const prev = previousMonth(year, month)
+        const key = `${prev.year}-${String(prev.month).padStart(2, '0')}`
         if (key in coverage) {
-          coverage[key] = true
+          coverage[key] = 'filed'
+        }
+      }
+      // Finalization: correct 'missing' → 'pending' for current / grace-window months.
+      for (const month of allMonths) {
+        if (coverage[month] !== 'filed') {
+          const [y, m] = month.split('-').map(Number)
+          coverage[month] = cellStatus(y, m, nowYear, nowMonth, nowDay)
         }
       }
     } else {

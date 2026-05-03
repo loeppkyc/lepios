@@ -12,10 +12,12 @@ interface StatementCoverageBand {
   months: string[] // "YYYY-MM" strings
 }
 
+type CoverageStatus = 'filed' | 'pending' | 'missing'
+
 interface StatementCoverageAccount {
   key: string
   label: string
-  coverage: Record<string, boolean> // "YYYY-MM" → present
+  coverage: Record<string, CoverageStatus> // "YYYY-MM" → filed | pending | missing
 }
 
 interface StatementCoverageResponse {
@@ -35,7 +37,13 @@ function shortMonthLabel(yyyyMM: string): string {
 
 // ── Cell ──────────────────────────────────────────────────────────────────────
 
-function CoverageCell({ present }: { present: boolean }) {
+function CoverageCell({ status }: { status: CoverageStatus }) {
+  const title =
+    status === 'filed'
+      ? 'Statement present'
+      : status === 'pending'
+        ? 'Not yet due'
+        : 'No statement found'
   return (
     <td
       style={{
@@ -44,7 +52,7 @@ function CoverageCell({ present }: { present: boolean }) {
         padding: 0,
         border: '1px solid var(--color-border)',
       }}
-      title={present ? 'Statement present' : 'No statement found'}
+      title={title}
     >
       <div
         style={{
@@ -55,10 +63,12 @@ function CoverageCell({ present }: { present: boolean }) {
           justifyContent: 'center',
         }}
       >
-        {present ? (
-          <Check size={14} className="text-emerald-500" />
-        ) : (
-          <X size={14} className="text-rose-500" />
+        {status === 'filed' && <Check size={14} className="text-emerald-500" />}
+        {status === 'missing' && <X size={14} className="text-rose-500" />}
+        {status === 'pending' && (
+          <span style={{ color: 'var(--color-text-disabled)', fontSize: 12, lineHeight: 1 }}>
+            –
+          </span>
         )}
       </div>
     </td>
@@ -300,7 +310,7 @@ export function StatementCoverageGrid() {
               {allMonths.map((yyyyMM) => (
                 <CoverageCell
                   key={`${account.key}-${yyyyMM}`}
-                  present={account.coverage[yyyyMM] ?? false}
+                  status={account.coverage[yyyyMM] ?? 'missing'}
                 />
               ))}
             </tr>

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { utcToEdmontonYearMonth, get2025Months, get2026YtdMonths } from '@/app/api/business-review/statement-coverage/route'
+import {
+  utcToEdmontonYearMonth,
+  get2025Months,
+  get2026YtdMonths,
+  previousMonth,
+  cellStatus,
+} from '@/app/api/business-review/statement-coverage/route'
 
 // ── Required timezone boundary tests (from acceptance doc) ────────────────────
 
@@ -91,6 +97,69 @@ describe('get2026YtdMonths', () => {
   it('returns at least 1 month (Jan 2026 has passed)', () => {
     const months = get2026YtdMonths()
     expect(months.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ── previousMonth: off-by-one mapping (upload month M → covers month M-1) ────
+
+describe('previousMonth', () => {
+  it('mid-year: month 5 → month 4, same year', () => {
+    expect(previousMonth(2026, 5)).toEqual({ year: 2026, month: 4 })
+  })
+
+  it('January rolls back to December of the prior year', () => {
+    expect(previousMonth(2026, 1)).toEqual({ year: 2025, month: 12 })
+  })
+
+  it('December → November, same year', () => {
+    expect(previousMonth(2025, 12)).toEqual({ year: 2025, month: 11 })
+  })
+
+  it('February → January, same year', () => {
+    expect(previousMonth(2026, 2)).toEqual({ year: 2026, month: 1 })
+  })
+})
+
+// ── cellStatus: pending / missing determination ────────────────────────────────
+
+describe('cellStatus', () => {
+  it('current month is always pending', () => {
+    // Today = 2026-05-03 (day 3)
+    expect(cellStatus(2026, 5, 2026, 5, 3)).toBe('pending')
+  })
+
+  it('current month is pending even on day 1', () => {
+    expect(cellStatus(2026, 5, 2026, 5, 1)).toBe('pending')
+  })
+
+  it('previous month is pending when today <= day 15', () => {
+    // Today = 2026-05-03: April is still in the grace window
+    expect(cellStatus(2026, 4, 2026, 5, 3)).toBe('pending')
+  })
+
+  it('previous month is pending on exactly day 15', () => {
+    expect(cellStatus(2026, 4, 2026, 5, 15)).toBe('pending')
+  })
+
+  it('previous month is missing when today > day 15', () => {
+    expect(cellStatus(2026, 4, 2026, 5, 16)).toBe('missing')
+  })
+
+  it('two months ago is always missing', () => {
+    expect(cellStatus(2026, 3, 2026, 5, 3)).toBe('missing')
+  })
+
+  it('past year is always missing', () => {
+    expect(cellStatus(2025, 1, 2026, 5, 3)).toBe('missing')
+  })
+
+  it('year-boundary: January is pending when previous month (Dec) and today <= 15', () => {
+    // today = 2026-01-10: December 2025 is in grace window
+    expect(cellStatus(2025, 12, 2026, 1, 10)).toBe('pending')
+  })
+
+  it('year-boundary: December is missing when today > 15 in January', () => {
+    expect(cellStatus(2025, 12, 2026, 1, 16)).toBe('missing')
   })
 })
 
