@@ -233,7 +233,13 @@ export function StatementCoverageGrid() {
   const [data, setData] = useState<StatementCoverageResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [devMode] = useDevMode()
+
+  function flashAuthError(msg: string) {
+    setAuthError(msg)
+    setTimeout(() => setAuthError(null), 3500)
+  }
 
   async function handleCellClick(accountKey: string, yearMonth: string, current: CoverageStatus) {
     if (current !== 'missing' && current !== 'filed_override') return
@@ -252,15 +258,15 @@ export function StatementCoverageGrid() {
       }
     })
 
+    let res: Response
     try {
-      const res = await fetch('/api/business-review/statement-coverage/override', {
+      res = await fetch('/api/business-review/statement-coverage/override', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountKey, yearMonth }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
-      // Revert on failure
+      // Network error — revert
       setData((prev) => {
         if (!prev) return prev
         return {
@@ -272,6 +278,25 @@ export function StatementCoverageGrid() {
           ),
         }
       })
+      return
+    }
+
+    if (!res.ok) {
+      // Revert optimistic update
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          accounts: prev.accounts.map((acc) =>
+            acc.key !== accountKey
+              ? acc
+              : { ...acc, coverage: { ...acc.coverage, [yearMonth]: current } }
+          ),
+        }
+      })
+      if (res.status === 401) {
+        flashAuthError('Sign in to mark cells')
+      }
     }
   }
 
@@ -325,6 +350,23 @@ export function StatementCoverageGrid() {
       <span className="label-caps" style={{ color: 'var(--color-pillar-money)' }}>
         Statement Coverage · Bank & Credit
       </span>
+
+      {/* Auth error banner — auto-dismisses after 3.5s */}
+      {authError && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-critical)',
+            background: 'color-mix(in srgb, var(--color-critical) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-critical) 30%, transparent)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '6px 12px',
+          }}
+        >
+          {authError}
+        </div>
+      )}
 
       {/* Grid table */}
       <table

@@ -419,7 +419,7 @@ export function CockpitSidebar() {
               flexShrink: 0,
             }}
           >
-            {email && (
+            {email ? (
               <div
                 title={email}
                 style={{
@@ -434,6 +434,22 @@ export function CockpitSidebar() {
               >
                 {email}
               </div>
+            ) : (
+              <Link
+                href="/login"
+                style={{
+                  display: 'block',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  color: 'var(--color-accent-gold)',
+                  textDecoration: 'none',
+                  marginBottom: 8,
+                }}
+              >
+                Sign In
+              </Link>
             )}
             <label
               style={{
