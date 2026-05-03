@@ -12,6 +12,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { telegram } from '@/lib/harness/arms-legs/telegram'
+import { fsRead, fsExists } from '@/lib/harness/arms-legs/fs'
 import { logEvent as logKnowledgeEvent } from '@/lib/knowledge/client'
 import { recordAttribution } from '@/lib/attribution/writer'
 import {
@@ -24,7 +25,6 @@ import {
 import { runCalibration } from './calibrator'
 import { estimateTask } from './estimator'
 import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
 import { join } from 'path'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ async function generateDocGapTasks(db: SupabaseClient): Promise<number> {
     for (const filePath of files) {
       let preview = ''
       try {
-        const content = readFileSync(filePath, 'utf8')
+        const content = await fsRead(filePath, 'work_budget')
         const todoLines = content
           .split('\n')
           .filter((line) => /TODO|PENDING|TBD|\[ \]/.test(line))
@@ -184,13 +184,7 @@ async function generateTestGapTasks(db: SupabaseClient): Promise<number> {
 
       // Check if a test file exists
       const testFile = join(testsPath, `${baseName}.test.ts`)
-      let testExists = false
-      try {
-        readFileSync(testFile)
-        testExists = true
-      } catch {
-        testExists = false
-      }
+      const testExists = await fsExists(testFile, 'work_budget')
 
       if (testExists) continue
       if (inserted >= 3 - (existing ?? 0)) break

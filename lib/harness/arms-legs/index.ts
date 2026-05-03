@@ -13,5 +13,9 @@ export type {
   Capability,
 } from './types'
 
-// http-handlers is imported for side effects only — registrations happen at module load
+export { fsRead, fsWrite, fsExists, fsDelete } from './fs'
+export type { FsReadPayload, FsWritePayload, FsDeletePayload } from './fs-handlers'
+
+// Side-effect imports — handler registrations happen at module load
 import './http-handlers'
+import './fs-handlers'

@@ -23,6 +23,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { recordAttribution } from '@/lib/attribution/writer'
+import { fsExists } from '@/lib/harness/arms-legs/fs'
 
 // ── Constants (Principle 11 — centralized, TODO-tagged thresholds) ─────────────
 
@@ -189,14 +190,9 @@ export async function analyzeChunk(taskQueueId: string): Promise<ChunkAudit> {
   // We check via a best-effort read; missing doc = acceptance_doc_found: false
   let acceptance_doc_found = false
   if (acceptance_doc_path) {
-    try {
-      // Dynamic import of fs — only available server-side; fails gracefully in tests
-      const { existsSync } = await import('fs')
-      acceptance_doc_found = existsSync(acceptance_doc_path)
-    } catch {
-      // fs not available (edge runtime, test) — treat as not found
-      acceptance_doc_found = false
-    }
+    acceptance_doc_found = await fsExists(acceptance_doc_path, 'improvement_engine').catch(
+      () => false
+    )
   }
 
   if (!acceptance_doc_found) {
