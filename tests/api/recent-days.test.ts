@@ -17,6 +17,18 @@ vi.mock('@/lib/amazon/orders', () => ({
   fetchOrderItems: mockFetchOrderItems,
 }))
 
+// ── Mock order-items cache ────────────────────────────────────────────────────
+
+const { mockGetOrderItemsBatch, mockUpsertOrderItems } = vi.hoisted(() => ({
+  mockGetOrderItemsBatch: vi.fn(),
+  mockUpsertOrderItems: vi.fn(),
+}))
+
+vi.mock('@/lib/amazon/order-items-cache', () => ({
+  getOrderItemsBatch: mockGetOrderItemsBatch,
+  upsertOrderItems: mockUpsertOrderItems,
+}))
+
 import { GET } from '@/app/api/business-review/recent-days/route'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -72,6 +84,9 @@ beforeEach(() => {
   // Default: one confirmed order per day window, no pending
   mockFetchOrders.mockResolvedValue([CONFIRMED_ORDER])
   mockFetchOrderItems.mockResolvedValue(CONFIRMED_ITEMS)
+  // Default: cache returns all misses (empty map) → falls through to fetchOrderItems
+  mockGetOrderItemsBatch.mockResolvedValue(new Map())
+  mockUpsertOrderItems.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -136,7 +151,7 @@ describe('GET /api/business-review/recent-days — no pending orders', () => {
     expect(() => new Date(body.fetchedAt)).not.toThrow()
   })
 
-  it('fetchOrderItems called for confirmed order', async () => {
+  it('fetchOrderItems called for confirmed order on cache miss', async () => {
     await GET()
     expect(mockFetchOrderItems).toHaveBeenCalledWith(CONFIRMED_ORDER.AmazonOrderId)
   })
@@ -191,14 +206,13 @@ describe('GET /api/business-review/recent-days — with pending orders', () => {
     expect(body.rows[0].units).toBe(2) // only CONFIRMED_ORDER's 2 shipped
   })
 
-  it('fetchOrderItems is called for BOTH confirmed and pending orders', async () => {
+  it('fetchOrderItems called only for confirmed orders (not pending)', async () => {
     await GET()
-    // 10 windows × 2 orders each = 20 calls total
-    expect(mockFetchOrderItems).toHaveBeenCalledTimes(20)
-    // Both order IDs appear
-    const calledIds = mockFetchOrderItems.mock.calls.map(([id]: [string]) => id)
+    // 10 windows × 1 confirmed order = 10 calls; pending uses OrderTotal directly
+    expect(mockFetchOrderItems).toHaveBeenCalledTimes(10)
+    const calledIds = mockFetchOrderItems.mock.calls.map((args) => args[0] as string)
     expect(calledIds).toContain(CONFIRMED_ORDER.AmazonOrderId)
-    expect(calledIds).toContain(PENDING_ORDER.AmazonOrderId)
+    expect(calledIds).not.toContain(PENDING_ORDER.AmazonOrderId)
   })
 })
 
@@ -221,16 +235,16 @@ describe('GET /api/business-review/recent-days — rounding', () => {
   })
 
   it('rounds pendingRevenueCad to 2 decimal places', async () => {
-    mockFetchOrders.mockResolvedValue([PENDING_ORDER])
-    mockFetchOrderItems.mockResolvedValue([
-      {
-        ItemPrice: { Amount: '10.336', CurrencyCode: 'CAD' },
-        ItemTax: { Amount: '0', CurrencyCode: 'CAD' },
-        ShippingTax: { Amount: '0', CurrencyCode: 'CAD' },
-        OrderItemId: 'x',
-        QuantityOrdered: 1,
-      },
-    ])
+    // Pending orders use OrderTotal directly — fetchOrderItems is never called for them.
+    // Use an OrderTotal that requires rounding to verify the Math.round path.
+    const pendingWithOddTotal = {
+      AmazonOrderId: 'AMZ-ROUND',
+      OrderStatus: 'Pending',
+      NumberOfItemsShipped: 0,
+      NumberOfItemsUnshipped: 1,
+      OrderTotal: { Amount: '10.336', CurrencyCode: 'CAD' },
+    }
+    mockFetchOrders.mockResolvedValue([pendingWithOddTotal])
     const res = await GET()
     const body = await res.json()
     expect(body.rows[0].pendingRevenueCad).toBe(10.34)
@@ -281,6 +295,138 @@ describe('GET /api/business-review/recent-days — OrderTotal fallback', () => {
     // PENDING_ITEMS ItemPrice = 766.85; PENDING_ORDER OrderTotal = 766.85 (same here)
     // but we verify the ItemPrice path is taken (not OrderTotal) when items exist
     expect(body.rows[0].pendingRevenueCad).toBe(766.85)
+  })
+})
+
+// ── Cache hit path ────────────────────────────────────────────────────────────
+
+describe('GET /api/business-review/recent-days — cache hit', () => {
+  it('fires 0 SP-API orderItems calls when all orders are cached', async () => {
+    mockGetOrderItemsBatch.mockResolvedValue(
+      new Map([[CONFIRMED_ORDER.AmazonOrderId, CONFIRMED_ITEMS]])
+    )
+    await GET()
+    expect(mockFetchOrderItems).not.toHaveBeenCalled()
+  })
+
+  it('returns correct revenue from cached items', async () => {
+    mockGetOrderItemsBatch.mockResolvedValue(
+      new Map([[CONFIRMED_ORDER.AmazonOrderId, CONFIRMED_ITEMS]])
+    )
+    const res = await GET()
+    const body = await res.json()
+    expect(body.rows[0].revenueCad).toBe(49.99)
+  })
+
+  it('does not set partialData when all orders served from cache', async () => {
+    mockGetOrderItemsBatch.mockResolvedValue(
+      new Map([[CONFIRMED_ORDER.AmazonOrderId, CONFIRMED_ITEMS]])
+    )
+    const res = await GET()
+    const body = await res.json()
+    expect(body.partialData).toBeUndefined()
+  })
+
+  it('does not call upsertOrderItems for cache hits', async () => {
+    mockGetOrderItemsBatch.mockResolvedValue(
+      new Map([[CONFIRMED_ORDER.AmazonOrderId, CONFIRMED_ITEMS]])
+    )
+    await GET()
+    expect(mockUpsertOrderItems).not.toHaveBeenCalled()
+  })
+})
+
+// ── Cache miss path ───────────────────────────────────────────────────────────
+
+describe('GET /api/business-review/recent-days — cache miss', () => {
+  it('calls fetchOrderItems for cache misses only', async () => {
+    // Default: empty map = all misses
+    await GET()
+    expect(mockFetchOrderItems).toHaveBeenCalledWith(CONFIRMED_ORDER.AmazonOrderId)
+  })
+
+  it('calls upsertOrderItems after successful fetch', async () => {
+    await GET()
+    expect(mockUpsertOrderItems).toHaveBeenCalledWith(
+      CONFIRMED_ORDER.AmazonOrderId,
+      CONFIRMED_ITEMS
+    )
+  })
+
+  it('does not set partialData when all fetches succeed', async () => {
+    const res = await GET()
+    const body = await res.json()
+    expect(body.partialData).toBeUndefined()
+  })
+
+  it('partial cache hit: only uncached order hits SP-API', async () => {
+    const ORDER_B = { ...CONFIRMED_ORDER, AmazonOrderId: 'AMZ-B' }
+    mockFetchOrders.mockResolvedValue([CONFIRMED_ORDER, ORDER_B])
+    // Only ORDER_B is cached; CONFIRMED_ORDER is a miss
+    mockGetOrderItemsBatch.mockResolvedValue(new Map([['AMZ-B', CONFIRMED_ITEMS]]))
+    await GET()
+    // fetchOrderItems called only for the uncached order, across all 10 windows
+    expect(mockFetchOrderItems).toHaveBeenCalledTimes(10)
+    const calledIds = mockFetchOrderItems.mock.calls.map((args) => args[0] as string)
+    expect(calledIds).toContain(CONFIRMED_ORDER.AmazonOrderId)
+    expect(calledIds).not.toContain('AMZ-B')
+  })
+})
+
+// ── Partial 429 path ──────────────────────────────────────────────────────────
+
+describe('GET /api/business-review/recent-days — partial 429', () => {
+  it('returns 200 (not 500) when some orderItems fetches fail', async () => {
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited after 5 retries'))
+    const res = await GET()
+    expect(res.status).toBe(200)
+  })
+
+  it('sets partialData when some orders fail', async () => {
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited after 5 retries'))
+    const res = await GET()
+    const body = await res.json()
+    expect(body.partialData).toBeDefined()
+    expect(body.partialData.failedOrders).toBeGreaterThan(0)
+    expect(body.partialData.totalOrders).toBeGreaterThan(0)
+  })
+
+  it('still returns rows with partial data on 429', async () => {
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited after 5 retries'))
+    const res = await GET()
+    const body = await res.json()
+    expect(body.rows).toHaveLength(10)
+  })
+
+  it('failed orders show $0 revenue in rows (not an exception)', async () => {
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited after 5 retries'))
+    const res = await GET()
+    const body = await res.json()
+    // Revenue is 0 for failed orders (map has no entry, aggregateDay defaults to 0)
+    expect(body.rows[0].revenueCad).toBe(0)
+  })
+
+  it('does not call upsertOrderItems when fetch fails', async () => {
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited after 5 retries'))
+    await GET()
+    expect(mockUpsertOrderItems).not.toHaveBeenCalled()
+  })
+
+  it('cached orders still appear when some uncached orders fail', async () => {
+    const ORDER_B = { ...CONFIRMED_ORDER, AmazonOrderId: 'AMZ-B' }
+    mockFetchOrders.mockResolvedValue([CONFIRMED_ORDER, ORDER_B])
+    // CONFIRMED_ORDER is cached; ORDER_B is a miss and will 429
+    mockGetOrderItemsBatch.mockResolvedValue(
+      new Map([[CONFIRMED_ORDER.AmazonOrderId, CONFIRMED_ITEMS]])
+    )
+    mockFetchOrderItems.mockRejectedValue(new Error('SP-API (429): rate limited'))
+    const res = await GET()
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    // Cached order contributes revenue; failed order contributes $0
+    expect(body.rows[0].revenueCad).toBe(49.99)
+    expect(body.partialData).toBeDefined()
+    expect(body.partialData.failedOrders).toBe(10) // 1 miss × 10 windows
   })
 })
 

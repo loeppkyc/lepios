@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
+import pLimit from 'p-limit'
 import { spApiConfigured } from '@/lib/amazon/client'
 import { fetchOrders, fetchOrderItems, type SpOrder, type SpOrderItem } from '@/lib/amazon/orders'
+import { getOrderItemsBatch, upsertOrderItems } from '@/lib/amazon/order-items-cache'
 
 // 15-minute server-side cache. Historical days are finalized — data does not change.
 // Do NOT use force-dynamic; that would make 10 × N orderItems calls on every page load.
 export const revalidate = 900
+
+// Maximum concurrent SP-API /orderItems calls per route invocation.
+// Raise only if quota headroom is confirmed; SP-API orderItems bucket is separate
+// from the orders-list bucket and is typically 0.5 req/s burst.
+const ORDERITEMS_CONCURRENCY = 2
 
 // Response shape — also defined inline in the component (Constraint C-2)
 interface RecentDayRow {
@@ -20,6 +27,9 @@ interface RecentDayRow {
 interface RecentDaysResponse {
   rows: RecentDayRow[]
   fetchedAt: string
+  // Present when one or more orderItems fetches failed (429 or other SP-API error).
+  // UI renders a "partial data" banner instead of a full error state.
+  partialData?: { failedOrders: number; totalOrders: number }
 }
 
 // ── Day-boundary helpers (Edmonton = America/Edmonton) ────────────────────────
@@ -80,15 +90,37 @@ function edmontonDateString(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
+interface FinanceMapResult {
+  map: Map<string, { revenue: number; tax: number }>
+  failedCount: number
+  totalConfirmed: number
+}
+
+function itemsToFinance(items: SpOrderItem[]): { revenue: number; tax: number } {
+  let revenue = 0
+  let tax = 0
+  for (const item of items) {
+    revenue += Number(item.ItemPrice?.Amount ?? 0)
+    tax += Number(item.ItemTax?.Amount ?? 0) + Number(item.ShippingTax?.Amount ?? 0)
+  }
+  return { revenue, tax }
+}
+
 /**
  * Build orderId → { revenue, tax } map.
+ *
+ * Cache-first strategy:
+ *   1. Batch SELECT all confirmed orderIds from amazon_order_items (one query).
+ *   2. Populate finance values from cache hits immediately.
+ *   3. Fetch only cache misses, throttled at ORDERITEMS_CONCURRENCY=2.
+ *   4. Upsert fresh results to cache (non-blocking on failure).
+ *   5. On 429 exhaustion, track as failed — returns partial data rather than throwing.
+ *
  * Pending orders use OrderTotal directly — SP-API returns empty items for them
  * anyway and aggregateDay already falls back to OrderTotal, so the API call
  * is wasted quota. Only confirmed orders fetch orderItems.
  */
-async function buildFinanceMap(
-  orders: SpOrder[]
-): Promise<Map<string, { revenue: number; tax: number }>> {
+async function buildFinanceMap(orders: SpOrder[]): Promise<FinanceMapResult> {
   const map = new Map<string, { revenue: number; tax: number }>()
 
   // Pending: use OrderTotal directly, no API call needed
@@ -101,24 +133,45 @@ async function buildFinanceMap(
     }
   }
 
-  // Confirmed: fetch actual item-level prices
   const confirmedOrders = orders.filter((o) => o.OrderStatus !== 'Pending')
-  const allItems = await Promise.all(
-    confirmedOrders.map((o) =>
-      fetchOrderItems(o.AmazonOrderId).then((items) => ({ id: o.AmazonOrderId, items }))
-    )
-  )
+  if (confirmedOrders.length === 0) return { map, failedCount: 0, totalConfirmed: 0 }
 
-  for (const { id, items } of allItems) {
-    let revenue = 0
-    let tax = 0
-    for (const item of items as SpOrderItem[]) {
-      revenue += Number(item.ItemPrice?.Amount ?? 0)
-      tax += Number(item.ItemTax?.Amount ?? 0) + Number(item.ShippingTax?.Amount ?? 0)
-    }
-    map.set(id, { revenue, tax })
+  const orderIds = confirmedOrders.map((o) => o.AmazonOrderId)
+
+  // Step 1: batch cache lookup — single SELECT IN query
+  const cached = await getOrderItemsBatch(orderIds)
+
+  // Step 2: populate map from cache hits
+  for (const [orderId, items] of cached) {
+    map.set(orderId, itemsToFinance(items))
   }
-  return map
+
+  // Step 3: identify misses
+  const misses = confirmedOrders.filter((o) => !cached.has(o.AmazonOrderId))
+
+  // Step 4: fetch misses with concurrency throttle
+  let failedCount = 0
+  if (misses.length > 0) {
+    const limit = pLimit(ORDERITEMS_CONCURRENCY)
+    await Promise.all(
+      misses.map((order) =>
+        limit(async () => {
+          try {
+            const items = await fetchOrderItems(order.AmazonOrderId)
+            // Cache write is non-blocking — a write failure does not affect the response
+            void upsertOrderItems(order.AmazonOrderId, items)
+            map.set(order.AmazonOrderId, itemsToFinance(items))
+          } catch {
+            // 429 exhausted retries or other SP-API error — count as failed,
+            // leave the order absent from the map (aggregateDay falls back to $0).
+            failedCount++
+          }
+        })
+      )
+    )
+  }
+
+  return { map, failedCount, totalConfirmed: confirmedOrders.length }
 }
 
 /** Aggregate one day's orders into confirmed and pending buckets. */
@@ -186,7 +239,6 @@ export async function GET() {
 
     for (let i = 1; i <= 10; i++) {
       const d = new Date(now)
-      // Subtract i days from today to get the target Edmonton calendar day
       d.setUTCDate(d.getUTCDate() - i)
       dayWindows.push({
         dateStr: edmontonDateString(d),
@@ -196,8 +248,10 @@ export async function GET() {
     }
 
     // Constraint C-5: fetch 10 order-list requests sequentially to respect SP-API rate limits.
-    // Per-day orderItems (confirmed + pending) are then fetched in parallel.
+    // Per-day orderItems (confirmed only) are cache-first with concurrency=2 for misses.
     const rows: RecentDayRow[] = []
+    let totalFailed = 0
+    let totalConfirmed = 0
 
     for (const window of dayWindows) {
       const orders = await fetchOrders({
@@ -205,8 +259,14 @@ export async function GET() {
         createdBefore: window.createdBefore,
       })
 
-      // Fetch items for ALL orders so pending revenue can be surfaced as sub-line
-      const financeMap = await buildFinanceMap(orders)
+      const {
+        map: financeMap,
+        failedCount,
+        totalConfirmed: dayConfirmed,
+      } = await buildFinanceMap(orders)
+      totalFailed += failedCount
+      totalConfirmed += dayConfirmed
+
       const agg = aggregateDay(orders, financeMap)
 
       rows.push({
@@ -220,10 +280,12 @@ export async function GET() {
       })
     }
 
-    // Rows are already ordered most-recent-first (yesterday at index 0)
     const body: RecentDaysResponse = {
       rows,
       fetchedAt: new Date().toISOString(),
+      ...(totalFailed > 0 && {
+        partialData: { failedOrders: totalFailed, totalOrders: totalConfirmed },
+      }),
     }
 
     return NextResponse.json(body)

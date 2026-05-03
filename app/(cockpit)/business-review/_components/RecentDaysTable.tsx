@@ -20,6 +20,7 @@ interface RecentDayRow {
 interface RecentDaysResponse {
   rows: RecentDayRow[]
   fetchedAt: string
+  partialData?: { failedOrders: number; totalOrders: number }
 }
 
 // ── "Minutes ago" helper ──────────────────────────────────────────────────────
@@ -159,23 +160,50 @@ export function RecentDaysTable() {
         )}
       </div>
 
-      {/* Error state */}
+      {/* Hard error state — SP-API completely unreachable, no data at all */}
       {error && (
         <div
           style={{
             fontFamily: 'var(--font-ui)',
             fontSize: 'var(--text-small)',
             color: 'var(--color-text-disabled)',
+            padding: '8px 12px',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
           }}
         >
-          Error: {error}
+          Orders data unavailable — SP-API unreachable. Refresh in a few minutes.
+        </div>
+      )}
+
+      {/* Partial data banner — some orders rate-limited but cached data is shown */}
+      {data?.partialData && data.partialData.failedOrders > 0 && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+            padding: '8px 12px',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+          }}
+        >
+          Partial data — {data.partialData.failedOrders} of {data.partialData.totalOrders} orders
+          rate-limited. Revenue may be understated. Refresh in a few minutes.
         </div>
       )}
 
       {/* Debug section */}
       {devMode && data && (
         <DebugSection heading="Debug — Recent Days Table">
-          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <pre
+            style={{
+              color: 'var(--color-text-primary)',
+              fontSize: 'var(--text-nano)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
             {JSON.stringify(data, null, 2)}
           </pre>
         </DebugSection>
