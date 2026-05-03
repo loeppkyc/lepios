@@ -1,18 +1,14 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import {
   CATEGORIES,
   PAYMENT_METHODS,
   TAX_RATE_KEYS,
-  TAX_RATES,
-  ZERO_GST_CATEGORIES,
-  TAX_RATE_ZERO,
   TAX_RATE_DEFAULT,
   defaultTaxRateKey,
   computeTax,
   type BusinessExpense,
-  type ExpensesResponse,
   type Frequency,
 } from '@/lib/types/expenses'
 
@@ -479,25 +475,25 @@ export function MonthlyExpensesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [flashMsg, setFlashMsg] = useState<string | null>(null)
 
-  const loadExpenses = useCallback(async () => {
+  const [refetchKey, setRefetchKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setFetchError(null)
-    try {
-      const res = await fetch(`/api/expenses?month=${month}`)
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error ?? `HTTP ${res.status}`)
-      }
-      const data = (await res.json()) as { expenses: BusinessExpense[] }
-      setExpenses(data.expenses)
-    } catch (e) {
-      setFetchError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [month])
-
-  useEffect(() => { loadExpenses() }, [loadExpenses])
+    fetch(`/api/expenses?month=${month}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(body.error ?? `HTTP ${res.status}`)
+        }
+        return res.json() as Promise<{ expenses: BusinessExpense[] }>
+      })
+      .then((data) => { if (!cancelled) setExpenses(data.expenses) })
+      .catch((e: unknown) => { if (!cancelled) setFetchError(e instanceof Error ? e.message : String(e)) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [month, refetchKey])
 
   function flash(msg: string) {
     setFlashMsg(msg)
@@ -527,7 +523,7 @@ export function MonthlyExpensesPage() {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
       setShowAddForm(false)
       flash(`Added ${body.created ?? 1} expense${(body.created ?? 1) > 1 ? 's' : ''}`)
-      await loadExpenses()
+      setRefetchKey((k) => k + 1)
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e))
     } finally {
@@ -559,7 +555,7 @@ export function MonthlyExpensesPage() {
       }
       setEditingId(null)
       flash('Expense updated')
-      await loadExpenses()
+      setRefetchKey((k) => k + 1)
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e))
     } finally {
@@ -576,7 +572,7 @@ export function MonthlyExpensesPage() {
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       flash('Expense deleted')
-      await loadExpenses()
+      setRefetchKey((k) => k + 1)
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e))
     }
@@ -589,13 +585,14 @@ export function MonthlyExpensesPage() {
       case 'date-desc': return b.date.localeCompare(a.date)
       case 'vendor':    return a.vendor.toLowerCase().localeCompare(b.vendor.toLowerCase())
       case 'amount-desc': return (b.pretax + b.tax_amount) - (a.pretax + a.tax_amount)
+      default: return 0
     }
   })
 
   // Summary
-  const totalPretax     = expenses.reduce((s, e) => s + e.pretax, 0)
-  const totalTax        = expenses.reduce((s, e) => s + e.tax_amount, 0)
-  const businessPortion = expenses.reduce((s, e) => s + e.pretax * (e.business_use_pct / 100), 0)
+  const totalPretax     = expenses.reduce((acc, e) => acc + e.pretax, 0)
+  const totalTax        = expenses.reduce((acc, e) => acc + e.tax_amount, 0)
+  const businessPortion = expenses.reduce((acc, e) => acc + e.pretax * (e.business_use_pct / 100), 0)
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 960, margin: '0 auto' }}>
@@ -737,8 +734,8 @@ export function MonthlyExpensesPage() {
             </thead>
             <tbody>
               {sorted.map((e) => (
-                <>
-                  <tr key={e.id}>
+                <Fragment key={e.id}>
+                  <tr>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', padding: '8px 8px 8px 0', borderBottom: '1px solid var(--color-border)' }}>
                       {e.date}
                     </td>
@@ -792,7 +789,7 @@ export function MonthlyExpensesPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
