@@ -189,7 +189,8 @@ export type CoverageStatus = 'filed' | 'pending' | 'missing'
 
 /**
  * Returns the status for a grid cell that has no uploaded statement.
- * 'pending' = current Edmonton month. 'missing' = everything else.
+ * 'pending' = current or future Edmonton month (statement not yet due).
+ * 'missing' = past month with no upload.
  */
 export function cellStatus(
   cellYear: number,
@@ -197,7 +198,8 @@ export function cellStatus(
   nowYear: number,
   nowMonth: number,
 ): 'pending' | 'missing' {
-  if (cellYear === nowYear && cellMonth === nowMonth) return 'pending'
+  if (cellYear > nowYear) return 'pending'
+  if (cellYear === nowYear && cellMonth >= nowMonth) return 'pending'
   return 'missing'
 }
 

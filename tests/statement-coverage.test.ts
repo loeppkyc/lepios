@@ -111,11 +111,23 @@ describe('previousMonth', () => {
   })
 })
 
-// ── cellStatus: pending = current month only ──────────────────────────────────
+// ── cellStatus: pending = current or future month ────────────────────────────
 
 describe('cellStatus', () => {
   it('current month is pending', () => {
     expect(cellStatus(2026, 5, 2026, 5)).toBe('pending')
+  })
+
+  it('next month (future, same year) is pending', () => {
+    expect(cellStatus(2026, 6, 2026, 5)).toBe('pending')
+  })
+
+  it('later month in same year is pending', () => {
+    expect(cellStatus(2026, 12, 2026, 5)).toBe('pending')
+  })
+
+  it('future year is pending', () => {
+    expect(cellStatus(2027, 1, 2026, 5)).toBe('pending')
   })
 
   it('previous month with no upload is missing', () => {
