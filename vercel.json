@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/amazon-settlements-sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/harness/self-repair-tick",
+      "schedule": "0 3 * * *"
     }
   ]
 }

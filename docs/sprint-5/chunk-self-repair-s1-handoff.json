@@ -1,0 +1,52 @@
+{
+  "chunk_id": "self-repair-slice-1",
+  "acceptance_doc_path": "docs/harness/SELF_REPAIR_SPEC.md",
+  "files_changed": [
+    "supabase/migrations/0070_self_repair_schema.sql",
+    "lib/harness/self-repair/detector.ts",
+    "lib/harness/self-repair/context.ts",
+    "lib/harness/self-repair/drafter.ts",
+    "lib/harness/self-repair/verifier.ts",
+    "lib/harness/self-repair/pr-opener.ts",
+    "lib/harness/self-repair/digest.ts",
+    "app/api/harness/self-repair-tick/route.ts",
+    "lib/orchestrator/digest.ts",
+    "vercel.json",
+    "tests/self-repair/detector.test.ts",
+    "tests/self-repair/drafter.test.ts",
+    "tests/self-repair/verifier.test.ts",
+    "tests/self-repair/pr-opener.test.ts",
+    "tests/self-repair/tick.test.ts",
+    "tests/self-repair/digest.test.ts",
+    "tests/self-repair/no-auto-merge.test.ts",
+    "tests/self-repair/no-self-target.test.ts",
+    "tests/orchestrator/digest.test.ts"
+  ],
+  "tests": {
+    "passing": 2038,
+    "failing": 0,
+    "new": 41
+  },
+  "migrations_applied": ["supabase/migrations/0070_self_repair_schema.sql"],
+  "deploy_url": "not deployed — per spec (Git only, no commit/push)",
+  "grounding_checkpoint_required": [
+    "Apply migration 0070 to production Supabase. Verify: SELECT COUNT(*) FROM self_repair_watchlist; → expect 1. SELECT action_type FROM self_repair_watchlist; → expect 'coordinator_await_timeout'. SELECT value FROM harness_config WHERE key='SELF_REPAIR_ENABLED'; → expect 'false'. SELECT value FROM harness_config WHERE key='SELF_REPAIR_DAILY_CAP'; → expect '3'. SELECT completion_pct FROM harness_components WHERE id='harness:self_repair'; → expect 46.",
+    "After deploy: seed a synthetic coordinator_await_timeout event in agent_events via SQL with action='coordinator_await_timeout'. Set SELF_REPAIR_ENABLED='true' in harness_config. Trigger POST /api/harness/self-repair-tick with CRON_SECRET. Within 10 min: verify a self_repair_runs row exists. Then flip SELF_REPAIR_ENABLED back to 'false' until slice 2 acceptance.",
+    "Verify no auto-merge: after any PR is opened by self_repair, confirm GitHub PR state is open (not merged) by querying GitHub API: GET /repos/loeppkyc/lepios/pulls/{prNumber} → merged: false, state: 'open'."
+  ],
+  "unknowns": [
+    "tests/orchestrator/digest.test.ts was modified (added mockBuildSelfRepairDigestLine mock) — this file is not in the spec's files-expected-to-change list. The change was required to prevent the new buildSelfRepairDigestLine() import from consuming Supabase mock slots and breaking 8 pre-existing tests. This is a sibling-section fix per CLAUDE.md global rule.",
+    "The spec notes migration number as '0050' but the correct next-available number based on the repo is 0070. Used 0070 per actual repo state.",
+    "verifier.ts uses a base64 shell heredoc trick to pass the diff into git apply — this works on Linux/macOS (Vercel) but would fail on Windows. Vercel runs Linux so this is fine for production; local Windows tests mock runInSandbox so no issue in CI.",
+    "pr-opener.ts attempts git push from the worktree as the primary branch-creation path, with GitHub API ref-create as fallback. The git push path requires git credentials to be configured in the Vercel environment. GITHUB_TOKEN env var must be set and configured for git remote auth. If not configured, the fallback path creates an empty branch (diff not included). Coordinator should verify GITHUB_TOKEN is set in Vercel env before enabling SELF_REPAIR_ENABLED.",
+    "The spec's §M4 says: 'runInSandbox call with same worktree' for the npm test step — interpreted as a single combined shell command (git apply && npm test) rather than two separate runInSandbox calls, since each call creates a new worktree. This is a valid interpretation but may differ from what the spec intended. If the coordinator wants two-step verification, that requires sandbox slice 2's worktree reuse feature.",
+    "SELF_REPAIR_ENABLED defaults to 'false' in harness_config. Colin must explicitly flip to 'true' to activate. This is intentional per AD4 default-deny posture."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0070 must be applied to production Supabase before the cron will do anything useful.",
+    "GITHUB_TOKEN must be set in Vercel env (with repo scope for PR opening) before SELF_REPAIR_ENABLED is flipped to true.",
+    "Slice 2 (broader detector + GitHub Actions webhook) is independent but will require self_repair_watchlist.likely_files column — a migration change."
+  ],
+  "tokens_used": 85000,
+  "timestamp": "2026-05-03T23:47:46Z"
+}

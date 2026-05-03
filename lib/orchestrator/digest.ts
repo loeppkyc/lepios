@@ -21,6 +21,7 @@ import { buildSecurityDigestLine } from '@/lib/security/security-digest'
 import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-digest'
 import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 import { buildChatUiDigestLine } from '@/lib/orb/tools/chat-ui-digest'
+import { buildSelfRepairDigestLine } from '@/lib/harness/self-repair/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -294,6 +295,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Chat UI tool bridge — tool calls + denials in last 24h ──────────
   const chatUiDigestLine = await buildChatUiDigestLine()
   messageToSend = `${messageToSend}\n${chatUiDigestLine}`
+
+  // ── F18: Self-repair — attempts, PRs opened, verify failures in last 24h ──
+  const selfRepairDigestLine = await buildSelfRepairDigestLine()
+  messageToSend = `${messageToSend}\n${selfRepairDigestLine}`
 
   characterCount = messageToSend.length
 

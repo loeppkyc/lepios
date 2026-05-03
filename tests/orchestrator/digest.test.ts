@@ -26,6 +26,7 @@ const {
   mockBuildArmsLegsDispatchLine,
   mockBuildSandboxDigestLine,
   mockBuildChatUiDigestLine,
+  mockBuildSelfRepairDigestLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -50,6 +51,7 @@ const {
   mockBuildArmsLegsDispatchLine: vi.fn(),
   mockBuildSandboxDigestLine: vi.fn(),
   mockBuildChatUiDigestLine: vi.fn(),
+  mockBuildSelfRepairDigestLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -161,6 +163,11 @@ vi.mock('@/lib/harness/sandbox/digest', () => ({
 // Mock chat-ui digest so buildChatUiDigestLine does not consume mockFrom slots.
 vi.mock('@/lib/orb/tools/chat-ui-digest', () => ({
   buildChatUiDigestLine: mockBuildChatUiDigestLine,
+}))
+
+// Mock self-repair digest so buildSelfRepairDigestLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/self-repair/digest', () => ({
+  buildSelfRepairDigestLine: mockBuildSelfRepairDigestLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
