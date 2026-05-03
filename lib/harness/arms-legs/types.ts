@@ -57,6 +57,9 @@ export type Capability =
   | 'browser.evaluate'
   | 'browser.click'
   | 'browser.fill'
+  // gmail (2) — migration 0066
+  | 'gmail.search'
+  | 'gmail.get'
 
 export interface HandlerContext {
   capability: Capability

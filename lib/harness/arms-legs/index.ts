@@ -31,8 +31,17 @@ export type {
   BrowserFillResult,
 } from './browser-handlers'
 
+export { gmailSearch, gmailGet } from './gmail'
+export type {
+  GmailSearchPayload,
+  GmailSearchResult,
+  GmailGetPayload,
+  GmailGetResult,
+} from './gmail-handlers'
+
 // Side-effect imports — handler registrations happen at module load
 import './http-handlers'
 import './fs-handlers'
 import './shell-handlers'
 import './browser-handlers'
+import './gmail-handlers'
