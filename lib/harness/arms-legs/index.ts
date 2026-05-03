@@ -19,7 +19,20 @@ export type { FsReadPayload, FsWritePayload, FsDeletePayload } from './fs-handle
 export { shellRun } from './shell'
 export type { ShellRunPayload, ShellRunResult } from './shell-handlers'
 
+export { browserNavigate, browserScreenshot, browserClick, browserFill } from './browser'
+export type {
+  BrowserNavigatePayload,
+  BrowserNavigateResult,
+  BrowserScreenshotPayload,
+  BrowserScreenshotResult,
+  BrowserClickPayload,
+  BrowserClickResult,
+  BrowserFillPayload,
+  BrowserFillResult,
+} from './browser-handlers'
+
 // Side-effect imports — handler registrations happen at module load
 import './http-handlers'
 import './fs-handlers'
 import './shell-handlers'
+import './browser-handlers'

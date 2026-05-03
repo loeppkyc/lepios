@@ -1,7 +1,7 @@
 // CRITICAL: Do NOT use the names ActionType, ActionResult, CapabilityCheck, or CapabilityResult
 // here — those are already defined in lib/security/types.ts.
 
-// Source of truth: capability_registry table, populated by migrations 0045 + 0062.
+// Source of truth: capability_registry table, populated by migrations 0045 + 0062 + 0065.
 export type Capability =
   // net (8)
   | 'net.outbound.*'
@@ -51,6 +51,12 @@ export type Capability =
   | 'tool.self_repair.read.agent_events'
   | 'tool.self_repair.draft_fix'
   | 'tool.self_repair.open_pr'
+  // browser (5) — migration 0065
+  | 'browser.navigate'
+  | 'browser.screenshot'
+  | 'browser.evaluate'
+  | 'browser.click'
+  | 'browser.fill'
 
 export interface HandlerContext {
   capability: Capability
