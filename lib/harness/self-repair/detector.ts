@@ -12,6 +12,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireCapability } from '@/lib/security/capability'
 import { httpRequest, telegram } from '@/lib/harness/arms-legs'
+import { runConsensus } from '@/lib/harness/consensus/runner'
 
 export interface DetectedFailure {
   /** agent_events.id (string UUID) */
@@ -200,7 +201,46 @@ async function checkAndAutoSuspend(
   const closedChecks = await Promise.all(typedRuns.map((r) => isPRClosedWithoutMerge(r.pr_number)))
   if (!closedChecks.every(Boolean)) return
 
-  // All 3 closed-without-merge — auto-suspend this action_type
+  // Consensus gate — split consensus blocks auto-suspend, escalates to Colin instead
+  try {
+    const cr = await runConsensus(
+      `Should self_repair auto-suspend action type '${actionType}'? Context: 3 consecutive self_repair PRs for this action type were closed by Colin without merging. This typically means the repair strategy is ineffective or the action type is misclassified. Should auto-suspend proceed?`,
+      { agentId: 'self_repair', reason: `auto-suspend gate for ${actionType}` }
+    )
+
+    if (cr.consensusLevel === 'split') {
+      // Don't auto-suspend — consensus disagrees. Escalate to Colin instead.
+      await db
+        .from('agent_events')
+        .insert({
+          domain: 'self_repair',
+          action: 'self_repair.watchlist.suspend_deferred',
+          actor: 'self_repair',
+          status: 'warning',
+          task_type: 'suspend_deferred',
+          output_summary: `auto-suspend deferred for ${actionType} — consensus split`,
+          meta: {
+            action_type: actionType,
+            reason: 'consensus_split',
+            consensus_run_id: cr.runId,
+            splits: cr.splits,
+            pr_numbers: typedRuns.map((r) => r.pr_number),
+          },
+        })
+        .catch(() => {})
+
+      await telegram(
+        `self_repair: consensus SPLIT on auto-suspend for '${actionType}'. 3 PRs closed-without-merge but reviewers disagree. Re-enable or permanently disable via SQL.`,
+        { bot: 'alerts', agentId: 'self_repair' }
+      ).catch(() => {})
+
+      return // Do NOT auto-suspend
+    }
+  } catch {
+    // Non-fatal — if runConsensus throws, proceed with auto-suspend as normal
+  }
+
+  // All 3 closed-without-merge AND consensus not split — auto-suspend this action_type
   await db.from('self_repair_watchlist').update({ enabled: false }).eq('action_type', actionType)
 
   await db.from('agent_events').insert({

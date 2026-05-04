@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { runConsensus } from '@/lib/harness/consensus/runner'
 
 const VERCEL_API = 'https://api.vercel.com'
 
@@ -578,11 +579,31 @@ export async function sendMigrationGateMessage(params: {
   const shaPrefix = commit_sha.slice(0, 8)
   const compareUrl = `${COMPARE_BASE_URL}${commit_sha}`
 
+  const migrationNames = migration_files_with_sql
+    .map((f) => f.filename.split('/').pop() ?? f.filename)
+    .join(', ')
+
+  let consensusNote = ''
+  try {
+    const cr = await runConsensus(
+      `Should this deployment be promoted to production?\nBranch: ${branch} | Task: ${task_id.slice(0, 8)} | Commit: ${shaPrefix}\nMigrations: ${migrationNames || 'none'}\nIs there any reason to delay or block this promotion?`,
+      { agentId: 'deploy_gate', reason: 'pre-promote migration review' }
+    )
+    if (cr.consensusLevel === 'split') {
+      consensusNote = `⚠️ CONSENSUS SPLIT — reviewers disagree on this promote. Check carefully.`
+    } else if (cr.answer) {
+      consensusNote = `✅ Consensus (${cr.consensusLevel}): ${cr.answer.slice(0, 120)}`
+    }
+  } catch {
+    // Non-fatal — message sends without consensus note if runConsensus throws
+  }
+
   const header = [
     `⏸ Migration review required`,
     `task: ${task_id.slice(0, 8)}`,
     `branch: ${branch}`,
     `commit: ${shaPrefix}`,
+    ...(consensusNote ? [consensusNote] : []),
   ].join('\n')
 
   let sqlBody = ''
