@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 71.4% (77.85 / 109 pts)
+## Total Readiness: 72.2% (78.75 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -95,10 +95,10 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | --- | ------------------------------------------------------------------------- | ------ | --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E1  | LEPIOS visual identity (favicon, color scheme, name visible in UI)        | 2      | 30% | 0.60         | **Partial 2026-04-28.** "LEPIOS" wordmark visible in CockpitNav and chat page identity strip. Color scheme already on LepiOS dark tokens. Remaining: custom favicon (`app/favicon.ico` still stock Next.js), opengraph image, login page wordmark.                                                                                       |
 | E2  | Custom Modelfile system prompt (voice, conventions, F-rules embedded)     | 1      | 75% | 0.75         | **Voice test suite shipped 2026-05-04.** `hasFillerPhrase()` validates response openers; 23 tests cover filler detection + prompt completeness + Modelfile integrity. Voice rules (terse, no filler, no emoji, no trailing summaries) embedded in `lib/llm/prompts/lepios.md`. Remaining 25%: F-rule embedding + real model calibration. |
-| E3  | Desktop launcher icon (double-click to open LEPIOS)                       | 1      | 0%  | 0.00         | No `.bat`, `.ps1`, or shortcut script.                                                                                                                                                                                                                                                                                                   |
+| E3  | Desktop launcher icon (double-click to open LEPIOS)                       | 1      | 90% | 0.90         | **Shipped 2026-05-04.** `scripts/orb-start.ps1` — checks cloudflared service (auto-starts if stopped), probes Ollama on :11434, opens `/chat`. Verified live: tunnel + 10 models listed + Ready. Remaining 10%: create `.lnk` shortcut on Desktop pointing to the script.                                                              |
 | E4  | Voice / tone calibrated and tested (paste discipline, audit-first, terse) | 1      | 65% | 0.65         | **Voice test suite shipped 2026-05-04** — `lib/llm/lepios-voice.ts` + `tests/llm/lepios-voice.test.ts` (23 tests). `hasFillerPhrase()` detects 12 filler openers. Modelfile bakes voice at model level. Remaining 35%: real model output calibration (requires Ollama tunnel live).                                                      |
 | E5  | LEPIOS identity — coordinated system prompt + branding pass               | 2      | 70% | 1.40         | **Shipped 2026-04-28.** Coordinated pass: `lib/orb/identity.ts` system prompt + nav label "LEPIOS" + chat header strip "LEPIOS · running on {model}" subtitle. Voice rules and current-capabilities scope embedded in prompt. Remaining 30%: custom favicon, login wordmark, voice calibration test results.                             |
-|     | **Category total**                                                        | **7**  |     | **3.40**     |                                                                                                                                                                                                                                                                                                                                          |
+|     | **Category total**                                                        | **7**  |     | **4.30**     |                                                                                                                                                                                                                                                                                                                                          |
 
 ---
 
@@ -125,7 +125,7 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | D — Tool Use          | 24      | 20.20     | 84%       |
 | E — Identity / Polish | 7       | 3.40      | 49%       |
 | F — Operational       | 15      | 1.10      | 7%        |
-| **Total**             | **109** | **77.85** | **71.4%** |
+| **Total**             | **109** | **78.75** | **72.2%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
