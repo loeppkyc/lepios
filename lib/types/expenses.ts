@@ -70,6 +70,23 @@ export const TAX_RATE_DEFAULT = 'GST 5% (AB / NT / NU / YT)'
 
 export type Frequency = 'one-time' | 'monthly' | 'annual'
 
+export interface RecurringTemplate {
+  id: string
+  vendor: string
+  category: string
+  pretax: number
+  tax_amount: number
+  payment_method: string
+  day_of_month: number
+  frequency: 'monthly' | 'annual'
+  annual_month: number | null
+  notes: string
+  business_use_pct: number
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface BusinessExpense {
   id: string
   date: string          // 'YYYY-MM-DD'
@@ -81,6 +98,7 @@ export interface BusinessExpense {
   hubdoc: boolean
   notes: string
   business_use_pct: number
+  recurring_template_id: string | null
   created_at: string
   updated_at: string
 }

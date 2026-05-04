@@ -65,6 +65,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Bookkeeping Hub', href: '/bookkeeping-hub' },
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
+      { label: 'Recurring Expenses', href: '/recurring' },
       { label: 'Monthly P&L', href: null },
       { label: 'Category P&L', href: '/cogs' },
       { label: 'Receipts', href: '/receipts' },
