@@ -11,7 +11,20 @@ import {
   type RecurringTemplate,
 } from '@/lib/types/expenses'
 
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
 
 function fmt(n: number): string {
   return n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -218,6 +231,7 @@ export function RecurringPage() {
   const [templates, setTemplates] = useState<RecurringTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [refetchKey, setRefetchKey] = useState(0)
 
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -230,22 +244,31 @@ export function RecurringPage() {
   const [genResult, setGenResult] = useState<{ generated: number; skipped: number } | null>(null)
   const [genErr, setGenErr] = useState<string | null>(null)
 
-  async function loadTemplates() {
-    setLoading(true)
-    setErr(null)
-    try {
-      const r = await fetch('/api/expenses/recurring')
-      const j = (await r.json()) as { templates?: RecurringTemplate[]; error?: string }
-      if (!r.ok) throw new Error(j.error ?? 'Failed to load')
-      setTemplates(j.templates ?? [])
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
+  function reload() {
+    setRefetchKey((k) => k + 1)
   }
 
-  useEffect(() => { void loadTemplates() }, [])
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setErr(null)
+      try {
+        const r = await fetch('/api/expenses/recurring')
+        const j = (await r.json()) as { templates?: RecurringTemplate[]; error?: string }
+        if (!r.ok) throw new Error(j.error ?? 'Failed to load')
+        if (!cancelled) setTemplates(j.templates ?? [])
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [refetchKey])
 
   function setField(update: Partial<FormState>) {
     setFormState((prev) => {
@@ -314,7 +337,7 @@ export function RecurringPage() {
       if (!r.ok) throw new Error(j.error ?? 'Save failed')
       setShowForm(false)
       setEditId(null)
-      await loadTemplates()
+      reload()
     } catch (e) {
       setFormErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -328,13 +351,13 @@ export function RecurringPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: !t.active }),
     })
-    await loadTemplates()
+    reload()
   }
 
   async function deleteTemplate(t: RecurringTemplate) {
     if (!confirm(`Delete "${t.vendor}"? Generated expenses are kept.`)) return
     await fetch(`/api/expenses/recurring/${t.id}`, { method: 'DELETE' })
-    await loadTemplates()
+    reload()
   }
 
   async function generate() {
@@ -375,8 +398,18 @@ export function RecurringPage() {
       </div>
 
       {/* Actions row */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button onClick={startAdd} style={s.btnPrimary}>+ Add Template</button>
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          marginBottom: 20,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button onClick={startAdd} style={s.btnPrimary}>
+          + Add Template
+        </button>
 
         <div style={{ flex: 1 }} />
 
@@ -384,7 +417,10 @@ export function RecurringPage() {
           <input
             type="month"
             value={genMonth}
-            onChange={(e) => { setGenMonth(e.target.value); setGenResult(null) }}
+            onChange={(e) => {
+              setGenMonth(e.target.value)
+              setGenResult(null)
+            }}
             style={{ ...s.input, width: 160, fontFamily: 'var(--font-ui)' }}
           />
           <button onClick={generate} disabled={generating} style={s.btnSecondary}>
@@ -393,12 +429,25 @@ export function RecurringPage() {
         </div>
 
         {genResult && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-pillar-money)' }}>
-            +{genResult.generated} added{genResult.skipped > 0 ? `, ${genResult.skipped} already existed` : ''}
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-pillar-money)',
+            }}
+          >
+            +{genResult.generated} added
+            {genResult.skipped > 0 ? `, ${genResult.skipped} already existed` : ''}
           </span>
         )}
         {genErr && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-critical)' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-critical)',
+            }}
+          >
             {genErr}
           </span>
         )}
@@ -411,7 +460,9 @@ export function RecurringPage() {
             {editId ? 'Edit Template' : 'New Template'}
           </div>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}
+            >
               <div>
                 <label style={s.label}>Vendor</label>
                 <input
@@ -429,12 +480,23 @@ export function RecurringPage() {
                   value={form.category}
                   onChange={(e) => setField({ category: e.target.value })}
                 >
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1.5fr 1fr',
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
               <div>
                 <label style={s.label}>Pre-tax ($)</label>
                 <input
@@ -454,7 +516,11 @@ export function RecurringPage() {
                   value={form.taxRateKey}
                   onChange={(e) => setField({ taxRateKey: e.target.value })}
                 >
-                  {TAX_RATE_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
+                  {TAX_RATE_KEYS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -470,7 +536,14 @@ export function RecurringPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.5fr 1fr 1fr',
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
               <div>
                 <label style={s.label}>Payment Method</label>
                 <select
@@ -478,7 +551,11 @@ export function RecurringPage() {
                   value={form.paymentMethod}
                   onChange={(e) => setField({ paymentMethod: e.target.value })}
                 >
-                  {PAYMENT_METHODS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {PAYMENT_METHODS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -522,7 +599,9 @@ export function RecurringPage() {
                     onChange={(e) => setField({ annualMonth: e.target.value })}
                   >
                     {MONTH_NAMES.map((m, i) => (
-                      <option key={i + 1} value={String(i + 1)}>{m}</option>
+                      <option key={i + 1} value={String(i + 1)}>
+                        {m}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -550,7 +629,14 @@ export function RecurringPage() {
             </div>
 
             {formErr && (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-critical)', marginBottom: 12 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-critical)',
+                  marginBottom: 12,
+                }}
+              >
                 {formErr}
               </div>
             )}
@@ -569,12 +655,26 @@ export function RecurringPage() {
 
       {/* Loading / error */}
       {loading && (
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)', padding: '20px 0' }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+            padding: '20px 0',
+          }}
+        >
           Loading templates…
         </div>
       )}
       {err && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-critical)', padding: '20px 0' }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-critical)',
+            padding: '20px 0',
+          }}
+        >
           {err}
         </div>
       )}
@@ -582,7 +682,15 @@ export function RecurringPage() {
       {/* Empty state */}
       {!loading && !err && templates.length === 0 && (
         <div style={s.card}>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-body)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '28px 0' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-body)',
+              color: 'var(--color-text-muted)',
+              textAlign: 'center',
+              padding: '28px 0',
+            }}
+          >
             No recurring templates yet — add your first subscription above.
           </div>
         </div>
@@ -591,10 +699,23 @@ export function RecurringPage() {
       {/* Monthly cost summary */}
       {!loading && active.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
             Monthly recurring total (incl. annuals ÷12):
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-body)', fontWeight: 700, color: 'var(--color-pillar-money)' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-body)',
+              fontWeight: 700,
+              color: 'var(--color-pillar-money)',
+            }}
+          >
             ${fmt(monthlyTotal)}
           </span>
         </div>
@@ -637,7 +758,14 @@ interface TemplateTableProps {
   muted?: boolean
 }
 
-function TemplateTable({ title, templates, onEdit, onToggle, onDelete, muted }: TemplateTableProps) {
+function TemplateTable({
+  title,
+  templates,
+  onEdit,
+  onToggle,
+  onDelete,
+  muted,
+}: TemplateTableProps) {
   if (templates.length === 0) return null
 
   return (
@@ -666,44 +794,119 @@ function TemplateTable({ title, templates, onEdit, onToggle, onDelete, muted }: 
                 opacity: muted ? 0.65 : 1,
               }}
             >
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  fontWeight: 500,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
                 {t.vendor}
                 {t.notes && (
-                  <span style={{ display: 'block', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', fontWeight: 400 }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-nano)',
+                      color: 'var(--color-text-disabled)',
+                      fontWeight: 400,
+                    }}
+                  >
                     {t.notes}
                   </span>
                 )}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
                 {t.category}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)', textAlign: 'right' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-primary)',
+                  textAlign: 'right',
+                }}
+              >
                 ${fmt(t.pretax)}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', textAlign: 'right' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                  textAlign: 'right',
+                }}
+              >
                 ${fmt(t.tax_amount)}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', fontWeight: 700, color: 'var(--color-pillar-money)', textAlign: 'right' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  fontWeight: 700,
+                  color: 'var(--color-pillar-money)',
+                  textAlign: 'right',
+                }}
+              >
                 ${fmt(t.pretax + t.tax_amount)}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
                 {t.frequency === 'monthly'
                   ? 'Monthly'
                   : `Annual — ${MONTH_NAMES[(t.annual_month ?? 1) - 1]}`}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                  textAlign: 'center',
+                }}
+              >
                 {t.day_of_month}
               </td>
-              <td style={{ padding: '7px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+              <td
+                style={{
+                  padding: '7px 8px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                  textAlign: 'center',
+                }}
+              >
                 {t.business_use_pct}%
               </td>
               <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button onClick={() => onEdit(t)} style={s.btnIcon}>Edit</button>
+                  <button onClick={() => onEdit(t)} style={s.btnIcon}>
+                    Edit
+                  </button>
                   <button onClick={() => onToggle(t)} style={s.btnIcon}>
                     {t.active ? 'Pause' : 'Resume'}
                   </button>
-                  <button onClick={() => onDelete(t)} style={s.btnDanger}>Delete</button>
+                  <button onClick={() => onDelete(t)} style={s.btnDanger}>
+                    Delete
+                  </button>
                 </div>
               </td>
             </tr>
