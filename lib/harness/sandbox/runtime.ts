@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { createHmac } from 'crypto'
 import path from 'path'
 import fs from 'fs'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -248,57 +249,115 @@ export async function runInSandbox(
   let stdoutData = ''
   let stderrData = ''
 
-  await new Promise<void>((resolve) => {
-    const child = spawn(shellBin, shellArgs, {
-      cwd: effectiveCwd,
-      env: mergedEnv,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }) as import('child_process').ChildProcess
+  // Remote exec via tunnel — real Docker isolation when SANDBOX_EXEC_URL is configured
+  let durationMs_remote: number | null = null
+  const sandboxExecUrl = process.env.SANDBOX_EXEC_URL?.trim()
+  const sandboxExecSecret = process.env.SANDBOX_EXEC_SECRET?.trim()
+  let usedRemoteExec = false
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(child as any).stdout?.on('data', (chunk: Buffer) => {
-      stdoutData += chunk.toString('utf8')
+  if (sandboxExecUrl && sandboxExecSecret) {
+    const cmdStr2 = Array.isArray(cmd) ? cmd.join(' ') : cmd
+    const bodyStr = JSON.stringify({
+      cmd: cmdStr2,
+      cwd: opts.cwd,
+      env: opts.env,
+      timeoutMs,
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(child as any).stderr?.on('data', (chunk: Buffer) => {
-      stderrData += chunk.toString('utf8')
-    })
-
-    const killTimer = setTimeout(() => {
-      timedOut = true
-      if (child.pid != null) {
-        try {
-          process.kill(-child.pid, 'SIGTERM')
-        } catch {
-          // Process may have already exited
+    const sig = createHmac('sha256', sandboxExecSecret).update(bodyStr).digest('hex')
+    const controller = new AbortController()
+    const remoteTimer = setTimeout(() => controller.abort(), timeoutMs + 5_000)
+    try {
+      const resp = await fetch(`${sandboxExecUrl}/exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `HMAC ${sig}` },
+        body: bodyStr,
+        signal: controller.signal,
+      })
+      clearTimeout(remoteTimer)
+      if (resp.ok) {
+        const remote = (await resp.json()) as {
+          exitCode: number | null
+          stdout: string
+          stderr: string
+          timedOut: boolean
+          durationMs: number
+          error?: string
         }
-        // SIGKILL after 2s grace
-        setTimeout(() => {
-          if (child.pid != null) {
-            try {
-              process.kill(-child.pid, 'SIGKILL')
-            } catch {
-              // Ignore
-            }
-          }
-        }, 2000)
+        if (!remote.error) {
+          exitCode = remote.exitCode
+          timedOut = remote.timedOut
+          stdoutData = remote.stdout ?? ''
+          stderrData = remote.stderr ?? ''
+          durationMs_remote = remote.durationMs
+          usedRemoteExec = true
+          // Real Docker isolation — remove the advisory warning, add remote marker
+          const idx = warnings.indexOf('process_isolation_not_enforced')
+          if (idx !== -1) warnings.splice(idx, 1)
+          warnings.push('process_isolation_remote_docker')
+        }
       }
-    }, timeoutMs)
+    } catch {
+      clearTimeout(remoteTimer)
+      // Remote failed — fall through to local spawn
+    }
+    if (!usedRemoteExec) {
+      warnings.push('remote_exec_failed_fallback_local')
+    }
+  }
 
-    child.on('close', (code: number | null) => {
-      clearTimeout(killTimer)
-      exitCode = timedOut ? null : code
-      resolve()
+  if (!usedRemoteExec) {
+    await new Promise<void>((resolve) => {
+      const child = spawn(shellBin, shellArgs, {
+        cwd: effectiveCwd,
+        env: mergedEnv,
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }) as import('child_process').ChildProcess
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(child as any).stdout?.on('data', (chunk: Buffer) => {
+        stdoutData += chunk.toString('utf8')
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(child as any).stderr?.on('data', (chunk: Buffer) => {
+        stderrData += chunk.toString('utf8')
+      })
+
+      const killTimer = setTimeout(() => {
+        timedOut = true
+        if (child.pid != null) {
+          try {
+            process.kill(-child.pid, 'SIGTERM')
+          } catch {
+            // Process may have already exited
+          }
+          // SIGKILL after 2s grace
+          setTimeout(() => {
+            if (child.pid != null) {
+              try {
+                process.kill(-child.pid, 'SIGKILL')
+              } catch {
+                // Ignore
+              }
+            }
+          }, 2000)
+        }
+      }, timeoutMs)
+
+      child.on('close', (code: number | null) => {
+        clearTimeout(killTimer)
+        exitCode = timedOut ? null : code
+        resolve()
+      })
+
+      child.on('error', () => {
+        clearTimeout(killTimer)
+        resolve()
+      })
     })
+  }
 
-    child.on('error', () => {
-      clearTimeout(killTimer)
-      resolve()
-    })
-  })
-
-  const durationMs = monotonicNow() - startMs
+  const durationMs = durationMs_remote ?? (monotonicNow() - startMs)
 
   // Step 7: capture fs-diff
   let fsDiff = {
