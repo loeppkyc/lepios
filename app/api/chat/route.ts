@@ -10,6 +10,7 @@ import {
   type MessagePart,
 } from '@/lib/orb/persistence'
 import { buildTools } from '@/lib/orb/tools/registry'
+import { buildSessionDigest } from '@/lib/memory/session-digest'
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'
 const MODEL = process.env.OLLAMA_CHAT_MODEL ?? 'qwen2.5-coder:3b'
@@ -64,11 +65,28 @@ export async function POST(req: Request) {
     userMsg?.parts ?? [{ type: 'text', text: userText }],
   )
 
+  // On new conversations: inject session digest into system prompt (spec A2).
+  // 3s timeout — never blocks session start (spec acceptance E).
+  let systemPrompt = LEPIOS_SYSTEM_PROMPT
+  if (isNew) {
+    try {
+      const digest = await Promise.race([
+        buildSessionDigest({ requested_by: 'chat_ui', topic: userText.slice(0, 100) || undefined }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ])
+      if (digest) {
+        systemPrompt = `${LEPIOS_SYSTEM_PROMPT}\n\n---\n${digest.markdown}`
+      }
+    } catch {
+      // digest unavailable — continue with base system prompt
+    }
+  }
+
   const result = streamText({
     // ollama-ai-provider@1.x returns LanguageModelV1; ai@6 expects V2/V3.
     // Cast through unknown to bridge the provider version gap at type level only.
     model: ollamaProvider(MODEL) as unknown as LanguageModel,
-    system: LEPIOS_SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: await convertToModelMessages(
       messages as Parameters<typeof convertToModelMessages>[0],
     ),

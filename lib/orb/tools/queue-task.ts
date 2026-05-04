@@ -54,8 +54,8 @@ export const queueTaskTool: ChatTool<Input, Output> = {
         task,
         description: description ?? null,
         priority: resolvedPriority,
-        status: 'open',
-        source: 'chat_ui',
+        status: 'queued',
+        source: 'manual',
       })
       .select('id')
       .single()
