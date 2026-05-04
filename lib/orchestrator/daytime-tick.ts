@@ -7,7 +7,7 @@ import { fetchHistoricalContext, scoreDaytimeTick } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { CheckResult, DaytimeTickResult, TickStatus, QualityScore } from './types'
 
-const SIGNAL_REVIEW_TIMEOUT_MS = 50_000
+const SIGNAL_REVIEW_TIMEOUT_MS = 100_000
 const DEFAULT_CHECK_TIMEOUT_MS = 15_000
 
 async function safeCheck(

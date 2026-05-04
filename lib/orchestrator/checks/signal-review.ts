@@ -1,8 +1,8 @@
-import { generate, OllamaUnreachableError, extractConfidence } from '@/lib/ollama/client'
+import { askOllama } from '@/lib/llm/ollama'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { CheckResult, Flag } from '../types'
 
-const GENERATE_TIMEOUT_MS = 45_000
+const GENERATE_TIMEOUT_MS = 90_000
 const LOOKBACK_HOURS = 12
 const LOW_CONFIDENCE_THRESHOLD = 0.4
 
@@ -68,38 +68,14 @@ ${eventsSummary}
 
 Format your response as a numbered list of issues found. If no issues, say "No anomalies detected."`
 
-  let ollamaText: string
-  let confidence: number
+  const ollamaResult = await askOllama(prompt, { timeoutMs: GENERATE_TIMEOUT_MS })
 
-  try {
-    const result = await generate(prompt, { task: 'analysis', timeoutMs: GENERATE_TIMEOUT_MS })
-    ollamaText = result.text
-    confidence = result.confidence
-  } catch (err) {
-    if (err instanceof OllamaUnreachableError) {
-      const causeIsAbort =
-        err.cause instanceof Error &&
-        (err.cause.name === 'AbortError' || err.cause.message.includes('aborted'))
-      const msgStr = err.cause instanceof Error ? err.cause.message : ''
-      const isTimeout = causeIsAbort || msgStr.includes('timed out')
-
-      if (isTimeout) {
-        flags.push({
-          severity: 'warn',
-          message: `Ollama generate timed out after ${GENERATE_TIMEOUT_MS / 1000}s — signal_review degraded`,
-          entity_type: 'ollama',
-        })
-      } else {
-        flags.push({
-          severity: 'warn',
-          message: `skipped — Ollama unreachable`,
-          entity_type: 'ollama',
-        })
-      }
-    } else {
-      const msg = err instanceof Error ? err.message : String(err)
-      flags.push({ severity: 'warn', message: `Ollama error: ${msg}`, entity_type: 'ollama' })
-    }
+  if (!ollamaResult) {
+    flags.push({
+      severity: 'warn',
+      message: `skipped — Ollama unreachable (see agent_events for detail)`,
+      entity_type: 'ollama',
+    })
     return {
       name: 'signal_review',
       status: 'warn',
@@ -108,6 +84,9 @@ Format your response as a numbered list of issues found. If no issues, say "No a
       duration_ms: Date.now() - start,
     }
   }
+
+  const ollamaText = ollamaResult.text
+  const confidence = ollamaResult.confidence
 
   // Confidence gate
   if (confidence < LOW_CONFIDENCE_THRESHOLD) {

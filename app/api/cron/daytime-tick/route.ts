@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const result = await Promise.race([
       runDaytimeTick(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('daytime tick exceeded 60s timeout')), 60_000)
+        setTimeout(() => reject(new Error('daytime tick exceeded 120s timeout')), 120_000)
       ),
     ])
     return NextResponse.json(result)
