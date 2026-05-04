@@ -53,6 +53,7 @@ import { listIdeasTool } from './list-ideas'
 import { submitIdeaTool } from './submit-idea'
 import { readFileTool } from './read-file'
 import { queryDbTool } from './query-db'
+import { webFetchTool } from './web-fetch'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REGISTERED: ChatTool<any, any>[] = [
   harnessRollupTool,
@@ -64,6 +65,7 @@ const REGISTERED: ChatTool<any, any>[] = [
   submitIdeaTool,
   readFileTool,
   queryDbTool,
+  webFetchTool,
 ]
 
 async function logToolEvent(

@@ -35,6 +35,7 @@ const { mockCheckCapability, mockInsert, stubs } = vi.hoisted(() => {
       submitIdea: makeStub('submitIdea', 'tool.chat_ui.action.submit_idea'),
       readFile: makeStub('readFile', 'tool.chat_ui.read.file'),
       queryDb: makeStub('queryDb', 'tool.chat_ui.read.db'),
+      webFetch: makeStub('webFetch', 'tool.chat_ui.read.web'),
     },
   }
 })
@@ -58,6 +59,7 @@ vi.mock('@/lib/orb/tools/list-ideas', () => ({ listIdeasTool: stubs.listIdeas })
 vi.mock('@/lib/orb/tools/submit-idea', () => ({ submitIdeaTool: stubs.submitIdea }))
 vi.mock('@/lib/orb/tools/read-file', () => ({ readFileTool: stubs.readFile }))
 vi.mock('@/lib/orb/tools/query-db', () => ({ queryDbTool: stubs.queryDb }))
+vi.mock('@/lib/orb/tools/web-fetch', () => ({ webFetchTool: stubs.webFetch }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
@@ -85,7 +87,7 @@ const DENIED_CAP = {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('buildTools — registry shape', () => {
-  it('registers all 9 expected tool names', () => {
+  it('registers all 10 expected tool names', () => {
     const tools = buildTools(CTX)
     const names = Object.keys(tools).sort()
     expect(names).toEqual(
@@ -99,6 +101,7 @@ describe('buildTools — registry shape', () => {
         'sendTelegramMessage',
         'submitIdea',
         'queueTask',
+        'webFetch',
       ].sort()
     )
   })
