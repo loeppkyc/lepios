@@ -22,6 +22,7 @@ import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-dige
 import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 import { buildChatUiDigestLine } from '@/lib/orb/tools/chat-ui-digest'
 import { buildSelfRepairDigestLine } from '@/lib/harness/self-repair/digest'
+import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -271,6 +272,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Amazon settlements sync — groups synced + net payout ────────────
   const amazonSettlementsSyncLine = await buildAmazonSettlementsSyncLine()
   messageToSend = `${messageToSend}\n${amazonSettlementsSyncLine}`
+
+  // ── F18: Reconciliation match rate — pending settlement orders (30d) ──────
+  const reconciliationMatchLine = await buildReconciliationMatchLine()
+  messageToSend = `${messageToSend}\n${reconciliationMatchLine}`
 
   // ── Ollama tunnel smoke health — P1 line on failure, silent on pass ───────
   const ollamaTunnelLine = await buildOllamaTunnelHealthLine()

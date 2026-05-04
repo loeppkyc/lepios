@@ -126,6 +126,43 @@ export async function GET(request: Request) {
     tags: ['amazon', 'cron', ...(isBackfill ? ['backfill'] : [])],
   })
 
+  // F18: log reconciliation match stats after each settlement sync
+  if (!dryRun) {
+    try {
+      const [matchedResult, totalResult] = await Promise.all([
+        db
+          .from('reconciled_orders_view')
+          .select('*', { count: 'exact', head: true })
+          .eq('match_status', 'reconciled'),
+        db.from('reconciled_orders_view').select('*', { count: 'exact', head: true }),
+      ])
+      const ordersMatched = matchedResult.count ?? 0
+      const ordersTotal = totalResult.count ?? 0
+      const ordersUnmatched = ordersTotal - ordersMatched
+      const matchPct =
+        ordersTotal > 0 ? Math.round((ordersMatched / ordersTotal) * 10000) / 10000 : 1
+
+      await db.from('agent_events').insert({
+        domain: 'amazon',
+        action: 'reconciliation_run',
+        actor: 'cron',
+        status: 'success',
+        task_type: 'amazon_settlements_sync',
+        output_summary: `reconciliation: ${ordersMatched}/${ordersTotal} matched (${Math.round(matchPct * 100)}%)`,
+        meta: {
+          run_id: runId,
+          orders_matched: ordersMatched,
+          orders_unmatched: ordersUnmatched,
+          total_orders: ordersTotal,
+          match_pct: matchPct,
+        },
+        tags: ['amazon', 'reconciliation'],
+      })
+    } catch {
+      // Non-fatal — reconciliation stats are informational only
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     run_id: runId,
