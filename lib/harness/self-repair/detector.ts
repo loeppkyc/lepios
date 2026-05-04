@@ -11,6 +11,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireCapability } from '@/lib/security/capability'
+import { httpRequest, telegram } from '@/lib/harness/arms-legs'
 
 export interface DetectedFailure {
   /** agent_events.id (string UUID) */
@@ -62,6 +63,26 @@ export async function detectNextFailure(): Promise<DetectedFailure | null> {
 
   const watchedTypes = (watchlist as { action_type: string }[]).map((r) => r.action_type)
 
+  // 2a. K2: Check for 3-consecutive-closed-without-merge pattern per action_type
+  //     Auto-suspend if found — prevents false-positive PR flood that erodes Colin's trust.
+  for (const actionType of watchedTypes) {
+    try {
+      await checkAndAutoSuspend(db, actionType)
+    } catch {
+      // Non-fatal — a failing K2 check must not block detection
+    }
+  }
+
+  // Reload watchlist after potential suspensions
+  const { data: refreshedWatchlist } = await db
+    .from('self_repair_watchlist')
+    .select('action_type')
+    .eq('enabled', true)
+  const activeTypes = ((refreshedWatchlist ?? []) as { action_type: string }[]).map(
+    (r) => r.action_type
+  )
+  if (activeTypes.length === 0) return null
+
   // 3. Find the oldest unprocessed event matching the watchlist
   //    "unprocessed" = no self_repair_runs row with trigger_event_id matching this event
   //    Slice 1: we query the last 24h of failure events and check for existing runs.
@@ -70,7 +91,7 @@ export async function detectNextFailure(): Promise<DetectedFailure | null> {
   const { data: events, error: eventsError } = await db
     .from('agent_events')
     .select('id, action, occurred_at, meta, actor')
-    .in('action', watchedTypes)
+    .in('action', activeTypes)
     .gte('occurred_at', since)
     .order('occurred_at', { ascending: true })
     .limit(50)
@@ -127,4 +148,75 @@ export async function detectNextFailure(): Promise<DetectedFailure | null> {
  */
 export async function releaseDetectorLock(actionType: string): Promise<void> {
   _activeLocks.delete(actionType)
+}
+
+// ── K2: Auto-suspend on 3 consecutive closed-without-merge PRs ───────────────
+
+const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER ?? 'loeppkyc'
+const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME ?? 'lepios'
+
+async function isPRClosedWithoutMerge(prNumber: number): Promise<boolean> {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return false
+  try {
+    const result = await httpRequest({
+      url: `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/pulls/${prNumber}`,
+      method: 'GET',
+      capability: 'net.outbound.github',
+      agentId: 'self_repair',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+    if (!result.ok) return false
+    const pr = result.body as { state?: string; merged?: boolean }
+    return pr.state === 'closed' && pr.merged === false
+  } catch {
+    return false
+  }
+}
+
+async function checkAndAutoSuspend(
+  db: ReturnType<typeof createServiceClient>,
+  actionType: string
+): Promise<void> {
+  // Get last 3 pr_opened runs for this action_type, most recent first
+  const { data: runs } = await db
+    .from('self_repair_runs')
+    .select('id, pr_number')
+    .eq('action_type', actionType)
+    .eq('status', 'pr_opened')
+    .not('pr_number', 'is', null)
+    .order('detected_at', { ascending: false })
+    .limit(3)
+
+  if (!runs || runs.length < 3) return
+
+  const typedRuns = runs as { id: string; pr_number: number }[]
+
+  // Check if all 3 are closed without merge
+  const closedChecks = await Promise.all(typedRuns.map((r) => isPRClosedWithoutMerge(r.pr_number)))
+  if (!closedChecks.every(Boolean)) return
+
+  // All 3 closed-without-merge — auto-suspend this action_type
+  await db.from('self_repair_watchlist').update({ enabled: false }).eq('action_type', actionType)
+
+  await db.from('agent_events').insert({
+    domain: 'self_repair',
+    action: 'self_repair.watchlist.auto_suspended',
+    actor: 'self_repair',
+    status: 'warning',
+    meta: {
+      action_type: actionType,
+      reason: '3 consecutive closed-without-merge PRs',
+      pr_numbers: typedRuns.map((r) => r.pr_number),
+    },
+  })
+
+  await telegram(
+    `self_repair: ${actionType} auto-suspended after 3 closed-without-merge PRs. Re-enable via SQL.`,
+    { bot: 'alerts', agentId: 'self_repair' }
+  ).catch(() => {})
 }

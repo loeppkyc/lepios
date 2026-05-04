@@ -31,6 +31,7 @@ import { draftFix } from '@/lib/harness/self-repair/drafter'
 import { verifyDraft } from '@/lib/harness/self-repair/verifier'
 import { openPR } from '@/lib/harness/self-repair/pr-opener'
 import { telegram } from '@/lib/harness/arms-legs'
+import { getCircuitState } from '@/lib/ollama/circuit'
 import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -141,6 +142,36 @@ export async function POST(request: NextRequest): Promise<Response> {
     return NextResponse.json({
       ok: true,
       reason: 'no_failure_detected',
+      started,
+    })
+  }
+
+  // 3a. Circuit-open defer — check before creating the runs row so the event stays unconsumed
+  // (acceptance criterion D: no self_repair_runs row when circuit is OPEN)
+  const circuitStatus = await getCircuitState()
+  if (circuitStatus.state === 'OPEN') {
+    try {
+      await db.from('agent_events').insert({
+        domain: 'self_repair',
+        action: 'self_repair.circuit_open_defer',
+        actor: 'self_repair',
+        status: 'warning',
+        meta: {
+          action_type: failure.actionType,
+          trigger_event_id: failure.eventId,
+          recent_failures: circuitStatus.recent_failures,
+          last_failure_at: circuitStatus.last_failure_at,
+          started,
+        },
+      })
+    } catch {
+      // Non-fatal
+    }
+    await releaseDetectorLock(failure.actionType)
+    return NextResponse.json({
+      ok: true,
+      reason: 'circuit_open',
+      action_type: failure.actionType,
       started,
     })
   }
