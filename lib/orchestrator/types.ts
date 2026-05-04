@@ -21,12 +21,17 @@ export interface CheckResult {
 export interface TickResult {
   tick_id: string
   run_id: string
-  mode: 'overnight_readonly'
+  mode: 'overnight_readonly' | 'daytime_ollama'
   checks: CheckResult[]
   duration_ms: number
   started_at: string
   finished_at: string
   status: TickStatus
+}
+
+export interface DaytimeTickResult extends Omit<TickResult, 'mode'> {
+  mode: 'daytime_ollama'
+  tunnel_used: boolean
 }
 
 export interface QualityDimensions {

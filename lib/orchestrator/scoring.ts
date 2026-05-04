@@ -1,12 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  CURRENT_CAPACITY_TIER,
-  WEIGHTS_V1,
-  BASELINE_MIN_RUNS,
-  SCORER_VERSION,
-} from './config'
+import { CURRENT_CAPACITY_TIER, WEIGHTS_V1, BASELINE_MIN_RUNS, SCORER_VERSION } from './config'
 import type {
   TickResult,
+  DaytimeTickResult,
   DigestResult,
   QualityScore,
   QualityDimensions,
@@ -178,6 +174,79 @@ function scoreDigestHygiene(result: DigestResult): number {
   }
   return Math.max(0, score)
 }
+
+// ── Daytime tick scorer ───────────────────────────────────────────────────────
+
+// Signal quality for daytime ticks is determined by the signal_review check outcome,
+// which is detected from check status and flag messages per the Step 6.5 spec §6.
+function scoreDaytimeSignalQuality(result: DaytimeTickResult): number {
+  const signalReview = result.checks.find((c) => c.name === 'signal_review')
+  if (!signalReview) return 50
+
+  if (signalReview.status === 'warn') {
+    const msgs = signalReview.flags.map((f) => f.message.toLowerCase())
+    if (msgs.some((m) => m.includes('unreachable') || m.includes('skipped'))) return 25
+    if (msgs.some((m) => m.includes('timed out') || m.includes('timeout'))) return 35
+    if (msgs.some((m) => m.includes('confidence below'))) return 40
+    return 40
+  }
+
+  // status === 'pass': score by anomaly flag count
+  const flagCount = signalReview.flags.length
+  if (flagCount === 0) return 50
+  if (flagCount <= 2) return 70
+  return 80
+}
+
+function scoreDaytimeCompleteness(result: DaytimeTickResult): number {
+  return scoreCompleteness(result as TickResult)
+}
+
+function scoreDaytimeHygiene(result: DaytimeTickResult): number {
+  const required: (keyof DaytimeTickResult)[] = [
+    'tick_id',
+    'run_id',
+    'mode',
+    'started_at',
+    'finished_at',
+    'checks',
+  ]
+  let score = 100
+  for (const field of required) {
+    const v = result[field]
+    if (v === undefined || v === null || v === '') score -= 20
+  }
+  return Math.max(0, score)
+}
+
+export function scoreDaytimeTick(
+  result: DaytimeTickResult,
+  history: HistoricalContext
+): QualityScore {
+  const dimensions: QualityDimensions = {
+    completeness: scoreDaytimeCompleteness(result),
+    signal_quality: scoreDaytimeSignalQuality(result),
+    efficiency: scoreEfficiencyMs(result.duration_ms, history),
+    hygiene: scoreDaytimeHygiene(result),
+  }
+
+  const raw =
+    dimensions.completeness * WEIGHTS_V1.completeness +
+    dimensions.signal_quality * WEIGHTS_V1.signal_quality +
+    dimensions.efficiency * WEIGHTS_V1.efficiency +
+    dimensions.hygiene * WEIGHTS_V1.hygiene
+
+  return {
+    aggregate: Math.round(raw * 10) / 10,
+    capacity_tier: CURRENT_CAPACITY_TIER,
+    dimensions,
+    weights_version: 'v1',
+    scored_at: new Date().toISOString(),
+    scored_by: SCORER_VERSION,
+  }
+}
+
+// ── Morning digest scorer ─────────────────────────────────────────────────────
 
 export function scoreMorningDigest(result: DigestResult, history: HistoricalContext): QualityScore {
   const dimensions: QualityDimensions = {
