@@ -10,10 +10,11 @@ vi.mock('@/lib/supabase/service', () => ({
 
 // ── Mock checks ───────────────────────────────────────────────────────────────
 
-const { mockSiteHealth, mockScanIntegrity, mockEventLog } = vi.hoisted(() => ({
+const { mockSiteHealth, mockScanIntegrity, mockEventLog, mockChatSummarize } = vi.hoisted(() => ({
   mockSiteHealth: vi.fn(),
   mockScanIntegrity: vi.fn(),
   mockEventLog: vi.fn(),
+  mockChatSummarize: vi.fn(),
 }))
 
 // ── Mock scoring ──────────────────────────────────────────────────────────────
@@ -34,6 +35,9 @@ vi.mock('@/lib/orchestrator/checks/scan-integrity', () => ({
 }))
 vi.mock('@/lib/orchestrator/checks/event-log-consistency', () => ({
   checkEventLogConsistency: mockEventLog,
+}))
+vi.mock('@/lib/orchestrator/checks/chat-summarize', () => ({
+  checkChatSummarize: mockChatSummarize,
 }))
 
 import { runNightTick } from '@/lib/orchestrator/tick'
@@ -82,6 +86,7 @@ beforeEach(() => {
   mockSiteHealth.mockResolvedValue(passCheck('site_health'))
   mockScanIntegrity.mockResolvedValue(passCheck('scan_integrity'))
   mockEventLog.mockResolvedValue(passCheck('event_log_consistency'))
+  mockChatSummarize.mockResolvedValue(passCheck('chat_summarize'))
   mockFetchHistory.mockResolvedValue({
     task_type: 'night_tick',
     capacity_tier: 'tier_1_laptop_ollama',
@@ -99,7 +104,7 @@ describe('runNightTick — shape', () => {
     expect(result.tick_id).toBeTruthy()
     expect(result.run_id).toBeTruthy()
     expect(result.mode).toBe('overnight_readonly')
-    expect(result.checks).toHaveLength(3)
+    expect(result.checks).toHaveLength(4)
     expect(result.started_at).toBeTruthy()
     expect(result.finished_at).toBeTruthy()
     expect(typeof result.duration_ms).toBe('number')
@@ -112,6 +117,7 @@ describe('runNightTick — shape', () => {
     expect(names).toContain('site_health')
     expect(names).toContain('scan_integrity')
     expect(names).toContain('event_log_consistency')
+    expect(names).toContain('chat_summarize')
   })
 })
 
@@ -149,6 +155,7 @@ describe('runNightTick — status mapping (dual assertions: column + meta)', () 
     mockSiteHealth.mockResolvedValue(failCheck('site_health'))
     mockScanIntegrity.mockResolvedValue(failCheck('scan_integrity'))
     mockEventLog.mockResolvedValue(failCheck('event_log_consistency'))
+    mockChatSummarize.mockResolvedValue(failCheck('chat_summarize'))
     const b = makeInsertBuilder()
     mockFrom.mockReturnValue(b)
     await runNightTick()

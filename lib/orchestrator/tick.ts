@@ -3,21 +3,26 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { checkSiteHealth } from './checks/site-health'
 import { checkScanIntegrity } from './checks/scan-integrity'
 import { checkEventLogConsistency } from './checks/event-log-consistency'
+import { checkChatSummarize } from './checks/chat-summarize'
 import { fetchHistoricalContext, scoreNightTick } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { CheckResult, TickResult, TickStatus, QualityScore } from './types'
 
-const CHECK_TIMEOUT_MS = 15_000
+const DEFAULT_CHECK_TIMEOUT_MS = 15_000
 
-async function safeCheck(name: string, fn: () => Promise<CheckResult>): Promise<CheckResult> {
+async function safeCheck(
+  name: string,
+  fn: () => Promise<CheckResult>,
+  timeoutMs = DEFAULT_CHECK_TIMEOUT_MS
+): Promise<CheckResult> {
   const start = Date.now()
   try {
     return await Promise.race([
       fn(),
       new Promise<never>((_, reject) =>
         setTimeout(
-          () => reject(new Error(`check '${name}' timed out after ${CHECK_TIMEOUT_MS}ms`)),
-          CHECK_TIMEOUT_MS
+          () => reject(new Error(`check '${name}' timed out after ${timeoutMs}ms`)),
+          timeoutMs
         )
       ),
     ])
@@ -57,6 +62,7 @@ export async function runNightTick(): Promise<TickResult> {
   checks.push(await safeCheck('site_health', checkSiteHealth))
   checks.push(await safeCheck('scan_integrity', checkScanIntegrity))
   checks.push(await safeCheck('event_log_consistency', checkEventLogConsistency))
+  checks.push(await safeCheck('chat_summarize', checkChatSummarize, 90_000))
 
   const finished_at = new Date().toISOString()
   const duration_ms = Date.now() - tickStart
