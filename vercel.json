@@ -51,6 +51,10 @@
     {
       "path": "/api/harness/self-repair-tick",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/daytime-tick",
+      "schedule": "0 18 * * *"
     }
   ]
 }

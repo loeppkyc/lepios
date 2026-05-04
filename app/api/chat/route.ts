@@ -1,4 +1,4 @@
-import { streamText, convertToModelMessages } from 'ai'
+import { streamText, convertToModelMessages, stepCountIs } from 'ai'
 import { createOllama } from 'ollama-ai-provider'
 import type { LanguageModel } from 'ai'
 import { LEPIOS_SYSTEM_PROMPT } from '@/lib/orb/identity'
@@ -98,6 +98,7 @@ export async function POST(req: Request) {
       toolCallId: '',
     }),
     toolChoice: 'auto',
+    stopWhen: stepCountIs(5),
     onFinish: async ({ text, usage, finishReason }) => {
       const totalTokens =
         (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) || undefined
