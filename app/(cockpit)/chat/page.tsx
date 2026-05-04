@@ -33,20 +33,68 @@ function dbMessagesToUIMessages(rows: DBMessage[]): UIMessage[] {
   )
 }
 
+function isPendingApproval(output: unknown): output is { preview: Record<string, unknown> } {
+  if (output === null || typeof output !== 'object') return false
+  const o = output as Record<string, unknown>
+  return (
+    'preview' in o &&
+    o.preview !== null &&
+    typeof o.preview === 'object' &&
+    (o.written === false || o.sent === false || o.queued === false)
+  )
+}
+
 function ToolCallCard({
   toolName,
   state,
   output,
+  onApprove,
 }: {
   toolName: string
   state: string
   output?: unknown
+  onApprove?: () => void
 }) {
+  const [dismissed, setDismissed] = useState(false)
+
   if (state === 'input-streaming' || state === 'input-available') {
     return (
       <div className="flex items-center gap-2 rounded-sm border border-[var(--color-border)] px-3 py-1.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] text-[var(--color-text-muted)]">
         <span className="animate-pulse">&#x23F3;</span>
         <span>{toolName}</span>
+      </div>
+    )
+  }
+
+  // Pending approval: dry-run result with preview — show approve/cancel card
+  if (!dismissed && isPendingApproval(output) && onApprove) {
+    const previewStr = JSON.stringify(output.preview, null, 2)
+    const previewTruncated =
+      previewStr.length > 400 ? previewStr.slice(0, 400) + '…' : previewStr
+    return (
+      <div className="rounded-sm border border-[var(--color-accent)] px-3 py-2 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)]">
+        <div className="mb-2 font-semibold text-[var(--color-accent)]">
+          &#x26A1; {toolName} — preview
+        </div>
+        <pre className="mb-3 max-h-32 overflow-y-auto whitespace-pre-wrap text-[var(--color-text)]">
+          {previewTruncated}
+        </pre>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onApprove}
+            className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 py-1 text-xs font-semibold text-[var(--color-base)]"
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-text-muted)]"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     )
   }
@@ -58,7 +106,7 @@ function ToolCallCard({
       : typeof output === 'string'
         ? output
         : JSON.stringify(output, null, 2)
-  const preview = outputStr.length > 400 ? outputStr.slice(0, 400) + '…' : outputStr
+  const outputTruncated = outputStr.length > 400 ? outputStr.slice(0, 400) + '…' : outputStr
 
   return (
     <details className="rounded-sm border border-[var(--color-border)] px-3 py-1.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)]">
@@ -66,7 +114,7 @@ function ToolCallCard({
         &#x2713; {toolName}
       </summary>
       <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-[var(--color-text)]">
-        {preview}
+        {outputTruncated}
       </pre>
     </details>
   )
@@ -275,6 +323,9 @@ function ActiveChat({
                           toolName={name}
                           state={part.state}
                           output={'output' in part ? part.output : undefined}
+                          onApprove={() =>
+                            sendMessage({ text: 'Approved. Please execute now (dryRun: false).' })
+                          }
                         />
                       )
                     }
