@@ -68,10 +68,17 @@ vi.mock('child_process', async (importOriginal) => {
   return {
     ...real,
     spawn: mockSpawn,
-    execFile: vi.fn((_bin: string, _args: string[], _opts: unknown, cb: Function) => {
-      // execFileAsync for git commands — return success with a fake sha
-      cb(null, { stdout: 'deadbeef1234\n', stderr: '' })
-    }),
+    execFile: vi.fn(
+      (
+        _bin: string,
+        _args: string[],
+        _opts: unknown,
+        cb: (err: null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        // execFileAsync for git commands — return success with a fake sha
+        cb(null, { stdout: 'deadbeef1234\n', stderr: '' })
+      }
+    ),
   }
 })
 
@@ -126,8 +133,8 @@ function insertOk(id: string) {
 /** Standard 4-call mockFrom sequence for a successful runInSandbox. */
 function setupDbMocks(runId = 'run-re-001', actionId = 'action-re-001') {
   mockFrom
-    .mockReturnValueOnce(insertOk(runId))          // sandbox_runs INSERT
-    .mockReturnValueOnce(insertOk(actionId))        // agent_actions INSERT
+    .mockReturnValueOnce(insertOk(runId)) // sandbox_runs INSERT
+    .mockReturnValueOnce(insertOk(actionId)) // agent_actions INSERT
     .mockReturnValueOnce(makeChain({ data: null, error: null })) // sandbox_runs UPDATE (audit_action_id)
     .mockReturnValueOnce(makeChain({ data: null, error: null })) // sandbox_runs UPDATE (final)
     // Catch-all for any extra agent_events inserts
@@ -292,10 +299,7 @@ describe('AC-RE4 — fetch throws → fallback_local warning + local spawn', () 
     setupDbMocks()
     mockSpawn.mockReturnValue(makeLocalSpawnChild(0))
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValueOnce(new Error('network unreachable'))
-    )
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('network unreachable')))
 
     const result = await runInSandbox('echo hello', SANDBOX_OPTS)
 
