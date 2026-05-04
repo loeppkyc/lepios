@@ -12,6 +12,7 @@
 import { httpRequest } from '@/lib/harness/arms-legs'
 import { requireCapability } from '@/lib/security/capability'
 import { createServiceClient } from '@/lib/supabase/service'
+import { runInSandbox } from '@/lib/harness/sandbox/runtime'
 import type { FailureContext } from './context'
 
 export interface DraftedFix {
@@ -20,6 +21,14 @@ export interface DraftedFix {
   rationale: string
   promptTokens: number
   completionTokens: number
+  /** Set for lint_failed path: sandbox run ID from runInSandbox */
+  sandboxRunId?: string
+  /** Set for lint_failed path: ephemeral worktree path from runInSandbox */
+  worktreePath?: string
+  /** Set for lint_failed path: file list changed by formatter */
+  filesChanged?: string[]
+  /** Set for lint_failed path: diff hash from sandbox */
+  diffHash?: string
 }
 
 const LLM_TIMEOUT_MS = 30_000 // TODO: tune with real data — slice 1 default per spec §Out of scope
@@ -101,11 +110,51 @@ function buildUserMessage(ctx: FailureContext): string {
 }
 
 /**
+ * Lint failures: deterministic auto-fix — skip LLM, run formatter in sandbox.
+ * Returns null if formatter changes nothing (lint failure may be a logic error).
+ */
+async function draftLintFix(ctx: FailureContext): Promise<DraftedFix | null> {
+  const result = await runInSandbox('npm run format && npm run lint:fix || true', {
+    agentId: 'self_repair',
+    capability: 'sandbox.run',
+    scope: { fs: { allowedPaths: ['.'] } },
+    timeoutMs: 120_000,
+    reason: 'lint_failed auto-fix: format + lint:fix',
+  })
+
+  if (result.filesChanged.length === 0) {
+    // Format+fix changed nothing — lint failure may be a logic error, not formatting
+    const db = createServiceClient()
+    await logDraftEvent(db, 'self_repair.lint_fix_no_changes', 'error', '', {
+      event_id: ctx.failure.eventId,
+    })
+    return null // escalate via normal verify_failed path
+  }
+
+  return {
+    summary: `Auto-fixed lint/formatting in ${result.filesChanged.length} file(s) via npm run format && npm run lint:fix`,
+    unifiedDiff: '', // diff captured in sandbox_runs — drafter reads from worktreePath
+    rationale: 'Lint failures are deterministic: formatter output IS the fix. No LLM needed.',
+    promptTokens: 0,
+    completionTokens: 0,
+    diffHash: result.diffHash,
+    filesChanged: result.filesChanged,
+    sandboxRunId: result.runId,
+    worktreePath: result.worktreePath,
+  }
+}
+
+/**
  * Call Claude Sonnet to draft a fix.
  * Writes audit events before and after the call.
  * Returns null if the LLM returns invalid JSON or the call fails.
  */
 export async function draftFix(ctx: FailureContext): Promise<DraftedFix | null> {
+  // Lint failures: deterministic auto-fix — skip LLM, run formatter in sandbox
+  if (ctx.failure.actionType === 'lint_failed') {
+    return draftLintFix(ctx)
+  }
+
   const db = createServiceClient()
 
   // Capability check — log_only, never blocks
