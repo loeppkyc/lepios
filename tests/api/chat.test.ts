@@ -59,12 +59,21 @@ vi.mock('ai', () => ({
   stepCountIs: vi.fn((n: number) => ({ type: 'stepCount', n })),
 }))
 
+vi.mock('@/lib/orb/twin-context', () => ({
+  getTwinContext: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('@/lib/memory/session-digest', () => ({
+  buildSessionDigest: vi.fn().mockResolvedValue(null),
+}))
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST as chatPost } from '@/app/api/chat/route'
 import { GET as conversationsGet } from '@/app/api/chat/conversations/route'
 import { GET as messagesGet } from '@/app/api/chat/conversations/[id]/messages/route'
 import { streamText } from 'ai'
+import { getTwinContext } from '@/lib/orb/twin-context'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -81,8 +90,8 @@ function makeStreamResponse() {
       ctrl.enqueue(encoder.encode('0:"Hello from Ollama"\n'))
       ctrl.enqueue(
         encoder.encode(
-          'e:{"finishReason":"stop","usage":{"promptTokens":5,"completionTokens":4}}\n',
-        ),
+          'e:{"finishReason":"stop","usage":{"promptTokens":5,"completionTokens":4}}\n'
+        )
       )
       ctrl.close()
     },
@@ -161,7 +170,7 @@ describe('POST /api/chat', () => {
       makeChatRequest({
         conversationId: null,
         messages: [{ role: 'user', parts: [{ type: 'text', text: longText }] }],
-      }),
+      })
     )
     const titleArg = mockCreateConversation.mock.calls[0][1]
     expect(titleArg).toHaveLength(50)
@@ -185,12 +194,18 @@ describe('POST /api/chat', () => {
     expect(mockAppendMessage).toHaveBeenCalledWith(
       CONV_A,
       'user',
-      expect.arrayContaining([expect.objectContaining({ type: 'text' })]),
+      expect.arrayContaining([expect.objectContaining({ type: 'text' })])
     )
   })
 
   it('persists assistant message via onFinish callback', async () => {
-    let capturedOnFinish: ((event: { text: string; usage: { inputTokens: number; outputTokens: number }; finishReason: string }) => unknown) | undefined
+    let capturedOnFinish:
+      | ((event: {
+          text: string
+          usage: { inputTokens: number; outputTokens: number }
+          finishReason: string
+        }) => unknown)
+      | undefined
     vi.mocked(streamText).mockImplementation((opts: unknown) => {
       capturedOnFinish = (opts as { onFinish?: typeof capturedOnFinish }).onFinish
       return {
@@ -289,5 +304,68 @@ describe('GET /api/chat/conversations/[id]/messages', () => {
     })
     expect(res.status).toBe(403)
     expect(mockLoadConversationMessages).not.toHaveBeenCalled()
+  })
+})
+
+// ── C6: Twin context injection ────────────────────────────────────────────────
+
+describe('POST /api/chat — twin context injection (C6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetUser.mockResolvedValue({ data: { user: USER_A }, error: null })
+    mockGetConversationOwner.mockResolvedValue(USER_A.id)
+    mockAppendMessage.mockResolvedValue({ id: 'msg-1' })
+    vi.mocked(streamText).mockReturnValue({
+      toUIMessageStreamResponse: vi.fn(() => makeStreamResponse()),
+    } as unknown as ReturnType<typeof streamText>)
+  })
+
+  it('(a) prepends twin context to system prompt when getTwinContext returns content', async () => {
+    vi.mocked(getTwinContext).mockResolvedValue(
+      '## Relevant context from your knowledge base\n[1] Colin is risk-averse | prefers conservative bets'
+    )
+
+    await chatPost(makeChatRequest({ conversationId: CONV_A }))
+
+    const system = vi.mocked(streamText).mock.calls[0][0].system as string
+    expect(system).toContain('## Relevant context from your knowledge base')
+    expect(system).toContain('Colin is risk-averse')
+  })
+
+  it('(b) uses base system prompt without twin block when getTwinContext returns null', async () => {
+    vi.mocked(getTwinContext).mockResolvedValue(null)
+
+    await chatPost(makeChatRequest({ conversationId: CONV_A }))
+
+    const system = vi.mocked(streamText).mock.calls[0][0].system as string
+    expect(system).toBeDefined()
+    expect(system).not.toContain('## Relevant context')
+  })
+
+  it('(c) calls getTwinContext with the user message text', async () => {
+    vi.mocked(getTwinContext).mockResolvedValue(null)
+    const userText = 'What is my risk tolerance?'
+
+    await chatPost(
+      makeChatRequest({
+        conversationId: CONV_A,
+        messages: [{ role: 'user', parts: [{ type: 'text', text: userText }] }],
+      })
+    )
+
+    expect(vi.mocked(getTwinContext)).toHaveBeenCalledWith(userText)
+  })
+
+  it('(d) twin context appended after base LEPIOS prompt, not replacing it', async () => {
+    vi.mocked(getTwinContext).mockResolvedValue('## Relevant context\n[1] some fact')
+
+    await chatPost(makeChatRequest({ conversationId: CONV_A }))
+
+    const system = vi.mocked(streamText).mock.calls[0][0].system as string
+    // Base prompt must still be present
+    expect(system.length).toBeGreaterThan(50)
+    // Twin context comes after
+    const contextIdx = system.indexOf('## Relevant context')
+    expect(contextIdx).toBeGreaterThan(0)
   })
 })

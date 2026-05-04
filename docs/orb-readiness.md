@@ -1,0 +1,203 @@
+# Orb Day Readiness Tracker
+
+**Definition of Orb Day:** Colin opens his laptop, plugs in an eGPU with a sufficient GPU, double-clicks LEPIOS, and a chat interface opens that:
+
+- Looks and feels like Claude.ai
+- Talks to a local model smart enough to be useful (14B+ post-GPU)
+- Knows everything about Colin via Twin context retrieval on every message
+- Can use tools — query LepiOS tables, read files, ship to harness, edit codebase
+- Persists memory across sessions
+- Has a distinct LEPIOS identity (not vanilla Qwen voice)
+
+**Update protocol:** Update on every window close that touches a line item. Recompute total. Bump "Last updated."
+
+**Enforcement (F22):** This tracker is a sibling of `docs/gpu-day-readiness.md` and falls under the same F22 rule. Any window that ships or confirms a line item must update this tracker before reporting completion. See CLAUDE.md §3 rule 11.
+
+**Scope note:** This tracker covers the full orb buildout. For harness reliability specifically (Ollama pipeline, drain, tunnel), see [`docs/gpu-day-readiness.md`](gpu-day-readiness.md).
+
+**OSS scout reference:** Rescores and new components sourced from [`docs/research/oss-scout.md`](research/oss-scout.md) (2026-04-27). Rescore rationale traceable there.
+
+**Estimated time to Orb Day: 3–5 weeks** (base case: 5–6h/week Colin review capacity, hardware ordered by Week 2). Derivation: [`docs/lepios/time-to-orb.md`](lepios/time-to-orb.md).
+
+---
+
+## Total Readiness: 46.6% (50.85 / 109 pts)
+
+_Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
+
+---
+
+## A — Chat UI (25 pts)
+
+_The front door. Without a working chat surface, nothing below can be experienced._
+
+| #   | Line item                                                         | Weight | Pct  | Contribution | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------- | ------ | ---- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Streaming chat component built (`/app/(cockpit)/chat` or similar) | 8      | 90%  | 7.20         | **Shipped 2026-04-27 (thin-slice spike).** `app/(cockpit)/chat/page.tsx` (`useChat` from `@ai-sdk/react`) + `app/api/chat/route.ts` (`streamText` + `ollama-ai-provider`). F21 acceptance tests: 6/6 green. Nav link added. Remaining: production Ollama tunnel live verify.                                                                                                                                                                                                     |
+| A2  | Message history persistence (DB-backed)                           | 4      | 85%  | 3.40         | **Shipped 2026-04-28.** Migration `0042_orb_chat_schema.sql` (conversations + messages + DB trigger for updated_at + message_count), `lib/orb/persistence.ts`, `GET /api/chat/conversations`, `GET /api/chat/conversations/[id]/messages`, `POST /api/chat` persists user + assistant messages with auto-create on first message. F21 tests: 16/16 green (incl. 401 unauth, 403 cross-user, X-Conversation-Id header). Remaining: migration applied to production + live verify. |
+| A3  | Code block rendering (syntax highlighting, copy button)           | 2      | 85%  | 1.70         | **Shipped 2026-04-28.** `components/orb/MarkdownMessage.tsx` — shiki@4 + rehype-pretty-code@0.14, github-dark theme, language label + copy button via `pre.innerText` ref. Wired into `/chat`. Remaining: production verify + E2E test.                                                                                                                                                                                                                                          |
+| A4  | File upload support (images, docs, code)                          | 1      | 0%   | 0.00         | No multipart handlers in `app/api/`.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| A5  | Markdown rendering                                                | 2      | 95%  | 1.90         | **Shipped 2026-04-28.** `components/orb/MarkdownMessage.tsx` — react-markdown@10 + remark-gfm@4 + rehype-pretty-code@0.14 + shiki@4. Full element override map (h1–h6, p, code, pre, table family, lists, blockquote, a, hr) using LepiOS Tailwind tokens. F20-compliant. User messages stay plain text; assistant uses markdown. Remaining: production verify.                                                                                                                  |
+| A6  | Multi-conversation management (sidebar of past chats)             | 3      | 80%  | 2.40         | **Shipped 2026-04-28.** Sidebar in `app/(cockpit)/chat/page.tsx` lists user's conversations (title + msg count), click to switch (loads history + remounts active pane via `key`), "+ New chat" button. Custom `DefaultChatTransport` captures `X-Conversation-Id` from first response and refreshes the list. Hidden on mobile (`hidden md:flex`). Remaining: archive/delete actions, conversation rename UI.                                                                   |
+| A7  | Mobile responsive                                                 | 2      | 30%  | 0.60         | Tailwind v4 configured; cockpit layout uses minimal inline styles with no responsive design. Some responsive classes in use.                                                                                                                                                                                                                                                                                                                                                     |
+| A8  | Authentication gate (Colin-only)                                  | 3      | 100% | 3.00         | Supabase auth enforced on all API routes. RLS policies on all tables. Login page at `/app/login`.                                                                                                                                                                                                                                                                                                                                                                                |
+|     | **Category total**                                                | **25** |      | **20.20**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+---
+
+## B — Brain / Model Integration (20 pts)
+
+_Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate scores; advance the tracker there for pipeline items._
+
+| #   | Line item                                                           | Weight | Pct | Contribution | Notes                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------------- | ------ | --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | Ollama client + production pipeline (see gpu-day-readiness.md §A+B) | 6      | 95% | 5.70         | `lib/ollama/client.ts` (451 lines): health checks, circuit breaker, retry, timeout. Only gap: `OLLAMA_TUNNEL_URL` not set in production (gpu-day B4: 0%).                                                                                                                                                                                                                     |
+| B2  | 14B model selected and pulled (post-GPU)                            | 4      | 0%  | 0.00         | Current model: `qwen2.5-coder:7b` at 8.14 tok/s. 14B+ requires GPU upgrade (hardware F1/F2 below). `ollama-ai-provider` in AI SDK registry means model swap is a config change once GPU is live.                                                                                                                                                                              |
+| B3  | LEPIOS Modelfile written (identity, voice, conventions, F-rules)    | 4      | 50% | 2.00         | **System prompt shipped 2026-04-28** — `lib/orb/identity.ts` exports `LEPIOS_SYSTEM_PROMPT` (~180 tokens), wired into `/api/chat/route.ts` via `streamText({ system })`. Establishes LEPIOS identity, model context, current capabilities, voice rules. Remaining 50%: Ollama Modelfile (so identity persists at the model level, not just the API layer) + voice test suite. |
+| B4  | Tool calling wired (Ollama → tools → results → model)               | 3      | 0%  | 0.00         | Blocked on D7 (Tool use bridge). AI SDK `ToolLoopAgent` is the implementation path; `needsApproval` gate maps to auto-merge-OFF philosophy.                                                                                                                                                                                                                                   |
+| B5  | Streaming integration with chat UI                                  | 3      | 90% | 2.70         | **Wired 2026-04-27.** `createOllama({ baseURL })` provider + `streamText` + `toUIMessageStreamResponse()` in `/api/chat/route.ts`. Streams `qwen2.5-coder:3b` via AI SDK 6. Remaining: production Ollama tunnel verify.                                                                                                                                                       |
+|     | **Category total**                                                  | **20** |     | **10.40**    |                                                                                                                                                                                                                                                                                                                                                                               |
+
+---
+
+## C — Context / Memory Layer (18 pts)
+
+| #   | Line item                                                                | Weight | Pct  | Contribution | Notes                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------ | ------ | ---- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | Twin pgvector retrieval (existing infrastructure)                        | 5      | 100% | 5.00         | Migration 0013: pgvector extension, `embedding vector(768)` column, `match_knowledge()` RPC. FTS fallback for low-confidence queries. Live in production.                                                                                                                                                                                                                                                  |
+| C2  | Pre-message Twin query wired into chat (context inject on every message) | 3      | 90%  | 2.70         | **Shipped 2026-05-04** (PR #75 orb/twin-context-inject). `getTwinContext(userText)` called on every message in `app/api/chat/route.ts` with 2s timeout; result appended to system prompt. 4 acceptance tests added to `tests/api/chat.test.ts` (C6). Remaining: production embed pipeline verify (depends on tunnel stability).                                                                            |
+| C3  | Conversation memory storage (every chat saved to DB)                     | 3      | 85%  | 2.55         | **Shipped 2026-04-28** alongside A2. Every user message persisted before streamText; every assistant response persisted in `onFinish` callback with model name + token usage. JSONB `content` preserves AI SDK 6 parts format (extensible to images/tool calls without schema change). DB trigger keeps `conversations.updated_at` + `message_count` current. Remaining: chat → Twin chunks pipeline (C4). |
+| C4  | Nightly summarization job (chats → Twin chunks)                          | 2      | 0%   | 0.00         | `night_tick` cron exists but processes Amazon/betting/knowledge — no chat summarization pipeline. Mem0 fact extraction pattern identified in OSS scout as implementation approach.                                                                                                                                                                                                                         |
+| C5  | Personal data tables connected as context sources                        | 2      | 70%  | 1.40         | Amazon (orders + settlements via 0034/0036) and utility (`utility_bills` via 0039) done. Health/Oura: 0% — no schema, no token in `harness_config`.                                                                                                                                                                                                                                                        |
+| C6  | Twin context bridge — Twin retrieval wired into AI SDK messages format   | 3      | 90%  | 2.70         | **Shipped 2026-05-04** (PR #75). `lib/orb/twin-context.ts`: embed user message → `retrievePersonalChunks()` (vector + FTS fallback) → `buildContextString()` → returns formatted block or null. Similarity filter >0.25 on vector path. Never throws. Tests: `tests/orb/twin-context.test.ts` (16 tests, all green). Remaining: production embed verify.                                                   |
+|     | **Category total**                                                       | **18** |      | **14.35**    |                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+---
+
+## D — Tool Use / Agentic Capability (24 pts)
+
+| #   | Line item                                                       | Weight | Pct | Contribution | Notes                                                                                                                                                                                                                                                                            |
+| --- | --------------------------------------------------------------- | ------ | --- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | File read tool (read repo files from chat)                      | 3      | 0%  | 0.00         | No `file_read` endpoint or tool definition. Depends on D7.                                                                                                                                                                                                                       |
+| D2  | File write tool with diff approval gate                         | 4      | 0%  | 0.00         | No file write tool. Depends on D7. AI SDK `needsApproval` gate is the approval mechanism.                                                                                                                                                                                        |
+| D3  | Database query tool (read LepiOS tables from chat)              | 4      | 0%  | 0.00         | Twin reads `knowledge` table only. No general-purpose query interface. Depends on D7.                                                                                                                                                                                            |
+| D4  | Harness submit tool (queue tasks from chat)                     | 4      | 5%  | 0.20         | `app/api/harness/invoke-coordinator/route.ts` and `lib/harness/invoke-coordinator.ts` exist. Not wired to any chat interface. Depends on D7.                                                                                                                                     |
+| D5  | Web fetch tool                                                  | 3      | 0%  | 0.00         | No generic web fetch tool. Depends on D7.                                                                                                                                                                                                                                        |
+| D6  | Code execution tool (sandboxed)                                 | 2      | 0%  | 0.00         | Not started. Depends on D7.                                                                                                                                                                                                                                                      |
+| D7  | Tool use bridge — AI SDK `ToolLoopAgent` + `needsApproval` gate | 4      | 50% | 2.00         | OSS scout: AI SDK 6 `ToolLoopAgent` with `needsApproval: (tool) => boolean` is the implementation path. Maps to auto-merge-OFF philosophy: reads auto-approved, writes require Colin approval. Design fully resolved from scout. Not yet wired — no `ToolLoopAgent` in codebase. |
+|     | **Category total**                                              | **24** |     | **2.20**     |                                                                                                                                                                                                                                                                                  |
+
+---
+
+## E — Identity / Polish (7 pts)
+
+| #   | Line item                                                                 | Weight | Pct | Contribution | Notes                                                                                                                                                                                                                                                                                                        |
+| --- | ------------------------------------------------------------------------- | ------ | --- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E1  | LEPIOS visual identity (favicon, color scheme, name visible in UI)        | 2      | 30% | 0.60         | **Partial 2026-04-28.** "LEPIOS" wordmark visible in CockpitNav and chat page identity strip. Color scheme already on LepiOS dark tokens. Remaining: custom favicon (`app/favicon.ico` still stock Next.js), opengraph image, login page wordmark.                                                           |
+| E2  | Custom Modelfile system prompt (voice, conventions, F-rules embedded)     | 1      | 60% | 0.60         | **System prompt shipped 2026-04-28** — `lib/orb/identity.ts` includes voice rules (direct, terse, no filler, no trailing summaries). Format guidance (markdown, code blocks, tables). Remaining 40%: F-rule embedding, audit-first behavior testing, voice calibration suite.                                |
+| E3  | Desktop launcher icon (double-click to open LEPIOS)                       | 1      | 0%  | 0.00         | No `.bat`, `.ps1`, or shortcut script.                                                                                                                                                                                                                                                                       |
+| E4  | Voice / tone calibrated and tested (paste discipline, audit-first, terse) | 1      | 0%  | 0.00         | No Modelfile, no test suite for voice.                                                                                                                                                                                                                                                                       |
+| E5  | LEPIOS identity — coordinated system prompt + branding pass               | 2      | 70% | 1.40         | **Shipped 2026-04-28.** Coordinated pass: `lib/orb/identity.ts` system prompt + nav label "LEPIOS" + chat header strip "LEPIOS · running on {model}" subtitle. Voice rules and current-capabilities scope embedded in prompt. Remaining 30%: custom favicon, login wordmark, voice calibration test results. |
+|     | **Category total**                                                        | **7**  |     | **2.60**     |                                                                                                                                                                                                                                                                                                              |
+
+---
+
+## F — Operational (15 pts)
+
+| #   | Line item                                                                                 | Weight | Pct | Contribution | Notes                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------- | ------ | --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1  | eGPU enclosure purchased + tested                                                         | 4      | 0%  | 0.00         | No purchase or mention in any docs. Hardware prerequisite for Orb Day.                                                                                           |
+| F2  | GPU card purchased + installed (CUDA-verified)                                            | 4      | 0%  | 0.00         | Current setup runs `qwen2.5-coder:7b` (may be CPU). No CUDA verification. 14B+ requires GPU. Once purchased, `ollama-ai-provider` model swap is a config change. |
+| F3  | Chat UI accessible from laptop without dev server (production deploy or local prod build) | 3      | 30% | 0.90         | `/chat` route exists; works in local dev. Remaining: production deploy confirmed + Ollama tunnel live.                                                           |
+| F4  | Auto-start on boot (optional)                                                             | 2      | 0%  | 0.00         | No docs, no installer, no Windows service entry. `coleam00/local-ai-packaged` identified Caddy as reverse proxy option (OSS scout).                              |
+| F5  | Backup of Twin + chat history (data is the asset)                                         | 2      | 10% | 0.20         | Supabase implicit point-in-time recovery. No custom backup doc.                                                                                                  |
+|     | **Category total**                                                                        | **15** |     | **1.10**     |                                                                                                                                                                  |
+
+---
+
+## Summary
+
+| Category              | Weight  | Earned    | %         |
+| --------------------- | ------- | --------- | --------- |
+| A — Chat UI           | 25      | 20.20     | 81%       |
+| B — Brain / Model     | 20      | 10.40     | 52%       |
+| C — Context / Memory  | 18      | 9.55      | 53%       |
+| D — Tool Use          | 24      | 2.20      | 9%        |
+| E — Identity / Polish | 7       | 2.60      | 37%       |
+| F — Operational       | 15      | 1.10      | 7%        |
+| **Total**             | **109** | **46.05** | **42.2%** |
+
+_Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
+
+---
+
+## Top 3 Highest-Leverage Items Remaining
+
+| Rank | Item                                   | Weight     | Gap       | Leverage      | Note                                                                                                                                                   |
+| ---- | -------------------------------------- | ---------- | --------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | F1 + F2 — eGPU + GPU card              | 8 combined | 100%      | 8.0           | Purchase decision, not code. Unlocks B2 (14B model) and the actual "orb" feel. Once purchased, model swap is a config change via `ollama-ai-provider`. |
+| 2    | A1 — Complete streaming chat component | 8          | 45%       | 3.6 remaining | Already 55% due to AI SDK 6 clarity. task `14ec2466` staged. Flip to `queued` for builder.                                                             |
+| 3    | D2 + D3 — File write + DB query tools  | 4 + 4      | 100% each | 4.0 each      | Blocked on D7 (Tool use bridge, already 50%). Completing D7 then D2/D3 adds 10 pts.                                                                    |
+
+A1 shipped (thin-slice) — added 2.8 pts. A1 full completion (production tunnel) adds remaining 0.8 pts. F1+F2 hardware purchase adds **8 pts** → ~39%.
+
+---
+
+## Gaps Found in Audit (Not Yet Queued)
+
+| Gap                                                    | Category            | Status                                                                          |
+| ------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------- |
+| A1 streaming chat component                            | A1                  | task `14ec2466` staged (awaiting_grounding). Flip to `queued` when ready.       |
+| A2 message history schema                              | A2                  | task `56e2e9c0` staged. Flip first — A1 depends on it.                          |
+| A5 markdown rendering                                  | A5                  | task `c809687c` staged. Flip after A1 ships.                                    |
+| B5 Ollama streaming                                    | B5                  | task `8ca50976` staged. Flip early — A1 depends on it.                          |
+| D7 tool use bridge (`ToolLoopAgent` + `needsApproval`) | D7                  | No task queued. Spec from orb-B5/A1 grounding docs + oss-scout.md §Patterns §3. |
+| C6 Twin context bridge                                 | C6                  | No task queued. Depends on A1. Can be Phase 2 of orb-A1 chunk.                  |
+| A6 multi-conversation sidebar                          | A6                  | No task. Follows A1 + A2.                                                       |
+| LEPIOS Modelfile / voice spec                          | B3/E5               | No task. Write voice spec doc first; E5 identity pass second.                   |
+| Oura health schema + token                             | C5 (health portion) | Add `oura_activities` table; set `OURA_ACCESS_TOKEN` in `harness_config`.       |
+| Tool use D1–D6                                         | D1–D6               | All blocked on D7. D7 needs to ship first.                                      |
+| eGPU + GPU hardware                                    | F1/F2               | Purchase decision — prerequisite for 14B model.                                 |
+
+---
+
+## Recommended Next Ship
+
+**Maximum % gain per sprint (code only):**
+
+Flip these tasks to `queued` in dependency order:
+
+1. `56e2e9c0` (orb-A2) — schema first
+2. `8ca50976` (orb-B5) — streaming config
+3. `14ec2466` (orb-A1) — chat component (after A2 + B5 complete)
+4. `c809687c` (orb-A5) — markdown rendering (after A1 ships)
+
+Combined these 4 tasks earn: A1 remaining 45% (+3.6) + A2 remaining 60% (+2.4) + A5 remaining 20% (+0.4) + B5 remaining 35% (+1.05) = **+7.45 pts** → total moves from **27.3% to ~34%**.
+
+**Maximum % gain (hardware):** Purchase eGPU + GPU card (+8 pts) → **~41%** total.
+
+---
+
+## Last Updated
+
+2026-04-28 MDT / UTC — orb-A2 message persistence + sidebar shipped. A2 40%→85%, A6 0%→80%, C3 0%→85%. Total: 36.1% → 42.2%.
+
+Previously: 2026-04-28 MDT / UTC — orb-A5 markdown rendering + LEPIOS identity pass shipped. A3 0%→85%, A5 80%→95%, B3 25%→50%, E1 5%→30%, E2 25%→60%, E5 10%→70%. Total: 31.4% → 36.1%.
+
+Previously: 2026-04-27 MDT / UTC — orb-A1 thin-slice spike shipped. A1 55%→90%, B5 65%→90%, F3 0%→30%. Total: 27.3% → 31.4%.
+
+Previously: 2026-04-27 MDT / UTC — OSS scout absorbed. Rescored A1 (0→55%), A2 (0→40%), A5 (0→80%), B5 (0→65%). Added C6 (Twin context bridge), D7 (Tool use bridge), E5 (LEPIOS identity). Tracker expanded 100→109 pts. Total: 17.5% → 27.3%.
+
+Previously: 2026-04-27 (initial write) — Audit pass. Total: 17.5 / 100.
+
+---
+
+## Changelog
+
+| Date       | Entry                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-28 | orb-A2 message persistence shipped: migration `0042_orb_chat_schema.sql` (conversations + messages + DB trigger), `lib/orb/persistence.ts`, `GET /api/chat/conversations`, `GET /api/chat/conversations/[id]/messages`, `POST /api/chat` persists with auto-create + `X-Conversation-Id` header, sidebar in `app/(cockpit)/chat/page.tsx`, F21 tests 16/16 green. A2 40→85%, A6 0→80%, C3 0→85%. Total: 36.1% → 42.2%.       |
+| 2026-04-28 | orb-A5 markdown rendering shipped: `components/orb/MarkdownMessage.tsx` (react-markdown@10 + remark-gfm@4 + rehype-pretty-code@0.14 + shiki@4), full element override map, F20-compliant. LEPIOS identity pass: `lib/orb/identity.ts` system prompt wired into `/api/chat/route.ts`, nav label + chat header strip both show "LEPIOS". A3 0→85%, A5 80→95%, B3 25→50%, E1 5→30%, E2 25→60%, E5 10→70%. Total: 31.4% → 36.1%. |
+| 2026-04-27 | orb-A1 thin-slice spike shipped: `app/(cockpit)/chat/page.tsx` + `app/api/chat/route.ts` + F21 tests (6/6 green) + nav link. A1 55→90%, B5 65→90%, F3 0→30%. Total: 27.3% → 31.4%.                                                                                                                                                                                                                                           |
+| 2026-04-27 | Absorbed OSS scout findings (`docs/research/oss-scout.md`). Rescored 4 components (A1, A2, A5, B5), added 3 new components (C6, D7, E5). Tracker expanded 100→109 pts. Total: 17.5% → 27.3%.                                                                                                                                                                                                                                 |
+| 2026-04-27 | Initial write. Audit pass across all categories. Total: 17.5 / 100.                                                                                                                                                                                                                                                                                                                                                          |
