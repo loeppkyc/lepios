@@ -43,10 +43,11 @@ class ToolTimeoutError extends Error {
   }
 }
 
-// Registered tools — slice 1 ships ONE
+// Registered tools — slice 3: getHarnessRollup + queryTwin
 import { harnessRollupTool } from './harness-rollup'
+import { twinQueryTool } from './twin-query'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REGISTERED: ChatTool<any, any>[] = [harnessRollupTool]
+const REGISTERED: ChatTool<any, any>[] = [harnessRollupTool, twinQueryTool]
 
 async function logToolEvent(
   action: string,
