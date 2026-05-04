@@ -72,6 +72,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Paper Trail', href: '/reconciliation' },
       { label: 'Monthly Close', href: null },
       { label: 'Tax Centre', href: '/tax-centre' },
+      { label: 'GST Return', href: '/gst-return' },
       { label: 'Tax Return', href: null },
       { label: 'MileIQ', href: null },
     ],
