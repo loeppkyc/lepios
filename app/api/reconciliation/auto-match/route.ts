@@ -1,42 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scoreMatch, greedyPair } from '@/lib/reconciliation/scoring'
 import type { Receipt } from '@/lib/types/receipts'
 import type { BusinessExpense } from '@/lib/types/expenses'
-
-function scoreMatch(
-  receiptTotal: number,
-  receiptDateStr: string,
-  receiptVendor: string,
-  expenseTotal: number,
-  expenseDateStr: string,
-  expenseVendor: string
-): number {
-  const tolerance = Math.max(Math.min(receiptTotal * 0.15, 20.0), 2.0)
-  const amountDiff = Math.abs(expenseTotal - receiptTotal)
-  if (amountDiff > tolerance) return 999
-
-  const rMs = new Date(receiptDateStr + 'T12:00:00').getTime()
-  const eMs = new Date(expenseDateStr + 'T12:00:00').getTime()
-  if (isNaN(rMs) || isNaN(eMs)) return 999
-  const dayDiff = Math.abs((eMs - rMs) / 86400000)
-  if (dayDiff > 10) return 999
-
-  let score = amountDiff * 10 + dayDiff * 0.5
-  if (dayDiff <= 3) score -= 2
-
-  if (receiptVendor) {
-    const v1 = receiptVendor.toLowerCase()
-    const v2 = expenseVendor.toLowerCase()
-    const words = v1.split(/\s+/).filter((w) => w.length > 3)
-    const matchCount = words.filter((w) => v2.includes(w)).length
-    if (matchCount >= 2) score -= 8
-    else if (matchCount === 1 || v2.includes(v1.slice(0, 6))) score -= 5
-    else if (v2.includes(v1.slice(0, 4)) || v1.includes(v2.slice(0, 4))) score -= 2
-  }
-
-  if (amountDiff < 0.01) score -= 3
-  return Math.max(0, score)
-}
 
 // POST /api/reconciliation/auto-match
 // Body: { month: 'YYYY-MM' }
@@ -95,14 +61,8 @@ export async function POST(request: Request) {
   const receipts = (receiptRows ?? []) as Receipt[]
   const expenses = (expenseRows ?? []) as BusinessExpense[]
 
-  // Score all receipt+expense pairs, collect (score, receiptId, expenseId)
-  interface ScoredPair {
-    score: number
-    receipt: Receipt
-    expense: BusinessExpense
-  }
-
-  const pairs: ScoredPair[] = []
+  // Build scored pairs, then greedily pair
+  const rawPairs = []
   for (const receipt of receipts) {
     const dateStr = receipt.receipt_date ?? receipt.upload_date
     const total = receipt.total ?? receipt.tax_amount + (receipt.pretax ?? 0)
@@ -118,37 +78,11 @@ export async function POST(request: Request) {
         expense.date,
         expense.vendor
       )
-      if (score < 999) {
-        pairs.push({ score, receipt, expense })
-      }
+      if (score < 999) rawPairs.push({ score, receiptId: receipt.id, expenseId: expense.id })
     }
   }
 
-  // Sort by score ascending (best first), greedily claim pairs with score ≤ 1.0
-  pairs.sort((a, b) => a.score - b.score)
-
-  const claimedReceiptIds = new Set<string>()
-  const claimedExpenseIds = new Set<string>()
-  const autoMatches: { receiptId: string; expenseId: string }[] = []
-  let needsReview = 0
-
-  for (const pair of pairs) {
-    if (claimedReceiptIds.has(pair.receipt.id)) continue
-    if (claimedExpenseIds.has(pair.expense.id)) continue
-
-    if (pair.score <= 1.0) {
-      autoMatches.push({ receiptId: pair.receipt.id, expenseId: pair.expense.id })
-      claimedReceiptIds.add(pair.receipt.id)
-      claimedExpenseIds.add(pair.expense.id)
-    } else if (pair.score <= 3.0) {
-      // Only count the best unclaimed candidate per receipt for review
-      if (!claimedReceiptIds.has(pair.receipt.id)) {
-        needsReview++
-        claimedReceiptIds.add(pair.receipt.id) // don't double-count
-      }
-    }
-  }
-
+  const { autoMatches, needsReview } = greedyPair(rawPairs)
   const noMatch = receipts.length - autoMatches.length - needsReview
 
   // Apply auto-matches in parallel (receipt update + expense update per pair)

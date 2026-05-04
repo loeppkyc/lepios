@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scoreMatch } from '@/lib/reconciliation/scoring'
 import type { Receipt } from '@/lib/types/receipts'
 import type { BusinessExpense } from '@/lib/types/expenses'
 
@@ -16,41 +17,6 @@ export interface ReceiptCandidate {
 export interface CandidatesResponse {
   receipts: ReceiptCandidate[]
   unmatchedExpenses: BusinessExpense[]
-}
-
-function scoreMatch(
-  receiptTotal: number,
-  receiptDateStr: string,
-  receiptVendor: string,
-  expenseTotal: number,
-  expenseDateStr: string,
-  expenseVendor: string
-): number {
-  const tolerance = Math.max(Math.min(receiptTotal * 0.15, 20.0), 2.0)
-  const amountDiff = Math.abs(expenseTotal - receiptTotal)
-  if (amountDiff > tolerance) return 999
-
-  const rMs = new Date(receiptDateStr + 'T12:00:00').getTime()
-  const eMs = new Date(expenseDateStr + 'T12:00:00').getTime()
-  if (isNaN(rMs) || isNaN(eMs)) return 999
-  const dayDiff = Math.abs((eMs - rMs) / 86400000)
-  if (dayDiff > 10) return 999
-
-  let score = amountDiff * 10 + dayDiff * 0.5
-  if (dayDiff <= 3) score -= 2
-
-  if (receiptVendor) {
-    const v1 = receiptVendor.toLowerCase()
-    const v2 = expenseVendor.toLowerCase()
-    const words = v1.split(/\s+/).filter((w) => w.length > 3)
-    const matchCount = words.filter((w) => v2.includes(w)).length
-    if (matchCount >= 2) score -= 8
-    else if (matchCount === 1 || v2.includes(v1.slice(0, 6))) score -= 5
-    else if (v2.includes(v1.slice(0, 4)) || v1.includes(v2.slice(0, 4))) score -= 2
-  }
-
-  if (amountDiff < 0.01) score -= 3
-  return Math.max(0, score)
 }
 
 // GET /api/reconciliation/candidates?month=YYYY-MM
