@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { MileageTrip } from '@/app/api/mileage/route'
+import type { ParsedTrip } from '@/app/api/mileage/import/route'
 
 // CRA prescribed per-km rates for 2024/2025 (self-employed reference)
 const CRA_RATE_TIER1 = 0.72 // first 5,000 km
@@ -51,6 +52,13 @@ export function MileagePage() {
   const [refetchKey, setRefetchKey] = useState(0)
   const [annualKm, setAnnualKm] = useState('') // user enters total annual km for % calc
 
+  // MileIQ import state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importErr, setImportErr] = useState<string | null>(null)
+  const [preview, setPreview] = useState<ParsedTrip[] | null>(null)
+  const [importingBulk, setImportingBulk] = useState(false)
+
   function reload() {
     setRefetchKey((k) => k + 1)
   }
@@ -82,6 +90,46 @@ export function MileagePage() {
 
   function setField(patch: Partial<FormState>) {
     setForm((f) => ({ ...f, ...patch }))
+  }
+
+  async function handleImportFile(file: File) {
+    setImporting(true)
+    setImportErr(null)
+    setPreview(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch('/api/mileage/import', { method: 'POST', body: fd })
+      const j = (await r.json()) as { trips?: ParsedTrip[]; count?: number; error?: string }
+      if (!r.ok) throw new Error(j.error ?? 'Parse failed')
+      setPreview(j.trips ?? [])
+    } catch (e) {
+      setImportErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setImporting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleBulkImport() {
+    if (!preview || preview.length === 0) return
+    setImportingBulk(true)
+    setImportErr(null)
+    try {
+      const r = await fetch('/api/mileage/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(preview),
+      })
+      const j = (await r.json()) as { inserted?: number; error?: string }
+      if (!r.ok) throw new Error(j.error ?? 'Import failed')
+      setPreview(null)
+      reload()
+    } catch (e) {
+      setImportErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setImportingBulk(false)
+    }
   }
 
   async function handleAdd() {
@@ -324,6 +372,251 @@ export function MileagePage() {
             Enter to compute business %
           </div>
         </div>
+      </div>
+
+      {/* MileIQ Import */}
+      <div
+        style={{
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '18px 20px',
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+            marginBottom: 14,
+          }}
+        >
+          Import MileIQ Report
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleImportFile(f)
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              padding: '8px 18px',
+              background: 'var(--color-surface-2)',
+              color: importing ? 'var(--color-text-disabled)' : 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: importing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {importing ? 'Parsing…' : 'Upload MileIQ CSV'}
+          </button>
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: '0.7rem',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            Export from MileIQ → Reports → CSV. Business drives only are imported.
+          </span>
+        </div>
+
+        {importErr && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '8px 12px',
+              background: '#2a1a1a',
+              border: '1px solid #e5534b',
+              borderRadius: 'var(--radius-sm)',
+              color: '#e5534b',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.78rem',
+            }}
+          >
+            {importErr}
+          </div>
+        )}
+
+        {preview && (
+          <div style={{ marginTop: 16 }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: '0.72rem',
+                color: 'var(--color-text-muted)',
+                marginBottom: 10,
+              }}
+            >
+              {preview.length === 0
+                ? 'No business drives found in the CSV.'
+                : `${preview.length} business trip${preview.length !== 1 ? 's' : ''} parsed — review then import:`}
+            </div>
+
+            {preview.length > 0 && (
+              <>
+                <div
+                  style={{
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    overflow: 'hidden',
+                    marginBottom: 12,
+                    maxHeight: 260,
+                    overflowY: 'auto',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ background: 'var(--color-surface-2)' }}>
+                        {['Date', 'From', 'To', 'km', 'Purpose'].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              padding: '6px 10px',
+                              textAlign: 'left',
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: '0.6rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.08em',
+                              color: 'var(--color-text-disabled)',
+                              textTransform: 'uppercase',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.map((t, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--color-border)' }}>
+                          <td
+                            style={{
+                              padding: '5px 10px',
+                              color: 'var(--color-text-muted)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.date}
+                          </td>
+                          <td
+                            style={{
+                              padding: '5px 10px',
+                              color: 'var(--color-text-primary)',
+                              maxWidth: 160,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.from_location}
+                          </td>
+                          <td
+                            style={{
+                              padding: '5px 10px',
+                              color: 'var(--color-text-primary)',
+                              maxWidth: 160,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.to_location}
+                          </td>
+                          <td
+                            style={{
+                              padding: '5px 10px',
+                              color: 'var(--color-accent-gold)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.km.toFixed(1)}
+                          </td>
+                          <td
+                            style={{
+                              padding: '5px 10px',
+                              color: 'var(--color-text-muted)',
+                              maxWidth: 200,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.purpose}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => void handleBulkImport()}
+                    disabled={importingBulk}
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      padding: '8px 22px',
+                      background: importingBulk
+                        ? 'var(--color-surface-2)'
+                        : 'var(--color-accent-gold)',
+                      color: importingBulk ? 'var(--color-text-disabled)' : '#000',
+                      border: 'none',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: importingBulk ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {importingBulk ? 'Importing…' : `Import ${preview.length} trips`}
+                  </button>
+                  <button
+                    onClick={() => setPreview(null)}
+                    disabled={importingBulk}
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      padding: '8px 16px',
+                      background: 'none',
+                      color: 'var(--color-text-disabled)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Add trip form */}
