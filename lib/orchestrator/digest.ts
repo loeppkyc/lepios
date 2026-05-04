@@ -22,6 +22,7 @@ import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-dige
 import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 import { buildChatUiDigestLine } from '@/lib/orb/tools/chat-ui-digest'
 import { buildSelfRepairDigestLine } from '@/lib/harness/self-repair/digest'
+import { buildDeploySmokeStatsLine } from '@/lib/harness/smoke-tests/digest'
 import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
@@ -304,6 +305,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Self-repair — attempts, PRs opened, verify failures in last 24h ──
   const selfRepairDigestLine = await buildSelfRepairDigestLine()
   messageToSend = `${messageToSend}\n${selfRepairDigestLine}`
+
+  // ── F18: Smoke test framework — deploy smoke results in last 24h ───────────
+  const smokeStatsLine = await buildDeploySmokeStatsLine()
+  messageToSend = `${messageToSend}\n${smokeStatsLine}`
 
   characterCount = messageToSend.length
 
