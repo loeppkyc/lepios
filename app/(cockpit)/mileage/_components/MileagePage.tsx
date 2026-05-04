@@ -1,0 +1,621 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import type { MileageTrip } from '@/app/api/mileage/route'
+
+// CRA prescribed per-km rates for 2024/2025 (self-employed reference)
+const CRA_RATE_TIER1 = 0.72 // first 5,000 km
+const CRA_RATE_TIER2 = 0.66 // above 5,000 km
+const TIER1_KM = 5000
+
+const CURRENT_YEAR = new Date().getFullYear()
+const YEARS = Array.from({ length: 4 }, (_, i) => CURRENT_YEAR - i)
+
+function craDeduction(km: number): number {
+  if (km <= TIER1_KM) return km * CRA_RATE_TIER1
+  return TIER1_KM * CRA_RATE_TIER1 + (km - TIER1_KM) * CRA_RATE_TIER2
+}
+
+const fmtKm = (n: number) => `${n.toLocaleString('en-CA', { maximumFractionDigits: 1 })} km`
+const fmtCad = (n: number) =>
+  n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 })
+
+interface FormState {
+  date: string
+  from: string
+  to: string
+  km: string
+  purpose: string
+  roundTrip: boolean
+  notes: string
+}
+
+const emptyForm = (): FormState => ({
+  date: new Date().toISOString().slice(0, 10),
+  from: '',
+  to: '',
+  km: '',
+  purpose: '',
+  roundTrip: false,
+  notes: '',
+})
+
+export function MileagePage() {
+  const [year, setYear] = useState(CURRENT_YEAR)
+  const [trips, setTrips] = useState<MileageTrip[]>([])
+  const [totalKm, setTotalKm] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [form, setForm] = useState<FormState>(emptyForm())
+  const [refetchKey, setRefetchKey] = useState(0)
+  const [annualKm, setAnnualKm] = useState('') // user enters total annual km for % calc
+
+  function reload() {
+    setRefetchKey((k) => k + 1)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setErr(null)
+      try {
+        const r = await fetch(`/api/mileage?year=${year}`)
+        const j = (await r.json()) as { trips?: MileageTrip[]; totalKm?: number; error?: string }
+        if (!r.ok) throw new Error(j.error ?? 'Failed to load')
+        if (!cancelled) {
+          setTrips(j.trips ?? [])
+          setTotalKm(j.totalKm ?? 0)
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [year, refetchKey])
+
+  function setField(patch: Partial<FormState>) {
+    setForm((f) => ({ ...f, ...patch }))
+  }
+
+  async function handleAdd() {
+    if (!form.from.trim() || !form.to.trim() || !form.km || !form.purpose.trim()) {
+      setErr('From, To, km, and Purpose are required')
+      return
+    }
+    const kmVal = parseFloat(form.km)
+    if (isNaN(kmVal) || kmVal <= 0) {
+      setErr('km must be a positive number')
+      return
+    }
+    setErr(null)
+    setSaving(true)
+    try {
+      const r = await fetch('/api/mileage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: form.date,
+          from_location: form.from.trim(),
+          to_location: form.to.trim(),
+          km: kmVal,
+          purpose: form.purpose.trim(),
+          round_trip: form.roundTrip,
+          notes: form.notes.trim(),
+        }),
+      })
+      const j = (await r.json()) as { error?: string }
+      if (!r.ok) throw new Error(j.error ?? 'Failed to save')
+      setForm(emptyForm())
+      reload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      const r = await fetch(`/api/mileage/${id}`, { method: 'DELETE' })
+      if (!r.ok) {
+        const j = (await r.json()) as { error?: string }
+        throw new Error(j.error ?? 'Delete failed')
+      }
+      reload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const businessPct =
+    annualKm && parseFloat(annualKm) > 0
+      ? Math.min(100, (totalKm / parseFloat(annualKm)) * 100)
+      : null
+
+  const deduction = craDeduction(totalKm)
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    color: 'var(--color-text-disabled)',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  }
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.82rem',
+    background: 'var(--color-surface-2)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-primary)',
+    padding: '7px 10px',
+    width: '100%',
+    boxSizing: 'border-box',
+  }
+
+  return (
+    <div style={{ padding: '24px 32px', fontFamily: 'var(--font-ui)', maxWidth: 900 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display, var(--font-ui))',
+            fontSize: '1.15rem',
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            color: 'var(--color-text-primary)',
+            textTransform: 'uppercase',
+            margin: 0,
+          }}
+        >
+          Mileage Log
+        </h1>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-muted)',
+            margin: '6px 0 0',
+          }}
+        >
+          CRA-compliant vehicle trip log — date, from/to, km, purpose
+        </p>
+      </div>
+
+      {/* Year selector */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 24 }}>
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}
+        >
+          {YEARS.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+        {loading && (
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.72rem',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            Loading…
+          </span>
+        )}
+      </div>
+
+      {/* Error */}
+      {err && (
+        <div
+          style={{
+            background: '#2a1a1a',
+            border: '1px solid #e5534b',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px 14px',
+            color: '#e5534b',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.8rem',
+            marginBottom: 20,
+          }}
+        >
+          {err}
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        {[
+          { label: `${year} Business km`, value: fmtKm(totalKm) },
+          {
+            label: 'CRA rate deduction est.',
+            value: fmtCad(deduction),
+            note: '(flat-rate reference)',
+          },
+          {
+            label: 'Business use %',
+            value: businessPct !== null ? `${businessPct.toFixed(1)}%` : '—',
+          },
+        ].map(({ label, value, note }) => (
+          <div
+            key={label}
+            style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '12px 18px',
+              minWidth: 160,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '1.3rem',
+                fontWeight: 700,
+                color: 'var(--color-accent-gold)',
+              }}
+            >
+              {value}
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: '0.68rem',
+                color: 'var(--color-text-disabled)',
+                marginTop: 2,
+              }}
+            >
+              {label}
+            </div>
+            {note && (
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: '0.65rem',
+                  color: 'var(--color-text-disabled)',
+                  marginTop: 1,
+                }}
+              >
+                {note}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Total annual km input for % calc */}
+        <div
+          style={{
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '12px 18px',
+            minWidth: 160,
+          }}
+        >
+          <label style={{ ...labelStyle, marginBottom: 6 }}>Total annual km</label>
+          <input
+            type="number"
+            value={annualKm}
+            onChange={(e) => setAnnualKm(e.target.value)}
+            placeholder="e.g. 18000"
+            style={{ ...inputStyle, fontSize: '0.8rem' }}
+          />
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: '0.65rem',
+              color: 'var(--color-text-disabled)',
+              marginTop: 4,
+            }}
+          >
+            Enter to compute business %
+          </div>
+        </div>
+      </div>
+
+      {/* Add trip form */}
+      <div
+        style={{
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '18px 20px',
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+            marginBottom: 14,
+          }}
+        >
+          Log Trip
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <label style={labelStyle}>Date</label>
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setField({ date: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>From</label>
+            <input
+              value={form.from}
+              onChange={(e) => setField({ from: e.target.value })}
+              placeholder="Home / Sherwood Park"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>To</label>
+            <input
+              value={form.to}
+              onChange={(e) => setField({ to: e.target.value })}
+              placeholder="UPS / Costco"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>km (one-way)</label>
+            <input
+              type="number"
+              value={form.km}
+              onChange={(e) => setField({ km: e.target.value })}
+              placeholder="12.5"
+              min={0}
+              step={0.1}
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>Purpose</label>
+            <input
+              value={form.purpose}
+              onChange={(e) => setField({ purpose: e.target.value })}
+              placeholder="Pick up pallet / drop off shipment"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.roundTrip}
+              onChange={(e) => setField({ roundTrip: e.target.checked })}
+              style={{ accentColor: 'var(--color-accent-gold)', cursor: 'pointer' }}
+            />
+            Round trip (doubles km)
+          </label>
+          {form.roundTrip && form.km && parseFloat(form.km) > 0 && (
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.75rem',
+                color: 'var(--color-accent-gold)',
+              }}
+            >
+              = {(parseFloat(form.km) * 2).toFixed(1)} km total
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={() => void handleAdd()}
+          disabled={saving}
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            padding: '8px 22px',
+            background: saving ? 'var(--color-surface-2)' : 'var(--color-accent-gold)',
+            color: saving ? 'var(--color-text-disabled)' : '#000',
+            border: 'none',
+            borderRadius: 'var(--radius-sm)',
+            cursor: saving ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {saving ? 'Saving…' : 'Log Trip'}
+        </button>
+      </div>
+
+      {/* Trip list */}
+      {trips.length === 0 && !loading ? (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+            padding: '20px 0',
+          }}
+        >
+          No trips logged for {year}.
+        </div>
+      ) : (
+        <div
+          style={{
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+          }}
+        >
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.78rem',
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  background: 'var(--color-surface-2)',
+                  borderBottom: '1px solid var(--color-border)',
+                }}
+              >
+                {['Date', 'From', 'To', 'km', 'Purpose', ''].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: '0.62rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      color: 'var(--color-text-disabled)',
+                      textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {trips.map((trip) => {
+                const effectiveKm = trip.km * (trip.round_trip ? 2 : 1)
+                return (
+                  <tr key={trip.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td
+                      style={{
+                        padding: '8px 12px',
+                        color: 'var(--color-text-muted)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {trip.date}
+                    </td>
+                    <td style={{ padding: '8px 12px', color: 'var(--color-text-primary)' }}>
+                      {trip.from_location}
+                    </td>
+                    <td style={{ padding: '8px 12px', color: 'var(--color-text-primary)' }}>
+                      {trip.to_location}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 12px',
+                        color: 'var(--color-accent-gold)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {effectiveKm.toFixed(1)}
+                      {trip.round_trip && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            color: 'var(--color-text-disabled)',
+                            marginLeft: 4,
+                          }}
+                        >
+                          (RT)
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 12px',
+                        color: 'var(--color-text-muted)',
+                        maxWidth: 280,
+                      }}
+                    >
+                      {trip.purpose}
+                      {trip.notes && (
+                        <span
+                          style={{
+                            display: 'block',
+                            fontSize: '0.7rem',
+                            color: 'var(--color-text-disabled)',
+                          }}
+                        >
+                          {trip.notes}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <button
+                        onClick={() => void handleDelete(trip.id)}
+                        style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '0.68rem',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-text-disabled)',
+                          cursor: 'pointer',
+                          padding: '2px 6px',
+                        }}
+                        title="Delete trip"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* CRA rate footnote */}
+      <div
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: '0.68rem',
+          color: 'var(--color-text-disabled)',
+          marginTop: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        <strong style={{ color: 'var(--color-text-muted)' }}>CRA rates 2024:</strong> $0.72/km
+        (first 5,000 km) · $0.66/km (above 5,000 km). For self-employed, use actual vehicle expenses
+        × business use % — the deduction estimate above is a flat-rate reference only. Business use
+        % = business km ÷ total annual km.
+      </div>
+    </div>
+  )
+}
