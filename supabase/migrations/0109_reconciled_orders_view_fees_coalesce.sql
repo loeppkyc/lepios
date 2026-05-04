@@ -1,14 +1,9 @@
--- One row per AmazonOrderId. Joins orders ↔ amazon_financial_events
--- ↔ amazon_settlements ↔ cogs_per_asin_view.
--- security_invoker = true: inherits RLS from base tables.
--- All /amazon routes must use createServiceClient() to read financial
--- event columns — authenticated role cannot see amazon_financial_events.
+-- Guards event_fees_cad against NULL to prevent silently nullifying
+-- net_profit_cad when fees_contribution is absent on a financial event row.
 
 CREATE OR REPLACE VIEW public.reconciled_orders_view
 WITH (security_invoker = true) AS
 WITH order_events AS (
-  -- Aggregate all financial event types per order so RefundEvent
-  -- refunds_contribution is included alongside ShipmentEvent gross.
   SELECT
     amazon_order_id,
     SUM(gross_contribution)                AS event_gross_cad,
@@ -20,8 +15,6 @@ WITH order_events AS (
   GROUP BY amazon_order_id
 ),
 order_cogs AS (
-  -- Per-order COGS and pallet/missing signals.
-  -- has_missing_cogs = true if any ASIN in the order has no cogs entry.
   SELECT
     o.amazon_order_id,
     SUM(cpav.weighted_avg_unit_cost * o.quantity) AS cogs_cad,
@@ -33,7 +26,6 @@ order_cogs AS (
   GROUP BY o.amazon_order_id
 ),
 order_agg AS (
-  -- Collapse order-item rows to order level.
   SELECT
     amazon_order_id,
     MIN(order_date)      AS first_order_date,
