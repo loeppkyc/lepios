@@ -5,6 +5,7 @@ import {
   parseCallbackData,
   parseGateCallbackData,
   parseImproveCallbackData,
+  parsePushBashCallbackData,
 } from '@/lib/harness/telegram-buttons'
 import {
   rollbackDeployment,
@@ -18,6 +19,95 @@ import {
   handlePurposeReviewTextReply,
 } from '@/lib/purpose-review/handler'
 import { handleBudgetCommand } from '@/lib/work-budget/parser'
+import { runInSandbox } from '@/lib/harness/sandbox/runtime'
+
+// ---- push_bash_automation callback handlers -----------------------------------------
+
+async function handlePushBashApprove(
+  decisionId: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  const { data: row } = await db
+    .from('push_bash_decisions')
+    .select('id, cmd, status')
+    .eq('id', decisionId)
+    .maybeSingle()
+
+  if (!row) return
+
+  // Idempotency guard
+  if (row.status !== 'pending') {
+    await editTelegramMessage(chatId, messageId, originalText + '\nalready resolved').catch(
+      () => {}
+    )
+    return
+  }
+
+  // Run in sandbox
+  let exitCode: number | null = null
+  let sandboxRunId: string | null = null
+  try {
+    const result = await runInSandbox(row.cmd as string, {
+      agentId: 'push_bash_automation',
+      capability: 'sandbox.run',
+      scope: { fs: { allowedPaths: ['.'] } },
+      timeoutMs: 120_000,
+      reason: 'push_bash: approved via Telegram',
+    })
+    exitCode = result.exitCode
+    sandboxRunId = result.runId
+  } catch {
+    exitCode = -1
+  }
+
+  await db
+    .from('push_bash_decisions')
+    .update({ status: 'approved', exit_code: exitCode, sandbox_run_id: sandboxRunId })
+    .eq('id', decisionId)
+    .catch(() => {})
+
+  const suffix = exitCode === 0 ? ' (exit 0)' : ' (exit ' + String(exitCode) + ')'
+  await editTelegramMessage(chatId, messageId, originalText + '\n' + '✅ approved' + suffix).catch(
+    () => {}
+  )
+}
+
+async function handlePushBashDeny(
+  decisionId: string,
+  chatId: number,
+  messageId: number,
+  originalText: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  const { data: row } = await db
+    .from('push_bash_decisions')
+    .select('id, status')
+    .eq('id', decisionId)
+    .maybeSingle()
+
+  if (!row) return
+
+  // Idempotency guard
+  if (row.status !== 'pending') {
+    await editTelegramMessage(chatId, messageId, originalText + '\nalready resolved').catch(
+      () => {}
+    )
+    return
+  }
+
+  await db
+    .from('push_bash_decisions')
+    .update({ status: 'denied' })
+    .eq('id', decisionId)
+    .catch(() => {})
+
+  await editTelegramMessage(chatId, messageId, originalText + '\n' + '🚫 denied').catch(() => {})
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -994,12 +1084,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
   const parsedImprove = parseImproveCallbackData(callbackQuery.data ?? '')
   const parsedPurposeReview = parsePurposeReviewCallback(callbackQuery.data ?? '')
+  const parsedPushBash = parsePushBashCallbackData(callbackQuery.data ?? '')
 
   await logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate || parsedImprove || parsedPurposeReview ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove || parsedPurposeReview || parsedPushBash
+      ? 'success'
+      : 'warning'
   )
 
   if (parsed) {
@@ -1105,6 +1198,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         meta: { task_queue_id: parsedPurposeReview.taskQueueId, error: String(err) },
       })
     })
+  } else if (parsedPushBash?.action === 'approve') {
+    await handlePushBashApprove(
+      parsedPushBash.decisionId,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    ).catch(() => {})
+  } else if (parsedPushBash?.action === 'deny') {
+    await handlePushBashDeny(
+      parsedPushBash.decisionId,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? ''
+    ).catch(() => {})
   }
 
   return NextResponse.json({ ok: true })

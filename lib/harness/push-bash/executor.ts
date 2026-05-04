@@ -10,6 +10,7 @@
 import { runInSandbox } from '@/lib/harness/sandbox/runtime'
 import { createServiceClient } from '@/lib/supabase/service'
 import { telegram } from '@/lib/harness/arms-legs'
+import { buildPushBashCallback } from '@/lib/harness/telegram-buttons'
 import type { PolicyDecision, DecisionContext } from './policy'
 
 // 8 KB — smaller than sandbox's 256 KB; enough for shell commands
@@ -72,13 +73,31 @@ export async function executeDecision(
 
     const decisionId = data?.id ?? ''
 
-    // Plain Telegram alert (Slice 2 replaces with inline keyboard)
-    await telegram(
-      `⏸ push_bash confirm needed\n\`${cmd.substring(0, 200)}\`\nReason: ${decision.reason}\nID: ${decisionId}\nApprove via: harness_config or Telegram button (Slice 2).`,
-      { bot: 'alerts' }
-    ).catch(() => {
-      /* non-fatal */
-    })
+    const nl = '\n'
+    const pb = '\u23F8'
+    const confirmText =
+      pb + ' push_bash confirm' + nl + '`' + cmd.substring(0, 200) + '`' + nl + decision.reason
+
+    const tgResult = await telegram(confirmText, {
+      bot: 'alerts',
+      agentId: 'push_bash_automation',
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: '\u2705 Approve', callback_data: buildPushBashCallback('approve', decisionId) },
+            { text: '\uD83D\uDEAB Deny', callback_data: buildPushBashCallback('deny', decisionId) },
+          ],
+        ],
+      },
+    }).catch(() => null)
+
+    if (tgResult?.messageId) {
+      await db
+        .from('push_bash_decisions')
+        .update({ telegram_message_id: tgResult.messageId })
+        .eq('id', decisionId)
+        .catch(() => {})
+    }
 
     return {
       decisionId,

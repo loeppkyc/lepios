@@ -8,11 +8,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mock telegram-buttons ─────────────────────────────────────────────────────
 
-const { mockIsAllowedUser, mockParseCallbackData, mockParseGateCallbackData, mockParseImproveCallbackData } = vi.hoisted(() => ({
+const {
+  mockIsAllowedUser,
+  mockParseCallbackData,
+  mockParseGateCallbackData,
+  mockParseImproveCallbackData,
+  mockParsePushBashCallbackData,
+} = vi.hoisted(() => ({
   mockIsAllowedUser: vi.fn(),
   mockParseCallbackData: vi.fn(),
   mockParseGateCallbackData: vi.fn(),
   mockParseImproveCallbackData: vi.fn().mockReturnValue(null), // default: not an improve callback
+  mockParsePushBashCallbackData: vi.fn().mockReturnValue(null), // default: not a push_bash callback
 }))
 
 vi.mock('@/lib/harness/telegram-buttons', () => ({
@@ -20,6 +27,7 @@ vi.mock('@/lib/harness/telegram-buttons', () => ({
   parseCallbackData: mockParseCallbackData,
   parseGateCallbackData: mockParseGateCallbackData,
   parseImproveCallbackData: mockParseImproveCallbackData,
+  parsePushBashCallbackData: mockParsePushBashCallbackData,
 }))
 
 // ── Mock deploy-gate functions ────────────────────────────────────────────────
@@ -43,6 +51,23 @@ vi.mock('@/lib/harness/deploy-gate', () => ({
 
 const { mockFrom } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/sandbox/runtime', () => ({
+  runInSandbox: vi.fn().mockResolvedValue({
+    runId: 'mock-run-id',
+    sandboxId: 'mock-sandbox',
+    worktreePath: '/tmp/mock',
+    exitCode: 0,
+    stdout: 'ok',
+    stderr: '',
+    timedOut: false,
+    durationMs: 10,
+    filesChanged: [],
+    diffStat: { insertions: 0, deletions: 0, files: 0 },
+    diffHash: 'abc',
+    warnings: [],
+  }),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({

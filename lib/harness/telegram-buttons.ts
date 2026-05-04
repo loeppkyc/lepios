@@ -101,3 +101,18 @@ export async function sendMessageWithButtons(agentEventId: string, text: string)
     throw new Error(`Telegram API error: ${result.error}`)
   }
 }
+// -- push_bash_automation callback builder + parser
+
+export function buildPushBashCallback(action: 'approve' | 'deny', decisionId: string): string {
+  return `pb:${action}:${decisionId}`
+}
+
+export function parsePushBashCallbackData(
+  data: string
+): { action: 'approve' | 'deny'; decisionId: string } | null {
+  const m = data.match(
+    /^pb:(approve|deny):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
+  )
+  if (!m) return null
+  return { action: m[1] as 'approve' | 'deny', decisionId: m[2] }
+}
