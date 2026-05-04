@@ -67,7 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
       { label: 'Recurring Expenses', href: '/recurring' },
       { label: 'Import Statement', href: '/import' },
-      { label: 'Monthly P&L', href: null },
+      { label: 'Monthly P&L', href: '/monthly-pnl' },
       { label: 'Category P&L', href: '/cogs' },
       { label: 'Receipts', href: '/receipts' },
       { label: 'Paper Trail', href: '/reconciliation' },
@@ -99,7 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Household',
     items: [
       { label: 'Net Worth', href: null },
-      { label: 'Personal Expenses', href: null },
+      { label: 'Personal Expenses', href: '/personal-expenses' },
       { label: 'Debt Payoff', href: null },
       { label: 'Retirement', href: null },
       { label: 'Insurance', href: null },
