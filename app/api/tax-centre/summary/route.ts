@@ -24,13 +24,30 @@ interface T2125Line {
   count: number
 }
 
+export type QuarterStatus = 'complete' | 'in_progress' | 'needs_attention' | 'upcoming'
+
+export interface QuarterReadiness {
+  q: number
+  label: string
+  status: QuarterStatus
+  revenue: number
+  settlementCount: number
+  expenseCount: number
+  uncategorizedCount: number
+  mileageTrips: number
+  mileageKm: number
+  hasStarted: boolean
+  hasEnded: boolean
+}
+
 export interface TaxSummaryResponse {
   year: number
   quarters: QuarterSummary[]
   ytd: { itc: number; pretax: number; businessPortion: number; count: number }
   t2125: T2125Line[]
-  loanRepaymentPretax: number // excluded from T2125 — not deductible
-  zeroGstExpenses: number // count of zero-rated expense rows
+  loanRepaymentPretax: number
+  zeroGstExpenses: number
+  quarterReadiness: QuarterReadiness[]
 }
 
 const QUARTERS: Pick<QuarterSummary, 'q' | 'label' | 'months'>[] = [
@@ -40,28 +57,15 @@ const QUARTERS: Pick<QuarterSummary, 'q' | 'label' | 'months'>[] = [
   { q: 4, label: 'Q4 (Oct–Dec)', months: [10, 11, 12] },
 ]
 
-// T2125 line mapping — categories that are NOT listed here get ignored or grouped as Other
 const T2125_MAP: Array<{ line: string; label: string; categories: string[] }> = [
   {
     line: '8519',
     label: 'Cost of Goods Sold',
     categories: ['Inventory — Books (Pallets)', 'Inventory — Other'],
   },
-  {
-    line: '8521',
-    label: 'Advertising',
-    categories: ['Amazon Advertising'],
-  },
-  {
-    line: '8690',
-    label: 'Insurance',
-    categories: ['Insurance'],
-  },
-  {
-    line: '8710',
-    label: 'Interest & Bank Charges',
-    categories: ['Bank Charges'],
-  },
+  { line: '8521', label: 'Advertising', categories: ['Amazon Advertising'] },
+  { line: '8690', label: 'Insurance', categories: ['Insurance'] },
+  { line: '8710', label: 'Interest & Bank Charges', categories: ['Bank Charges'] },
   {
     line: '8760',
     label: 'Office Expenses',
@@ -97,7 +101,10 @@ function round2(n: number) {
   return Math.round(n * 100) / 100
 }
 
-// GET /api/tax-centre/summary?year=YYYY
+function getMonth(dateStr: string): number {
+  return new Date(dateStr + 'T12:00:00').getMonth() + 1
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const yearStr = searchParams.get('year')
@@ -113,16 +120,30 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('business_expenses')
-    .select('*')
-    .gte('date', `${year}-01-01`)
-    .lte('date', `${year}-12-31`)
-    .order('date', { ascending: true })
+  const [expensesResult, settlementsResult, mileageResult] = await Promise.all([
+    supabase
+      .from('business_expenses')
+      .select('*')
+      .gte('date', `${year}-01-01`)
+      .lte('date', `${year}-12-31`)
+      .order('date', { ascending: true }),
+    supabase
+      .from('amazon_settlements')
+      .select('period_end_at, net_payout')
+      .gte('period_end_at', `${year}-01-01`)
+      .lte('period_end_at', `${year}-12-31`),
+    supabase
+      .from('mileage_log')
+      .select('date, km, round_trip')
+      .gte('date', `${year}-01-01`)
+      .lte('date', `${year}-12-31`),
+  ])
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (expensesResult.error) {
+    return NextResponse.json({ error: expensesResult.error.message }, { status: 500 })
+  }
 
-  const expenses = (data ?? []) as BusinessExpense[]
+  const expenses = (expensesResult.data ?? []) as BusinessExpense[]
 
   // Build quarter → expenses map
   const quarterMap = new Map<number, BusinessExpense[]>()
@@ -132,18 +153,89 @@ export async function GET(request: Request) {
   let loanRepaymentPretax = 0
 
   for (const exp of expenses) {
-    const month = new Date(exp.date + 'T12:00:00').getMonth() + 1
+    const month = getMonth(exp.date)
     const q = QUARTERS.find((qq) => qq.months.includes(month))
     if (q) quarterMap.get(q.q)!.push(exp)
-
     if (ZERO_GST_CATEGORIES.has(exp.category)) zeroGstCount++
     if (LOAN_CATEGORIES.has(exp.category)) loanRepaymentPretax += exp.pretax
   }
 
-  // Non-loan expenses for T2125
-  const deductibleExpenses = expenses.filter((e) => !LOAN_CATEGORIES.has(e.category))
+  // Group settlements by quarter
+  const settlementsByQ = new Map<number, { count: number; revenue: number }>()
+  for (const s of (settlementsResult.data ?? []) as Array<{
+    period_end_at: string
+    net_payout: number
+  }>) {
+    const month = getMonth(s.period_end_at)
+    const q = QUARTERS.find((qq) => qq.months.includes(month))
+    if (!q) continue
+    const cur = settlementsByQ.get(q.q) ?? { count: 0, revenue: 0 }
+    cur.count++
+    cur.revenue += s.net_payout
+    settlementsByQ.set(q.q, cur)
+  }
 
-  // Quarter summaries — ITC = sum of tax_amount (only non-zero-rated categories have non-zero tax)
+  // Group mileage by quarter
+  const mileageByQ = new Map<number, { trips: number; km: number }>()
+  for (const m of (mileageResult.data ?? []) as Array<{
+    date: string
+    km: number
+    round_trip: boolean
+  }>) {
+    const month = getMonth(m.date)
+    const q = QUARTERS.find((qq) => qq.months.includes(month))
+    if (!q) continue
+    const cur = mileageByQ.get(q.q) ?? { trips: 0, km: 0 }
+    cur.trips++
+    cur.km += m.round_trip ? m.km * 2 : m.km
+    mileageByQ.set(q.q, cur)
+  }
+
+  const today = new Date()
+
+  // Quarter readiness
+  const quarterReadiness: QuarterReadiness[] = QUARTERS.map(({ q, label, months }) => {
+    const qStartDate = new Date(year, months[0] - 1, 1)
+    const qEndDate = new Date(year, months[months.length - 1], 0) // Last day of last month
+
+    const hasStarted = today >= qStartDate
+    const hasEnded = today > qEndDate
+
+    const expRows = quarterMap.get(q) ?? []
+    const uncategorizedCount = expRows.filter(
+      (e) => !e.category || e.category === 'Uncategorized'
+    ).length
+
+    const sData = settlementsByQ.get(q) ?? { count: 0, revenue: 0 }
+    const mData = mileageByQ.get(q) ?? { trips: 0, km: 0 }
+
+    let status: QuarterStatus
+    if (!hasStarted) {
+      status = 'upcoming'
+    } else if (!hasEnded) {
+      status = 'in_progress'
+    } else if (uncategorizedCount > 0) {
+      status = 'needs_attention'
+    } else {
+      status = 'complete'
+    }
+
+    return {
+      q,
+      label,
+      status,
+      revenue: round2(sData.revenue),
+      settlementCount: sData.count,
+      expenseCount: expRows.length,
+      uncategorizedCount,
+      mileageTrips: mData.trips,
+      mileageKm: round2(mData.km),
+      hasStarted,
+      hasEnded,
+    }
+  })
+
+  // Quarter summaries (ITC)
   const quarters: QuarterSummary[] = QUARTERS.map(({ q, label, months }) => {
     const rows = quarterMap.get(q)!
     let itc = 0,
@@ -173,6 +265,7 @@ export async function GET(request: Request) {
   }
 
   // T2125 line totals
+  const deductibleExpenses = expenses.filter((e) => !LOAN_CATEGORIES.has(e.category))
   const categoryToPretax = new Map<
     string,
     { pretax: number; businessPortion: number; count: number }
@@ -214,5 +307,6 @@ export async function GET(request: Request) {
     t2125,
     loanRepaymentPretax: round2(loanRepaymentPretax),
     zeroGstExpenses: zeroGstCount,
+    quarterReadiness,
   } satisfies TaxSummaryResponse)
 }
