@@ -179,21 +179,35 @@ export default function ChatPage() {
           {conversations.map((conv) => {
             const isActive = conv.id === activeId
             return (
-              <button
-                key={conv.id}
-                type="button"
-                onClick={() => selectConversation(conv.id)}
-                className={`mb-0.5 block w-full rounded-[var(--radius-sm)] px-3 py-2 text-left font-[family-name:var(--font-ui)] text-xs transition-colors ${
-                  isActive
-                    ? 'bg-[var(--color-surface)] text-[var(--color-text)]'
-                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
-                }`}
-              >
-                <span className="block truncate">{conv.title ?? 'Untitled'}</span>
-                <span className="mt-0.5 block text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
-                  {conv.message_count} {conv.message_count === 1 ? 'msg' : 'msgs'}
-                </span>
-              </button>
+              <div key={conv.id} className="group relative mb-0.5">
+                <button
+                  type="button"
+                  onClick={() => selectConversation(conv.id)}
+                  className={`block w-full rounded-[var(--radius-sm)] px-3 py-2 pr-7 text-left font-[family-name:var(--font-ui)] text-xs transition-colors ${
+                    isActive
+                      ? 'bg-[var(--color-surface)] text-[var(--color-text)]'
+                      : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <span className="block truncate">{conv.title ?? 'Untitled'}</span>
+                  <span className="mt-0.5 block text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+                    {conv.message_count} {conv.message_count === 1 ? 'msg' : 'msgs'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  title="Delete conversation"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    await fetch(`/api/chat/conversations/${conv.id}`, { method: 'DELETE' })
+                    if (conv.id === activeId) startNewChat()
+                    loadConversations()
+                  }}
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 hidden rounded px-1 py-0.5 text-[length:var(--text-nano)] text-[var(--color-text-disabled)] transition-colors hover:text-[var(--color-critical)] group-hover:block"
+                >
+                  &#x2715;
+                </button>
+              </div>
             )
           })}
         </div>

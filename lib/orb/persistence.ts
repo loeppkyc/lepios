@@ -81,6 +81,19 @@ export async function appendMessage(
   return data as ChatMessage
 }
 
+export async function archiveConversation(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  const db = createServiceClient()
+  const { error } = await db
+    .from('conversations')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', conversationId)
+    .eq('user_id', userId) // ownership guard
+  if (error) throw error
+}
+
 export async function loadConversationMessages(
   conversationId: string,
 ): Promise<ChatMessage[]> {

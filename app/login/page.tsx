@@ -117,6 +117,11 @@ export default function LoginPage() {
         >
           Edmonton · Alberta · Canada
         </p>
+        <div className="mt-3">
+          <span className="rounded-sm border border-[var(--color-accent)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] font-semibold uppercase tracking-widest text-[var(--color-accent)]">
+            LEPIOS
+          </span>
+        </div>
       </div>
 
       {/* ── Module icons ── */}
