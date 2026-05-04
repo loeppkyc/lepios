@@ -56,6 +56,7 @@ vi.mock('ollama-ai-provider', () => {
 vi.mock('ai', () => ({
   streamText: vi.fn(),
   convertToModelMessages: vi.fn((msgs: unknown[]) => msgs),
+  stepCountIs: vi.fn((n: number) => ({ type: 'stepCount', n })),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────

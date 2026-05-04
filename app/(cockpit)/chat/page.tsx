@@ -1,7 +1,7 @@
 'use client'
 
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MarkdownMessage } from '@/components/orb/MarkdownMessage'
@@ -30,6 +30,45 @@ function dbMessagesToUIMessages(rows: DBMessage[]): UIMessage[] {
         role: m.role,
         parts: m.content,
       }) as unknown as UIMessage,
+  )
+}
+
+function ToolCallCard({
+  toolName,
+  state,
+  output,
+}: {
+  toolName: string
+  state: string
+  output?: unknown
+}) {
+  if (state === 'input-streaming' || state === 'input-available') {
+    return (
+      <div className="flex items-center gap-2 rounded-sm border border-[var(--color-border)] px-3 py-1.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] text-[var(--color-text-muted)]">
+        <span className="animate-pulse">&#x23F3;</span>
+        <span>{toolName}</span>
+      </div>
+    )
+  }
+
+  // output-available, output-error, output-denied, or any terminal state
+  const outputStr =
+    output === null || output === undefined
+      ? '(no result)'
+      : typeof output === 'string'
+        ? output
+        : JSON.stringify(output, null, 2)
+  const preview = outputStr.length > 400 ? outputStr.slice(0, 400) + '…' : outputStr
+
+  return (
+    <details className="rounded-sm border border-[var(--color-border)] px-3 py-1.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)]">
+      <summary className="cursor-pointer text-[var(--color-text-muted)]">
+        &#x2713; {toolName}
+      </summary>
+      <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-[var(--color-text)]">
+        {preview}
+      </pre>
+    </details>
   )
 }
 
@@ -228,6 +267,17 @@ function ActiveChat({
                   }`}
                 >
                   {msg.parts.map((part, i) => {
+                    if (isToolUIPart(part)) {
+                      const name = getToolName(part)
+                      return (
+                        <ToolCallCard
+                          key={i}
+                          toolName={name}
+                          state={part.state}
+                          output={'output' in part ? part.output : undefined}
+                        />
+                      )
+                    }
                     if (part.type !== 'text') return null
                     if (isUser) {
                       return (
