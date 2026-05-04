@@ -11,6 +11,7 @@ import {
 } from '@/lib/orb/persistence'
 import { buildTools } from '@/lib/orb/tools/registry'
 import { buildSessionDigest } from '@/lib/memory/session-digest'
+import { getTwinContext } from '@/lib/orb/twin-context'
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434'
 const MODEL = process.env.OLLAMA_CHAT_MODEL ?? 'qwen2.5-coder:3b'
@@ -59,11 +60,7 @@ export async function POST(req: Request) {
     conversationId = incomingId
   }
 
-  await appendMessage(
-    conversationId,
-    'user',
-    userMsg?.parts ?? [{ type: 'text', text: userText }],
-  )
+  await appendMessage(conversationId, 'user', userMsg?.parts ?? [{ type: 'text', text: userText }])
 
   // On new conversations: inject session digest into system prompt (spec A2).
   // 3s timeout — never blocks session start (spec acceptance E).
@@ -82,13 +79,22 @@ export async function POST(req: Request) {
     }
   }
 
+  // Twin context: inject per-message, 2s timeout, never blocks chat (C2/C6).
+  const twinCtx = await Promise.race([
+    getTwinContext(userText),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 2_000)),
+  ])
+  if (twinCtx) {
+    systemPrompt = `${systemPrompt}\n\n${twinCtx}`
+  }
+
   const result = streamText({
     // ollama-ai-provider@1.x returns LanguageModelV1; ai@6 expects V2/V3.
     // Cast through unknown to bridge the provider version gap at type level only.
     model: ollamaProvider(MODEL) as unknown as LanguageModel,
     system: systemPrompt,
     messages: await convertToModelMessages(
-      messages as Parameters<typeof convertToModelMessages>[0],
+      messages as Parameters<typeof convertToModelMessages>[0]
     ),
     temperature: 0.7,
     tools: buildTools({
@@ -100,15 +106,8 @@ export async function POST(req: Request) {
     toolChoice: 'auto',
     stopWhen: stepCountIs(5),
     onFinish: async ({ text, usage, finishReason }) => {
-      const totalTokens =
-        (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) || undefined
-      await appendMessage(
-        conversationId,
-        'assistant',
-        [{ type: 'text', text }],
-        MODEL,
-        totalTokens,
-      )
+      const totalTokens = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0) || undefined
+      await appendMessage(conversationId, 'assistant', [{ type: 'text', text }], MODEL, totalTokens)
       console.log(
         '[orb-chat]',
         JSON.stringify({
@@ -119,7 +118,7 @@ export async function POST(req: Request) {
           output_tokens: usage.outputTokens,
           duration_ms: Date.now() - t0,
           finish_reason: finishReason,
-        }),
+        })
       )
     },
   })
