@@ -202,6 +202,7 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [chatKey, setChatKey] = useState(0)
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([])
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/api/chat/conversations')
@@ -236,8 +237,18 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-48px)] bg-[var(--color-base)]">
+      {/* mobile overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-10 bg-black/50 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--color-border)] md:flex">
+      <aside
+        className={`${mobileSidebarOpen ? 'flex' : 'hidden'} absolute inset-y-0 left-0 z-20 w-60 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-base)] md:relative md:flex`}
+      >
         <div className="p-3">
           <button
             type="button"
@@ -283,6 +294,7 @@ export default function ChatPage() {
         conversationId={activeId}
         initialMessages={initialMessages}
         onConversationCreated={handleConversationCreated}
+        onMenuClick={() => setMobileSidebarOpen((v) => !v)}
       />
     </div>
   )
@@ -292,10 +304,12 @@ function ActiveChat({
   conversationId,
   initialMessages,
   onConversationCreated,
+  onMenuClick,
 }: {
   conversationId: string | null
   initialMessages: UIMessage[]
   onConversationCreated: (id: string) => void
+  onMenuClick?: () => void
 }) {
   const conversationIdRef = useRef<string | null>(conversationId)
   const onCreatedRef = useRef(onConversationCreated)
@@ -359,7 +373,21 @@ function ActiveChat({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {/* identity strip */}
-      <div className="flex items-baseline gap-3 border-b border-[var(--color-border)] bg-[var(--color-base)] px-4 py-3">
+      <div className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-base)] px-4 py-3">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="mr-1 flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text)] md:hidden"
+            aria-label="Toggle sidebar"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="4" width="14" height="1.5" rx="0.75" fill="currentColor" />
+              <rect x="2" y="8.25" width="14" height="1.5" rx="0.75" fill="currentColor" />
+              <rect x="2" y="12.5" width="14" height="1.5" rx="0.75" fill="currentColor" />
+            </svg>
+          </button>
+        )}
         <span className="font-[family-name:var(--font-ui)] text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
           LEPIOS
         </span>

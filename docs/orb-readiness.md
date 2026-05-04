@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 78.4% (85.45 / 109 pts)
+## Total Readiness: 80.9% (88.15 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -39,9 +39,9 @@ _The front door. Without a working chat surface, nothing below can be experience
 | A4  | File upload support (images, docs, code)                          | 1      | 0%   | 0.00         | No multipart handlers in `app/api/`.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | A5  | Markdown rendering                                                | 2      | 95%  | 1.90         | **Shipped 2026-04-28.** `components/orb/MarkdownMessage.tsx` — react-markdown@10 + remark-gfm@4 + rehype-pretty-code@0.14 + shiki@4. Full element override map (h1–h6, p, code, pre, table family, lists, blockquote, a, hr) using LepiOS Tailwind tokens. F20-compliant. User messages stay plain text; assistant uses markdown. Remaining: production verify.                                                                                                                  |
 | A6  | Multi-conversation management (sidebar of past chats)             | 3      | 100% | 3.00         | **Complete 2026-05-04.** Delete: `DELETE /api/chat/conversations/[id]` soft-archive + hover × button. Rename: `PATCH /api/chat/conversations/[id]` + `ConvRow` component — double-click title → inline input (Enter/blur commits, Escape cancels, 100-char cap). `renameConversation()` in persistence.ts. All routes auth + ownership guarded.                                                                                                                                |
-| A7  | Mobile responsive                                                 | 2      | 30%  | 0.60         | Tailwind v4 configured; cockpit layout uses minimal inline styles with no responsive design. Some responsive classes in use.                                                                                                                                                                                                                                                                                                                                                     |
+| A7  | Mobile responsive                                                 | 2      | 85%  | 1.70         | **Updated 2026-05-04.** Chat page: hamburger button (md:hidden) in identity strip, `mobileSidebarOpen` state, sidebar absolute-positioned + z-20 on mobile with dark overlay, overlay tap-to-close. Remaining 15%: other cockpit routes (amazon, bookkeeping) not yet responsive.                                                                                                                                                                                              |
 | A8  | Authentication gate (Colin-only)                                  | 3      | 100% | 3.00         | Supabase auth enforced on all API routes. RLS policies on all tables. Login page at `/app/login`.                                                                                                                                                                                                                                                                                                                                                                                |
-|     | **Category total**                                                | **25** |      | **22.00**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|     | **Category total**                                                | **25** |      | **23.10**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -109,9 +109,9 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | F1  | eGPU enclosure purchased + tested                                                         | 4      | 0%  | 0.00         | No purchase or mention in any docs. Hardware prerequisite for Orb Day.                                                                                           |
 | F2  | GPU card purchased + installed (CUDA-verified)                                            | 4      | 0%  | 0.00         | Current setup runs `qwen2.5-coder:7b` (may be CPU). No CUDA verification. 14B+ requires GPU. Once purchased, `ollama-ai-provider` model swap is a config change. |
 | F3  | Chat UI accessible from laptop without dev server (production deploy or local prod build) | 3      | 95% | 2.85         | **Verified 2026-05-04.** `https://lepios-one.vercel.app/chat` returns 200, full UI visible (sidebar + identity strip + message input), Ollama tunnel live. `LEPIOS.lnk` Desktop shortcut opens it directly. Remaining 5%: confirm a real message round-trips end-to-end in production (requires sitting at laptop + Ollama running).                                                                                                                                                                    |
-| F4  | Auto-start on boot (optional)                                                             | 2      | 0%  | 0.00         | No docs, no installer, no Windows service entry. `coleam00/local-ai-packaged` identified Caddy as reverse proxy option (OSS scout).                              |
+| F4  | Auto-start on boot (optional)                                                             | 2      | 80% | 1.60         | **Verified 2026-05-04.** cloudflared installed as Windows AUTO_START service (`sc.exe`) — routes `ollama.loeppky.xyz → localhost:11434`. Ollama auto-starts via `Ollama.lnk` + `start_ollama.bat` in Windows Startup folder. Both confirmed on-machine. Remaining 20%: formal post-reboot smoke test log.                                                                                                              |
 | F5  | Backup of Twin + chat history (data is the asset)                                         | 2      | 50% | 1.00         | **Strategy documented 2026-05-04.** `docs/ops/backup-strategy.md`: Layer 1 = Supabase PITR 7-day (implicit); Layer 2 = manual knowledge export to `docs/backups/`; recovery runbooks for 3 scenarios. Remaining 50%: automated nightly export script + Dropbox/Storage destination.                                                            |
-|     | **Category total**                                                                        | **15** |     | **3.85**     |                                                                                                                                                                  |
+|     | **Category total**                                                                        | **15** |     | **5.45**     |                                                                                                                                                                  |
 
 ---
 
@@ -119,13 +119,13 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 
 | Category              | Weight  | Earned    | %         |
 | --------------------- | ------- | --------- | --------- |
-| A — Chat UI           | 25      | 22.00     | 88%       |
+| A — Chat UI           | 25      | 23.10     | 92%       |
 | B — Brain / Model     | 20      | 15.60     | 78%       |
 | C — Context / Memory  | 18      | 16.75     | 93%       |
 | D — Tool Use          | 24      | 21.20     | 88%       |
 | E — Identity / Polish | 7       | 6.05      | 86%       |
-| F — Operational       | 15      | 3.85      | 26%       |
-| **Total**             | **109** | **85.45** | **78.4%** |
+| F — Operational       | 15      | 5.45      | 36%       |
+| **Total**             | **109** | **88.15** | **80.9%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
