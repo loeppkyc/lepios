@@ -33,7 +33,7 @@ const SandboxRunRequestSchema = z.object({
   scope: SandboxScopeSchema,
   timeoutMs: z.number().int().min(1000).max(300_000).optional(),
   cwd: z.string().optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
   reason: z.string().optional(),
 })
 
