@@ -43,7 +43,7 @@ class ToolTimeoutError extends Error {
   }
 }
 
-// Registered tools — slice 5: + listIdeas + submitIdea
+// Registered tools — slice 6: + readFile + queryDb
 import { harnessRollupTool } from './harness-rollup'
 import { twinQueryTool } from './twin-query'
 import { sendTelegramTool } from './send-telegram'
@@ -51,6 +51,8 @@ import { queueTaskTool } from './queue-task'
 import { listAgentEventsTool } from './list-agent-events'
 import { listIdeasTool } from './list-ideas'
 import { submitIdeaTool } from './submit-idea'
+import { readFileTool } from './read-file'
+import { queryDbTool } from './query-db'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REGISTERED: ChatTool<any, any>[] = [
   harnessRollupTool,
@@ -60,6 +62,8 @@ const REGISTERED: ChatTool<any, any>[] = [
   listAgentEventsTool,
   listIdeasTool,
   submitIdeaTool,
+  readFileTool,
+  queryDbTool,
 ]
 
 async function logToolEvent(
@@ -72,7 +76,7 @@ async function logToolEvent(
     toolCallId: string
     durationMs: number
     error?: string
-  },
+  }
 ): Promise<void> {
   try {
     const db = createServiceClient()
@@ -102,7 +106,7 @@ export function buildTools(ctx: ChatToolContext): Record<string, Tool> {
     REGISTERED.map((t) => [
       t.name,
       // tool() overload inference breaks with any-typed schemas; cast directly.
-      ({
+      {
         description: t.description,
         parameters: t.parameters,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,10 +134,7 @@ export function buildTools(ctx: ChatToolContext): Record<string, Tool> {
             const result = await Promise.race([
               t.execute(args as Parameters<typeof t.execute>[0], callCtx),
               new Promise<never>((_, reject) =>
-                setTimeout(
-                  () => reject(new ToolTimeoutError(t.name)),
-                  TOOL_TIMEOUT_MS,
-                ),
+                setTimeout(() => reject(new ToolTimeoutError(t.name)), TOOL_TIMEOUT_MS)
               ),
             ])
             await logToolEvent('chat_ui.tool.ok', {
@@ -144,7 +145,11 @@ export function buildTools(ctx: ChatToolContext): Record<string, Tool> {
               toolCallId,
               durationMs: Date.now() - t0,
             })
-            return { allowed: true, result, auditId: cap.audit_id } satisfies ChatToolResult<unknown>
+            return {
+              allowed: true,
+              result,
+              auditId: cap.audit_id,
+            } satisfies ChatToolResult<unknown>
           } catch (err) {
             const isTimeout = err instanceof ToolTimeoutError
             await logToolEvent(isTimeout ? 'chat_ui.tool.timeout' : 'chat_ui.tool.error', {
@@ -159,7 +164,7 @@ export function buildTools(ctx: ChatToolContext): Record<string, Tool> {
             throw err
           }
         },
-      }) as unknown as Tool,
-    ]),
+      } as unknown as Tool,
+    ])
   )
 }
