@@ -1,5 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
-import { archiveConversation, getConversationOwner } from '@/lib/orb/persistence'
+import { archiveConversation, getConversationOwner, renameConversation } from '@/lib/orb/persistence'
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return new Response(null, { status: 401 })
+
+  const { id } = await params
+  const owner = await getConversationOwner(id)
+  if (owner !== user.id) return new Response(null, { status: 403 })
+
+  const { title } = (await req.json()) as { title?: string }
+  if (typeof title !== 'string') return Response.json({ error: 'title required' }, { status: 400 })
+
+  await renameConversation(id, user.id, title)
+  return new Response(null, { status: 204 })
+}
 
 export async function DELETE(
   _req: Request,

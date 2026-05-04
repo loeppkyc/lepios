@@ -81,6 +81,20 @@ export async function appendMessage(
   return data as ChatMessage
 }
 
+export async function renameConversation(
+  conversationId: string,
+  userId: string,
+  title: string,
+): Promise<void> {
+  const db = createServiceClient()
+  const { error } = await db
+    .from('conversations')
+    .update({ title: title.trim().slice(0, 100) || null })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function archiveConversation(
   conversationId: string,
   userId: string,

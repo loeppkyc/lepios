@@ -33,6 +33,83 @@ function dbMessagesToUIMessages(rows: DBMessage[]): UIMessage[] {
   )
 }
 
+function ConvRow({
+  conv,
+  isActive,
+  onSelect,
+  onDelete,
+  onRename,
+}: {
+  conv: Conversation
+  isActive: boolean
+  onSelect: () => void
+  onDelete: () => void
+  onRename: (title: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    setDraft(conv.title ?? '')
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  function commitEdit() {
+    setEditing(false)
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== (conv.title ?? '')) onRename(trimmed)
+  }
+
+  return (
+    <div className="group relative mb-0.5">
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="block w-full rounded-[var(--radius-sm)] bg-[var(--color-surface)] px-3 py-2 font-[family-name:var(--font-ui)] text-xs text-[var(--color-text)] outline-none ring-1 ring-[var(--color-accent)]"
+          maxLength={100}
+          autoFocus
+        />
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onSelect}
+            onDoubleClick={startEdit}
+            className={`block w-full rounded-[var(--radius-sm)] px-3 py-2 pr-7 text-left font-[family-name:var(--font-ui)] text-xs transition-colors ${
+              isActive
+                ? 'bg-[var(--color-surface)] text-[var(--color-text)]'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            <span className="block truncate">{conv.title ?? 'Untitled'}</span>
+            <span className="mt-0.5 block text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+              {conv.message_count} {conv.message_count === 1 ? 'msg' : 'msgs'}
+            </span>
+          </button>
+          <button
+            type="button"
+            title="Delete conversation"
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 hidden rounded px-1 py-0.5 text-[length:var(--text-nano)] text-[var(--color-text-disabled)] transition-colors hover:text-[var(--color-critical)] group-hover:block"
+          >
+            &#x2715;
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function isPendingApproval(output: unknown): output is { preview: Record<string, unknown> } {
   if (output === null || typeof output !== 'object') return false
   const o = output as Record<string, unknown>
@@ -176,40 +253,27 @@ export default function ChatPage() {
               No conversations yet.
             </p>
           )}
-          {conversations.map((conv) => {
-            const isActive = conv.id === activeId
-            return (
-              <div key={conv.id} className="group relative mb-0.5">
-                <button
-                  type="button"
-                  onClick={() => selectConversation(conv.id)}
-                  className={`block w-full rounded-[var(--radius-sm)] px-3 py-2 pr-7 text-left font-[family-name:var(--font-ui)] text-xs transition-colors ${
-                    isActive
-                      ? 'bg-[var(--color-surface)] text-[var(--color-text)]'
-                      : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
-                  }`}
-                >
-                  <span className="block truncate">{conv.title ?? 'Untitled'}</span>
-                  <span className="mt-0.5 block text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
-                    {conv.message_count} {conv.message_count === 1 ? 'msg' : 'msgs'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  title="Delete conversation"
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    await fetch(`/api/chat/conversations/${conv.id}`, { method: 'DELETE' })
-                    if (conv.id === activeId) startNewChat()
-                    loadConversations()
-                  }}
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 hidden rounded px-1 py-0.5 text-[length:var(--text-nano)] text-[var(--color-text-disabled)] transition-colors hover:text-[var(--color-critical)] group-hover:block"
-                >
-                  &#x2715;
-                </button>
-              </div>
-            )
-          })}
+          {conversations.map((conv) => (
+            <ConvRow
+              key={conv.id}
+              conv={conv}
+              isActive={conv.id === activeId}
+              onSelect={() => selectConversation(conv.id)}
+              onDelete={async () => {
+                await fetch(`/api/chat/conversations/${conv.id}`, { method: 'DELETE' })
+                if (conv.id === activeId) startNewChat()
+                loadConversations()
+              }}
+              onRename={async (title) => {
+                await fetch(`/api/chat/conversations/${conv.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title }),
+                })
+                loadConversations()
+              }}
+            />
+          ))}
         </div>
       </aside>
 
