@@ -33,7 +33,7 @@ export async function GET() {
   const yearMap = new Map<number, YearData>()
 
   for (const e of expenses) {
-    const year = parseInt(e.date.slice(0, 4))
+    const year = parseInt(e.date.slice(0, 4), 10)
     if (!yearMap.has(year)) {
       yearMap.set(year, {
         year,
