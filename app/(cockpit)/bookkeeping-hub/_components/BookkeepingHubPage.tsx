@@ -4,6 +4,19 @@ import { useEffect, useState, Fragment } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface YearRow {
+  year: number
+  count: number
+  totalPretax: number
+  totalTax: number
+  businessPortion: number
+  topCategories: { category: string; total: number }[]
+}
+
+interface HistoryData {
+  years: YearRow[]
+}
+
 interface MonthRow {
   month: string // 'YYYY-MM'
   count: number
@@ -169,6 +182,182 @@ const s = {
   } as React.CSSProperties,
 }
 
+// ── Historical Bar Chart ──────────────────────────────────────────────────────
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Inventory — Other': '#6366f1',
+  'Vehicle & Mileage': '#f59e0b',
+  'Professional Fees': '#8b5cf6',
+  Insurance: '#ec4899',
+  'Phone & Internet': '#06b6d4',
+  'Bank Charges': '#64748b',
+  'Software & Subscriptions': '#3b82f6',
+  'Shipping & Delivery': '#10b981',
+  'Rent & Lease': '#f97316',
+  'Office Expenses': '#84cc16',
+  'Amazon Advertising': '#ef4444',
+  'Vehicle — Parking': '#a16207',
+  'Meals & Entertainment': '#db2777',
+  'Marketplace Fees': '#0891b2',
+  'Business Travel': '#7c3aed',
+}
+
+function HistoricalChart({
+  years,
+  activeYear,
+  onYearClick,
+}: {
+  years: YearRow[]
+  activeYear: number
+  onYearClick: (y: number) => void
+}) {
+  if (!years.length) return null
+
+  const maxTotal = Math.max(...years.map((y) => y.totalPretax))
+  const barHeight = 28
+  const labelW = 44
+  const amtW = 80
+  const barAreaW = 480
+  const rowGap = 10
+  const svgH = years.length * (barHeight + rowGap)
+
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${labelW + barAreaW + amtW + 16} ${svgH}`}
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      {years.map((yr, i) => {
+        const y = i * (barHeight + rowGap)
+        const barW = maxTotal > 0 ? (yr.totalPretax / maxTotal) * barAreaW : 0
+        const isActive = yr.year === activeYear
+
+        // Stacked category segments within bar
+        let xOffset = 0
+        const segments: { x: number; w: number; color: string; cat: string }[] = []
+        for (const cat of yr.topCategories) {
+          const segW = maxTotal > 0 ? (cat.total / maxTotal) * barAreaW : 0
+          segments.push({
+            x: xOffset,
+            w: segW,
+            color: CATEGORY_COLORS[cat.category] ?? '#6b7280',
+            cat: cat.category,
+          })
+          xOffset += segW
+        }
+
+        return (
+          <g key={yr.year} onClick={() => onYearClick(yr.year)} style={{ cursor: 'pointer' }}>
+            {/* Year label */}
+            <text
+              x={labelW - 8}
+              y={y + barHeight / 2 + 5}
+              textAnchor="end"
+              fontFamily="var(--font-mono)"
+              fontSize={11}
+              fill={isActive ? 'var(--color-pillar-money)' : 'var(--color-text-muted)'}
+              fontWeight={isActive ? 700 : 400}
+            >
+              {yr.year}
+            </text>
+
+            {/* Background track */}
+            <rect
+              x={labelW}
+              y={y}
+              width={barAreaW}
+              height={barHeight}
+              rx={4}
+              fill="var(--color-surface-2)"
+            />
+
+            {/* Stacked category segments */}
+            {segments.map((seg, si) => (
+              <rect
+                key={si}
+                x={labelW + seg.x}
+                y={y}
+                width={Math.max(seg.w, 0)}
+                height={barHeight}
+                rx={si === 0 ? 4 : 0}
+                fill={seg.color}
+                opacity={isActive ? 1 : 0.65}
+              />
+            ))}
+
+            {/* Active year highlight border */}
+            {isActive && (
+              <rect
+                x={labelW}
+                y={y}
+                width={barAreaW}
+                height={barHeight}
+                rx={4}
+                fill="none"
+                stroke="var(--color-pillar-money)"
+                strokeWidth={1.5}
+              />
+            )}
+
+            {/* Amount label */}
+            <text
+              x={labelW + barAreaW + 8}
+              y={y + barHeight / 2 + 5}
+              fontFamily="var(--font-mono)"
+              fontSize={11}
+              fill={isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)'}
+              fontWeight={isActive ? 700 : 400}
+            >
+              ${Math.round(yr.totalPretax / 1000)}k
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ── Category Legend ───────────────────────────────────────────────────────────
+
+function CategoryLegend({ categories }: { categories: { category: string; total: number }[] }) {
+  const total = categories.reduce((s, c) => s + c.total, 0)
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 12 }}>
+      {categories.map((c) => (
+        <div key={c.category} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 2,
+              backgroundColor: CATEGORY_COLORS[c.category] ?? '#6b7280',
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            {c.category.replace('Inventory — ', 'Inv ').replace('Vehicle — ', 'Veh ')}
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {total > 0 ? `${Math.round((c.total / total) * 100)}%` : '—'}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function BookkeepingHubPage() {
@@ -178,6 +367,15 @@ export function BookkeepingHubPage() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [showAllMissing, setShowAllMissing] = useState(false)
+  const [history, setHistory] = useState<HistoryData | null>(null)
+
+  // Load multi-year history once on mount
+  useEffect(() => {
+    fetch('/api/bookkeeping/history')
+      .then((r) => r.json())
+      .then((d: HistoryData) => setHistory(d))
+      .catch(() => null)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -241,7 +439,7 @@ export function BookkeepingHubPage() {
         </span>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={s.select}>
-            {[currentYear - 1, currentYear].map((y) => (
+            {Array.from({ length: currentYear - 2020 + 1 }, (_, i) => currentYear - i).map((y) => (
               <option key={y} value={y}>
                 {y}
               </option>
@@ -274,6 +472,46 @@ export function BookkeepingHubPage() {
           }}
         >
           Error: {fetchError}
+        </div>
+      )}
+
+      {/* ── Historical Overview (always shown when data available) ── */}
+      {history && history.years.length > 0 && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={s.sectionTitle}>
+            Annual Expenses — 2020–{currentYear} &nbsp;
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-disabled)',
+                fontWeight: 400,
+              }}
+            >
+              ${Math.round(history.years.reduce((s, y) => s + y.totalPretax, 0) / 1000)}k total
+            </span>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <HistoricalChart
+              years={history.years}
+              activeYear={year}
+              onYearClick={(y) => setYear(y)}
+            />
+          </div>
+          {(() => {
+            const activeYr = history.years.find((y) => y.year === year)
+            return activeYr ? <CategoryLegend categories={activeYr.topCategories} /> : null
+          })()}
+          <div
+            style={{
+              marginTop: 10,
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            Click a year bar to drill down below
+          </div>
         </div>
       )}
 
