@@ -163,6 +163,22 @@ export function extractConfidence(text: string): number {
   return 0.2
 }
 
+// ── Cloudflare Access headers ─────────────────────────────────────────────────
+// When CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET are set, inject service
+// token headers so Cloudflare Access allows server-to-server requests to the
+// tunnel URL without a browser auth flow. Both vars must be set or neither
+// is used (partial config is silently ignored — avoids sending half-tokens).
+
+function getCFAccessHeaders(): Record<string, string> {
+  const id = process.env.CF_ACCESS_CLIENT_ID
+  const secret = process.env.CF_ACCESS_CLIENT_SECRET
+  if (!id || !secret) return {}
+  return {
+    'CF-Access-Client-Id': id,
+    'CF-Access-Client-Secret': secret,
+  }
+}
+
 // ── Shared fetch helper ───────────────────────────────────────────────────────
 
 async function ollamaFetch(path: string, body: unknown, timeoutMs = 15_000): Promise<Response> {
@@ -172,7 +188,7 @@ async function ollamaFetch(path: string, body: unknown, timeoutMs = 15_000): Pro
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCFAccessHeaders() },
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -202,6 +218,7 @@ export async function healthCheck(): Promise<OllamaHealthResult> {
   try {
     const res = await fetch(`${baseUrl}/api/tags`, {
       method: 'GET',
+      headers: getCFAccessHeaders(),
       signal: AbortSignal.timeout(5_000),
     })
     const latency_ms = Date.now() - start
