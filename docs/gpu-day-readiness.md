@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 67.0 / 100
+## Total Readiness: 75.0 / 100
 
 ---
 
@@ -31,15 +31,15 @@ _The GPU Day enabler. Without this category, the upgrade has nothing to run on._
 
 _Without reliable drain + tunnel, autonomous ships are deaf-and-dumb post-GPU._
 
-| #   | Line item                                                             | Weight | Pct  | Contribution | Notes                                                                                                                                   |
-| --- | --------------------------------------------------------------------- | ------ | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| B1  | Drain pipeline reliable (task `2b05123b` shipped)                     | 8      | 100% | 8.00         | PR #35 shipped — Stage 2 `pending_drain_triggers` pattern complete                                                                      |
-| B2  | F18 surfacing gap closed (task `434ac58a`)                            | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                          |
-| B3  | BUMP parser fix (task `90a47e2e`)                                     | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                          |
-| B4  | Tunnel reliability — cloudflared as Windows service (task `d82411e1`) | 8      | 0%   | 0.00         | `OLLAMA_TUNNEL_URL` not set in Vercel; Ollama healthy locally but never reachable from production; cloudflared not installed as service |
-| B5  | Coordinator branch-naming bug fixed                                   | 2      | 85%  | 1.70         | F-N3 documented; `coordinator.md` updated (staged in git) with pre-git task_id guard; `branch_guard_triggered` events logging           |
-| B6  | Direct SQL audit gap resolved (task `305a9528`)                       | 2      | 0%   | 0.00         | Not started                                                                                                                             |
-|     | **Category total**                                                    | **30** |      | **19.70**    |                                                                                                                                         |
+| #   | Line item                                                             | Weight | Pct  | Contribution | Notes                                                                                                                                                                                                                                                     |
+| --- | --------------------------------------------------------------------- | ------ | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | Drain pipeline reliable (task `2b05123b` shipped)                     | 8      | 100% | 8.00         | PR #35 shipped — Stage 2 `pending_drain_triggers` pattern complete                                                                                                                                                                                        |
+| B2  | F18 surfacing gap closed (task `434ac58a`)                            | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                                                                                                                                            |
+| B3  | BUMP parser fix (task `90a47e2e`)                                     | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                                                                                                                                            |
+| B4  | Tunnel reliability — cloudflared as Windows service (task `d82411e1`) | 8      | 100% | 8.00         | **Shipped 2026-05-04.** cloudflared v2025.8.1 installed as AUTO_START Windows service. `OLLAMA_TUNNEL_URL=https://ollama.loeppky.xyz` already set in Vercel. Acceptance test: 10/10 embed requests @ 194ms avg, 0 failures. F18 logged. Survives reboots. |
+| B5  | Coordinator branch-naming bug fixed                                   | 2      | 85%  | 1.70         | F-N3 documented; `coordinator.md` updated (staged in git) with pre-git task_id guard; `branch_guard_triggered` events logging                                                                                                                             |
+| B6  | Direct SQL audit gap resolved (task `305a9528`)                       | 2      | 0%   | 0.00         | Not started                                                                                                                                                                                                                                               |
+|     | **Category total**                                                    | **30** |      | **27.70**    |                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -88,11 +88,11 @@ _4 of 6 already won._
 | Category                | Weight  | Earned    | %         |
 | ----------------------- | ------- | --------- | --------- |
 | A — Ollama Pipeline     | 25      | 21.25     | 85%       |
-| B — Harness Reliability | 30      | 19.70     | 66%       |
+| B — Harness Reliability | 30      | 27.70     | 92%       |
 | C — Doctrine + Docs     | 15      | 7.00      | 47%       |
 | D — Staged Batch        | 20      | 17.00     | 85%       |
 | E — Env + Secrets       | 10      | 2.00      | 20%       |
-| **Total**               | **100** | **66.95** | **67.0%** |
+| **Total**               | **100** | **74.95** | **75.0%** |
 
 ---
 
