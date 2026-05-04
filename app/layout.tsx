@@ -17,17 +17,27 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'LepiOS',
   description: 'Life command center',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'LepiOS',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    apple: '/icon.svg',
+  },
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
       className={`${inter.variable} ${jetbrainsMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col" style={{ backgroundColor: 'var(--color-base)', color: 'var(--color-text-primary)' }}>
+      <body
+        className="flex min-h-full flex-col"
+        style={{ backgroundColor: 'var(--color-base)', color: 'var(--color-text-primary)' }}
+      >
         {children}
       </body>
     </html>
