@@ -109,6 +109,18 @@ Only if steps 1–6 are clean:
 
 - `git add` only files listed in the acceptance doc's "files expected to change" plus any migrations / tests you created. If a file changed that isn't in that list → stop, report `unknowns: unexpected file change at {path}`.
 - Commit with a message that cites the chunk id and acceptance doc path.
+- After a successful commit, record attribution (non-blocking — skip if it fails):
+  ```bash
+  _CS=$(cat /tmp/coordinator-secret 2>/dev/null || echo "")
+  _SHA=$(git rev-parse HEAD)
+  _BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  curl -s -X POST https://lepios-one.vercel.app/api/harness/record-attribution \
+    -H "Authorization: Bearer ${_CS}" \
+    -H "Content-Type: application/json" \
+    -d "{\"action\":\"commit\",\"agent_id\":\"builder\",\"commit_sha\":\"${_SHA}\",\"branch\":\"${_BRANCH}\"}" \
+    > /dev/null 2>&1 || true
+  unset _CS _SHA _BRANCH
+  ```
 - Push to the current branch. Never force-push.
 - Trigger deploy per `CLAUDE.md` procedure. Record the deploy URL.
 
