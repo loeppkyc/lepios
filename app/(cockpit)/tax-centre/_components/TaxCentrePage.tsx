@@ -2,6 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import type { QuarterReadiness, QuarterStatus } from '@/app/api/tax-centre/summary/route'
+// Inline type — avoids server-only module leak per F11 (route imports supabase/server)
+interface GstAccrualResponse {
+  currentYear: {
+    label: string
+    netPayout: number
+    estimatedGst: number
+    openingCredit: number
+    openingCreditNote: string
+    netOwing: number
+  }
+  priorYear: {
+    label: string
+    netPayout: number
+    filedGst: number
+  }
+}
 
 interface QuarterSummary {
   q: number
@@ -42,7 +58,10 @@ function fmtCompact(n: number): string {
   return fmt(n)
 }
 
-const STATUS_CONFIG: Record<QuarterStatus, { label: string; color: string; border: string; bg: string }> = {
+const STATUS_CONFIG: Record<
+  QuarterStatus,
+  { label: string; color: string; border: string; bg: string }
+> = {
   complete: {
     label: 'Complete',
     color: 'var(--color-pillar-health)',
@@ -83,8 +102,23 @@ function ReadinessCard({ q }: { q: QuarterReadiness }) {
       }}
     >
       {/* Quarter header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.06em' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            letterSpacing: '0.06em',
+          }}
+        >
           {q.label}
         </span>
         <span
@@ -103,14 +137,36 @@ function ReadinessCard({ q }: { q: QuarterReadiness }) {
 
       {/* Revenue */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 2,
+          }}
+        >
           Amazon Revenue
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', fontWeight: 700, color: q.revenue > 0 ? 'var(--color-text-primary)' : 'var(--color-text-disabled)' }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '1rem',
+            fontWeight: 700,
+            color: q.revenue > 0 ? 'var(--color-text-primary)' : 'var(--color-text-disabled)',
+          }}
+        >
           {q.revenue > 0 ? fmtCompact(q.revenue) : '—'}
         </div>
         {q.settlementCount > 0 && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
             {q.settlementCount} settlement{q.settlementCount !== 1 ? 's' : ''}
           </div>
         )}
@@ -118,19 +174,47 @@ function ReadinessCard({ q }: { q: QuarterReadiness }) {
 
       {/* Expenses */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 2,
+          }}
+        >
           Expenses
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)' }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
           {q.expenseCount > 0 ? `${q.expenseCount} logged` : '—'}
         </div>
         {q.uncategorizedCount > 0 && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: '#e5534b', fontWeight: 600 }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: '#e5534b',
+              fontWeight: 600,
+            }}
+          >
             {q.uncategorizedCount} uncategorized — fix before filing
           </div>
         )}
         {q.expenseCount > 0 && q.uncategorizedCount === 0 && q.hasStarted && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-pillar-health)' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-pillar-health)',
+            }}
+          >
             All categorized
           </div>
         )}
@@ -138,10 +222,25 @@ function ReadinessCard({ q }: { q: QuarterReadiness }) {
 
       {/* Mileage */}
       <div>
-        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 2,
+          }}
+        >
           Mileage
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)' }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
           {q.mileageTrips > 0 ? `${q.mileageTrips} trips · ${q.mileageKm.toFixed(0)} km` : '—'}
         </div>
       </div>
@@ -150,9 +249,7 @@ function ReadinessCard({ q }: { q: QuarterReadiness }) {
 }
 
 function YearEndChecklist({ readiness, year }: { readiness: QuarterReadiness[]; year: number }) {
-  const allExpensesCategorized = readiness.every(
-    (q) => !q.hasEnded || q.uncategorizedCount === 0
-  )
+  const allExpensesCategorized = readiness.every((q) => !q.hasEnded || q.uncategorizedCount === 0)
   const completedQuarters = readiness.filter((q) => q.hasEnded && q.status === 'complete')
   const hasRevenue = readiness.some((q) => q.revenue > 0)
   const hasMileage = readiness.some((q) => q.mileageTrips > 0)
@@ -215,7 +312,10 @@ function YearEndChecklist({ readiness, year }: { readiness: QuarterReadiness[]; 
       </div>
       <div style={{ padding: '12px 16px' }}>
         {items.map((item) => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+          <div
+            key={item.label}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}
+          >
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
@@ -228,10 +328,22 @@ function YearEndChecklist({ readiness, year }: { readiness: QuarterReadiness[]; 
               {item.done ? '✓' : '✗'}
             </span>
             <div>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-primary)' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
                 {item.label}
               </div>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: item.done ? 'var(--color-text-disabled)' : '#e5534b' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: item.done ? 'var(--color-text-disabled)' : '#e5534b',
+                }}
+              >
                 {item.detail}
               </div>
             </div>
@@ -247,10 +359,346 @@ function YearEndChecklist({ readiness, year }: { readiness: QuarterReadiness[]; 
             color: 'var(--color-text-disabled)',
           }}
         >
-          Annual GST filing due end of April {year + 1} · T1 income tax (self-employed) due June 15, {year + 1}
+          Annual GST filing due end of April {year + 1} · T1 income tax (self-employed) due June 15,{' '}
+          {year + 1}
         </div>
       </div>
     </div>
+  )
+}
+
+function GstAccrualCard() {
+  const [accrual, setAccrual] = useState<GstAccrualResponse | null>(null)
+  const [accrualError, setAccrualError] = useState<string | null>(null)
+  const [accrualLoading, setAccrualLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setAccrualLoading(true)
+      setAccrualError(null)
+      try {
+        const res = await fetch('/api/tax/gst-accrual')
+        if (!res.ok) {
+          const j = (await res.json()) as { error?: string }
+          throw new Error(j.error ?? `HTTP ${res.status}`)
+        }
+        const json = (await res.json()) as GstAccrualResponse
+        if (!cancelled) setAccrual(json)
+      } catch (e: unknown) {
+        if (!cancelled) setAccrualError(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setAccrualLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const netOwing = accrual?.currentYear.netOwing ?? 0
+  const positionColor =
+    netOwing <= 0
+      ? 'var(--color-pillar-health)'
+      : netOwing < 5000
+        ? 'var(--color-accent-gold)'
+        : '#e5534b'
+
+  return (
+    <section style={{ marginBottom: 28 }}>
+      <div
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--color-text-muted)',
+          marginBottom: 12,
+        }}
+      >
+        GST Accrual — Annual Filer (May 1 → Apr 30)
+      </div>
+
+      {accrualError && (
+        <div
+          style={{
+            background: 'var(--color-surface-2)',
+            border: '1px solid #e5534b',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px 16px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-small)',
+            color: '#e5534b',
+          }}
+        >
+          {accrualError}
+        </div>
+      )}
+
+      {accrualLoading && (
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+          }}
+        >
+          Loading…
+        </p>
+      )}
+
+      {!accrualLoading && accrual && (
+        <div
+          style={{
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Current GST year */}
+          <div
+            style={{
+              padding: '14px 18px',
+              borderBottom: '1px solid var(--color-border)',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr 1fr',
+              gap: 20,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}
+              >
+                {accrual.currentYear.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                {fmt(accrual.currentYear.netPayout)}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                net Amazon payouts
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}
+              >
+                Estimated GST Owing
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                {fmt(accrual.currentYear.estimatedGst)}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                2.5% of net payouts
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}
+              >
+                Opening Credit
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  color: 'var(--color-pillar-health)',
+                }}
+              >
+                {fmt(accrual.currentYear.openingCredit)}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                {accrual.currentYear.openingCreditNote}
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4,
+                }}
+              >
+                Net Position
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1.3rem',
+                  fontWeight: 900,
+                  color: positionColor,
+                }}
+              >
+                {netOwing <= 0 ? fmt(Math.abs(netOwing)) + ' CR' : fmt(netOwing)}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: positionColor,
+                  fontWeight: 600,
+                }}
+              >
+                {netOwing <= 0
+                  ? 'Credit exceeds estimated liability'
+                  : netOwing < 5000
+                    ? 'Estimated owing — within credit range'
+                    : 'Owing — set aside funds'}
+              </div>
+            </div>
+          </div>
+
+          {/* Prior year row */}
+          <div
+            style={{
+              padding: '10px 18px',
+              background: 'var(--color-surface-2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 24,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-disabled)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+              }}
+            >
+              Prior Year
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              {accrual.priorYear.label}
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 32, alignItems: 'center' }}>
+              <div>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-disabled)',
+                  }}
+                >
+                  Net payouts:{' '}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-small)',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  {fmt(accrual.priorYear.netPayout)}
+                </span>
+              </div>
+              <div>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-disabled)',
+                  }}
+                >
+                  Filed GST:{' '}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-small)',
+                    fontWeight: 700,
+                    color: 'var(--color-pillar-health)',
+                  }}
+                >
+                  {fmt(accrual.priorYear.filedGst)}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-pillar-health)',
+                }}
+              >
+                ✓ Filed &amp; assessed
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -294,7 +742,15 @@ export function TaxCentrePage() {
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          marginBottom: 28,
+          flexWrap: 'wrap',
+        }}
+      >
         <h1
           style={{
             fontFamily: 'var(--font-display, var(--font-ui))',
@@ -345,13 +801,35 @@ export function TaxCentrePage() {
             gap: 12,
           }}
         >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.1rem', color: 'var(--color-pillar-health)' }}>✓</span>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '1.1rem',
+              color: 'var(--color-pillar-health)',
+            }}
+          >
+            ✓
+          </span>
           <div>
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', fontWeight: 700, color: 'var(--color-pillar-health)' }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                fontWeight: 700,
+                color: 'var(--color-pillar-health)',
+              }}
+            >
               {year} — Filed & Assessed
             </div>
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
-              GST return and T1 income tax both complete. Notice of Assessment received from CRA. Managed by Rob.
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-disabled)',
+              }}
+            >
+              GST return and T1 income tax both complete. Notice of Assessment received from CRA.
+              Managed by Rob.
             </div>
           </div>
         </div>
@@ -375,7 +853,13 @@ export function TaxCentrePage() {
       )}
 
       {loading && (
-        <p style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+          }}
+        >
           Loading…
         </p>
       )}
@@ -457,7 +941,13 @@ export function TaxCentrePage() {
                   >
                     {fmt(q.itc)}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 'var(--text-nano)',
+                      color: 'var(--color-text-disabled)',
+                    }}
+                  >
                     {fmt(q.pretax)} pretax · {q.count} exp
                   </div>
                 </div>
@@ -478,28 +968,64 @@ export function TaxCentrePage() {
               }}
             >
               <div>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-disabled)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                  }}
+                >
                   {year} Total ITCs
                 </span>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.5rem', fontWeight: 900, color: 'var(--color-accent-gold)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '1.5rem',
+                    fontWeight: 900,
+                    color: 'var(--color-accent-gold)',
+                  }}
+                >
                   {fmt(data.ytd.itc)}
                 </div>
               </div>
               <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)' }} />
               <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)', color: 'var(--color-text-muted)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-small)',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
                   {fmt(data.ytd.pretax)} total pretax
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-disabled)',
+                  }}
+                >
                   {fmt(data.ytd.businessPortion)} business portion · {data.ytd.count} expenses
                 </div>
               </div>
               {data.zeroGstExpenses > 0 && (
                 <>
-                  <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)' }} />
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
+                  <div
+                    style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)' }}
+                  />
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-nano)',
+                      color: 'var(--color-text-disabled)',
+                    }}
+                  >
                     {data.zeroGstExpenses} zero-rated rows (books, bank, insurance)
-                    <br />excluded from ITC total
+                    <br />
+                    excluded from ITC total
                   </div>
                 </>
               )}
@@ -519,10 +1045,16 @@ export function TaxCentrePage() {
                 color: 'var(--color-text-muted)',
               }}
             >
-              <strong style={{ color: 'var(--color-text-primary)' }}>Amazon Marketplace Facilitator:</strong>{' '}
-              Amazon collects and remits GST/HST on your behalf (CRA Line 103 = $0). You still claim ITCs on all business expenses (Line 106). Confirm Line 103 with Rob before filing.
+              <strong style={{ color: 'var(--color-text-primary)' }}>
+                Amazon Marketplace Facilitator:
+              </strong>{' '}
+              Amazon collects and remits GST/HST on your behalf (CRA Line 103 = $0). You still claim
+              ITCs on all business expenses (Line 106). Confirm Line 103 with Rob before filing.
             </div>
           </section>
+
+          {/* GST Accrual — always shown, not year-gated (covers current GST year) */}
+          <GstAccrualCard />
 
           {/* T2125 Preview */}
           {data.t2125.length > 0 && (
@@ -541,7 +1073,14 @@ export function TaxCentrePage() {
                 T2125 Line Preview — {year}
               </div>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-small)' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                }}
+              >
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                     {['Line', 'Description', 'Expenses', 'Business Portion'].map((h) => (
@@ -572,22 +1111,79 @@ export function TaxCentrePage() {
                         borderBottom: '1px solid var(--color-border)',
                       }}
                     >
-                      <td style={{ padding: '7px 10px', color: 'var(--color-text-disabled)', fontWeight: 700 }}>{line.line}</td>
-                      <td style={{ padding: '7px 10px', color: 'var(--color-text-primary)', fontFamily: 'var(--font-ui)' }}>{line.label}</td>
-                      <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--color-text-muted)' }}>{fmt(line.pretax)}</td>
-                      <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--color-text-primary)', fontWeight: 600 }}>{fmt(line.businessPortion)}</td>
+                      <td
+                        style={{
+                          padding: '7px 10px',
+                          color: 'var(--color-text-disabled)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {line.line}
+                      </td>
+                      <td
+                        style={{
+                          padding: '7px 10px',
+                          color: 'var(--color-text-primary)',
+                          fontFamily: 'var(--font-ui)',
+                        }}
+                      >
+                        {line.label}
+                      </td>
+                      <td
+                        style={{
+                          padding: '7px 10px',
+                          textAlign: 'right',
+                          color: 'var(--color-text-muted)',
+                        }}
+                      >
+                        {fmt(line.pretax)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '7px 10px',
+                          textAlign: 'right',
+                          color: 'var(--color-text-primary)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {fmt(line.businessPortion)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: '2px solid var(--color-border)' }}>
-                    <td colSpan={2} style={{ padding: '8px 10px', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+                    <td
+                      colSpan={2}
+                      style={{
+                        padding: '8px 10px',
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-nano)',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
                       Total Deductible
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--color-text-muted)' }}>
+                    <td
+                      style={{
+                        padding: '8px 10px',
+                        textAlign: 'right',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
                       {fmt(data.t2125.reduce((s, l) => s + l.pretax, 0))}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--color-accent-gold)', fontWeight: 700 }}>
+                    <td
+                      style={{
+                        padding: '8px 10px',
+                        textAlign: 'right',
+                        color: 'var(--color-accent-gold)',
+                        fontWeight: 700,
+                      }}
+                    >
                       {fmt(data.t2125.reduce((s, l) => s + l.businessPortion, 0))}
                     </td>
                   </tr>
@@ -595,15 +1191,29 @@ export function TaxCentrePage() {
               </table>
 
               {data.loanRepaymentPretax > 0 && (
-                <div style={{ marginTop: 8, fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)', color: 'var(--color-text-disabled)' }}>
-                  Note: {fmt(data.loanRepaymentPretax)} in loan repayments (BDC/Tesla) excluded — principal is not deductible on T2125 (interest portion is — confirm with Rob).
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-disabled)',
+                  }}
+                >
+                  Note: {fmt(data.loanRepaymentPretax)} in loan repayments (BDC/Tesla) excluded —
+                  principal is not deductible on T2125 (interest portion is — confirm with Rob).
                 </div>
               )}
             </section>
           )}
 
           {data.t2125.length === 0 && !loading && (
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)', color: 'var(--color-text-disabled)' }}>
+            <p
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-disabled)',
+              }}
+            >
               No expenses logged for {year}.
             </p>
           )}
