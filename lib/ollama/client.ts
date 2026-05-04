@@ -342,12 +342,14 @@ export async function generate(
     // Probe succeeded — fall through to generate
   }
 
+  // Analysis tasks use qwen2.5:32b which can take >15s to load from cold.
+  const defaultTimeout = task === 'analysis' ? 60_000 : 15_000
   let res: Response
   try {
     res = await ollamaFetch(
       '/api/generate',
       { model, prompt, system: opts.systemPrompt, stream: false },
-      opts.timeoutMs ?? 15_000
+      opts.timeoutMs ?? defaultTimeout
     )
   } catch (err) {
     void logEvent('ollama', 'ollama.generate', {
