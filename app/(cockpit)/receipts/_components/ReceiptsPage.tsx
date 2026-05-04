@@ -447,6 +447,7 @@ export function ReceiptsPage() {
   const currentYear = new Date().getFullYear()
   const months = allMonthsForYear(currentYear)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const [month, setMonth] = useState(currentMonthStr)
   const [receipts, setReceipts] = useState<Receipt[]>([])
@@ -694,6 +695,31 @@ export function ReceiptsPage() {
                 e.target.value = ''
               }}
             />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) void handleFile(f)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              style={{
+                ...s.btnPrimary,
+                marginTop: 12,
+                width: '100%',
+                padding: '12px 20px',
+                fontSize: 'var(--text-body)',
+                display: 'block',
+              }}
+            >
+              Take Photo
+            </button>
             {scanError && (
               <div
                 style={{
