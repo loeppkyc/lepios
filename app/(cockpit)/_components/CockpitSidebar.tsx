@@ -23,7 +23,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Dashboard',
     items: [
       { label: 'Business Review', href: '/business-review' },
-      { label: 'Life P&L', href: '/money' },
+      { label: 'Life P&L', href: '/life-pnl' },
       { label: 'Trading Journal', href: null },
       { label: 'Sports Betting', href: null },
     ],
