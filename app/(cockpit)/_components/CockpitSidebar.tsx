@@ -75,7 +75,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Tax Centre', href: '/tax-centre' },
       { label: 'GST Return', href: '/gst-return' },
       { label: 'Tax Return', href: null },
-      { label: 'MileIQ', href: null },
+      { label: 'Mileage Log', href: '/mileage' },
     ],
   },
   {
