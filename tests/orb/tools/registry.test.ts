@@ -63,9 +63,24 @@ vi.mock('@/lib/orb/tools/query-db', () => ({ queryDbTool: stubs.queryDb }))
 
 import { buildTools } from '@/lib/orb/tools/registry'
 
-const CTX = { agentId: 'chat_ui' as const, conversationId: 'conv-1', userId: 'user-1', toolCallId: '' }
-const ALLOWED_CAP = { allowed: true, reason: 'in_scope', enforcement_mode: 'enforce' as const, audit_id: 'audit-123' }
-const DENIED_CAP = { allowed: false, reason: 'no_grant_for_agent', enforcement_mode: 'enforce' as const, audit_id: 'audit-456' }
+const CTX = {
+  agentId: 'chat_ui' as const,
+  conversationId: 'conv-1',
+  userId: 'user-1',
+  toolCallId: '',
+}
+const ALLOWED_CAP = {
+  allowed: true,
+  reason: 'in_scope',
+  enforcement_mode: 'enforce' as const,
+  audit_id: 'audit-123',
+}
+const DENIED_CAP = {
+  allowed: false,
+  reason: 'no_grant_for_agent',
+  enforcement_mode: 'enforce' as const,
+  audit_id: 'audit-456',
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -91,8 +106,9 @@ describe('buildTools — registry shape', () => {
   it('each tool entry has description and parameters', () => {
     const tools = buildTools(CTX)
     for (const [, tool] of Object.entries(tools)) {
-      expect(tool.description).toBeTruthy()
-      expect(tool.parameters).toBeTruthy()
+      const t = tool as unknown as { description: string; parameters: unknown }
+      expect(t.description).toBeTruthy()
+      expect(t.parameters).toBeTruthy()
     }
   })
 })
@@ -103,15 +119,27 @@ describe('buildTools — capability gate', () => {
   it('calls checkCapability on every execute', async () => {
     mockCheckCapability.mockResolvedValue(ALLOWED_CAP)
     const tools = buildTools(CTX)
-    await (tools.getHarnessRollup as { execute: Function }).execute({}, { toolCallId: 'tc-1' })
+    await (
+      tools.getHarnessRollup as unknown as {
+        execute: (a: Record<string, unknown>, o: { toolCallId: string }) => Promise<unknown>
+      }
+    ).execute({}, { toolCallId: 'tc-1' })
     expect(mockCheckCapability).toHaveBeenCalledOnce()
   })
 
   it('returns { allowed: false } when capability is denied', async () => {
     mockCheckCapability.mockResolvedValue(DENIED_CAP)
     const tools = buildTools(CTX)
-    const result = await (tools.getHarnessRollup as { execute: Function }).execute({}, { toolCallId: 'tc-2' })
-    expect(result).toMatchObject({ allowed: false, reason: 'no_grant_for_agent', auditId: 'audit-456' })
+    const result = await (
+      tools.getHarnessRollup as unknown as {
+        execute: (a: Record<string, unknown>, o: { toolCallId: string }) => Promise<unknown>
+      }
+    ).execute({}, { toolCallId: 'tc-2' })
+    expect(result).toMatchObject({
+      allowed: false,
+      reason: 'no_grant_for_agent',
+      auditId: 'audit-456',
+    })
   })
 
   it('does not call the underlying tool when capability is denied', async () => {
@@ -120,7 +148,11 @@ describe('buildTools — capability gate', () => {
     vi.clearAllMocks()
     mockCheckCapability.mockResolvedValue(DENIED_CAP)
     const tools = buildTools(CTX)
-    await (tools.getHarnessRollup as { execute: Function }).execute({}, { toolCallId: 'tc-3' })
+    await (
+      tools.getHarnessRollup as unknown as {
+        execute: (a: Record<string, unknown>, o: { toolCallId: string }) => Promise<unknown>
+      }
+    ).execute({}, { toolCallId: 'tc-3' })
     expect(harnessRollupTool.execute).not.toHaveBeenCalled()
   })
 })
@@ -133,13 +165,21 @@ describe('buildTools — successful execute path', () => {
 
   it('wraps result in { allowed: true, result, auditId }', async () => {
     const tools = buildTools(CTX)
-    const out = await (tools.getHarnessRollup as { execute: Function }).execute({}, { toolCallId: 'tc-4' })
+    const out = await (
+      tools.getHarnessRollup as unknown as {
+        execute: (a: Record<string, unknown>, o: { toolCallId: string }) => Promise<unknown>
+      }
+    ).execute({}, { toolCallId: 'tc-4' })
     expect(out).toMatchObject({ allowed: true, result: { ok: true }, auditId: 'audit-123' })
   })
 
   it('logs a chat_ui.tool.ok event to agent_events', async () => {
     const tools = buildTools(CTX)
-    await (tools.getHarnessRollup as { execute: Function }).execute({}, { toolCallId: 'tc-5' })
+    await (
+      tools.getHarnessRollup as unknown as {
+        execute: (a: Record<string, unknown>, o: { toolCallId: string }) => Promise<unknown>
+      }
+    ).execute({}, { toolCallId: 'tc-5' })
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'chat_ui.tool.ok', domain: 'chat_ui' })
     )
