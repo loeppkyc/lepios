@@ -116,21 +116,54 @@ export async function POST(request: Request) {
     }
   }
 
+  const vendorStr = (vendor as string).trim()
+  const pretaxNum = typeof pretax === 'number' ? pretax : null
+  const taxNum = typeof taxAmount === 'number' ? taxAmount : 0
+  const totalNum =
+    typeof total === 'number' ? total : pretaxNum !== null ? pretaxNum + taxNum : null
+  const categoryStr = typeof category === 'string' ? category.trim() : ''
+  const notesStr = typeof notes === 'string' ? notes.trim() : ''
+
+  // Create the business_expenses row first (if we have enough data)
+  let expenseId: string | null = null
+  if (pretaxNum !== null && typeof receiptDate === 'string' && receiptDate) {
+    const { data: expData } = await supabase
+      .from('business_expenses')
+      .insert({
+        date: receiptDate,
+        vendor: vendorStr,
+        category: categoryStr || 'Uncategorized',
+        pretax: pretaxNum,
+        tax_amount: taxNum,
+        payment_method: 'Receipt Scan',
+        hubdoc: true,
+        notes: notesStr,
+        business_use_pct: 100,
+      })
+      .select('id')
+      .single()
+    expenseId = expData?.id ?? null
+  }
+
   const insert = {
     receipt_date: receiptDate ?? null,
-    vendor: (vendor as string).trim(),
-    pretax: typeof pretax === 'number' ? pretax : null,
-    tax_amount: typeof taxAmount === 'number' ? taxAmount : 0,
-    total: typeof total === 'number' ? total : null,
-    category: typeof category === 'string' ? category.trim() : '',
+    vendor: vendorStr,
+    pretax: pretaxNum,
+    tax_amount: taxNum,
+    total: totalNum,
+    category: categoryStr,
     storage_path: storagePath,
-    match_status: matchStatus === 'review' ? 'review' : 'unmatched',
-    notes: typeof notes === 'string' ? notes.trim() : '',
+    match_status: expenseId ? 'matched' : matchStatus === 'review' ? 'review' : 'unmatched',
+    notes: notesStr,
+    ...(expenseId ? { matched_expense_id: expenseId } : {}),
   }
 
   const { data, error } = await supabase.from('receipts').insert(insert).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ receipt: data as Receipt }, { status: 201 })
+  return NextResponse.json(
+    { receipt: data as Receipt, expenseCreated: expenseId !== null },
+    { status: 201 }
+  )
 }
