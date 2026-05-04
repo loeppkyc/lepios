@@ -369,3 +369,57 @@ describe('POST /api/chat — twin context injection (C6)', () => {
     expect(contextIdx).toBeGreaterThan(0)
   })
 })
+
+// ── POST /api/chat — tool calling wiring (B4) ────────────────────────────────
+
+describe('POST /api/chat — tool calling wiring (B4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetUser.mockResolvedValue({ data: { user: USER_A }, error: null })
+    mockCreateConversation.mockResolvedValue({ id: CONV_NEW, user_id: USER_A.id })
+    mockAppendMessage.mockResolvedValue({ id: 'msg-1' })
+    vi.mocked(streamText).mockReturnValue({
+      toUIMessageStreamResponse: vi.fn(() => makeStreamResponse()),
+    } as unknown as ReturnType<typeof streamText>)
+  })
+
+  it('passes tools record to streamText', async () => {
+    await chatPost(makeChatRequest())
+    const args = vi.mocked(streamText).mock.calls[0][0]
+    expect(args.tools).toBeDefined()
+    expect(typeof args.tools).toBe('object')
+  })
+
+  it('tools record includes all 11 registered tool names', async () => {
+    await chatPost(makeChatRequest())
+    const tools = vi.mocked(streamText).mock.calls[0][0].tools as Record<string, unknown>
+    const names = Object.keys(tools).sort()
+    expect(names).toEqual(
+      [
+        'getHarnessRollup',
+        'listAgentEvents',
+        'listIdeas',
+        'queryDb',
+        'queryTwin',
+        'readFile',
+        'sendTelegramMessage',
+        'submitIdea',
+        'queueTask',
+        'webFetch',
+        'writeFile',
+      ].sort()
+    )
+  })
+
+  it('passes toolChoice: auto to streamText', async () => {
+    await chatPost(makeChatRequest())
+    const args = vi.mocked(streamText).mock.calls[0][0]
+    expect(args.toolChoice).toBe('auto')
+  })
+
+  it('passes stopWhen to streamText (step count guard)', async () => {
+    await chatPost(makeChatRequest())
+    const args = vi.mocked(streamText).mock.calls[0][0]
+    expect(args.stopWhen).toBeDefined()
+  })
+})
