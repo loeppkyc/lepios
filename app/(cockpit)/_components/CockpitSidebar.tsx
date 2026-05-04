@@ -70,7 +70,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Receipts', href: '/receipts' },
       { label: 'Paper Trail', href: '/reconciliation' },
       { label: 'Monthly Close', href: null },
-      { label: 'Tax Centre', href: null },
+      { label: 'Tax Centre', href: '/tax-centre' },
       { label: 'Tax Return', href: null },
       { label: 'MileIQ', href: null },
     ],
