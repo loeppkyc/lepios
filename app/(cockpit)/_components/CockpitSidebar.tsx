@@ -63,7 +63,7 @@ const NAV_SECTIONS: NavSection[] = [
     id: 'accounting',
     label: 'Accounting & Tax',
     items: [
-      { label: 'Bookkeeping Hub', href: null },
+      { label: 'Bookkeeping Hub', href: '/bookkeeping-hub' },
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
       { label: 'Monthly P&L', href: null },
       { label: 'Category P&L', href: '/cogs' },
