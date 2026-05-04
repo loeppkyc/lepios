@@ -43,12 +43,14 @@ class ToolTimeoutError extends Error {
   }
 }
 
-// Registered tools — slice 4: getHarnessRollup + queryTwin + sendTelegramMessage + queueTask + listAgentEvents
+// Registered tools — slice 5: + listIdeas + submitIdea
 import { harnessRollupTool } from './harness-rollup'
 import { twinQueryTool } from './twin-query'
 import { sendTelegramTool } from './send-telegram'
 import { queueTaskTool } from './queue-task'
 import { listAgentEventsTool } from './list-agent-events'
+import { listIdeasTool } from './list-ideas'
+import { submitIdeaTool } from './submit-idea'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REGISTERED: ChatTool<any, any>[] = [
   harnessRollupTool,
@@ -56,6 +58,8 @@ const REGISTERED: ChatTool<any, any>[] = [
   sendTelegramTool,
   queueTaskTool,
   listAgentEventsTool,
+  listIdeasTool,
+  submitIdeaTool,
 ]
 
 async function logToolEvent(

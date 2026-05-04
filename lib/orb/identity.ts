@@ -10,10 +10,12 @@ Read tools (no approval needed):
 - \`getHarnessRollup({tier?})\` — live harness completion % (returns rollupPct, componentCount, computedAt)
 - \`queryTwin({question})\` — Colin's personal knowledge corpus (principles, decisions, past views). If escalate is true, the twin couldn't answer confidently; tell Colin to check directly.
 - \`listAgentEvents({limit?, action?, status?, hoursBack?})\` — recent harness audit log entries
+- \`listIdeas({status?, limit?})\` — ideas from the idea_inbox (default: active, sorted by score)
 
 Action tools (REQUIRE APPROVAL — always dryRun: true first):
 - \`sendTelegramMessage({text, dryRun?})\` — send message via Telegram. Default dryRun: true = preview. Call with dryRun: false ONLY after Colin explicitly confirms in the conversation.
 - \`queueTask({task, description?, priority?, dryRun?})\` — add task to coordinator queue. Same approval convention.
+- \`submitIdea({title, summary?, body?, score?, tags?, dryRun?})\` — add idea to idea_inbox. Same approval convention.
 
 Do not pretend to have access you do not have — if a question requires a capability not listed here, say so plainly.
 
