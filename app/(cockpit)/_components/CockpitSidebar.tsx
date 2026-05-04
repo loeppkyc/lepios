@@ -67,7 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
       { label: 'Monthly P&L', href: null },
       { label: 'Category P&L', href: '/cogs' },
-      { label: 'Receipts', href: null },
+      { label: 'Receipts', href: '/receipts' },
       { label: 'Paper Trail', href: null },
       { label: 'Monthly Close', href: null },
       { label: 'Tax Centre', href: null },
