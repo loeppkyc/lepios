@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 80.9% (88.15 / 109 pts)
+## Total Readiness: 81.8% (89.15 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -110,8 +110,8 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | F2  | GPU card purchased + installed (CUDA-verified)                                            | 4      | 0%  | 0.00         | Current setup runs `qwen2.5-coder:7b` (may be CPU). No CUDA verification. 14B+ requires GPU. Once purchased, `ollama-ai-provider` model swap is a config change. |
 | F3  | Chat UI accessible from laptop without dev server (production deploy or local prod build) | 3      | 95% | 2.85         | **Verified 2026-05-04.** `https://lepios-one.vercel.app/chat` returns 200, full UI visible (sidebar + identity strip + message input), Ollama tunnel live. `LEPIOS.lnk` Desktop shortcut opens it directly. Remaining 5%: confirm a real message round-trips end-to-end in production (requires sitting at laptop + Ollama running).                                                                                                                                                                    |
 | F4  | Auto-start on boot (optional)                                                             | 2      | 80% | 1.60         | **Verified 2026-05-04.** cloudflared installed as Windows AUTO_START service (`sc.exe`) — routes `ollama.loeppky.xyz → localhost:11434`. Ollama auto-starts via `Ollama.lnk` + `start_ollama.bat` in Windows Startup folder. Both confirmed on-machine. Remaining 20%: formal post-reboot smoke test log.                                                                                                              |
-| F5  | Backup of Twin + chat history (data is the asset)                                         | 2      | 50% | 1.00         | **Strategy documented 2026-05-04.** `docs/ops/backup-strategy.md`: Layer 1 = Supabase PITR 7-day (implicit); Layer 2 = manual knowledge export to `docs/backups/`; recovery runbooks for 3 scenarios. Remaining 50%: automated nightly export script + Dropbox/Storage destination.                                                            |
-|     | **Category total**                                                                        | **15** |     | **5.45**     |                                                                                                                                                                  |
+| F5  | Backup of Twin + chat history (data is the asset)                                         | 2      | 100% | 2.00        | **Complete 2026-05-04.** `app/api/cron/backup`: exports knowledge (no embedding/fts), conversations, messages as NDJSON daily at 07:00 UTC. Private `backups` Supabase Storage bucket (100 MB ceiling, migration 0122). Logs row counts to `agent_events`. Layer 1 = PITR; Layer 2 = manual SQL export; Layer 3 = this cron.                        |
+|     | **Category total**                                                                        | **15** |     | **6.45**     |                                                                                                                                                                  |
 
 ---
 
@@ -124,8 +124,8 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | C — Context / Memory  | 18      | 16.75     | 93%       |
 | D — Tool Use          | 24      | 21.20     | 88%       |
 | E — Identity / Polish | 7       | 6.05      | 86%       |
-| F — Operational       | 15      | 5.45      | 36%       |
-| **Total**             | **109** | **88.15** | **80.9%** |
+| F — Operational       | 15      | 6.45      | 43%       |
+| **Total**             | **109** | **89.15** | **81.8%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
