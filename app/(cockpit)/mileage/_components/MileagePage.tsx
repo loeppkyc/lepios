@@ -189,6 +189,24 @@ export function MileagePage() {
 
   const deduction = craDeduction(totalKm)
 
+  // Which months have at least one trip logged?
+  const coveredMonths = new Set(trips.map((t) => t.date.slice(0, 7)))
+  const now = new Date()
+  const MONTH_LABELS = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ]
+
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '0.68rem',
@@ -371,6 +389,96 @@ export function MileagePage() {
           >
             Enter to compute business %
           </div>
+        </div>
+      </div>
+
+      {/* MileIQ monthly coverage grid */}
+      <div
+        style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-sm)',
+          overflow: 'hidden',
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            padding: '8px 16px',
+            background: 'var(--color-surface-2)',
+            borderBottom: '1px solid var(--color-border)',
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            color: 'var(--color-text-disabled)',
+            textTransform: 'uppercase',
+          }}
+        >
+          MileIQ Report Coverage — {year}
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(12, 1fr)',
+            padding: '12px 16px',
+            gap: 6,
+          }}
+        >
+          {MONTH_LABELS.map((label, i) => {
+            const monthKey = `${year}-${String(i + 1).padStart(2, '0')}`
+            const isFuture = year === now.getFullYear() && i + 1 > now.getMonth() + 1
+            const hasCoverage = coveredMonths.has(monthKey)
+            return (
+              <div
+                key={monthKey}
+                title={
+                  isFuture
+                    ? `${label} — not yet due`
+                    : hasCoverage
+                      ? `${label} — imported`
+                      : `${label} — missing`
+                }
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '8px 4px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: hasCoverage
+                    ? 'rgba(var(--color-pillar-health-rgb, 74,222,128), 0.08)'
+                    : isFuture
+                      ? 'transparent'
+                      : 'rgba(229,83,75,0.08)',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    color: isFuture ? 'var(--color-text-disabled)' : 'var(--color-text-muted)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.9rem',
+                    color: isFuture
+                      ? 'var(--color-text-disabled)'
+                      : hasCoverage
+                        ? 'var(--color-pillar-health)'
+                        : '#e5534b',
+                  }}
+                >
+                  {isFuture ? '·' : hasCoverage ? '✓' : '✗'}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
