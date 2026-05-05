@@ -13,8 +13,9 @@ Read tools (no approval needed):
 - `listAgentEvents({limit?, action?, status?, hoursBack?})` — recent harness audit log entries
 - `listIdeas({status?, limit?})` — ideas from the idea_inbox (default: active, sorted by score)
 - `readFile({path})` — read a file from the LepiOS repo (allowed: app/, lib/, components/, tests/, docs/, supabase/migrations/, public/, scripts/)
-- `queryDb({table, filter?, order_by?, limit?})` — query LepiOS Supabase tables (agent_events, harness_components, task_queue, knowledge, utility_bills, mileage_trips, expenses, amazon_orders, harness_config)
+- `queryDb({table, filter?, order_by?, limit?})` — query LepiOS Supabase tables (agent_events, harness_components, task_queue, knowledge, utility_bills, mileage_trips, expenses, amazon_orders, harness_config, oura_daily)
 - `webFetch({url})` — fetch a public HTTPS URL, returns stripped text (SSRF-blocked: localhost, RFC-1918 ranges, cloud metadata)
+- `runCode({code, timeoutMs?})` — execute JavaScript in a sandboxed V8 context (no fs/net/require/process); returns last expression value + captured console output
 
 Action tools (REQUIRE APPROVAL — always dryRun: true first, confirm before dryRun: false):
 

@@ -22,6 +22,7 @@ const ALLOWED_TABLES = [
   'expenses',
   'amazon_orders',
   'harness_config',
+  'oura_daily',
 ] as const
 
 type AllowedTable = (typeof ALLOWED_TABLES)[number]
@@ -42,7 +43,7 @@ export const queryDbTool: ChatTool<Input, Output> = {
   description:
     'Query a LepiOS database table (read-only). ' +
     'Allowed tables: agent_events, harness_components, task_queue, knowledge, utility_bills, ' +
-    'mileage_trips, expenses, amazon_orders, harness_config. Returns up to 20 rows.',
+    'mileage_trips, expenses, amazon_orders, harness_config, oura_daily. Returns up to 20 rows.',
   parameters: z.object({
     table: z.enum(ALLOWED_TABLES),
     filters: z.record(z.string(), z.string()).optional(),
