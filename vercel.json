@@ -63,6 +63,10 @@
     {
       "path": "/api/cron/oura-sync",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/env-drift-check",
+      "schedule": "30 6 * * *"
     }
   ]
 }
