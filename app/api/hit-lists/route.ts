@@ -18,12 +18,21 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: 'Failed to fetch lists' }, { status: 500 })
 
-  const lists = (data ?? []).map((row) => ({
-    id: row.id,
-    name: row.name,
-    created_at: row.created_at,
-    item_count: (row.hit_list_items as unknown as { count: number }[])[0]?.count ?? 0,
-  }))
+  // Supabase typegen reports hit_list_items as the relation row type, but the
+  // `select(... hit_list_items(count))` aggregate returns `[{ count: number }]`.
+  // Narrow once at the boundary instead of repeating an `as unknown as`.
+  type HitListRow = (typeof data)[number] & {
+    hit_list_items: { count: number }[]
+  }
+  const lists = (data ?? []).map((row) => {
+    const r = row as HitListRow
+    return {
+      id: r.id,
+      name: r.name,
+      created_at: r.created_at,
+      item_count: r.hit_list_items[0]?.count ?? 0,
+    }
+  })
 
   return NextResponse.json(lists)
 }

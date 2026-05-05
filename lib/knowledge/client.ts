@@ -46,7 +46,7 @@ function trunc(s: string | null | undefined, max: number): string | undefined {
 export async function logEvent(
   domain: string,
   action: string,
-  opts: LogEventOptions = {},
+  opts: LogEventOptions = {}
 ): Promise<string | null> {
   try {
     const supabase = createServiceClient()
@@ -85,7 +85,7 @@ export async function logError(
   domain: string,
   action: string,
   error: unknown,
-  opts: Omit<LogEventOptions, 'status' | 'errorMessage' | 'errorType'> = {},
+  opts: Omit<LogEventOptions, 'status' | 'errorMessage' | 'errorType'> = {}
 ): Promise<string | null> {
   const err = error instanceof Error ? error : new Error(String(error))
   return logEvent(domain, action, {
@@ -101,7 +101,7 @@ export async function logSuccess(
   domain: string,
   action: string,
   summary: string,
-  opts: Omit<LogEventOptions, 'status' | 'outputSummary'> = {},
+  opts: Omit<LogEventOptions, 'status' | 'outputSummary'> = {}
 ): Promise<string | null> {
   return logEvent(domain, action, {
     ...opts,
@@ -124,7 +124,7 @@ export async function saveKnowledge(
   category: KnowledgeCategory,
   domain: string,
   title: string,
-  opts: SaveKnowledgeOptions = {},
+  opts: SaveKnowledgeOptions = {}
 ): Promise<string | null> {
   try {
     const supabase = createServiceClient()
@@ -133,16 +133,16 @@ export async function saveKnowledge(
     // content_hash MUST be computed over the same values that the DB
     // generated column will see — otherwise the lookup misses and we
     // hit the unique-index error path on insert.
-    const titleStored    = trunc(title, 300) ?? title
-    const problemStored  = trunc(opts.problem,  1000) ?? null
+    const titleStored = trunc(title, 300) ?? title
+    const problemStored = trunc(opts.problem, 1000) ?? null
     const solutionStored = trunc(opts.solution, 1000) ?? null
-    const contextStored  = trunc(opts.context,  1000) ?? null
-    const entityValue    = opts.entity ?? null
+    const contextStored = trunc(opts.context, 1000) ?? null
+    const entityValue = opts.entity ?? null
 
     // Mirror migration 0049's expression: md5(coalesce(title,'') || '||' || ...)
     const contentHash = createHash('md5')
       .update(
-        `${titleStored ?? ''}||${problemStored ?? ''}||${solutionStored ?? ''}||${contextStored ?? ''}`,
+        `${titleStored ?? ''}||${problemStored ?? ''}||${solutionStored ?? ''}||${contextStored ?? ''}`
       )
       .digest('hex')
 
@@ -161,7 +161,7 @@ export async function saveKnowledge(
 
     if (existing) {
       const existingSourceEvents: string[] = Array.isArray(
-        (existing as { source_events?: unknown }).source_events,
+        (existing as { source_events?: unknown }).source_events
       )
         ? ((existing as { source_events: unknown[] }).source_events as string[])
         : []
@@ -184,9 +184,7 @@ export async function saveKnowledge(
     // fail silently — the row is still saved.
     let embedding: number[] | null = null
     try {
-      const embedText = [title, opts.problem, opts.solution, opts.context]
-        .filter(Boolean)
-        .join(' ')
+      const embedText = [title, opts.problem, opts.solution, opts.context].filter(Boolean).join(' ')
       embedding = await embed(embedText)
     } catch (err) {
       if (!(err instanceof OllamaUnreachableError)) throw err
@@ -212,12 +210,15 @@ export async function saveKnowledge(
       .single()
 
     if (error) {
-      const e = error as unknown as Record<string, unknown>
+      // PostgrestError shape (from @supabase/postgrest-js): message + the
+      // diagnostic trio details/hint/code. Narrow once instead of casting
+      // the whole object through `unknown`.
+      const e = error as { details?: string | null; hint?: string | null; code?: string | null }
       console.error('[saveKnowledge] Supabase insert failed:', {
         message: error.message,
-        details: e['details'] ?? null,
-        hint:    e['hint']    ?? null,
-        code:    e['code']    ?? null,
+        details: e.details ?? null,
+        hint: e.hint ?? null,
+        code: e.code ?? null,
       })
       return null
     }
@@ -230,17 +231,16 @@ export async function saveKnowledge(
 
 // ── FTS helpers (internal) ────────────────────────────────────────────────────
 
-async function runFtsSearch(
-  query: string,
-  opts: FindKnowledgeOptions,
-): Promise<KnowledgeEntry[]> {
+async function runFtsSearch(query: string, opts: FindKnowledgeOptions): Promise<KnowledgeEntry[]> {
   const supabase = createServiceClient()
   const limit = opts.limit ?? 5
   const minConfidence = opts.minConfidence ?? 0.0
 
   let q = supabase
     .from('knowledge')
-    .select('id, created_at, updated_at, category, domain, entity, title, problem, solution, context, confidence, times_used, times_helpful, last_used_at, source_events, tags, embedding_id')
+    .select(
+      'id, created_at, updated_at, category, domain, entity, title, problem, solution, context, confidence, times_used, times_helpful, last_used_at, source_events, tags, embedding_id'
+    )
     .gte('confidence', minConfidence)
     .order('confidence', { ascending: false })
     .limit(limit)
@@ -273,11 +273,10 @@ interface VectorRow extends KnowledgeEntry {
 function mergeHybrid(
   vectorRows: VectorRow[],
   ftsRows: KnowledgeEntry[],
-  limit: number,
+  limit: number
 ): KnowledgeEntry[] {
   // Normalize FTS rank: position 0 = score 1.0, last = 0.0
-  const ftsScore = (idx: number, total: number) =>
-    total > 1 ? 1 - idx / (total - 1) : 1
+  const ftsScore = (idx: number, total: number) => (total > 1 ? 1 - idx / (total - 1) : 1)
 
   const scores = new Map<string, number>()
   const byId = new Map<string, KnowledgeEntry>()
@@ -312,7 +311,7 @@ function mergeHybrid(
  */
 export async function findKnowledge(
   query: string,
-  opts: FindKnowledgeOptions = {},
+  opts: FindKnowledgeOptions = {}
 ): Promise<KnowledgeEntry[]> {
   const limit = opts.limit ?? 5
   const minConfidence = opts.minConfidence ?? 0.0
@@ -333,7 +332,8 @@ export async function findKnowledge(
     // Vector path unavailable → FTS-only fallback
     if (embeddingResult.status === 'rejected') {
       void logEvent('knowledge', 'knowledge.search.fts_only', {
-        actor: 'system', status: 'warning',
+        actor: 'system',
+        status: 'warning',
         inputSummary: trimmedQuery.slice(0, 200),
         outputSummary: `Ollama unreachable — fell back to FTS (${ftsRows.length} results)`,
       })
@@ -351,7 +351,8 @@ export async function findKnowledge(
     if (vectorError || !vectorData) {
       // RPC failed — fall back to FTS
       void logEvent('knowledge', 'knowledge.search.fts_only', {
-        actor: 'system', status: 'warning',
+        actor: 'system',
+        status: 'warning',
         inputSummary: trimmedQuery.slice(0, 200),
         outputSummary: `match_knowledge RPC error — fell back to FTS (${ftsRows.length} results)`,
       })
@@ -359,9 +360,9 @@ export async function findKnowledge(
     }
 
     // Apply category/domain filters to vector results (RPC doesn't filter)
-    let vectorRows = (vectorData as VectorRow[])
+    let vectorRows = vectorData as VectorRow[]
     if (opts.category) vectorRows = vectorRows.filter((r) => r.category === opts.category)
-    if (opts.domain)   vectorRows = vectorRows.filter((r) => r.domain   === opts.domain)
+    if (opts.domain) vectorRows = vectorRows.filter((r) => r.domain === opts.domain)
 
     return mergeHybrid(vectorRows, ftsRows, limit)
   } catch {
@@ -376,7 +377,7 @@ export async function findKnowledge(
 export async function retrieveForError(
   errorType: string,
   errorMessage: string,
-  limit: number = 3,
+  limit: number = 3
 ): Promise<KnowledgeEntry[]> {
   try {
     const supabase = createServiceClient()
@@ -412,7 +413,7 @@ export async function retrieveForError(
  */
 export async function retrieveContext(
   question: string,
-  opts: { domain?: string; limit?: number } = {},
+  opts: { domain?: string; limit?: number } = {}
 ): Promise<string> {
   const entries = await findKnowledge(question, {
     domain: opts.domain,
@@ -455,10 +456,7 @@ export async function markUsed(knowledgeId: string, helpful: boolean = true): Pr
 // ── 3. Query Helpers ─────────────────────────────────────────────────────────
 
 /** Count events in the last N hours, optionally filtered by domain. */
-export async function getEventCount(
-  domain?: string,
-  hours: number = 24,
-): Promise<number> {
+export async function getEventCount(domain?: string, hours: number = 24): Promise<number> {
   try {
     const supabase = createServiceClient()
     const cutoff = new Date(Date.now() - hours * 3_600_000).toISOString()
@@ -476,7 +474,7 @@ export async function getEventCount(
 
 /** Error summary grouped by domain+action+error_type for the last N hours. */
 export async function getErrorSummary(
-  hours: number = 24,
+  hours: number = 24
 ): Promise<Array<{ domain: string; action: string; error_type: string; count: number }>> {
   try {
     const supabase = createServiceClient()
@@ -490,14 +488,22 @@ export async function getErrorSummary(
     if (!data) return []
 
     // Group client-side (Supabase JS SDK doesn't expose GROUP BY directly)
-    const counts = new Map<string, { domain: string; action: string; error_type: string; count: number }>()
+    const counts = new Map<
+      string,
+      { domain: string; action: string; error_type: string; count: number }
+    >()
     for (const row of data) {
       const key = `${row.domain}::${row.action}::${row.error_type ?? 'unknown'}`
       const existing = counts.get(key)
       if (existing) {
         existing.count++
       } else {
-        counts.set(key, { domain: row.domain, action: row.action, error_type: row.error_type ?? 'unknown', count: 1 })
+        counts.set(key, {
+          domain: row.domain,
+          action: row.action,
+          error_type: row.error_type ?? 'unknown',
+          count: 1,
+        })
       }
     }
 
@@ -539,11 +545,17 @@ export async function getKnowledgeStats(): Promise<{
 export async function getMemoryHealth(): Promise<MemoryHealthStats> {
   try {
     const supabase = createServiceClient()
-    const { data } = await supabase
-      .from('knowledge')
-      .select('category, domain, confidence')
+    const { data } = await supabase.from('knowledge').select('category, domain, confidence')
 
-    if (!data) return { total: 0, avgConfidence: 0, staleCount: 0, byCategory: {}, byDomain: {}, coverageGaps: [] }
+    if (!data)
+      return {
+        total: 0,
+        avgConfidence: 0,
+        staleCount: 0,
+        byCategory: {},
+        byDomain: {},
+        coverageGaps: [],
+      }
 
     const byCategory: Record<string, number> = {}
     const byDomain: Record<string, number> = {}
@@ -570,6 +582,13 @@ export async function getMemoryHealth(): Promise<MemoryHealthStats> {
       coverageGaps,
     }
   } catch {
-    return { total: 0, avgConfidence: 0, staleCount: 0, byCategory: {}, byDomain: {}, coverageGaps: [] }
+    return {
+      total: 0,
+      avgConfidence: 0,
+      staleCount: 0,
+      byCategory: {},
+      byDomain: {},
+      coverageGaps: [],
+    }
   }
 }

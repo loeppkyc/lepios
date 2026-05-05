@@ -227,7 +227,7 @@ export function parseFinancialEventPages(
         gross_contribution: round2(gross),
         fees_contribution: round2(fees),
         refunds_contribution: 0,
-        raw_json: event as unknown as Record<string, unknown>,
+        raw_json: { ...event },
       })
     }
 
@@ -251,7 +251,7 @@ export function parseFinancialEventPages(
         gross_contribution: 0,
         fees_contribution: 0,
         refunds_contribution: round2(refunds),
-        raw_json: event as unknown as Record<string, unknown>,
+        raw_json: { ...event },
       })
     }
 
@@ -272,7 +272,7 @@ export function parseFinancialEventPages(
         gross_contribution: 0,
         fees_contribution: round2(fees),
         refunds_contribution: 0,
-        raw_json: event as unknown as Record<string, unknown>,
+        raw_json: { ...event },
       })
     }
   }
