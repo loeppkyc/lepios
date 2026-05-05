@@ -37,7 +37,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Shipment Manager', href: null },
       { label: 'Inventory', href: '/inventory' },
       { label: 'Repricer', href: null },
-      { label: 'Sales Charts', href: null },
+      { label: 'Sales Charts', href: '/amazon-sales' },
       { label: 'Amazon Orders', href: null },
       { label: 'Payouts', href: '/payouts' },
       { label: 'Inventory Spend', href: null },
