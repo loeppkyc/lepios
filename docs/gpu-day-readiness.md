@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 75.0 / 100
+## Total Readiness: 78.0 / 100
 
 ---
 
@@ -77,9 +77,9 @@ _4 of 6 already won._
 | #   | Line item                                          | Weight | Pct | Contribution | Notes                                                                                                    |
 | --- | -------------------------------------------------- | ------ | --- | ------------ | -------------------------------------------------------------------------------------------------------- |
 | E1  | `KEEPA_API_KEY` verified in Vercel                 | 4      | 50% | 2.00         | Sprint 3 PageProfit shipped (implies key was live), but no recent verification; give it benefit of doubt |
-| E2  | `OURA_ACCESS_TOKEN` in `harness_config`            | 3      | 0%  | 0.00         | Oura study doc explicitly flags this as a prereq not yet done                                            |
+| E2  | `OURA_ACCESS_TOKEN` in `harness_config`            | 3      | 100% | 3.00         | **Complete 2026-05-05.** `OURA_TOKEN` (key name) confirmed in `harness_config`. `/api/cron/oura-sync` triggered manually: `{"ok":true,"days":30}`. 30 rows in `oura_daily` table (Apr 5–May 4). |
 | E3  | Staged-batch env vars audited (Dropbox, n8n, etc.) | 3      | 0%  | 0.00         | No audit doc found; design decisions pending for Dropbox + Profile modules                               |
-|     | **Category total**                                 | **10** |     | **2.00**     |                                                                                                          |
+|     | **Category total**                                 | **10** |     | **5.00**     |                                                                                                          |
 
 ---
 
@@ -91,8 +91,8 @@ _4 of 6 already won._
 | B — Harness Reliability | 30      | 27.70     | 92%       |
 | C — Doctrine + Docs     | 15      | 7.00      | 47%       |
 | D — Staged Batch        | 20      | 17.00     | 85%       |
-| E — Env + Secrets       | 10      | 2.00      | 20%       |
-| **Total**               | **100** | **74.95** | **75.0%** |
+| E — Env + Secrets       | 10      | 5.00      | 50%       |
+| **Total**               | **100** | **77.95** | **78.0%** |
 
 ---
 
@@ -126,7 +126,9 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-04-27 (W4) — C4 chart strategy → 100%. shadcn/ui Chart (Recharts) adopted. `docs/decisions/chart-library-strategy.md` written. AmazonDailyChart + UtilityBarChart migrated. Total: 64.0% → 67.0%.  
+2026-05-05 MDT — E2 → 100%. `OURA_TOKEN` confirmed in `harness_config` (key name differs from spec but matches code). `/api/cron/oura-sync` returned `{"ok":true,"days":30}`; 30 rows in `oura_daily` (Apr 5–May 4). Total: 75.0% → 78.0%.
+
+Previously: 2026-04-27 (W4) — C4 chart strategy → 100%. shadcn/ui Chart (Recharts) adopted. `docs/decisions/chart-library-strategy.md` written. AmazonDailyChart + UtilityBarChart migrated. Total: 64.0% → 67.0%.  
 2026-04-27 11:31 MDT / 17:31 UTC — updated after PR #35 merge (B1/B2/B3 → 100%)  
 Previously: 2026-04-27 ~10:00 MDT (initial write same session)
 
