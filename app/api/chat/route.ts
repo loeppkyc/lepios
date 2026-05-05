@@ -1,6 +1,5 @@
 import { streamText, convertToModelMessages, stepCountIs } from 'ai'
-import { createOllama } from 'ollama-ai-provider'
-import type { LanguageModel } from 'ai'
+import { createOllama } from 'ollama-ai-provider-v2'
 import { LEPIOS_SYSTEM_PROMPT } from '@/lib/orb/identity'
 import { createClient } from '@/lib/supabase/server'
 import {
@@ -89,9 +88,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    // ollama-ai-provider@1.x returns LanguageModelV1; ai@6 expects V2/V3.
-    // Cast through unknown to bridge the provider version gap at type level only.
-    model: ollamaProvider(MODEL) as unknown as LanguageModel,
+    model: ollamaProvider(MODEL),
     system: systemPrompt,
     messages: await convertToModelMessages(
       messages as Parameters<typeof convertToModelMessages>[0]

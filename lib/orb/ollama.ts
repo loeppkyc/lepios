@@ -1,4 +1,4 @@
-import { createOllama } from 'ollama-ai-provider'
+import { createOllama } from 'ollama-ai-provider-v2'
 
 // ── Error types ────────────────────────────────────────────────────────────────
 
@@ -84,13 +84,13 @@ export function errorStream(message: string): Response {
       ctrl.enqueue(enc.encode(`0:${JSON.stringify(message)}\n`))
       ctrl.enqueue(
         enc.encode(
-          `e:${JSON.stringify({ finishReason: 'stop', usage: { promptTokens: 0, completionTokens: 0 }, isContinued: false })}\n`,
-        ),
+          `e:${JSON.stringify({ finishReason: 'stop', usage: { promptTokens: 0, completionTokens: 0 }, isContinued: false })}\n`
+        )
       )
       ctrl.enqueue(
         enc.encode(
-          `d:${JSON.stringify({ finishReason: 'stop', usage: { promptTokens: 0, completionTokens: 0 } })}\n`,
-        ),
+          `d:${JSON.stringify({ finishReason: 'stop', usage: { promptTokens: 0, completionTokens: 0 } })}\n`
+        )
       )
       ctrl.close()
     },
