@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 81.0 / 100
+## Total Readiness: 91.0 / 100
 
 ---
 
@@ -38,8 +38,8 @@ _Without reliable drain + tunnel, autonomous ships are deaf-and-dumb post-GPU._
 | B3  | BUMP parser fix (task `90a47e2e`)                                     | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                                                                                                                                            |
 | B4  | Tunnel reliability — cloudflared as Windows service (task `d82411e1`) | 8      | 100% | 8.00         | **Shipped 2026-05-04.** cloudflared v2025.8.1 installed as AUTO_START Windows service. `OLLAMA_TUNNEL_URL=https://ollama.loeppky.xyz` already set in Vercel. Acceptance test: 10/10 embed requests @ 194ms avg, 0 failures. F18 logged. Survives reboots. |
 | B5  | Coordinator branch-naming bug fixed                                   | 2      | 85%  | 1.70         | F-N3 documented; `coordinator.md` updated (staged in git) with pre-git task_id guard; `branch_guard_triggered` events logging                                                                                                                             |
-| B6  | Direct SQL audit gap resolved (task `305a9528`)                       | 2      | 0%   | 0.00         | Not started                                                                                                                                                                                                                                               |
-|     | **Category total**                                                    | **30** |      | **27.70**    |                                                                                                                                                                                                                                                           |
+| B6  | Direct SQL audit gap resolved (task `305a9528`)                       | 2      | 100% | 2.00         | **Resolved 2026-05-05.** Decision: accept as designed. `docs/decisions/sql-direct-write-backdoor.md`. Task `305a9528` marked completed in `task_queue`. SQL is a privileged Colin-only backdoor; F18 surfacing covers agent operations only.                                                                                                                                                                                                                                |
+|     | **Category total**                                                    | **30** |      | **29.70**    |                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -49,10 +49,10 @@ _Without reliable drain + tunnel, autonomous ships are deaf-and-dumb post-GPU._
 | --- | ------------------------------------------ | ------ | ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | C1  | CLAUDE.md §8 capabilities hardened         | 2      | 100% | 2.00         | §8 comprehensive — agents, endpoints, MCP tools, skills, runtime config                                                                   |
 | C2  | `failures.md` + `successes.md` backfilled  | 2      | 100% | 2.00         | F-N1–F-N4 and S-N1–S-N3 in `docs/claude-md/`                                                                                              |
-| C3  | Safety Agent doctrine resolved (W1 Task 1) | 4      | 0%   | 0.00         | CLAUDE.md §8 says "Target: Sprint 5+" — no doc, no decision, not queued                                                                   |
+| C3  | Safety Agent doctrine resolved (W1 Task 1) | 4      | 100% | 4.00         | **Resolved 2026-05-05.** Decision: build it. `docs/specs/safety-agent.md` shipped (3-phase build: static checks → LLM review → Telegram approval). Phase 1 queued as task `9b9bca02` in `task_queue`. CLAUDE.md §8 will be updated when Phase 1 ships.                                                                                                                   |
 | C4  | Chart strategy decided (W4)                | 3      | 100% | 3.00         | `docs/decisions/chart-library-strategy.md` — shadcn/ui Chart (Recharts). AmazonDailyChart + UtilityBarChart migrated. PR open 2026-04-27. |
-| C5  | Status page spec'd or shipped (W1 Task 2)  | 4      | 0%   | 0.00         | Referenced as "W1 Task 2" but no spec, no queue entry, no build                                                                           |
-|     | **Category total**                         | **15** |      | **7.00**     |                                                                                                                                           |
+| C5  | Status page spec'd or shipped (W1 Task 2)  | 4      | 100% | 4.00         | **Resolved 2026-05-05.** Decision: deferred indefinitely. `docs/decisions/status-page-deferred.md` — `morning_digest` already covers the surface; a webpage would duplicate at maintenance cost. Revisit triggers documented.                                                                           |
+|     | **Category total**                         | **15** |      | **15.00**    |                                                                                                                                           |
 
 ---
 
@@ -88,11 +88,11 @@ _4 of 6 already won._
 | Category                | Weight  | Earned    | %         |
 | ----------------------- | ------- | --------- | --------- |
 | A — Ollama Pipeline     | 25      | 21.25     | 85%       |
-| B — Harness Reliability | 30      | 27.70     | 92%       |
-| C — Doctrine + Docs     | 15      | 7.00      | 47%       |
+| B — Harness Reliability | 30      | 29.70     | 99%       |
+| C — Doctrine + Docs     | 15      | 15.00     | 100%      |
 | D — Staged Batch        | 20      | 17.00     | 85%       |
 | E — Env + Secrets       | 10      | 8.00      | 80%       |
-| **Total**               | **100** | **80.95** | **81.0%** |
+| **Total**               | **100** | **90.95** | **91.0%** |
 
 ---
 
@@ -126,7 +126,9 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-05-05 MDT — E3 → 100%. `docs/env-audit-2026-05-05.md` shipped. **Caught CRITICAL F-E1** (chat route hit localhost in prod — `OLLAMA_BASE_URL` unset) + F-E2 (UI label drift) — both fixed by setting Vercel env vars. 6 follow-ups flagged. Total: 78.0% → 81.0%.
+2026-05-05 MDT — Decision sweep with Colin: B6 → 100% (SQL backdoor accepted), C3 → 100% (Safety Agent: build, Phase 1 queued as task `9b9bca02`), C5 → 100% (Status page deferred, morning_digest covers surface). 5 spec/decision docs written, 3 tasks queued, 1 task closed. C category now 100%. Total: 81.0% → **91.0%**.
+
+Previously: 2026-05-05 MDT — E3 → 100%. `docs/env-audit-2026-05-05.md` shipped. **Caught CRITICAL F-E1** (chat route hit localhost in prod — `OLLAMA_BASE_URL` unset) + F-E2 (UI label drift) — both fixed by setting Vercel env vars. 6 follow-ups flagged. Total: 78.0% → 81.0%.
 
 Previously: 2026-05-05 MDT — E2 → 100%. `OURA_TOKEN` confirmed in `harness_config` (key name differs from spec but matches code). `/api/cron/oura-sync` returned `{"ok":true,"days":30}`; 30 rows in `oura_daily` (Apr 5–May 4). Total: 75.0% → 78.0%.
 

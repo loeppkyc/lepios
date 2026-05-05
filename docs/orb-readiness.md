@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 86.7% (94.55 / 109 pts)
+## Total Readiness: 88.6% (96.55 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -107,11 +107,11 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | #   | Line item                                                                                 | Weight | Pct | Contribution | Notes                                                                                                                                                            |
 | --- | ----------------------------------------------------------------------------------------- | ------ | --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | F1  | eGPU enclosure purchased + tested                                                         | 4      | 0%  | 0.00         | No purchase or mention in any docs. Hardware prerequisite for Orb Day.                                                                                           |
-| F2  | GPU card purchased + installed (CUDA-verified)                                            | 4      | 0%  | 0.00         | Current setup runs `qwen2.5-coder:7b` (may be CPU). No CUDA verification. 14B+ requires GPU. Once purchased, `ollama-ai-provider` model swap is a config change. |
+| F2  | GPU card purchased + installed (CUDA-verified)                                            | 4      | 50% | 2.00         | **Updated 2026-05-05.** RTX 3060 12GB on hand (purchased ✓). 12GB VRAM fits qwen2.5:14b Q4_K_M (~8.5GB) comfortably — the actual Orb Day target. 32B does NOT fit (needs 24GB+); pre-cached 32B will remain CPU-only or be unloaded. Remaining 50%: install in eGPU (gated on F1) + CUDA verify + first inference benchmark.        |
 | F3  | Chat UI accessible from laptop without dev server (production deploy or local prod build) | 3      | 95% | 2.85         | **Verified 2026-05-04.** `https://lepios-one.vercel.app/chat` returns 200, full UI visible (sidebar + identity strip + message input), Ollama tunnel live. `LEPIOS.lnk` Desktop shortcut opens it directly. Remaining 5%: confirm a real message round-trips end-to-end in production (requires sitting at laptop + Ollama running).                                                                                                                                                                    |
 | F4  | Auto-start on boot (optional)                                                             | 2      | 100% | 2.00         | **Complete 2026-05-05.** cloudflared installed as Windows AUTO_START service (`sc.exe`) — routes `ollama.loeppky.xyz → localhost:11434`. Ollama auto-starts via `Ollama.lnk` + `start_ollama.bat` in Windows Startup folder. `scripts/post-reboot-smoke.ps1` shipped: 4 checks (cloudflared service, tunnel, prod /chat, local 11434), logs to `logs/post-reboot-smoke.log`, exit 1 on FAIL. First run 2026-05-05: 4/4 PASS, ExitCode 0.                                                                                                              |
 | F5  | Backup of Twin + chat history (data is the asset)                                         | 2      | 100% | 2.00        | **Complete 2026-05-04.** `app/api/cron/backup`: exports knowledge (no embedding/fts), conversations, messages as NDJSON daily at 07:00 UTC. Private `backups` Supabase Storage bucket (100 MB ceiling, migration 0122). Logs row counts to `agent_events`. Layer 1 = PITR; Layer 2 = manual SQL export; Layer 3 = this cron.                        |
-|     | **Category total**                                                                        | **15** |     | **6.85**     |                                                                                                                                                                  |
+|     | **Category total**                                                                        | **15** |     | **8.85**     |                                                                                                                                                                  |
 
 ---
 
@@ -124,8 +124,8 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | C — Context / Memory  | 18      | 17.35     | 96%       |
 | D — Tool Use          | 24      | 23.00     | 96%       |
 | E — Identity / Polish | 7       | 6.35      | 91%       |
-| F — Operational       | 15      | 6.85      | 46%       |
-| **Total**             | **109** | **94.55** | **86.7%** |
+| F — Operational       | 15      | 8.85      | 59%       |
+| **Total**             | **109** | **96.55** | **88.6%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
@@ -180,7 +180,9 @@ Combined these 4 tasks earn: A1 remaining 45% (+3.6) + A2 remaining 60% (+2.4) +
 
 ## Last Updated
 
-2026-05-05 MDT — Autonomous progress sweep. C5 oura-sync verified (30 rows). B2 0→50% (qwen2.5:32b already pulled). Chat route flipped to qwen2.5:7b (`OLLAMA_CHAT_MODEL` env var, F15-clean, deploy `dpl_9PcEXaHoaHp86wWEhXZF1j9QzDNG` READY). E1 95→100% (opengraph PNG verified in prod, HTTP 200, 15.8KB). F4 80→100% (`scripts/post-reboot-smoke.ps1` shipped, 4/4 PASS first run). Total: 84.2% → 86.7%.
+2026-05-05 MDT — Decision sweep + F2 update. F2 0→50% (RTX 3060 12GB on hand; install gated on eGPU which Colin will get soon). 14B is the true Orb Day target on 12GB VRAM (qwen2.5:14b Q4_K_M ~8.5GB fits; 32B does not). Total: 86.7% → 88.6%.
+
+Previously: 2026-05-05 MDT — Autonomous progress sweep. C5 oura-sync verified (30 rows). B2 0→50% (qwen2.5:32b already pulled). Chat route flipped to qwen2.5:7b (`OLLAMA_CHAT_MODEL` env var, F15-clean, deploy `dpl_9PcEXaHoaHp86wWEhXZF1j9QzDNG` READY). E1 95→100% (opengraph PNG verified in prod, HTTP 200, 15.8KB). F4 80→100% (`scripts/post-reboot-smoke.ps1` shipped, 4/4 PASS first run). Total: 84.2% → 86.7%.
 
 Previously: 2026-05-04 MDT / UTC — Cloudflared tunnel live as Windows service. 10/10 embed acceptance test @ 194ms avg, 0 failures. OLLAMA_TUNNEL_URL=https://ollama.loeppky.xyz confirmed in Vercel production. All tunnel-gated items closed: A1 90→100%, B1 95→100%, B4 75→100%, B5 90→100%, C2 90→100%, C6 90→100%, D1 85→100%, D3 85→100%, D4 85→100%. Total: 67.4% → 71.4%.
 
