@@ -61,7 +61,7 @@ const T2125_MAP: Array<{ line: string; label: string; categories: string[] }> = 
   {
     line: '8519',
     label: 'Cost of Goods Sold',
-    categories: ['Inventory — Books (Pallets)', 'Inventory — Other'],
+    categories: ['Inventory — Books (Pallets)', 'Inventory'],
   },
   { line: '8521', label: 'Advertising', categories: ['Amazon Advertising'] },
   { line: '8690', label: 'Insurance', categories: ['Insurance'] },

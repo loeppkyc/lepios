@@ -29,7 +29,7 @@ export const ZERO_GST: ReadonlySet<string> = new Set([
  */
 export const CATEGORIES: readonly string[] = [
   'Inventory — Books (Pallets)',
-  'Inventory — Other',
+  'Inventory',
   'Amazon Advertising',
   'Bank Charges',
   'Software & Subscriptions',

@@ -3,7 +3,7 @@
 
 export const CATEGORIES = [
   'Inventory — Books (Pallets)',
-  'Inventory — Other',
+  'Inventory',
   'Shipping & Delivery',
   'Amazon Advertising',
   'Bank Charges',
@@ -55,13 +55,13 @@ export const ZERO_GST_CATEGORIES = new Set<string>([
 
 // Canadian province tax rates — label → decimal multiplier
 export const TAX_RATES: Record<string, number> = {
-  'No tax — 0%':                   0.00,
-  'GST 5% (AB / NT / NU / YT)':   0.05,
-  'GST+PST 11% (SK)':              0.11,
-  'GST+PST 12% (BC / MB)':         0.12,
-  'HST 13% (ON)':                  0.13,
-  'HST 15% (NB / NS / PE / NL)':  0.15,
-  'GST+QST ~15% (QC)':             0.14975,
+  'No tax — 0%': 0.0,
+  'GST 5% (AB / NT / NU / YT)': 0.05,
+  'GST+PST 11% (SK)': 0.11,
+  'GST+PST 12% (BC / MB)': 0.12,
+  'HST 13% (ON)': 0.13,
+  'HST 15% (NB / NS / PE / NL)': 0.15,
+  'GST+QST ~15% (QC)': 0.14975,
 }
 
 export const TAX_RATE_KEYS = Object.keys(TAX_RATES)
@@ -89,7 +89,7 @@ export interface RecurringTemplate {
 
 export interface BusinessExpense {
   id: string
-  date: string          // 'YYYY-MM-DD'
+  date: string // 'YYYY-MM-DD'
   vendor: string
   category: string
   pretax: number
@@ -107,8 +107,8 @@ export interface ExpenseSummary {
   count: number
   totalPretax: number
   totalTax: number
-  totalLogged: number   // pretax + tax
-  businessPortion: number  // pretax * business_use_pct/100 (no tax)
+  totalLogged: number // pretax + tax
+  businessPortion: number // pretax * business_use_pct/100 (no tax)
 }
 
 export interface ExpensesResponse {
@@ -140,11 +140,11 @@ export function expandRecurring(
   baseDateStr: string,
   pretax: number,
   taxAmount: number,
-  frequency: Frequency,
+  frequency: Frequency
 ): Array<{ date: string; pretax: number; taxAmount: number }> {
   const base = new Date(baseDateStr + 'T12:00:00')
   const year = base.getFullYear()
-  const baseMonth = base.getMonth() + 1  // 1-12
+  const baseMonth = base.getMonth() + 1 // 1-12
   const baseDay = base.getDate()
 
   function clampDay(y: number, m: number, d: number): string {
@@ -171,7 +171,7 @@ export function expandRecurring(
 
   // annual: divide across all 12 months
   const monthlyPretax = Math.round((pretax / 12) * 100) / 100
-  const monthlyTax    = Math.round((taxAmount / 12) * 100) / 100
+  const monthlyTax = Math.round((taxAmount / 12) * 100) / 100
   return Array.from({ length: 12 }, (_, i) => ({
     date: clampDay(year, i + 1, baseDay),
     pretax: monthlyPretax,

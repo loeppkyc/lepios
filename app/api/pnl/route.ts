@@ -2,11 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // Costs directly tied to producing Amazon revenue
-const COGS_CATEGORIES = new Set([
-  'Inventory — Books (Pallets)',
-  'Inventory — Other',
-  'Shipping & Delivery',
-])
+const COGS_CATEGORIES = new Set(['Inventory — Books (Pallets)', 'Inventory', 'Shipping & Delivery'])
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
