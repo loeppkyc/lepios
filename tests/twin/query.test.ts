@@ -76,7 +76,7 @@ function makePersonalChunk(
     solution: string | null
     context: string | null
     similarity: number
-  }> = {},
+  }> = {}
 ) {
   return {
     id: 'chunk-abc',
@@ -99,6 +99,23 @@ function makeFtsChain(result: { data: unknown; error: unknown }) {
   return chain
 }
 
+// Routes mockFrom by table name. FTS chain for knowledge; insert chain for
+// twin_escalations (slice 2 — recordEscalation writes here on escalate=true).
+function makeEscalationInsertChain(result: { data: { id: string } | null; error: unknown }) {
+  return {
+    insert: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue(result),
+      }),
+    }),
+  }
+}
+
+let mockEscalationResult: { data: { id: string } | null; error: unknown } = {
+  data: { id: 'esc-default' },
+  error: null,
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -108,7 +125,11 @@ beforeEach(() => {
   // claudeFallback() guards on missing ANTHROPIC_API_KEY; tests that exercise
   // the fallback path still need the SDK to be reachable for the mock to fire.
   process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
-  mockFrom.mockReturnValue(makeFtsChain({ data: [], error: null }))
+  mockEscalationResult = { data: { id: 'esc-default' }, error: null }
+  mockFrom.mockImplementation((table: string) => {
+    if (table === 'twin_escalations') return makeEscalationInsertChain(mockEscalationResult)
+    return makeFtsChain({ data: [], error: null })
+  })
 })
 
 afterEach(() => {
@@ -270,7 +291,7 @@ describe('askTwin — FTS fallback', () => {
           },
         ],
         error: null,
-      }),
+      })
     )
     mockGenerate.mockResolvedValue({
       text: 'Colin lives in Alberta.',
@@ -284,5 +305,75 @@ describe('askTwin — FTS fallback', () => {
     expect(result.retrieval_path).toBe('fts')
     expect(result.sources).toHaveLength(1)
     expect(result.sources[0].similarity).toBe(0)
+  })
+})
+
+// ── Slice 2: escalation_id capture ────────────────────────────────────────────
+
+describe('askTwin — escalation_id (slice 2)', () => {
+  it('returns escalation_id when escalate=true and twin_escalations insert succeeds', async () => {
+    mockEscalationResult = { data: { id: 'esc-abc-123' }, error: null }
+    mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
+    mockRpc.mockResolvedValue({ data: [makePersonalChunk({ similarity: 0.75 })], error: null })
+    mockGenerate.mockResolvedValue({
+      text: 'personal_escalation',
+      confidence: 0,
+      model: 'qwen2.5:32b',
+      tokens_used: 5,
+    })
+
+    const result = await askTwin('What is my deepest fear?')
+
+    expect(result.escalate).toBe(true)
+    expect(result.escalate_reason).toBe('personal_escalation')
+    expect(result.escalation_id).toBe('esc-abc-123')
+  })
+
+  it('returns escalation_id=null when escalate=false (no insert fired)', async () => {
+    mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
+    mockRpc.mockResolvedValue({ data: [makePersonalChunk({ similarity: 0.75 })], error: null })
+    mockGenerate.mockResolvedValue({
+      text: 'Colin lives in Edmonton.',
+      confidence: 0.9,
+      model: 'qwen2.5:32b',
+      tokens_used: 20,
+    })
+
+    const result = await askTwin('Where does Colin live?')
+
+    expect(result.escalate).toBe(false)
+    expect(result.escalation_id).toBeNull()
+  })
+
+  it('returns escalation_id=null when escalate=true but insert fails (escalate still true)', async () => {
+    mockEscalationResult = { data: null, error: new Error('db down') }
+    mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
+    mockRpc.mockResolvedValue({ data: [makePersonalChunk({ similarity: 0.75 })], error: null })
+    mockGenerate.mockResolvedValue({
+      text: 'insufficient_context',
+      confidence: 0,
+      model: 'qwen2.5:32b',
+      tokens_used: 5,
+    })
+
+    const result = await askTwin('Tell me something only Colin knows.')
+
+    expect(result.escalate).toBe(true)
+    expect(result.escalate_reason).toBe('insufficient_context')
+    expect(result.escalation_id).toBeNull()
+  })
+
+  it('captures escalation on Ollama-down + no-context branch', async () => {
+    mockEscalationResult = { data: { id: 'esc-ollama-down' }, error: null }
+    mockEmbed.mockResolvedValue(FAKE_EMBEDDING)
+    // FTS path returns empty so contextStr is empty
+    mockRpc.mockResolvedValue({ data: [], error: null })
+    mockGenerate.mockRejectedValue(new MockOllamaUnreachableError('circuit open'))
+
+    const result = await askTwin('Question with no context match.')
+
+    expect(result.escalate).toBe(true)
+    expect(result.escalate_reason).toBe('insufficient_context')
+    expect(result.escalation_id).toBe('esc-ollama-down')
   })
 })

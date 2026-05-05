@@ -29,6 +29,7 @@ const {
   mockBuildSelfRepairDigestLine,
   mockBuildReconciliationMatchLine,
   mockBuildDeploySmokeStatsLine,
+  mockBuildOpenEscalationsLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -56,6 +57,7 @@ const {
   mockBuildSelfRepairDigestLine: vi.fn(),
   mockBuildReconciliationMatchLine: vi.fn(),
   mockBuildDeploySmokeStatsLine: vi.fn(),
+  mockBuildOpenEscalationsLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -182,6 +184,11 @@ vi.mock('@/lib/amazon/reconciliation-digest', () => ({
 // Mock smoke-tests/digest so buildDeploySmokeStatsLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/smoke-tests/digest', () => ({
   buildDeploySmokeStatsLine: mockBuildDeploySmokeStatsLine,
+}))
+
+// Mock twin-escalations/digest so buildOpenEscalationsLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/twin-escalations/digest', () => ({
+  buildOpenEscalationsLine: mockBuildOpenEscalationsLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -313,6 +320,7 @@ beforeEach(() => {
   mockBuildSelfRepairDigestLine.mockResolvedValue('Self-repair (24h): 0 attempts')
   mockBuildReconciliationMatchLine.mockResolvedValue('Reconciliation: no data')
   mockBuildDeploySmokeStatsLine.mockResolvedValue('Deploy smoke (24h): no runs')
+  mockBuildOpenEscalationsLine.mockResolvedValue('Twin escalations (24h): 0 open')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
