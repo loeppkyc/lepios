@@ -47,7 +47,9 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Revenue: amazon_settlements bucketed by period_end_at
-  // gross is deferred/null in current schema — using net_payout as revenue proxy
+  // net_payout is after Amazon fees (~18% cut). Gross taxable sales are ~10–11% higher.
+  // Filed 2024-05→2025-04 return: Line 101 = $731,465 gross vs $653K net payout.
+  // Line 101 here is understated — use Seller Central settlement reports for exact gross.
   const { data: settlements, error: settErr } = await supabase
     .from('amazon_settlements')
     .select('id, net_payout, period_start_at, period_end_at')
@@ -74,6 +76,8 @@ export async function GET(request: Request) {
   const revenue = (settlements ?? []).reduce((sum, s) => sum + (Number(s.net_payout) || 0), 0)
   // GST estimate on revenue: Amazon typically collects & remits GST on marketplace
   // sales as the deemed supplier — confirm with accountant before filing
+  // Blended effective GST rate on gross sales is ~9% (customers in all provinces).
+  // On net payouts it's ~10%. Filed return: $65,900 collected on $731K gross = 9.01%.
   const gstOnRevenue = revenue * GST_RATE
 
   const itcs = gstEligible.reduce((sum, e) => sum + (Number(e.tax_amount) || 0), 0)
@@ -83,7 +87,7 @@ export async function GET(request: Request) {
     period: { year, quarter, start, end },
     // Line 101: total sales (using net_payout — gross is deferred)
     revenue: round2(revenue),
-    // Estimated GST collected on revenue (may be $0 if Amazon remits on your behalf)
+    // Estimated GST collected on revenue (~9% blended rate; Amazon does NOT remit for registered sellers)
     gstOnRevenue: round2(gstOnRevenue),
     // Line 106: input tax credits from GST-eligible business expenses
     line106Itcs: round2(itcs),

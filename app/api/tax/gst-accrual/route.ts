@@ -3,10 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 0
 
-// TODO: tune with real data — rule-of-thumb 2.5% of net Amazon payouts
-const GST_RATE_ESTIMATE = 0.025
+// Derived from 2024-05–2025-04 filed GST return: Line 103 $65,900.59 / Line 101 $731,465.40 = 9.01% on gross.
+// Since we store net payouts (after ~18% Amazon fees), effective rate on net is ~10.09%.
+// Use 10% as working estimate until current-year return is filed.
+const GST_RATE_ESTIMATE = 0.10
 
-// TODO: update when 2026 NOA is received — this is the 2025 NOA overpayment credit
+// $2K overpayment credit from 2025 NOA — applied against 2025-05→2026-04 filing.
+// Update when 2026 NOA is received.
 const OPENING_CREDIT_CAD = 2000.0
 const OPENING_CREDIT_NOTE = 'from 2025 NOA overpayment'
 
