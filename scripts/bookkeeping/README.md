@@ -141,16 +141,20 @@ INSERT INTO vendor_rules (
 );
 ```
 
-Auto-learning: future enhancement — when you correct a categorization in the review UI, the system can ask "want me to remember this for future similar transactions?" and create a rule.
+Auto-learning: when you tick "Save as rule for pattern" in `/bookkeeping/reconcile`, the approval call inserts a `vendor_rules` row with `source='auto_learned'`. Next time the same pattern hits, it auto-approves.
 
-## What's NOT yet built (Phase 2+)
+## What's NOT yet built
 
-- **Approval UI** — review queue is currently SQL-only. Need `/bookkeeping/reconcile` page in Cockpit.
 - **Amazon settlement matching** — link `AMAZON MSP` TD deposits to `amazon_settlements.net_payout` for reconciliation.
 - **GST collected on sales** — currently we book GST on purchases (input tax credits). Sales-side GST tracking from Amazon CSVs needed for proper GST filing.
-- **QB writeback** — generate QB CSV/IIF or push directly via QBO REST API.
-- **Hubdoc PDF parsing** — for receipts that don't appear on bank statements (rare but exists).
+- **Hubdoc PDF parsing for receipts** — covered for TD Chequing statements (`parse-td-pdf.py`). Receipt PDFs that don't appear on bank statements still need parsing.
 - **Recurring transaction detection** — detect monthly subscriptions and auto-confirm them as expected.
+
+## What's built
+
+- **Approval UI** at `/bookkeeping/reconcile` — visual queue for `pending_transactions WHERE status='needs_review'`, approve/edit/reject, optional rule learning.
+- **QB CSV export** at `/bookkeeping/qb-export` — exports unexported `lepios_auto` JEs in QB Online Journal Entry import format. Two-step: download → import in QB → mark exported. Filters out the `qb_import` Q1 baseline.
+- **TD Chequing PDF parser** — `parse-td-pdf.py` reads Hubdoc PDF statements directly, validates parsed net change against starting/ending balance.
 
 ## Failure modes & gotchas
 
