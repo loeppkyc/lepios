@@ -84,14 +84,18 @@ export async function GET(request: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
 
-    await db.from('agent_events').insert({
-      domain: 'backup',
-      action: 'backup.export',
-      actor: 'cron_backup',
-      status: 'error',
-      duration_ms: Date.now() - started,
-      error_message: msg,
-    }).catch(() => undefined)
+    try {
+      await db.from('agent_events').insert({
+        domain: 'backup',
+        action: 'backup.export',
+        actor: 'cron_backup',
+        status: 'error',
+        duration_ms: Date.now() - started,
+        error_message: msg,
+      })
+    } catch {
+      // best-effort log
+    }
 
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
