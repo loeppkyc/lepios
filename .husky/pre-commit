@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
+# `set -e` is load-bearing: without it, a Layer 0 exit-1 prints "BLOCKED"
+# but doesn't actually abort the hook (sh keeps running after non-zero exits
+# unless errexit is on). The hook then returns the last command's exit code.
+set -e
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
