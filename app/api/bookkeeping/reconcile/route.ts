@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 0
 
@@ -30,6 +31,12 @@ export interface ReconcileQueue {
 }
 
 export async function GET() {
+  const ssr = await createClient()
+  const {
+    data: { user },
+  } = await ssr.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = createServiceClient()
 
   const { data: pending, error: pErr } = await supabase

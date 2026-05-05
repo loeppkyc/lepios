@@ -9,10 +9,17 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFrom } = vi.hoisted(() => ({ mockFrom: vi.fn() }))
+const { mockFrom, mockGetUser } = vi.hoisted(() => ({
+  mockFrom: vi.fn(),
+  mockGetUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'user-1' } } })),
+}))
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(() => Promise.resolve({ auth: { getUser: mockGetUser } })),
 }))
 
 import { POST } from '@/app/api/bookkeeping/reconcile/approve/route'
@@ -138,6 +145,18 @@ function postReq(body: unknown): Request {
 
 beforeEach(() => {
   mockFrom.mockReset()
+  mockGetUser.mockReset()
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+})
+
+describe('POST /api/bookkeeping/reconcile/approve — auth', () => {
+  it('returns 401 when no user is authenticated', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+    const res = await POST(
+      postReq({ id: 'a', expense_account: 'X', gst_rate: 0.05, business_use_pct: 100 })
+    )
+    expect(res.status).toBe(401)
+  })
 })
 
 describe('POST /api/bookkeeping/reconcile/approve — input validation', () => {

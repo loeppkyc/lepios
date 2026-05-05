@@ -5,10 +5,17 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFrom } = vi.hoisted(() => ({ mockFrom: vi.fn() }))
+const { mockFrom, mockGetUser } = vi.hoisted(() => ({
+  mockFrom: vi.fn(),
+  mockGetUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'user-1' } } })),
+}))
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(() => Promise.resolve({ auth: { getUser: mockGetUser } })),
 }))
 
 import { GET as qbGET } from '@/app/api/bookkeeping/qb-export/route'
@@ -16,6 +23,8 @@ import { POST as markPOST } from '@/app/api/bookkeeping/qb-export/mark/route'
 
 beforeEach(() => {
   mockFrom.mockReset()
+  mockGetUser.mockReset()
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
 })
 
 const SAMPLE_JES = [
@@ -125,6 +134,28 @@ function jelMock(data: unknown[]) {
     }),
   }
 }
+
+// ---- Auth ----
+
+describe('qb-export — auth', () => {
+  it('GET returns 401 when no user', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+    const res = await qbGET(new Request('http://localhost/api/bookkeeping/qb-export'))
+    expect(res.status).toBe(401)
+  })
+
+  it('POST mark returns 401 when no user', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+    const res = await markPOST(
+      new Request('http://localhost/api/bookkeeping/qb-export/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ je_ids: ['a'] }),
+      })
+    )
+    expect(res.status).toBe(401)
+  })
+})
 
 // ---- GET /api/bookkeeping/qb-export (JSON summary) ----
 

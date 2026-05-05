@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 interface MarkBody {
   je_ids: string[]
@@ -8,6 +9,12 @@ interface MarkBody {
 }
 
 export async function POST(request: Request) {
+  const ssr = await createClient()
+  const {
+    data: { user },
+  } = await ssr.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   let body: MarkBody
   try {
     body = (await request.json()) as MarkBody

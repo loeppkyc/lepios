@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 0
 
@@ -62,6 +63,12 @@ function csvEscape(v: string | number | null | undefined): string {
 }
 
 export async function GET(request: Request) {
+  const ssr = await createClient()
+  const {
+    data: { user },
+  } = await ssr.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const url = new URL(request.url)
   const format = url.searchParams.get('format')
   const includeExported = url.searchParams.get('include_exported') === 'true'

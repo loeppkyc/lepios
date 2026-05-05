@@ -5,10 +5,17 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFrom } = vi.hoisted(() => ({ mockFrom: vi.fn() }))
+const { mockFrom, mockGetUser } = vi.hoisted(() => ({
+  mockFrom: vi.fn(),
+  mockGetUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'user-1' } } })),
+}))
 
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(() => Promise.resolve({ auth: { getUser: mockGetUser } })),
 }))
 
 import { GET as queueGET } from '@/app/api/bookkeeping/reconcile/route'
@@ -16,6 +23,24 @@ import { POST as rejectPOST } from '@/app/api/bookkeeping/reconcile/reject/route
 
 beforeEach(() => {
   mockFrom.mockReset()
+  mockGetUser.mockReset()
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+})
+
+// ---- Auth ----
+
+describe('bookkeeping/reconcile — auth', () => {
+  it('GET returns 401 when no user', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+    const res = await queueGET()
+    expect(res.status).toBe(401)
+  })
+
+  it('POST reject returns 401 when no user', async () => {
+    mockGetUser.mockResolvedValueOnce({ data: { user: null } })
+    const res = await rejectPOST(rejectReq({ id: 'a', reason: 'x' }))
+    expect(res.status).toBe(401)
+  })
 })
 
 // ---- GET /api/bookkeeping/reconcile ----

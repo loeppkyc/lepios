@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 interface ApproveBody {
   id: string
@@ -104,6 +105,12 @@ function buildJeLines(args: {
 }
 
 export async function POST(request: Request) {
+  const ssr = await createClient()
+  const {
+    data: { user },
+  } = await ssr.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   let body: ApproveBody
   try {
     body = (await request.json()) as ApproveBody
