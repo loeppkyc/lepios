@@ -5,8 +5,16 @@ import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MarkdownMessage } from '@/components/orb/MarkdownMessage'
+import {
+  ALLOWED_EXTENSIONS,
+  combineTextAndFiles,
+  validateAndProcessText,
+  type AttachedFile,
+} from '@/lib/orb/file-upload'
 
 const CHAT_MODEL = process.env.NEXT_PUBLIC_OLLAMA_CHAT_MODEL ?? 'qwen2.5-coder:3b'
+
+const FILE_ACCEPT_ATTR = ALLOWED_EXTENSIONS.join(',')
 
 type Conversation = {
   id: string
@@ -314,6 +322,9 @@ function ActiveChat({
   const conversationIdRef = useRef<string | null>(conversationId)
   const onCreatedRef = useRef(onConversationCreated)
   const [input, setInput] = useState('')
+  const [files, setFiles] = useState<AttachedFile[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -359,15 +370,52 @@ function ActiveChat({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || isStreaming) return
+    if ((!text && files.length === 0) || isStreaming) return
+    const combined = combineTextAndFiles(text, files)
     setInput('')
-    sendMessage({ text })
+    setFiles([])
+    setUploadError(null)
+    sendMessage({ text: combined })
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       handleSubmit(e as unknown as React.FormEvent)
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const incoming = Array.from(e.target.files ?? [])
+    if (incoming.length === 0) return
+
+    let totalBytes = files.reduce((sum, f) => sum + f.size, 0)
+    let count = files.length
+    const accepted: AttachedFile[] = []
+    let firstError: string | null = null
+
+    for (const file of incoming) {
+      const text = await file.text()
+      const result = validateAndProcessText(file.name, text, totalBytes, count)
+      if (result.ok) {
+        accepted.push(result.file)
+        totalBytes += result.file.size
+        count += 1
+      } else if (!firstError) {
+        firstError = result.error
+      }
+    }
+
+    if (accepted.length > 0) {
+      setFiles((prev) => [...prev, ...accepted])
+    }
+    setUploadError(firstError)
+    // Reset the input so the same file can be re-selected if removed.
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+    setUploadError(null)
   }
 
   return (
@@ -460,24 +508,79 @@ function ActiveChat({
 
       {/* input bar */}
       <div className="border-t border-[var(--color-border)] bg-[var(--color-base)] px-4 py-3">
-        <form onSubmit={handleSubmit} className="mx-auto flex max-w-2xl gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Message LEPIOS… (Ctrl+Enter to send)"
-            rows={1}
-            disabled={isStreaming}
-            className="flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-disabled)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isStreaming}
-            className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--color-base)] transition-opacity disabled:opacity-40"
-          >
-            {isStreaming ? '…' : 'Send'}
-          </button>
-        </form>
+        <div className="mx-auto max-w-2xl">
+          {(files.length > 0 || uploadError) && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {files.map((f, i) => (
+                <span
+                  key={`${f.name}-${i}`}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] text-[var(--color-text-muted)]"
+                >
+                  <span>{f.name}</span>
+                  <span className="text-[var(--color-text-disabled)]">{f.size}B{f.truncated ? ' (trunc)' : ''}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    aria-label={`Remove ${f.name}`}
+                    className="ml-0.5 text-[var(--color-text-disabled)] hover:text-[var(--color-text)]"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {uploadError && (
+                <span className="font-[family-name:var(--font-ui)] text-[length:var(--text-nano)] text-[var(--color-error)]">
+                  {uploadError}
+                </span>
+              )}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={FILE_ACCEPT_ATTR}
+              onChange={handleFileChange}
+              className="hidden"
+              aria-hidden
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming}
+              aria-label="Attach files"
+              title="Attach text or code files"
+              className="flex-shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)] disabled:opacity-40"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M11.5 6L6.5 11C5.7 11.8 4.4 11.8 3.6 11C2.8 10.2 2.8 8.9 3.6 8.1L9.1 2.6C9.6 2.1 10.4 2.1 10.9 2.6C11.4 3.1 11.4 3.9 10.9 4.4L5.4 9.9C5.2 10.1 4.9 10.1 4.7 9.9C4.5 9.7 4.5 9.4 4.7 9.2L9.5 4.4"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message LEPIOS… (Ctrl+Enter to send)"
+              rows={1}
+              disabled={isStreaming}
+              className="flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-disabled)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={(!input.trim() && files.length === 0) || isStreaming}
+              className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 py-2 font-[family-name:var(--font-ui)] text-sm font-semibold text-[var(--color-base)] transition-opacity disabled:opacity-40"
+            >
+              {isStreaming ? '…' : 'Send'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
