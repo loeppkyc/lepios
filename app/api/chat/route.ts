@@ -1,6 +1,12 @@
 import { streamText, convertToModelMessages, stepCountIs } from 'ai'
 import { createOllama } from 'ollama-ai-provider-v2'
 import { LEPIOS_SYSTEM_PROMPT } from '@/lib/orb/identity'
+
+// CPU-only Ollama cold-loads qwen2.5:7b in ~10-30s; default 60s lambda
+// timeout kills the stream before first token. 300s (Pro plan max) covers
+// cold-start + a long generation. Set OLLAMA_KEEP_ALIVE=24h on the Ollama
+// side to avoid cold loads entirely.
+export const maxDuration = 300
 import { createClient } from '@/lib/supabase/server'
 import {
   createConversation,
