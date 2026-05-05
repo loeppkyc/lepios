@@ -23,6 +23,7 @@ import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 import { buildChatUiDigestLine } from '@/lib/orb/tools/chat-ui-digest'
 import { buildSelfRepairDigestLine } from '@/lib/harness/self-repair/digest'
 import { buildDeploySmokeStatsLine } from '@/lib/harness/smoke-tests/digest'
+import { buildOpenEscalationsLine } from '@/lib/harness/twin-escalations/digest'
 import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
@@ -309,6 +310,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Smoke test framework — deploy smoke results in last 24h ───────────
   const smokeStatsLine = await buildDeploySmokeStatsLine()
   messageToSend = `${messageToSend}\n${smokeStatsLine}`
+
+  // ── Twin escalation queue — open count in last 24h (slice 2 of escalation loop) ──
+  const twinEscalationsLine = await buildOpenEscalationsLine()
+  messageToSend = `${messageToSend}\n${twinEscalationsLine}`
 
   characterCount = messageToSend.length
 

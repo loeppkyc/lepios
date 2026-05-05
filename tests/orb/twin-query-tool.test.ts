@@ -34,6 +34,7 @@ function makeTwinResponse(overrides: Partial<TwinResponse> = {}): TwinResponse {
     escalate: false,
     escalate_reason: null,
     retrieval_path: 'vector',
+    escalation_id: null,
     ...overrides,
   }
 }
@@ -95,7 +96,7 @@ describe('twinQueryTool.execute — escalate path', () => {
         escalate_reason: 'insufficient_context',
         retrieval_path: 'none',
         sources: [],
-      }),
+      })
     )
 
     const result = await twinQueryTool.execute({ question: 'What is my bank account number?' })
@@ -114,7 +115,7 @@ describe('twinQueryTool.execute — escalate path', () => {
         escalate_reason: 'personal_escalation',
         retrieval_path: 'vector',
         sources: [{ chunk_id: 'chunk-xyz', similarity: 0.8 }],
-      }),
+      })
     )
 
     const result = await twinQueryTool.execute({ question: 'Should Colin move to the USA?' })
@@ -132,7 +133,7 @@ describe('twinQueryTool.execute — escalate path', () => {
         escalate_reason: 'below_threshold',
         retrieval_path: 'fts',
         sources: [{ chunk_id: 'fts-chunk', similarity: 0 }],
-      }),
+      })
     )
 
     const result = await twinQueryTool.execute({ question: 'Tell me about Colin?' })
@@ -154,17 +155,17 @@ describe('twinQueryTool.execute — sources_count', () => {
           { chunk_id: 'c2', similarity: 0.8 },
           { chunk_id: 'c3', similarity: 0.7 },
         ],
-      }),
+      })
     )
 
-    const result = await twinQueryTool.execute({ question: 'What are Colin\'s principles?' })
+    const result = await twinQueryTool.execute({ question: "What are Colin's principles?" })
 
     expect(result.sources_count).toBe(3)
   })
 
   it('sources_count is 0 when no sources', async () => {
     mockAskTwin.mockResolvedValue(
-      makeTwinResponse({ sources: [], escalate: true, escalate_reason: 'insufficient_context' }),
+      makeTwinResponse({ sources: [], escalate: true, escalate_reason: 'insufficient_context' })
     )
 
     const result = await twinQueryTool.execute({ question: 'Unknown question?' })

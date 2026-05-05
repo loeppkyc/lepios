@@ -13,7 +13,11 @@ import { logEvent } from '@/lib/knowledge/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type EscalateReason = 'insufficient_context' | 'personal_escalation' | 'below_threshold' | null
+export type EscalateReason =
+  | 'insufficient_context'
+  | 'personal_escalation'
+  | 'below_threshold'
+  | null
 
 export interface TwinSource {
   chunk_id: string
@@ -27,6 +31,7 @@ export interface TwinResponse {
   escalate: boolean
   escalate_reason: EscalateReason
   retrieval_path: 'vector' | 'fts' | 'none'
+  escalation_id: string | null
 }
 
 interface PersonalChunk {
@@ -74,7 +79,10 @@ export function getTwinConfig() {
 
 // ── Retrieval ─────────────────────────────────────────────────────────────────
 
-export async function retrievePersonalChunks(question: string, limit = 10): Promise<RetrievalResult> {
+export async function retrievePersonalChunks(
+  question: string,
+  limit = 10
+): Promise<RetrievalResult> {
   const supabase = createServiceClient()
 
   // Vector path
@@ -164,6 +172,37 @@ export async function claudeFallback(
   return { answer, confidence }
 }
 
+// ── Escalation tracking ───────────────────────────────────────────────────────
+
+/**
+ * Inserts a row into twin_escalations capturing the escalated question.
+ * Returns the new row id, or null on insert failure (table missing,
+ * RLS denial, etc.). Soft-fails — never throws — so the askTwin response
+ * is unaffected by tracking issues.
+ */
+async function recordEscalation(
+  question: string,
+  escalateReason: Exclude<EscalateReason, null>,
+  sourceEventId: string | null
+): Promise<string | null> {
+  try {
+    const supabase = createServiceClient()
+    const { data, error } = await supabase
+      .from('twin_escalations')
+      .insert({
+        question: question.slice(0, 2000),
+        escalate_reason: escalateReason,
+        source_event_id: sourceEventId,
+      })
+      .select('id')
+      .single()
+    if (error || !data) return null
+    return (data as { id: string }).id
+  } catch {
+    return null
+  }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function askTwin(question: string): Promise<TwinResponse> {
@@ -218,15 +257,7 @@ export async function askTwin(question: string): Promise<TwinResponse> {
     // Ollama down — fall straight to Claude
     finalModel = 'claude-sonnet-4-6'
     if (!contextStr) {
-      const resp: TwinResponse = {
-        answer: '',
-        confidence: 0,
-        sources,
-        escalate: true,
-        escalate_reason: 'insufficient_context',
-        retrieval_path,
-      }
-      void logEvent('twin', 'twin.ask', {
+      const sourceEventId = await logEvent('twin', 'twin.ask', {
         actor: 'user',
         inputSummary: question.slice(0, 200),
         outputSummary: 'ollama_unreachable + no_context',
@@ -245,7 +276,16 @@ export async function askTwin(question: string): Promise<TwinResponse> {
               : 'low_confidence',
         },
       })
-      return resp
+      const escalation_id = await recordEscalation(question, 'insufficient_context', sourceEventId)
+      return {
+        answer: '',
+        confidence: 0,
+        sources,
+        escalate: true,
+        escalate_reason: 'insufficient_context',
+        retrieval_path,
+        escalation_id,
+      }
     }
 
     try {
@@ -253,15 +293,7 @@ export async function askTwin(question: string): Promise<TwinResponse> {
       answer = fallback.answer
       confidence = fallback.confidence
     } catch {
-      const resp: TwinResponse = {
-        answer: '',
-        confidence: 0,
-        sources,
-        escalate: true,
-        escalate_reason: 'below_threshold',
-        retrieval_path,
-      }
-      void logEvent('twin', 'twin.ask', {
+      const sourceEventId = await logEvent('twin', 'twin.ask', {
         actor: 'user',
         inputSummary: question.slice(0, 200),
         outputSummary: 'ollama_unreachable + claude_failed',
@@ -280,7 +312,16 @@ export async function askTwin(question: string): Promise<TwinResponse> {
               : 'low_confidence',
         },
       })
-      return resp
+      const escalation_id = await recordEscalation(question, 'below_threshold', sourceEventId)
+      return {
+        answer: '',
+        confidence: 0,
+        sources,
+        escalate: true,
+        escalate_reason: 'below_threshold',
+        retrieval_path,
+        escalation_id,
+      }
     }
 
     // Normalise Claude response through the same special-token check
@@ -297,7 +338,7 @@ export async function askTwin(question: string): Promise<TwinResponse> {
       escalate_reason = 'below_threshold'
     }
 
-    void logEvent('twin', 'twin.ask', {
+    const sourceEventId = await logEvent('twin', 'twin.ask', {
       actor: 'user',
       inputSummary: question.slice(0, 200),
       outputSummary: answer.slice(0, 200),
@@ -317,6 +358,9 @@ export async function askTwin(question: string): Promise<TwinResponse> {
             : 'low_confidence',
       },
     })
+    const escalation_id = escalate
+      ? await recordEscalation(question, escalate_reason!, sourceEventId)
+      : null
     return {
       answer,
       confidence,
@@ -324,6 +368,7 @@ export async function askTwin(question: string): Promise<TwinResponse> {
       escalate,
       escalate_reason,
       retrieval_path,
+      escalation_id,
     }
   }
 
@@ -374,7 +419,7 @@ export async function askTwin(question: string): Promise<TwinResponse> {
     }
   }
 
-  void logEvent('twin', 'twin.ask', {
+  const sourceEventId = await logEvent('twin', 'twin.ask', {
     actor: 'user',
     inputSummary: question.slice(0, 200),
     outputSummary: answer.slice(0, 200),
@@ -398,6 +443,10 @@ export async function askTwin(question: string): Promise<TwinResponse> {
     },
   })
 
+  const escalation_id = escalate
+    ? await recordEscalation(question, escalate_reason!, sourceEventId)
+    : null
+
   return {
     answer,
     confidence,
@@ -405,5 +454,6 @@ export async function askTwin(question: string): Promise<TwinResponse> {
     escalate,
     escalate_reason,
     retrieval_path,
+    escalation_id,
   }
 }

@@ -6,6 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const { mockFrom } = vi.hoisted(() => ({ mockFrom: vi.fn() }))
+
 vi.mock('@/lib/auth/cron-secret', () => ({
   requireCronSecret: vi.fn(() => null),
 }))
@@ -13,6 +15,10 @@ vi.mock('@/lib/auth/cron-secret', () => ({
 vi.mock('@/lib/knowledge/client', () => ({
   saveKnowledge: vi.fn(),
   logEvent: vi.fn(() => Promise.resolve(null)),
+}))
+
+vi.mock('@/lib/supabase/service', () => ({
+  createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
 import { POST } from '@/app/api/twin/teach/route'
@@ -30,10 +36,18 @@ function makeRequest(body: unknown) {
   })
 }
 
+function makeUpdateChain() {
+  const eq = vi.fn().mockResolvedValue({ data: null, error: null })
+  const update = vi.fn().mockReturnValue({ eq })
+  return { update, eq }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(requireCronSecret).mockReturnValue(null)
   vi.mocked(saveKnowledge).mockResolvedValue('abc-123-uuid')
+  // Default: every from() call returns a working update chain
+  mockFrom.mockImplementation(() => makeUpdateChain())
 })
 
 describe('POST /api/twin/teach', () => {
@@ -131,5 +145,54 @@ describe('POST /api/twin/teach', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('question is required')
+  })
+
+  // ── Slice 2: escalation linkage ─────────────────────────────────────────────
+
+  it('AC-Slice2-1: when escalation_id provided + save succeeds, escalation row is updated', async () => {
+    const chain = makeUpdateChain()
+    mockFrom.mockReturnValueOnce(chain)
+
+    const res = await POST(
+      makeRequest({
+        question: 'q',
+        answer: 'a',
+        escalation_id: 'esc-1',
+      })
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockFrom).toHaveBeenCalledWith('twin_escalations')
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'answered',
+        knowledge_id: 'abc-123-uuid',
+        answer: 'a',
+      })
+    )
+    // answered_at must be an ISO string from new Date().toISOString()
+    const updateArg = chain.update.mock.calls[0][0]
+    expect(typeof updateArg.answered_at).toBe('string')
+    expect(updateArg.answered_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(chain.eq).toHaveBeenCalledWith('id', 'esc-1')
+  })
+
+  it('AC-Slice2-2: when escalation_id absent, no twin_escalations call fires', async () => {
+    await POST(makeRequest({ question: 'q', answer: 'a' }))
+    expect(mockFrom).not.toHaveBeenCalledWith('twin_escalations')
+  })
+
+  it('AC-Slice2-3: linkage failure does not fail the response', async () => {
+    // saveKnowledge succeeds but update throws
+    mockFrom.mockImplementationOnce(() => {
+      throw new Error('db boom')
+    })
+
+    const res = await POST(makeRequest({ question: 'q', answer: 'a', escalation_id: 'esc-2' }))
+
+    // Knowledge row was saved → still 200
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.knowledge_id).toBe('abc-123-uuid')
   })
 })
