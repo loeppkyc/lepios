@@ -410,7 +410,7 @@ function ActiveChat({
     },
   })
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, regenerate, status, error, clearError } = useChat({
     transport,
     messages: initialMessages,
   })
@@ -429,13 +429,17 @@ function ActiveChat({
     setInput('')
     setFiles([])
     setUploadError(null)
+    clearError()
     sendMessage({ text: combined })
   }
 
+  // Enter sends, Shift+Enter inserts a newline. Ctrl/Cmd+Enter still works for
+  // muscle memory.
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      handleSubmit(e as unknown as React.FormEvent)
-    }
+    if (e.key !== 'Enter') return
+    if (e.shiftKey) return
+    e.preventDefault()
+    handleSubmit(e as unknown as React.FormEvent)
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -566,6 +570,36 @@ function ActiveChat({
       {/* input bar */}
       <div className="border-t border-[var(--color-border)] bg-[var(--color-base)] px-4 py-3">
         <div className="mx-auto max-w-2xl">
+          {error && (
+            <div
+              className="mb-2 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-critical)] bg-[var(--color-surface)] px-3 py-2 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] text-[var(--color-text)]"
+              role="alert"
+            >
+              <span className="mt-0.5 font-semibold text-[var(--color-critical)]">Send failed</span>
+              <span className="flex-1 break-words text-[var(--color-text-muted)]">
+                {error.message || 'Unknown error'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearError()
+                  void regenerate()
+                }}
+                disabled={isStreaming}
+                className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-2 py-0.5 text-[length:var(--text-nano)] font-semibold text-[var(--color-base)] disabled:opacity-40"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={clearError}
+                aria-label="Dismiss error"
+                className="text-[var(--color-text-disabled)] hover:text-[var(--color-text)]"
+              >
+                ×
+              </button>
+            </div>
+          )}
           {(files.length > 0 || uploadError) && (
             <div className="mb-2 flex flex-wrap items-center gap-2">
               {files.map((f, i) => (
@@ -632,7 +666,7 @@ function ActiveChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message LEPIOS… (Ctrl+Enter to send)"
+              placeholder="Message LEPIOS… (Enter to send, Shift+Enter for newline)"
               rows={1}
               disabled={isStreaming}
               className="flex-1 resize-none rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-[family-name:var(--font-ui)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-disabled)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-50"
