@@ -108,6 +108,7 @@ If the chunk touches schema:
 Only if steps 1–6 are clean:
 
 - `git add` only files listed in the acceptance doc's "files expected to change" plus any migrations / tests you created. If a file changed that isn't in that list → stop, report `unknowns: unexpected file change at {path}`.
+- **Safety Agent gate (Layer 0 of pre-commit):** the husky pre-commit hook runs `scripts/pre-commit-safety.mjs` against the staged diff and blocks on destructive SQL / `harness_config` writes / force-push patterns. If blocked, **do not bypass with `SAFETY_BYPASS=1` autonomously** — stop, report the finding in `unknowns`, and let coordinator escalate. Bypass is a Colin-only decision. Spec: `docs/specs/safety-agent.md`. Library: `lib/harness/safety/`.
 - Commit with a message that cites the chunk id and acceptance doc path.
 - After a successful commit, record attribution (non-blocking — skip if it fails):
   ```bash

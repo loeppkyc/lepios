@@ -406,7 +406,8 @@ If any fails → escalate the doc to Colin before it goes to builder. Log the es
 ## Phase 3 — Delegate to builder
 
 1. Update `docs/sprint-state.md` with the active chunk id, acceptance doc path, and status = `in-build`.
-2. Hand the acceptance doc to the builder sub-agent. You do not watch builder work. You wait for the structured handoff report.
+2. **Pre-flight Safety Agent check (high-risk acceptance docs only):** if the acceptance doc proposes a destructive SQL op (DROP / TRUNCATE / DELETE-no-WHERE), an `ALTER` on an RLS-protected table, a `harness_config` write from code, or a Telegram send to a non-Colin chat ID, call `runSafetyCheck` from `lib/harness/safety/index.ts` (full path: static + LLM + approval) BEFORE handing off. If it returns `pending_human_review`, set sprint-state to `awaiting-grounding` with the approval id and stop. Spec: `docs/specs/safety-agent.md`. Routine acceptance docs (read-only routes, UI, doc edits, additive migrations) skip this and proceed straight to step 3.
+3. Hand the acceptance doc to the builder sub-agent. You do not watch builder work. You wait for the structured handoff report.
 
 ## Phase 4 — Review builder handoff
 

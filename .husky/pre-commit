@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
+# Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
+# Blocks destructive SQL / secret writes / force-push patterns in staged diff.
+# Bypass: SAFETY_BYPASS=1 git commit ...
+node scripts/pre-commit-safety.mjs
+
 # Layer 1 — deterministic checks (zero tokens, fast)
 npx lint-staged
 
