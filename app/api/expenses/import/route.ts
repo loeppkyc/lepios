@@ -80,7 +80,14 @@ export async function POST(request: Request) {
   const csvText = fullText.slice(0, MAX_CSV_CHARS)
   const truncated = fullText.length > MAX_CSV_CHARS
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY not configured — expense CSV parsing requires the frontier model. Set the env var or import manually.' },
+      { status: 503 },
+    )
+  }
+  const client = new Anthropic({ apiKey })
 
   let raw: string
   try {

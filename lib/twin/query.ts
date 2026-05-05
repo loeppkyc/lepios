@@ -146,7 +146,11 @@ export async function claudeFallback(
   question: string,
   contextStr: string
 ): Promise<{ answer: string; confidence: number }> {
-  const client = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? '').trim() })
+  const apiKey = (process.env.ANTHROPIC_API_KEY ?? '').trim()
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY not configured — frontier fallback unavailable')
+  }
+  const client = new Anthropic({ apiKey })
 
   const msg = await client.messages.create({
     model: 'claude-sonnet-4-6',

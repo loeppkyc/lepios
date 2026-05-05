@@ -56,7 +56,14 @@ export async function POST(request: Request) {
 
   const base64 = Buffer.from(bytes).toString('base64')
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY not configured — receipt OCR requires Claude Vision. Set the env var or enter receipt manually.' },
+      { status: 503 },
+    )
+  }
+  const client = new Anthropic({ apiKey })
 
   let raw: string
   try {

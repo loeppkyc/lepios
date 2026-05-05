@@ -105,6 +105,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.OLLAMA_TWIN_MODEL
   delete process.env.TWIN_CONFIDENCE_THRESHOLD
+  // claudeFallback() guards on missing ANTHROPIC_API_KEY; tests that exercise
+  // the fallback path still need the SDK to be reachable for the mock to fire.
+  process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
   mockFrom.mockReturnValue(makeFtsChain({ data: [], error: null }))
 })
 
