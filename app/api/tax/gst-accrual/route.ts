@@ -8,10 +8,11 @@ export const revalidate = 0
 // Use 10% as working estimate until current-year return is filed.
 const GST_RATE_ESTIMATE = 0.10
 
-// $2K overpayment credit from 2025 NOA — applied against 2025-05→2026-04 filing.
-// Update when 2026 NOA is received.
-const OPENING_CREDIT_CAD = 2000.0
-const OPENING_CREDIT_NOTE = 'from 2025 NOA overpayment'
+// 2025 personal income NOA (Apr 23, 2026) shows $2,046.03 OWING — no credit.
+// This $2K figure may be a CRA installment carry-forward; confirm with Rob.
+// Set to 0 until source is verified.
+const OPENING_CREDIT_CAD = 0
+const OPENING_CREDIT_NOTE = 'unverified — confirm with Rob before applying'
 
 // Colin's GST year: May 1 → April 30 (annual filer)
 function gstYearBounds(referenceDate: Date): { start: string; end: string; label: string } {
