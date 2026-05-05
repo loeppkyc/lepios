@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 88.6% (96.55 / 109 pts)
+## Total Readiness: 89.5% (97.55 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -36,12 +36,12 @@ _The front door. Without a working chat surface, nothing below can be experience
 | A1  | Streaming chat component built (`/app/(cockpit)/chat` or similar) | 8      | 100% | 8.00         | **Shipped 2026-04-27 (thin-slice spike).** `app/(cockpit)/chat/page.tsx` (`useChat` from `@ai-sdk/react`) + `app/api/chat/route.ts` (`streamText` + `ollama-ai-provider`). F21 acceptance tests: 6/6 green. Nav link added. Production tunnel live — 10/10 embed acceptance test passed 2026-05-04.                                                                                                                                                                              |
 | A2  | Message history persistence (DB-backed)                           | 4      | 95%  | 3.80         | **Production verified 2026-05-04.** Migration `0042_orb_chat_schema.sql` applied to production Supabase — `conversations` + `messages` tables live with RLS, indexes, and message_count trigger. F21 tests: 16/16 green. Remaining 5%: send a real message and confirm it lands in the DB.                                                                                                                                                                               |
 | A3  | Code block rendering (syntax highlighting, copy button)           | 2      | 95%  | 1.90         | **Code-audited 2026-05-04.** `components/orb/MarkdownMessage.tsx` — shiki@4 + rehype-pretty-code@0.14, github-dark theme, language label + copy button via `pre.innerText` ref. All 4 packages verified present at correct versions. Wired at chat/page.tsx:446. TypeScript clean. Remaining 5%: live browser E2E test (needs Chrome debug port).                                                                                                                               |
-| A4  | File upload support (images, docs, code)                          | 1      | 0%   | 0.00         | No multipart handlers in `app/api/`.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| A4  | File upload support (images, docs, code)                          | 1      | 100% | 1.00         | **Shipped 2026-05-05 (v1: text/code only).** `lib/orb/file-upload.ts` (allowlist of 18 text/source extensions, `stripHtml`, 32KB-per-file truncate, 128KB total cap, max 5 files). Paperclip button + chips + × removal in `app/(cockpit)/chat/page.tsx`. Files become inline text appended to user message — no schema or server change. 17 unit tests green. v2 deferred: image vision routing (llava:7b), PDF extraction, drag-and-drop. |
 | A5  | Markdown rendering                                                | 2      | 100% | 2.00         | **Complete 2026-05-04.** `components/orb/MarkdownMessage.tsx` — react-markdown@10 + remark-gfm@4 + rehype-pretty-code@0.14 + shiki@4. Full element override map (h1–h6, p, code, pre, table family, lists, blockquote, a, hr) using LepiOS Tailwind tokens. F20-compliant. Code-level audit confirmed packages present, wired at chat/page.tsx:446, TypeScript clean.                                                                                                         |
 | A6  | Multi-conversation management (sidebar of past chats)             | 3      | 100% | 3.00         | **Complete 2026-05-04.** Delete: `DELETE /api/chat/conversations/[id]` soft-archive + hover × button. Rename: `PATCH /api/chat/conversations/[id]` + `ConvRow` component — double-click title → inline input (Enter/blur commits, Escape cancels, 100-char cap). `renameConversation()` in persistence.ts. All routes auth + ownership guarded.                                                                                                                                |
 | A7  | Mobile responsive                                                 | 2      | 85%  | 1.70         | **Updated 2026-05-04.** Chat page: hamburger button (md:hidden) in identity strip, `mobileSidebarOpen` state, sidebar absolute-positioned + z-20 on mobile with dark overlay, overlay tap-to-close. Remaining 15%: other cockpit routes (amazon, bookkeeping) not yet responsive.                                                                                                                                                                                              |
 | A8  | Authentication gate (Colin-only)                                  | 3      | 100% | 3.00         | Supabase auth enforced on all API routes. RLS policies on all tables. Login page at `/app/login`.                                                                                                                                                                                                                                                                                                                                                                                |
-|     | **Category total**                                                | **25** |      | **23.40**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|     | **Category total**                                                | **25** |      | **24.40**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -119,13 +119,13 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 
 | Category              | Weight  | Earned    | %         |
 | --------------------- | ------- | --------- | --------- |
-| A — Chat UI           | 25      | 23.40     | 94%       |
+| A — Chat UI           | 25      | 24.40     | 98%       |
 | B — Brain / Model     | 20      | 17.60     | 88%       |
 | C — Context / Memory  | 18      | 17.35     | 96%       |
 | D — Tool Use          | 24      | 23.00     | 96%       |
 | E — Identity / Polish | 7       | 6.35      | 91%       |
 | F — Operational       | 15      | 8.85      | 59%       |
-| **Total**             | **109** | **96.55** | **88.6%** |
+| **Total**             | **109** | **97.55** | **89.5%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
@@ -180,7 +180,9 @@ Combined these 4 tasks earn: A1 remaining 45% (+3.6) + A2 remaining 60% (+2.4) +
 
 ## Last Updated
 
-2026-05-05 MDT — Decision sweep + F2 update. F2 0→50% (RTX 3060 12GB on hand; install gated on eGPU which Colin will get soon). 14B is the true Orb Day target on 12GB VRAM (qwen2.5:14b Q4_K_M ~8.5GB fits; 32B does not). Total: 86.7% → 88.6%.
+2026-05-05 MDT — A4 shipped (3 of 3 builder sessions completed in autonomous run). orb-A4 file upload v1: text/code only (lib/orb/file-upload.ts + chat/page.tsx UI). 17 unit tests green. A4: 0→100% (+1.0 pt). Also shipped (gpu-day tracker, no orb line): Safety Agent Phase 1 (lib/harness/safety/static.ts, 24 tests), env drift check cron (app/api/cron/env-drift-check, 5 tests). Total: 88.6% → 89.5%.
+
+Previously: 2026-05-05 MDT — Decision sweep + F2 update. F2 0→50% (RTX 3060 12GB on hand; install gated on eGPU which Colin will get soon). 14B is the true Orb Day target on 12GB VRAM (qwen2.5:14b Q4_K_M ~8.5GB fits; 32B does not). Total: 86.7% → 88.6%.
 
 Previously: 2026-05-05 MDT — Autonomous progress sweep. C5 oura-sync verified (30 rows). B2 0→50% (qwen2.5:32b already pulled). Chat route flipped to qwen2.5:7b (`OLLAMA_CHAT_MODEL` env var, F15-clean, deploy `dpl_9PcEXaHoaHp86wWEhXZF1j9QzDNG` READY). E1 95→100% (opengraph PNG verified in prod, HTTP 200, 15.8KB). F4 80→100% (`scripts/post-reboot-smoke.ps1` shipped, 4/4 PASS first run). Total: 84.2% → 86.7%.
 
