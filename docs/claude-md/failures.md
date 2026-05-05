@@ -5,6 +5,15 @@ Newest-first. Format: date · what happened · root cause · fix/workaround · w
 
 ---
 
+## F-N5 — `/api/bookkeeping/*` shipped publicly accessible for ~5 hours (2026-05-05)
+
+- **What:** Five new bookkeeping API routes (reconcile GET, reconcile/approve POST, reconcile/reject POST, qb-export GET, qb-export/mark POST) used `createServiceClient` for DB writes but never checked `auth.getUser()`. Root middleware excludes `/api/*` (API routes self-gate). Anyone hitting the URL could read the needs_review queue, read all unexported JEs, write JEs via approve, mark JEs as exported. Live in production from `c4c9e9c` (initial reconcile) until `a3425d9` (auth fix) — roughly 5 hours.
+- **Root cause:** New API routes were copied from existing patterns that used the SSR/anon client (RLS-gated by default). Switching to service_role for write capability removed the implicit RLS gate without adding an explicit auth gate. No checklist or lint rule caught it. The bookkeeping tests verified shape + business logic but not the security envelope.
+- **Fix/workaround:** Inline `auth.getUser()` check at the top of each handler, return 401 if no session, then proceed with the service client. Same pattern as `app/api/business-review/statement-coverage/override/route.ts`. Smoke tests now hit both routes expecting 401 — auth regression would surface in `morning_digest`.
+- **Next time:** Any new `/api/*` route that uses `createServiceClient` must (a) call `auth.getUser()` for user-facing routes OR (b) use `requireCronSecret(request)` for cron-style routes. There is no third option. Worth a lint rule: `no-restricted-syntax` against `createServiceClient` in files under `app/api/**` that don't import either `auth.getUser` or `requireCronSecret`. Also: every new API route should ship with a 401 test case in the same commit as the route.
+
+---
+
 ## F-N4 — 74 silent embed failures: cloudflared tunnel unreliable over batch (2026-04-27)
 
 - **What:** Twin corpus ingest via Ollama returned 74 failures silently. Those chunks have no embeddings.

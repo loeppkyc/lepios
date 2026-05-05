@@ -5,6 +5,15 @@ Newest-first. Format: date · what happened · why it worked · apply when.
 
 ---
 
+## S-N9 — Bookkeeping pipeline shipped end-to-end in one session (14 commits, 2026-05-05)
+
+- **Win:** Full auto-bookkeeping flow shipped in one autonomous-mode session: (1) `/bookkeeping/reconcile` approval UI, (2) `/bookkeeping/qb-export` CSV export with mark-as-exported, (3) `parse-td-pdf.py` for Hubdoc PDFs (validated against 4 statements, $0.00 net diff), (4) `match-amazon-settlements.py` settlement linker (8/8 April matches verified), (5) Bonvoy mis-cat patch + rule demote, (6) cockpit nav entries, (7) full security gate after F-N5 caught, (8) 39 vitest cases + 2 production smoke routes, (9) audit doc with 4 batched questions for Colin, (10) recurring template candidates doc. Total: 14 commits, 3 schema migrations, all production-verified.
+- **Why it worked:** Tight feedback loop on each piece (read schema → write code → SQL parity check → commit → push) instead of trying to design the whole pipeline upfront. Heavy use of audit-first (read existing scripts/migrations/types before writing) avoided the F-L3-class drift that would have torpedoed any single piece. Side-by-side parity simulation in SQL substituted for the Python script's broken env loading — verification path stayed open even when execution path didn't.
+- **Pattern:** When shipping a multi-piece pipeline autonomously, ship the smallest end-to-end slice first (UI → DB → JE), then layer adjacent pieces (export, parser, matcher) onto it. Each layer rests on a verified foundation. The audit + recurring docs at the end batch all "needs Colin's judgment" questions into one read instead of trickling them across the session.
+- **Reference:** Commits `c4c9e9c` → `da92be5`, this session's full handoff. Bookkeeping pipeline from 0→production in one window.
+
+---
+
 ## S-N8 — Husky/libuv UV_HANDLE_CLOSING crash closed by process.exitCode pattern (2026-04-28)
 
 - **Win:** Recurring Windows-only husky teardown crash (review-skips.md rows 234, 235, 242, 243) resolved by replacing `process.exit(N)` with `process.exitCode = N; return` in `scripts/ai-review.mjs`. Script body wrapped in `async function main()` returning exit codes, with `process.exitCode = await main()` at module top. Lets Node drain the Anthropic SDK keep-alive HTTPS sockets cleanly before shutdown instead of forcing exit while libuv handles are still closing. Verified: commit `2fa15be` itself completed end-to-end through the hook chain (lint-staged + AI reviewer PASS) without `--no-verify`.
