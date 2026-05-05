@@ -22,10 +22,7 @@ export type ChatMessage = {
   created_at: string
 }
 
-export async function createConversation(
-  userId: string,
-  title?: string,
-): Promise<Conversation> {
+export async function createConversation(userId: string, title?: string): Promise<Conversation> {
   const db = createServiceClient()
   const { data, error } = await db
     .from('conversations')
@@ -38,11 +35,18 @@ export async function createConversation(
 
 export async function listConversations(userId: string): Promise<Conversation[]> {
   const db = createServiceClient()
+  // Filter to message_count >= 2: the first persisted message is always the
+  // user message; if the assistant stream errors before it can append, the
+  // conversation is left as a 1-msg orphan. Hiding orphans from the sidebar
+  // matches the behaviour the user expects (they already saw the error
+  // toast and either retried or moved on). The conv stays in the DB —
+  // a future cleanup cron can prune old orphans.
   const { data, error } = await db
     .from('conversations')
     .select('id, user_id, title, message_count, created_at, updated_at, archived_at')
     .eq('user_id', userId)
     .is('archived_at', null)
+    .gte('message_count', 2)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as Conversation[]
@@ -63,7 +67,7 @@ export async function appendMessage(
   role: ChatMessage['role'],
   content: MessagePart[],
   model?: string,
-  tokensUsed?: number,
+  tokensUsed?: number
 ): Promise<ChatMessage> {
   const db = createServiceClient()
   const { data, error } = await db
@@ -84,7 +88,7 @@ export async function appendMessage(
 export async function renameConversation(
   conversationId: string,
   userId: string,
-  title: string,
+  title: string
 ): Promise<void> {
   const db = createServiceClient()
   const { error } = await db
@@ -95,10 +99,7 @@ export async function renameConversation(
   if (error) throw error
 }
 
-export async function archiveConversation(
-  conversationId: string,
-  userId: string,
-): Promise<void> {
+export async function archiveConversation(conversationId: string, userId: string): Promise<void> {
   const db = createServiceClient()
   const { error } = await db
     .from('conversations')
@@ -108,9 +109,7 @@ export async function archiveConversation(
   if (error) throw error
 }
 
-export async function loadConversationMessages(
-  conversationId: string,
-): Promise<ChatMessage[]> {
+export async function loadConversationMessages(conversationId: string): Promise<ChatMessage[]> {
   const db = createServiceClient()
   const { data, error } = await db
     .from('messages')

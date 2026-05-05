@@ -358,6 +358,7 @@ export function ChatClient({
           conversationId={activeId}
           initialMessages={initialMessages}
           onConversationCreated={handleConversationCreated}
+          onMessageFinished={loadConversations}
           onMenuClick={() => setMobileSidebarOpen((v) => !v)}
         />
       </ChatErrorBoundary>
@@ -369,15 +370,18 @@ function ActiveChat({
   conversationId,
   initialMessages,
   onConversationCreated,
+  onMessageFinished,
   onMenuClick,
 }: {
   conversationId: string | null
   initialMessages: UIMessage[]
   onConversationCreated: (id: string) => void
+  onMessageFinished?: () => void
   onMenuClick?: () => void
 }) {
   const conversationIdRef = useRef<string | null>(conversationId)
   const onCreatedRef = useRef(onConversationCreated)
+  const onFinishedRef = useRef(onMessageFinished)
   const [input, setInput] = useState('')
   const [files, setFiles] = useState<AttachedFile[]>([])
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -387,6 +391,10 @@ function ActiveChat({
   useEffect(() => {
     onCreatedRef.current = onConversationCreated
   }, [onConversationCreated])
+
+  useEffect(() => {
+    onFinishedRef.current = onMessageFinished
+  }, [onMessageFinished])
 
   // useChat's internal chatRef captures the transport on first render only —
   // later transport instances are dropped — so memoizing here is unnecessary.
@@ -413,6 +421,13 @@ function ActiveChat({
   const { messages, sendMessage, regenerate, status, error, clearError } = useChat({
     transport,
     messages: initialMessages,
+    // Fired after the assistant stream completes and onFinish (server-side)
+    // has persisted the assistant message. We refresh the sidebar so a
+    // freshly-created conversation appears (it was filtered out at
+    // message_count=1 during streaming and now satisfies the >=2 cutoff).
+    onFinish: () => {
+      onFinishedRef.current?.()
+    },
   })
 
   const isStreaming = status === 'submitted' || status === 'streaming'
