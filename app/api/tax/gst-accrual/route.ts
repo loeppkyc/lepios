@@ -8,11 +8,10 @@ export const revalidate = 0
 // Use 10% as working estimate until current-year return is filed.
 const GST_RATE_ESTIMATE = 0.10
 
-// 2025 personal income NOA (Apr 23, 2026) shows $2,046.03 OWING — no credit.
-// This $2K figure may be a CRA installment carry-forward; confirm with Rob.
-// Set to 0 until source is verified.
-const OPENING_CREDIT_CAD = 0
-const OPENING_CREDIT_NOTE = 'unverified — confirm with Rob before applying'
+// Confirmed May 2026: $2,000 installment credit sitting with CRA for the 2026 GST year.
+// Applied against the May 2026–Apr 2027 net tax obligation.
+const OPENING_CREDIT_CAD = 2000.0
+const OPENING_CREDIT_NOTE = '$2,000 CRA credit carried into 2026 GST year'
 
 // Colin's GST year: May 1 → April 30 (annual filer)
 function gstYearBounds(referenceDate: Date): { start: string; end: string; label: string } {
