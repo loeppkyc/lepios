@@ -43,7 +43,7 @@ class ToolTimeoutError extends Error {
   }
 }
 
-// Registered tools — slice 6: + readFile + queryDb
+// Registered tools — slice 6: + readFile + queryDb; D6: + runCode
 import { harnessRollupTool } from './harness-rollup'
 import { twinQueryTool } from './twin-query'
 import { sendTelegramTool } from './send-telegram'
@@ -55,6 +55,7 @@ import { readFileTool } from './read-file'
 import { queryDbTool } from './query-db'
 import { webFetchTool } from './web-fetch'
 import { writeFileTool } from './write-file'
+import { runCodeTool } from './run-code'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REGISTERED: ChatTool<any, any>[] = [
   harnessRollupTool,
@@ -68,6 +69,7 @@ const REGISTERED: ChatTool<any, any>[] = [
   queryDbTool,
   webFetchTool,
   writeFileTool,
+  runCodeTool,
 ]
 
 async function logToolEvent(
