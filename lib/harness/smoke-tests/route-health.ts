@@ -36,6 +36,9 @@ const ROUTES: RouteSpec[] = [
     body: { question: 'smoke test' },
   },
   { path: '/api/telegram/webhook', method: 'GET', expectedStatus: 405 },
+  // Bookkeeping endpoints — must require auth (401 unauthed = route registered + auth gate live).
+  { path: '/api/bookkeeping/reconcile', method: 'GET', expectedStatus: 401 },
+  { path: '/api/bookkeeping/qb-export', method: 'GET', expectedStatus: 401 },
 ]
 
 // ── Single route check ────────────────────────────────────────────────────────

@@ -68,6 +68,9 @@ function makePassingFetch() {
     if (url.includes('/api/telegram/webhook')) {
       return Promise.resolve({ ok: false, status: 405 })
     }
+    if (url.includes('/api/bookkeeping/reconcile') || url.includes('/api/bookkeeping/qb-export')) {
+      return Promise.resolve({ ok: false, status: 401 })
+    }
     return Promise.resolve({ ok: false, status: 500 })
   })
 }
@@ -83,7 +86,7 @@ describe('runRouteHealthSmoke — all routes pass', () => {
 
     expect(result.passed).toBe(true)
     expect(result.failed_routes).toHaveLength(0)
-    expect(result.routes).toHaveLength(3)
+    expect(result.routes).toHaveLength(5)
     expect(result.total_ms).toBeGreaterThanOrEqual(0)
   })
 
@@ -100,7 +103,7 @@ describe('runRouteHealthSmoke — all routes pass', () => {
     expect(insertCall.actor).toBe('route-health')
     expect(insertCall.status).toBe('success')
     expect(insertCall.meta.base_url).toBe(BASE_URL)
-    expect(insertCall.meta.routes).toHaveLength(3)
+    expect(insertCall.meta.routes).toHaveLength(5)
   })
 
   it('does NOT insert outbound_notifications on all-pass', async () => {
@@ -316,7 +319,7 @@ describe('runRouteHealthSmoke — route unreachable (timeout)', () => {
 
     const result = await runRouteHealthSmoke(BASE_URL)
     expect(result.passed).toBe(false)
-    expect(result.failed_routes).toHaveLength(3) // all timed out
+    expect(result.failed_routes).toHaveLength(5) // all timed out
   })
 })
 
@@ -333,6 +336,12 @@ describe('runRouteHealthSmoke — mixed results', () => {
       }
       if (url.includes('/api/telegram/webhook')) {
         return Promise.resolve({ ok: false, status: 405 })
+      }
+      if (
+        url.includes('/api/bookkeeping/reconcile') ||
+        url.includes('/api/bookkeeping/qb-export')
+      ) {
+        return Promise.resolve({ ok: false, status: 401 })
       }
       return Promise.resolve({ ok: false, status: 500 })
     })
@@ -357,11 +366,17 @@ describe('runRouteHealthSmoke — mixed results', () => {
     expect(webhookRoute!.passed).toBe(true)
   })
 
-  it('result.routes contains all 3 routes regardless of pass/fail', async () => {
+  it('result.routes contains all routes regardless of pass/fail', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/api/health')) return Promise.resolve({ ok: false, status: 503 })
       if (url.includes('/api/twin/ask')) return Promise.resolve({ ok: true, status: 200 })
       if (url.includes('/api/telegram/webhook')) return Promise.resolve({ ok: false, status: 405 })
+      if (
+        url.includes('/api/bookkeeping/reconcile') ||
+        url.includes('/api/bookkeeping/qb-export')
+      ) {
+        return Promise.resolve({ ok: false, status: 401 })
+      }
       return Promise.resolve({ ok: false, status: 500 })
     })
     mockFrom.mockImplementation((table: string) => {
@@ -371,7 +386,7 @@ describe('runRouteHealthSmoke — mixed results', () => {
 
     const result = await runRouteHealthSmoke(BASE_URL)
 
-    expect(result.routes).toHaveLength(3)
+    expect(result.routes).toHaveLength(5)
     expect(result.failed_routes).toEqual(['/api/health'])
   })
 })
