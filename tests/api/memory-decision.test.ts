@@ -89,11 +89,11 @@ describe('POST /api/memory/decision — auth', () => {
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
-  it('skips auth check entirely when CRON_SECRET is unset (dev mode)', async () => {
+  it('returns 500 when CRON_SECRET is unset (fail-closed per F22)', async () => {
     delete process.env.CRON_SECRET
     const req = makeRequest(VALID_BODY, { Authorization: '' })
     const res = await POST(req)
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(500)
   })
 })
 
