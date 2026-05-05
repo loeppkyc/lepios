@@ -3,7 +3,16 @@
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage } from 'ai'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Component,
+  type ErrorInfo,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { MarkdownMessage } from '@/components/orb/MarkdownMessage'
 import {
   ALLOWED_EXTENSIONS,
@@ -39,6 +48,50 @@ function dbMessagesToUIMessages(rows: DBMessage[]): UIMessage[] {
         parts: m.content,
       }) as unknown as UIMessage,
   )
+}
+
+class ChatErrorBoundary extends Component<
+  { children: ReactNode; resetKey: number },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  componentDidUpdate(prev: { resetKey: number }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null })
+    }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[chat-render-error]', error, info.componentStack)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-6 py-10 font-[family-name:var(--font-mono)] text-sm text-[var(--color-text)]">
+          <div className="max-w-xl rounded-[var(--radius-md)] border border-[var(--color-critical)] bg-[var(--color-surface)] p-4">
+            <div className="mb-2 font-semibold text-[var(--color-critical)]">
+              Chat render crashed
+            </div>
+            <pre className="mb-3 max-h-48 overflow-auto whitespace-pre-wrap text-[length:var(--text-nano)] text-[var(--color-text-muted)]">
+              {this.state.error.message}
+              {'\n\n'}
+              {this.state.error.stack ?? ''}
+            </pre>
+            <p className="text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+              Pick another conversation or start a new chat. Full error in browser console.
+            </p>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 function ConvRow({
@@ -297,13 +350,15 @@ export default function ChatPage() {
       </aside>
 
       {/* main pane (key remount on conversation switch) */}
-      <ActiveChat
-        key={chatKey}
-        conversationId={activeId}
-        initialMessages={initialMessages}
-        onConversationCreated={handleConversationCreated}
-        onMenuClick={() => setMobileSidebarOpen((v) => !v)}
-      />
+      <ChatErrorBoundary resetKey={chatKey}>
+        <ActiveChat
+          key={chatKey}
+          conversationId={activeId}
+          initialMessages={initialMessages}
+          onConversationCreated={handleConversationCreated}
+          onMenuClick={() => setMobileSidebarOpen((v) => !v)}
+        />
+      </ChatErrorBoundary>
     </div>
   )
 }
@@ -349,17 +404,10 @@ function ActiveChat({
     [],
   )
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status } = useChat({
     transport,
+    messages: initialMessages,
   })
-
-  useEffect(() => {
-    if (initialMessages.length > 0) {
-      setMessages(initialMessages)
-    }
-    // intentionally only on mount — initialMessages is captured via the parent's key
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const isStreaming = status === 'submitted' || status === 'streaming'
 
