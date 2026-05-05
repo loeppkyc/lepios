@@ -21,7 +21,7 @@
 
 ---
 
-## Total Readiness: 82.1% (89.45 / 109 pts)
+## Total Readiness: 83.7% (91.25 / 109 pts)
 
 _Tracker expanded from 100 → 109 pts after OSS scout added 3 new components. % denominator reflects actual tracked scope._
 
@@ -83,9 +83,9 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | D3  | Database query tool (read LepiOS tables from chat)              | 4      | 100% | 4.00         | **Shipped (Chat UI Slice 6).** `lib/orb/tools/query-db.ts`: 9-table allowlist (agent_events, harness_components, task_queue, knowledge, utility_bills, mileage_trips, expenses, amazon_orders, harness_config). Filter + order_by + limit (max 20). Tests: dryRun gate in registry suite. Production tunnel live 2026-05-04.                                                                                                                                                                                                 |
 | D4  | Harness submit tool (queue tasks from chat)                     | 4      | 100% | 4.00         | **Shipped (Chat UI Slice 6).** `lib/orb/tools/queue-task.ts`: dryRun=true default (preview), dryRun=false inserts to `task_queue`. `lib/orb/tools/submit-idea.ts` also wired. Tests: dryRun gate (2 cases) in `tests/orb/tools/send-telegram.test.ts`. Production tunnel live 2026-05-04.                                                                                                                                                                                                                                    |
 | D5  | Web fetch tool                                                  | 3      | 80%  | 2.40         | **Shipped 2026-05-04.** `lib/orb/tools/web-fetch.ts`: HTTPS-only, SSRF guard (localhost, 127.x, 10.x, 192.168.x, 169.254.x, link-local IPv6, cloud metadata), HTML stripping (script/style/tags/entities), 16KB truncation, non-text rejection. Registered in `buildTools()` (now 10 tools). 16 tests. Remaining 20%: E2E live verify with tunnel.                                                                                                                                                                           |
-| D6  | Code execution tool (sandboxed)                                 | 2      | 0%   | 0.00         | Not started. Depends on D7.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| D6  | Code execution tool (sandboxed)                                 | 2      | 90%  | 1.80         | **Shipped 2026-05-04.** `lib/orb/tools/run-code.ts`: Node.js `vm.createContext()` sandbox — isolated V8 context, whitelisted globals only (Math/JSON/Date/Array etc.), process/require/fetch/global blocked. console.log/error/warn captured. 5s default timeout, 10s max, 8KB code limit. Registered as 12th chat_ui tool. migration 0123: capability seeded. 23 tests green. Remaining 10%: live verify with Ollama routing the tool call.                                |
 | D7  | Tool use bridge — AI SDK `ToolLoopAgent` + `needsApproval` gate | 4      | 100% | 4.00         | **Complete 2026-05-04.** `lib/orb/tools/registry.ts`: 11 tools registered, `buildTools()` wires capability check, 30s timeout, `agent_events` logging. `streamText` with `tools + toolChoice:auto + stopWhen:stepCountIs(5)`. UI approval gate: `isPendingApproval()` detects dry-run previews; amber card with Approve/Cancel; Approve message re-triggers model with `dryRun: false`. 77 tests green.                                                                                                                        |
-|     | **Category total**                                              | **24** |      | **21.20**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|     | **Category total**                                              | **24** |      | **23.00**    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ---
 
@@ -122,10 +122,10 @@ _Sub-items B1 cross-reference `docs/gpu-day-readiness.md` — do not duplicate s
 | A — Chat UI           | 25      | 23.40     | 94%       |
 | B — Brain / Model     | 20      | 15.60     | 78%       |
 | C — Context / Memory  | 18      | 16.75     | 93%       |
-| D — Tool Use          | 24      | 21.20     | 88%       |
+| D — Tool Use          | 24      | 23.00     | 96%       |
 | E — Identity / Polish | 7       | 6.05      | 86%       |
 | F — Operational       | 15      | 6.45      | 43%       |
-| **Total**             | **109** | **89.45** | **82.1%** |
+| **Total**             | **109** | **91.25** | **83.7%** |
 
 _Note: tracker expanded from 100 → 109 pts (OSS scout added C6, D7, E5). % computed against actual tracked scope._
 
