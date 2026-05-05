@@ -18,6 +18,10 @@ import {
   handlePurposeReviewTextReply,
 } from '@/lib/purpose-review/handler'
 import { handleBudgetCommand } from '@/lib/work-budget/parser'
+import {
+  decideApproval,
+  parseSafetyCallbackData,
+} from '@/lib/harness/safety/approval'
 
 export const dynamic = 'force-dynamic'
 
@@ -994,13 +998,53 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
   const parsedImprove = parseImproveCallbackData(callbackQuery.data ?? '')
   const parsedPurposeReview = parsePurposeReviewCallback(callbackQuery.data ?? '')
+  const parsedSafety = parseSafetyCallbackData(callbackQuery.data ?? '')
 
   await logWebhookEvent(
-    parsed?.agentEventId ?? null,
+    parsed?.agentEventId ?? parsedSafety?.approvalId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate || parsedImprove || parsedPurposeReview ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove || parsedPurposeReview || parsedSafety ? 'success' : 'warning'
   )
+
+  if (parsedSafety) {
+    try {
+      const result = await decideApproval({
+        approvalId: parsedSafety.approvalId,
+        decision: parsedSafety.decision,
+        decidedBy: `telegram_user_${callbackQuery.from.id}`,
+      })
+      const ackText = `${(callbackQuery.message.text ?? '').split('\n')[0]}\n— ${result.status.state} by ${result.status.decided_by}`
+      const token = process.env.TELEGRAM_BOT_TOKEN
+      if (token) {
+        await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            text: ackText,
+            reply_markup: { inline_keyboard: [] },
+          }),
+        }).catch(() => {})
+      }
+      await answerCallbackQuery(callbackQuery.id)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      await logEvent({
+        task_type: 'safety_decide_failed',
+        status: 'error',
+        output_summary: `safety decide failed: ${msg.slice(0, 200)}`,
+        meta: {
+          approval_id: parsedSafety.approvalId,
+          decision: parsedSafety.decision,
+          from_user_id: callbackQuery.from.id,
+        },
+      })
+      await answerCallbackQuery(callbackQuery.id)
+    }
+    return NextResponse.json({ ok: true })
+  }
 
   if (parsed) {
     await writeFeedback({
