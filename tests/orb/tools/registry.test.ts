@@ -89,7 +89,7 @@ const DENIED_CAP = {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('buildTools — registry shape', () => {
-  it('registers all 11 expected tool names', () => {
+  it('registers all 12 expected tool names', () => {
     const tools = buildTools(CTX)
     const names = Object.keys(tools).sort()
     expect(names).toEqual(
@@ -99,10 +99,11 @@ describe('buildTools — registry shape', () => {
         'listIdeas',
         'queryDb',
         'queryTwin',
+        'queueTask',
         'readFile',
+        'runCode',
         'sendTelegramMessage',
         'submitIdea',
-        'queueTask',
         'webFetch',
         'writeFile',
       ].sort()

@@ -50,6 +50,22 @@ function makeChain(result: unknown) {
   return chain
 }
 
+/**
+ * Route mockFrom() calls by table name so the detector can call any number of
+ * tables in any order without the test caring about call sequence. The
+ * detector's call graph evolves (e.g. checkAndAutoSuspend, watchlist reload),
+ * and test fixtures shouldn't have to track every new query.
+ *
+ * Pass a map of table → result. Default for any unconfigured table:
+ * `{ data: [], error: null }` — empty rows, no error.
+ */
+function setupTables(map: Record<string, unknown>) {
+  mockFrom.mockImplementation((table: string) => {
+    const result = table in map ? map[table] : { data: [], error: null }
+    return makeChain(result)
+  })
+}
+
 // ── import under test (after mocks) ──────────────────────────────────────────
 
 import { detectNextFailure, releaseDetectorLock } from '@/lib/harness/self-repair/detector'
@@ -79,10 +95,11 @@ afterEach(async () => {
 
 describe('AC-B: detectNextFailure', () => {
   it('returns DetectedFailure for a watchlisted action type', async () => {
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null })) // watchlist query
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null })) // agent_events query
-      .mockReturnValueOnce(makeChain({ data: null, error: null })) // existing run check (maybeSingle)
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [FAILURE_EVENT], error: null },
+      self_repair_runs: { data: null, error: null }, // no existing run, no auto-suspend trigger
+    })
 
     const result = await detectNextFailure()
 
@@ -94,38 +111,45 @@ describe('AC-B: detectNextFailure', () => {
   })
 
   it('returns null when no matching events in agent_events', async () => {
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [], error: null }))
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [], error: null },
+      self_repair_runs: { data: null, error: null },
+    })
 
     const result = await detectNextFailure()
     expect(result).toBeNull()
   })
 
   it('returns null when watchlist is empty', async () => {
-    mockFrom.mockReturnValueOnce(makeChain({ data: [], error: null }))
+    setupTables({
+      self_repair_watchlist: { data: [], error: null },
+    })
 
     const result = await detectNextFailure()
     expect(result).toBeNull()
   })
 
   it('ignores events NOT in the watchlist', async () => {
-    // Watchlist has only coordinator_await_timeout
-    // But we check that drain_trigger_failed is filtered at query level
-    // (the query uses .in('action', watchedTypes))
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [], error: null })) // no events match the .in() filter
+    // Watchlist has only coordinator_await_timeout. The query uses
+    // .in('action', watchedTypes), so non-watched types are filtered server-side
+    // and the agent_events fixture below is what the DB would return.
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [], error: null },
+      self_repair_runs: { data: null, error: null },
+    })
 
     const result = await detectNextFailure()
     expect(result).toBeNull()
   })
 
   it('skips events that already have a self_repair_run', async () => {
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null }))
-      .mockReturnValueOnce(makeChain({ data: { id: 'run-123', status: 'pr_opened' }, error: null })) // existing run
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [FAILURE_EVENT], error: null },
+      self_repair_runs: { data: { id: 'run-123', status: 'pr_opened' }, error: null },
+    })
 
     const result = await detectNextFailure()
     expect(result).toBeNull()
@@ -136,42 +160,31 @@ describe('AC-B: detectNextFailure', () => {
 
 describe('AC-B: advisory lock', () => {
   it('second call returns null when lock is held', async () => {
-    // First call acquires lock
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [FAILURE_EVENT], error: null },
+      self_repair_runs: { data: null, error: null },
+    })
 
     const first = await detectNextFailure()
     expect(first).not.toBeNull()
 
-    // Second call: lock is held — should return null
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null }))
-
+    // Second call: lock is held — should return null even with the same fixture data.
     const second = await detectNextFailure()
     expect(second).toBeNull()
   })
 
   it('after releaseDetectorLock, a new call can proceed', async () => {
-    // Acquire
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+    setupTables({
+      self_repair_watchlist: { data: WATCHLIST_ROWS, error: null },
+      agent_events: { data: [FAILURE_EVENT], error: null },
+      self_repair_runs: { data: null, error: null },
+    })
 
     const first = await detectNextFailure()
     expect(first).not.toBeNull()
 
-    // Release
     await releaseDetectorLock('coordinator_await_timeout')
-
-    // Third call after release — should find the event again
-    mockFrom
-      .mockReturnValueOnce(makeChain({ data: WATCHLIST_ROWS, error: null }))
-      .mockReturnValueOnce(makeChain({ data: [FAILURE_EVENT], error: null }))
-      .mockReturnValueOnce(makeChain({ data: null, error: null }))
 
     const third = await detectNextFailure()
     expect(third).not.toBeNull()

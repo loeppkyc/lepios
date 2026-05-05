@@ -136,6 +136,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   delete process.env.OLLAMA_TWIN_MODEL
   delete process.env.TWIN_CONFIDENCE_THRESHOLD
+  // claudeFallback() throws if ANTHROPIC_API_KEY is unset (47c7b0e). Tests
+  // that mock the Anthropic SDK still need the env var present for the guard
+  // to pass through to the mock.
+  vi.stubEnv('ANTHROPIC_API_KEY', 'test-key')
   mockFrom.mockReturnValue(makeFtsChain({ data: [], error: null }))
 })
 

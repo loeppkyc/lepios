@@ -390,7 +390,7 @@ describe('POST /api/chat — tool calling wiring (B4)', () => {
     expect(typeof args.tools).toBe('object')
   })
 
-  it('tools record includes all 11 registered tool names', async () => {
+  it('tools record includes all 12 registered tool names', async () => {
     await chatPost(makeChatRequest())
     const tools = vi.mocked(streamText).mock.calls[0][0].tools as Record<string, unknown>
     const names = Object.keys(tools).sort()
@@ -401,10 +401,11 @@ describe('POST /api/chat — tool calling wiring (B4)', () => {
         'listIdeas',
         'queryDb',
         'queryTwin',
+        'queueTask',
         'readFile',
+        'runCode',
         'sendTelegramMessage',
         'submitIdea',
-        'queueTask',
         'webFetch',
         'writeFile',
       ].sort()

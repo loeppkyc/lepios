@@ -27,6 +27,8 @@ const {
   mockBuildSandboxDigestLine,
   mockBuildChatUiDigestLine,
   mockBuildSelfRepairDigestLine,
+  mockBuildReconciliationMatchLine,
+  mockBuildDeploySmokeStatsLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -52,6 +54,8 @@ const {
   mockBuildSandboxDigestLine: vi.fn(),
   mockBuildChatUiDigestLine: vi.fn(),
   mockBuildSelfRepairDigestLine: vi.fn(),
+  mockBuildReconciliationMatchLine: vi.fn(),
+  mockBuildDeploySmokeStatsLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -168,6 +172,16 @@ vi.mock('@/lib/orb/tools/chat-ui-digest', () => ({
 // Mock self-repair digest so buildSelfRepairDigestLine does not consume mockFrom slots.
 vi.mock('@/lib/harness/self-repair/digest', () => ({
   buildSelfRepairDigestLine: mockBuildSelfRepairDigestLine,
+}))
+
+// Mock reconciliation-digest so buildReconciliationMatchLine does not consume mockFrom slots.
+vi.mock('@/lib/amazon/reconciliation-digest', () => ({
+  buildReconciliationMatchLine: mockBuildReconciliationMatchLine,
+}))
+
+// Mock smoke-tests/digest so buildDeploySmokeStatsLine does not consume mockFrom slots.
+vi.mock('@/lib/harness/smoke-tests/digest', () => ({
+  buildDeploySmokeStatsLine: mockBuildDeploySmokeStatsLine,
 }))
 
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
@@ -296,6 +310,9 @@ beforeEach(() => {
   mockBuildSandboxDigestLine.mockResolvedValue('Sandbox: no run in last 24h')
   // Default: chat ui no tool calls yet (first run after deploy)
   mockBuildChatUiDigestLine.mockResolvedValue('Chat UI (24h): no tool calls')
+  mockBuildSelfRepairDigestLine.mockResolvedValue('Self-repair (24h): 0 attempts')
+  mockBuildReconciliationMatchLine.mockResolvedValue('Reconciliation: no data')
+  mockBuildDeploySmokeStatsLine.mockResolvedValue('Deploy smoke (24h): no runs')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
