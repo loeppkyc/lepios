@@ -64,6 +64,8 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Accounting & Tax',
     items: [
       { label: 'Bookkeeping Hub', href: '/bookkeeping-hub' },
+      { label: 'Reconcile (auto)', href: '/bookkeeping/reconcile' },
+      { label: 'QB Export', href: '/bookkeeping/qb-export' },
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
       { label: 'Recurring Expenses', href: '/recurring' },
       { label: 'Import Statement', href: '/import' },
