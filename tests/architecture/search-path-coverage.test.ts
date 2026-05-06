@@ -103,8 +103,8 @@ describe('architecture: search_path coverage (F-N7)', () => {
         missing.map((n) => `  - ${n}`).join('\n') +
         `\n\nFix: add 'SET search_path = ''' to the function definition. ` +
         `Body refs to user-schema objects must then be qualified ` +
-        `(public.knowledge, OPERATOR(public.<=>), public.vector_cosine_ops, ` +
-        `etc.). See migrations 0128/0129/0130 for examples. ` +
+        `(public.knowledge, OPERATOR(extensions.<=>), extensions.vector_cosine_ops, ` +
+        `etc.). See migrations 0128/0129/0130/0131 for examples. ` +
         `If a function is intentionally exempt, add it to ALLOWED_NO_SEARCH_PATH ` +
         `in tests/architecture/search-path-coverage.test.ts with a reason.`
     ).toEqual([])
