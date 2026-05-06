@@ -103,7 +103,7 @@ const NAV_SECTIONS: NavSection[] = [
     id: 'household',
     label: 'Household',
     items: [
-      { label: 'Net Worth', href: null },
+      { label: 'Net Worth', href: '/net-worth' },
       { label: 'Personal Expenses', href: '/personal-expenses' },
       { label: 'Debt Payoff', href: null },
       { label: 'Retirement', href: null },
