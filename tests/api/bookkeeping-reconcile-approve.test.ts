@@ -212,7 +212,7 @@ describe('POST /api/bookkeeping/reconcile/approve — txn lookup', () => {
     expect(res.status).toBe(404)
   })
 
-  it('returns 409 when txn is already approved', async () => {
+  it('returns 409 when txn is already classified (manual_je)', async () => {
     mockFrom.mockImplementation(
       buildMockFrom({
         pending_transactions: {
@@ -222,7 +222,7 @@ describe('POST /api/bookkeeping/reconcile/approve — txn lookup', () => {
             source_account: 'TD CHEQUING (9150)',
             description: 'PAYPAL MSP',
             amount_signed: -49.55,
-            status: 'approved',
+            status: 'manual_je',
             matched_rule_id: null,
             suggested_expense_account: null,
           },
@@ -257,6 +257,51 @@ describe('POST /api/bookkeeping/reconcile/approve — txn lookup', () => {
       postReq({ id: 'a', expense_account: 'BOGUS', gst_rate: 0.05, business_use_pct: 100 })
     )
     expect(res.status).toBe(400)
+  })
+})
+
+// F-N7 regression: the API previously wrote status='approved' on success,
+// which violates the pending_transactions_status_check CHECK constraint
+// (allowed: pending, auto_approved, needs_review, rejected, manual_je,
+// duplicate). The fix uses 'manual_je'. This test pins the status string so
+// any future drift trips a unit test, not a 500 in production.
+describe('POST /api/bookkeeping/reconcile/approve — status transition (F-N7 regression guard)', () => {
+  it('writes status=manual_je on the pending_transactions UPDATE', async () => {
+    const state: TableState = {
+      pending_transactions: {
+        txn: {
+          id: 'a',
+          txn_date: '2026-04-02',
+          source_account: 'TD CHEQUING (9150)',
+          description: 'OFFICE STORE',
+          amount_signed: -105,
+          status: 'needs_review',
+          matched_rule_id: null,
+          suggested_expense_account: null,
+        },
+      },
+      chart_of_accounts: { accounts: [{ full_name: 'OFFICE EXPENSES' }] },
+      journal_entries: {},
+      journal_entry_lines: {},
+    }
+    mockFrom.mockImplementation(buildMockFrom(state))
+
+    const res = await POST(
+      postReq({
+        id: 'a',
+        expense_account: 'OFFICE EXPENSES',
+        gst_rate: 0.05,
+        business_use_pct: 100,
+      })
+    )
+    expect(res.status).toBe(200)
+
+    const captured = state.pending_transactions!.captured!
+    expect(captured).toHaveLength(1)
+    const update = captured[0].update as Record<string, unknown>
+    expect(update.status).toBe('manual_je')
+    expect(update.je_id).toBeDefined()
+    expect(update.reviewed_at).toBeDefined()
   })
 })
 
