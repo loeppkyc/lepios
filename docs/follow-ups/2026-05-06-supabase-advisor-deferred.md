@@ -55,13 +55,43 @@ The codebase has many embedding-related queries that could break. Twin retrieval
 
 **Rough effort:** ~1 hour with care. Plan a dedicated session.
 
-## 3. auth_leaked_password_protection — Supabase Auth dashboard toggle
+## 3. auth_leaked_password_protection — gated behind Supabase Pro plan
 
 **WARN-level.** Supabase Auth can check passwords against the HaveIBeenPwned database to reject known-leaked credentials. Currently disabled.
 
-**Why deferred:** not a SQL change. Supabase dashboard toggle: Authentication → Settings → Password Security → "Enable leaked password protection." ~30 seconds, no code change needed.
+**Status: ACCEPTED — plan-gated, not a missing toggle.**
 
-**Fix:** Colin clicks the toggle.
+**What we tried (2026-05-06):** Called `PATCH https://api.supabase.com/v1/projects/{ref}/config/auth` with `{"password_hibp_enabled":true}` using a Supabase Management Personal Access Token. Token authenticated successfully; API returned `HTTP 402` with body:
+
+```text
+Configuring leaked password protection via HaveIBeenPwned.org is available on Pro Plans and up.
+```
+
+The dashboard toggle would surface the same gate (upgrade-to-Pro modal). This is not fixable on the current free tier without upgrading.
+
+**Decision:** advisor WARN will persist on the free tier. The advisor lints uniformly regardless of plan. Document as accepted-risk-due-to-plan; do not retry until/unless the project moves to Pro.
+
+**To revisit:** if/when this Supabase project is upgraded to Pro+, simply re-run:
+
+```bash
+TOKEN=$(supabase-management-token-from-harness_config)  # see "Management API access" below
+curl -X PATCH "https://api.supabase.com/v1/projects/xpanlbcjueimeofgsara/config/auth" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"password_hibp_enabled":true}'
+```
+
+Then re-check `get_advisors` to confirm the WARN clears.
+
+### Management API access (added 2026-05-06)
+
+A Supabase Personal Access Token is now stored in `harness_config.SUPABASE_MANAGEMENT_TOKEN` (`is_secret=true`). Reads:
+
+```sql
+SELECT value FROM harness_config WHERE key = 'SUPABASE_MANAGEMENT_TOKEN';
+```
+
+This unlocks any future Management API task that doesn't require Pro plan — e.g. project config flips, log access, branch operations. Token was minted as `lepios-management` and has full Management API scope on the account.
 
 ---
 
