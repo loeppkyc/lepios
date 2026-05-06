@@ -9,6 +9,12 @@ import type {
   NetWorthSnapshot,
 } from '@/app/api/net-worth/route'
 
+interface SaveRowInput {
+  id: string
+  balance: number
+  as_of_date: string
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   bank: 'Business Banking',
   cash: 'Cash',
@@ -169,6 +175,20 @@ export function NetWorthPage() {
       setSavingSnap(false)
     }
   }, [load])
+
+  const saveRow = useCallback(
+    async ({ id, balance, as_of_date }: SaveRowInput) => {
+      const r = await fetch('/api/balance-sheet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, balance, as_of_date }),
+      })
+      const j = (await r.json()) as { ok?: boolean; error?: string }
+      if (!r.ok || j.error) throw new Error(j.error ?? `HTTP ${r.status}`)
+      await load()
+    },
+    [load]
+  )
 
   const filteredRows = data ? applyPillar(data.rows, pillar) : []
   const filteredCats = data ? applyPillarToCats(data.byCategory, pillar) : []
@@ -496,9 +516,9 @@ export function NetWorthPage() {
                     borderBottom: '1px solid var(--color-border)',
                   }}
                 >
-                  {['Account', 'Balance', 'As Of'].map((h, i) => (
+                  {['Account', 'Balance', 'As Of', ''].map((h, i) => (
                     <th
-                      key={h}
+                      key={h + i}
                       style={{
                         fontFamily: 'var(--font-ui)',
                         fontSize: 'var(--text-nano)',
@@ -527,6 +547,7 @@ export function NetWorthPage() {
                       isLiability={cat.account_type === 'liability'}
                       rows={rows}
                       total={cat.total}
+                      onSave={saveRow}
                     />
                   )
                 })}
@@ -643,11 +664,13 @@ function RowGroup({
   isLiability,
   rows,
   total,
+  onSave,
 }: {
   label: string
   isLiability: boolean
   rows: BalanceSheetEntryLite[]
   total: number
+  onSave: (input: SaveRowInput) => Promise<void>
 }) {
   return (
     <>
@@ -679,45 +702,207 @@ function RowGroup({
           {fmt(total)}
         </td>
         <td />
+        <td />
       </tr>
       {rows.map((r) => (
-        <tr key={r.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <td
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-text-secondary)',
-              padding: '7px 14px 7px 28px',
-            }}
-          >
-            {r.name}
-          </td>
-          <td
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-text-primary)',
-              textAlign: 'right',
-              padding: '7px 14px',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {fmt(r.balance)}
-          </td>
-          <td
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-nano)',
-              color: 'var(--color-text-disabled)',
-              textAlign: 'right',
-              padding: '7px 14px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {r.as_of_date}
-          </td>
-        </tr>
+        <EditableRow key={r.id} row={r} onSave={onSave} />
       ))}
     </>
+  )
+}
+
+function EditableRow({
+  row,
+  onSave,
+}: {
+  row: BalanceSheetEntryLite
+  onSave: (input: SaveRowInput) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [balanceStr, setBalanceStr] = useState(String(row.balance))
+  const [asOfDate, setAsOfDate] = useState(row.as_of_date)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  function startEdit() {
+    setBalanceStr(String(row.balance))
+    setAsOfDate(row.as_of_date)
+    setErr(null)
+    setEditing(true)
+  }
+
+  async function save() {
+    const val = parseFloat(balanceStr)
+    if (!Number.isFinite(val)) {
+      setErr('Invalid number')
+      return
+    }
+    setSaving(true)
+    setErr(null)
+    try {
+      await onSave({ id: row.id, balance: val, as_of_date: asOfDate })
+      setEditing(false)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function cancel() {
+    setBalanceStr(String(row.balance))
+    setAsOfDate(row.as_of_date)
+    setErr(null)
+    setEditing(false)
+  }
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 'var(--text-small)',
+    background: 'var(--color-surface-2)',
+    border: '1px solid var(--color-accent-gold)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-primary)',
+    padding: '4px 8px',
+    outline: 'none',
+  }
+
+  return (
+    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+      <td
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 'var(--text-small)',
+          color: 'var(--color-text-secondary)',
+          padding: '7px 14px 7px 28px',
+        }}
+      >
+        {row.name}
+      </td>
+      <td
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-small)',
+          color: 'var(--color-text-primary)',
+          textAlign: 'right',
+          padding: '7px 14px',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {editing ? (
+          <input
+            type="number"
+            step="0.01"
+            value={balanceStr}
+            onChange={(e) => setBalanceStr(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void save()
+              if (e.key === 'Escape') cancel()
+            }}
+            style={{ ...inputStyle, width: 130, textAlign: 'right' }}
+            autoFocus
+            disabled={saving}
+          />
+        ) : (
+          fmt(row.balance)
+        )}
+      </td>
+      <td
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-nano)',
+          color: 'var(--color-text-disabled)',
+          textAlign: 'right',
+          padding: '7px 14px',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {editing ? (
+          <input
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            style={{ ...inputStyle, width: 140 }}
+            disabled={saving}
+          />
+        ) : (
+          row.as_of_date
+        )}
+      </td>
+      <td
+        style={{
+          padding: '7px 14px',
+          textAlign: 'right',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {editing ? (
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            <button
+              onClick={cancel}
+              disabled={saving}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-muted)',
+                cursor: saving ? 'wait' : 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => void save()}
+              disabled={saving}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                fontWeight: 700,
+                padding: '3px 10px',
+                background: 'var(--color-accent-gold)',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: '#000',
+                cursor: saving ? 'wait' : 'pointer',
+              }}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {err && (
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: '#e5534b',
+                  alignSelf: 'center',
+                }}
+                title={err}
+              >
+                ⚠
+              </span>
+            )}
+          </span>
+        ) : (
+          <button
+            onClick={startEdit}
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              padding: '3px 10px',
+              background: 'none',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-text-disabled)',
+              cursor: 'pointer',
+            }}
+          >
+            Edit
+          </button>
+        )}
+      </td>
+    </tr>
   )
 }
