@@ -24,6 +24,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Business Review', href: '/business-review' },
       { label: 'Life P&L', href: '/life-pnl' },
+      { label: 'Net Worth', href: '/net-worth' },
       { label: 'Trading Journal', href: null },
       { label: 'Sports Betting', href: null },
     ],
@@ -102,7 +103,7 @@ const NAV_SECTIONS: NavSection[] = [
     id: 'household',
     label: 'Household',
     items: [
-      { label: 'Net Worth', href: null },
+      { label: 'Net Worth', href: '/net-worth' },
       { label: 'Personal Expenses', href: '/personal-expenses' },
       { label: 'Debt Payoff', href: null },
       { label: 'Retirement', href: null },
