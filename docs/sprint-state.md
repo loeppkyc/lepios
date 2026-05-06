@@ -156,13 +156,14 @@ chunks_awaiting_grounding_stall_alert:
 active_chunk: "button-data-invalid"
 active_chunk_acceptance_doc: "docs/sprint-5/button-data-invalid-acceptance.md"
 active_chunk_task_id: "6d4f2276-dc65-42e8-8696-0ff01724d49b"
-active_chunk_status: "in-build"
+active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-26T19:08:00Z"
 active_chunk_delegated_to_builder_at: "2026-05-06T00:05:00Z"
-active_chunk_build_complete_at: null
-active_chunk_commit: null
-active_chunk_tests: null
-last_updated_at: "2026-05-06T00:05:00Z"
+active_chunk_build_complete_at: "2026-05-06T00:14:00Z"
+active_chunk_commit: "421644e"
+active_chunk_tests: "1433 passing, 0 failing, 32 new"
+last_updated_at: "2026-05-06T00:15:00Z"
+active_chunk_handoff: "docs/sprint-5/chunk-button-data-invalid-handoff.json"
 
 prior_active_chunk: "notification-drain-dedup"
 prior_active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
