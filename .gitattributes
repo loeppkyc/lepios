@@ -1,0 +1,17 @@
+# Force LF line endings on shell-script-style files.
+#
+# Background: scripts/pre-commit-safety.mjs starts with a shebang line
+# (#!/usr/bin/env node). On Windows clients with core.autocrlf=true the
+# checkout converts to CRLF, producing `#!/usr/bin/env node\r\n` at the
+# top of the file. Vitest's transform pipeline then fails to import the
+# module with "SyntaxError: Invalid or unexpected token" — see today's
+# investigation. The other .mjs test in the repo
+# (tests/scripts/ai-review-core.test.ts → scripts/lib/ai-review-core.mjs)
+# does not have this problem because that file has no shebang.
+#
+# Cross-platform safe rule: any file that runs as a script (shebang at
+# top) must use LF universally. Listing both .mjs (Node ESM scripts) and
+# .sh (bash) covers the executable surface in this repo.
+
+*.mjs text eol=lf
+*.sh  text eol=lf
