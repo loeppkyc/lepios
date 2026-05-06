@@ -14,10 +14,11 @@ export interface SettlementRow {
   netPayout: number
   fundTransferStatus: string
   currency: string
+  notes: string | null
 }
 
 export interface MonthRollup {
-  month: string   // 'YYYY-MM'
+  month: string // 'YYYY-MM'
   label: string
   gross: number
   feesTotal: number
@@ -41,21 +42,40 @@ export interface PayoutsResponse {
   }
 }
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
 
-function r2(n: number) { return Math.round(n * 100) / 100 }
+function r2(n: number) {
+  return Math.round(n * 100) / 100
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const year = parseInt(searchParams.get('year') ?? String(new Date().getFullYear()), 10)
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data, error } = await supabase
     .from('amazon_settlements')
-    .select('id, period_start_at, period_end_at, gross, fees_total, refunds_total, reimbursements_total_cad, net_payout, fund_transfer_status, currency')
+    .select(
+      'id, period_start_at, period_end_at, gross, fees_total, refunds_total, reimbursements_total_cad, net_payout, fund_transfer_status, currency, notes'
+    )
     .gte('period_end_at', `${year}-01-01`)
     .lte('period_end_at', `${year}-12-31`)
     .order('period_end_at', { ascending: false })
@@ -64,7 +84,7 @@ export async function GET(request: Request) {
 
   const rows = data ?? []
 
-  const settlements: SettlementRow[] = rows.map(r => ({
+  const settlements: SettlementRow[] = rows.map((r) => ({
     id: r.id as string,
     periodStart: (r.period_start_at as string).slice(0, 10),
     periodEnd: (r.period_end_at as string).slice(0, 10),
@@ -75,10 +95,14 @@ export async function GET(request: Request) {
     netPayout: r2(Number(r.net_payout ?? 0)),
     fundTransferStatus: (r.fund_transfer_status as string) ?? '',
     currency: (r.currency as string) ?? 'CAD',
+    notes: (r.notes as string | null) ?? null,
   }))
 
   // Monthly rollups
-  const monthMap = new Map<string, { gross: number; fees: number; refunds: number; reimb: number; net: number; count: number }>()
+  const monthMap = new Map<
+    string,
+    { gross: number; fees: number; refunds: number; reimb: number; net: number; count: number }
+  >()
   for (let m = 1; m <= 12; m++) {
     const key = `${year}-${String(m).padStart(2, '0')}`
     monthMap.set(key, { gross: 0, fees: 0, refunds: 0, reimb: 0, net: 0, count: 0 })

@@ -79,6 +79,27 @@ export function isScriptPath(path) {
 }
 
 /**
+ * Strip Postgres dollar-quoted string bodies from SQL text.
+ *
+ * Function bodies (CREATE [OR REPLACE] FUNCTION ... AS $tag$ ... $tag$;) are
+ * stored as TEXT in pg_proc.prosrc and re-parsed at call time — they are NOT
+ * top-level DDL. A `DROP INDEX IF EXISTS` *inside* a function body is a string
+ * literal, not a destructive operation at migration apply time.
+ *
+ * Without this strip, the destructive_sql patterns produce false positives on
+ * any migration that defines a function whose body includes DROP/TRUNCATE/etc.
+ * (See migrations 0129, 0131, and PRs #82 / #84 which had to use SAFETY_BYPASS
+ * for exactly this reason.)
+ *
+ * Anonymous tags ($$ ... $$) and named tags ($function$ ... $function$,
+ * $body$ ... $body$, etc.) are both handled. Backreference `\1` correctly
+ * matches an empty group when the tag is anonymous.
+ */
+export function stripDollarQuotedBodies(sql) {
+  return sql.replace(/\$([A-Za-z_]\w*)?\$[\s\S]*?\$\1\$/g, '')
+}
+
+/**
  * Parse a unified diff (output of `git diff --cached --no-color`) into
  * { path, additions } records. additions is the joined `+` lines (without
  * the leading +) for that file.
@@ -128,13 +149,16 @@ export function scanStagedFiles(files) {
 
   // ── destructive_sql ────────────────────────────────────────────────────────
   for (const { path, additions } of sqlContext) {
-    const upper = additions.toUpperCase()
+    // Strip dollar-quoted function bodies before pattern matching — DROP/etc.
+    // inside a CREATE FUNCTION body is a string literal, not top-level DDL.
+    const stripped = stripDollarQuotedBodies(additions)
+    const upper = stripped.toUpperCase()
 
     if (/\bDROP\s+(TABLE|SCHEMA|DATABASE|VIEW|FUNCTION|INDEX)\s+\w+/.test(upper)) {
       findings.push({
         severity: 'block',
         rule: 'DROP statement',
-        evidence: extractMatch(additions, /\bDROP\s+\w+\s+\w+/i) ?? 'DROP …',
+        evidence: extractMatch(stripped, /\bDROP\s+\w+\s+\w+/i) ?? 'DROP …',
         path,
       })
     }
@@ -145,13 +169,13 @@ export function scanStagedFiles(files) {
       findings.push({
         severity: 'block',
         rule: 'TRUNCATE statement',
-        evidence: extractMatch(additions, /\bTRUNCATE\s+(?:TABLE\s+)?\w+/i) ?? 'TRUNCATE …',
+        evidence: extractMatch(stripped, /\bTRUNCATE\s+(?:TABLE\s+)?\w+/i) ?? 'TRUNCATE …',
         path,
       })
     }
 
     // DELETE FROM <table> without a WHERE in the same statement.
-    for (const stmt of additions.split(';')) {
+    for (const stmt of stripped.split(';')) {
       if (/\bDELETE\s+FROM\s+\w+/i.test(stmt) && !/\bWHERE\b/i.test(stmt)) {
         findings.push({
           severity: 'block',

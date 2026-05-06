@@ -69,9 +69,32 @@ const RLS_PROTECTED_TABLES = [
 
 // ── Destructive SQL ──────────────────────────────────────────────────────────
 
+/**
+ * Strip Postgres dollar-quoted string bodies from SQL text.
+ *
+ * Function bodies (`CREATE [OR REPLACE] FUNCTION ... AS $tag$ ... $tag$;`) are
+ * stored as TEXT in pg_proc.prosrc and re-parsed at call time — they are NOT
+ * top-level DDL. A `DROP INDEX IF EXISTS` *inside* a function body is a string
+ * literal, not a destructive operation at migration apply time.
+ *
+ * Without this strip, the destructive_sql patterns produce false positives on
+ * any migration that defines a function whose body includes DROP/TRUNCATE/etc.
+ * (See migrations 0129, 0131, and PRs #82 / #84 which had to use SAFETY_BYPASS
+ * for exactly this reason.)
+ *
+ * Anonymous tags (`$$ ... $$`) and named tags (`$function$ ... $function$`,
+ * `$body$ ... $body$`, etc.) are both handled. Backreference matches an empty
+ * group when the tag is anonymous.
+ */
+export function stripDollarQuotedBodies(sql: string): string {
+  return sql.replace(/\$([A-Za-z_]\w*)?\$[\s\S]*?\$\1\$/g, '')
+}
+
 export function checkDestructiveSql(sql: string): SafetyFinding[] {
   const findings: SafetyFinding[] = []
-  const stripped = sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+  const stripped = stripDollarQuotedBodies(sql)
+    .replace(/--[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
   const upper = stripped.toUpperCase()
 
   if (/\bDROP\s+(TABLE|SCHEMA|DATABASE|VIEW|FUNCTION|INDEX)\b/.test(upper)) {
@@ -159,8 +182,17 @@ export function checkSecretChanges(diff: string): SafetyFinding[] {
 
 // ── Side effects ─────────────────────────────────────────────────────────────
 
-export function checkSideEffects(input: NonNullable<StaticCheckInput['telegram'] | StaticCheckInput['stripe'] | StaticCheckInput['git'] | StaticCheckInput['storage']> | undefined,
-  context: 'telegram' | 'stripe' | 'git' | 'storage'): SafetyFinding[] {
+export function checkSideEffects(
+  input:
+    | NonNullable<
+        | StaticCheckInput['telegram']
+        | StaticCheckInput['stripe']
+        | StaticCheckInput['git']
+        | StaticCheckInput['storage']
+      >
+    | undefined,
+  context: 'telegram' | 'stripe' | 'git' | 'storage'
+): SafetyFinding[] {
   const findings: SafetyFinding[] = []
   if (!input) return findings
 
@@ -227,10 +259,7 @@ export function staticSafetyCheck(input: StaticCheckInput): StaticCheckResult {
   if (input.git) findings.push(...checkSideEffects(input.git, 'git'))
   if (input.storage) findings.push(...checkSideEffects(input.storage, 'storage'))
 
-  const severity = findings.reduce<Severity>(
-    (worst, f) => maxSeverity(worst, f.severity),
-    'pass',
-  )
+  const severity = findings.reduce<Severity>((worst, f) => maxSeverity(worst, f.severity), 'pass')
   return { severity, findings }
 }
 

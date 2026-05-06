@@ -14,6 +14,7 @@ import {
   checkSecretChanges,
   checkSideEffects,
   staticSafetyCheck,
+  stripDollarQuotedBodies,
 } from '@/lib/harness/safety/static'
 
 describe('Safety Agent — destructive SQL (3 destructive + 3 safe)', () => {
@@ -54,6 +55,58 @@ describe('Safety Agent — destructive SQL (3 destructive + 3 safe)', () => {
     const out = checkDestructiveSql('ALTER TABLE harness_config DROP COLUMN value;')
     expect(out.find((f) => f.rule.includes('ALTER on RLS-protected'))).toBeDefined()
   })
+
+  // Regression: PRs #82 and #84 had to use SAFETY_BYPASS=1 because the
+  // unchanged DROP INDEX inside a CREATE OR REPLACE FUNCTION body was being
+  // mis-classified as a top-level DROP. Stripping dollar-quoted bodies first
+  // fixes the false positive without weakening detection of real top-level DDL.
+  it('SAFE: DROP INDEX inside a function body is not a top-level DROP', () => {
+    const sql = `CREATE OR REPLACE FUNCTION public.rebuild_idx() RETURNS void
+LANGUAGE plpgsql AS $function$
+BEGIN
+  DROP INDEX IF EXISTS public.knowledge_embedding_idx;
+  CREATE INDEX knowledge_embedding_idx ON public.knowledge USING ivfflat (embedding extensions.vector_cosine_ops);
+END;
+$function$;`
+    expect(checkDestructiveSql(sql)).toEqual([])
+  })
+
+  it('SAFE: TRUNCATE inside a function body is not a top-level TRUNCATE', () => {
+    const sql = `CREATE OR REPLACE FUNCTION purger() RETURNS void
+LANGUAGE plpgsql AS $function$ BEGIN TRUNCATE TABLE stale_rows; END; $function$;`
+    expect(checkDestructiveSql(sql)).toEqual([])
+  })
+
+  it('SAFE: DELETE without WHERE inside a function body does not flag', () => {
+    const sql = `CREATE FUNCTION purger() RETURNS void
+LANGUAGE plpgsql AS $function$ BEGIN DELETE FROM stale_rows; END; $function$;`
+    expect(checkDestructiveSql(sql)).toEqual([])
+  })
+
+  it('still blocks a real top-level DROP next to a (harmless) function body', () => {
+    const sql = `DROP TABLE legacy_audit;
+CREATE FUNCTION harmless() RETURNS void LANGUAGE plpgsql AS $function$ BEGIN RETURN; END; $function$;`
+    const out = checkDestructiveSql(sql)
+    expect(out.find((f) => f.rule === 'DROP statement')).toBeDefined()
+  })
+})
+
+describe('stripDollarQuotedBodies', () => {
+  it('strips a named-tag function body', () => {
+    const sql = `CREATE FUNCTION foo() AS $function$ BEGIN DROP TABLE x; END; $function$;`
+    expect(stripDollarQuotedBodies(sql)).not.toContain('DROP TABLE')
+  })
+
+  it('strips an anonymous-tag $$ body', () => {
+    const sql = `DO $$ BEGIN TRUNCATE accounts; END $$;`
+    expect(stripDollarQuotedBodies(sql)).not.toContain('TRUNCATE')
+  })
+
+  it('preserves top-level DDL outside any body', () => {
+    const sql = `DROP TABLE legacy;
+CREATE FUNCTION foo() AS $function$ BEGIN RETURN; END; $function$;`
+    expect(stripDollarQuotedBodies(sql)).toContain('DROP TABLE legacy')
+  })
 })
 
 describe('Safety Agent — secret changes in diff (3 destructive + 3 safe)', () => {
@@ -74,7 +127,9 @@ describe('Safety Agent — secret changes in diff (3 destructive + 3 safe)', () 
   it('blocks harness_config write from code', () => {
     const diff = `+await db.from('harness_config').insert({ key: 'NEW_TOKEN', value: 'x' })`
     const out = checkSecretChanges(diff)
-    expect(out.find((f) => f.severity === 'block' && f.rule.includes('harness_config write'))).toBeDefined()
+    expect(
+      out.find((f) => f.severity === 'block' && f.rule.includes('harness_config write'))
+    ).toBeDefined()
   })
 
   it('SAFE: unrelated diff line', () => {
