@@ -22,6 +22,7 @@ import {
   isScriptPath,
   parseStagedDiff,
   scanStagedFiles,
+  stripDollarQuotedBodies,
 } from '../../../scripts/pre-commit-safety.mjs'
 
 // ── Allowlist (self-referencing safety files) ────────────────────────────────
@@ -243,6 +244,133 @@ describe('scanStagedFiles — harness_config write', () => {
       {
         path: 'lib/bar.ts',
         additions: 'const { data } = await db.from("harness_config").select("*")',
+      },
+    ])
+    expect(out.severity).toBe('pass')
+  })
+})
+
+// ── stripDollarQuotedBodies (regression for PR #82 / #84 false positive) ─────
+
+describe('stripDollarQuotedBodies', () => {
+  it('strips a named-tag function body', () => {
+    const sql = `CREATE OR REPLACE FUNCTION foo() RETURNS void
+LANGUAGE plpgsql AS $function$
+BEGIN
+  DROP INDEX IF EXISTS bar;
+END;
+$function$;`
+    expect(stripDollarQuotedBodies(sql)).not.toContain('DROP INDEX')
+    expect(stripDollarQuotedBodies(sql)).toContain('CREATE OR REPLACE FUNCTION foo')
+  })
+
+  it('strips an anonymous-tag ($$) body', () => {
+    const sql = `DO $$ BEGIN TRUNCATE accounts; END $$;`
+    expect(stripDollarQuotedBodies(sql)).not.toContain('TRUNCATE')
+  })
+
+  it('strips multiple function bodies in one file', () => {
+    const sql = `CREATE FUNCTION a() RETURNS void LANGUAGE plpgsql AS $function$
+BEGIN DROP TABLE x; END;
+$function$;
+CREATE FUNCTION b() RETURNS void LANGUAGE plpgsql AS $body$
+BEGIN TRUNCATE y; END;
+$body$;`
+    const out = stripDollarQuotedBodies(sql)
+    expect(out).not.toContain('DROP TABLE')
+    expect(out).not.toContain('TRUNCATE')
+    expect(out).toContain('CREATE FUNCTION a')
+    expect(out).toContain('CREATE FUNCTION b')
+  })
+
+  it('preserves top-level DDL outside any function body', () => {
+    const sql = `DROP TABLE legacy_audit;
+CREATE FUNCTION foo() RETURNS void LANGUAGE plpgsql AS $function$
+BEGIN RETURN; END;
+$function$;`
+    expect(stripDollarQuotedBodies(sql)).toContain('DROP TABLE legacy_audit')
+  })
+
+  it('handles a body that itself contains a $body$ block (mixed tags)', () => {
+    // PG doesn't allow same-tag nesting, but mixed tags are valid. This pattern
+    // shouldn't appear in our migrations but is worth pinning down.
+    const sql = `CREATE FUNCTION foo() RETURNS void LANGUAGE plpgsql AS $outer$
+BEGIN
+  EXECUTE $body$ TRUNCATE x $body$;
+END;
+$outer$;`
+    expect(stripDollarQuotedBodies(sql)).not.toContain('TRUNCATE')
+  })
+})
+
+// ── Regression: function-body DROP must NOT block (PR #82 / #84 false positive) ──
+
+describe('scanStagedFiles — function-body DROP false positive (regression)', () => {
+  // Exactly the pattern in migration 0129 (rebuild_knowledge_ivfflat_index)
+  // and 0131 (re-create after pgvector schema move) that forced SAFETY_BYPASS=1.
+  it('passes a CREATE OR REPLACE FUNCTION whose body contains DROP INDEX IF EXISTS', () => {
+    const out = scanStagedFiles([
+      {
+        path: 'supabase/migrations/0131_move_pgvector_to_extensions.sql',
+        additions: `CREATE OR REPLACE FUNCTION public.rebuild_knowledge_ivfflat_index()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+BEGIN
+  DROP INDEX IF EXISTS public.knowledge_embedding_idx;
+  CREATE INDEX knowledge_embedding_idx
+    ON public.knowledge USING ivfflat (embedding extensions.vector_cosine_ops)
+    WITH (lists = 50);
+END;
+$function$;`,
+      },
+    ])
+    expect(out.severity).toBe('pass')
+    expect(out.findings).toEqual([])
+  })
+
+  it('still blocks an actual top-level DROP TABLE outside any function body', () => {
+    const out = scanStagedFiles([
+      {
+        path: 'supabase/migrations/0999_destructive.sql',
+        additions: `DROP TABLE legacy_audit;
+CREATE FUNCTION harmless() RETURNS void LANGUAGE plpgsql AS $function$ BEGIN RETURN; END; $function$;`,
+      },
+    ])
+    expect(out.severity).toBe('block')
+    expect(out.findings.some((f) => f.rule === 'DROP statement')).toBe(true)
+  })
+
+  it('still blocks DROP INDEX top-level even when a function body is present', () => {
+    const out = scanStagedFiles([
+      {
+        path: 'supabase/migrations/0999_drop_idx.sql',
+        additions: `DROP INDEX old_idx;
+CREATE FUNCTION harmless() RETURNS void LANGUAGE plpgsql AS $function$ BEGIN RETURN; END; $function$;`,
+      },
+    ])
+    expect(out.severity).toBe('block')
+  })
+
+  it('still blocks DELETE without WHERE inside top-level (not function body)', () => {
+    const out = scanStagedFiles([
+      {
+        path: 'supabase/migrations/0999_purge.sql',
+        additions: `DELETE FROM old_logs;`,
+      },
+    ])
+    expect(out.severity).toBe('block')
+  })
+
+  it('passes a function body containing DELETE FROM ... no WHERE (string literal)', () => {
+    const out = scanStagedFiles([
+      {
+        path: 'supabase/migrations/0999_purge_fn.sql',
+        additions: `CREATE FUNCTION purger() RETURNS void LANGUAGE plpgsql AS $function$
+BEGIN DELETE FROM stale_rows; END;
+$function$;`,
       },
     ])
     expect(out.severity).toBe('pass')
