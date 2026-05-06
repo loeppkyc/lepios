@@ -205,10 +205,16 @@ export async function POST(request: Request) {
     )
   }
 
+  // status='manual_je' is the only valid post-approval state per the
+  // pending_transactions_status_check CHECK constraint. Allowed values:
+  // 'pending', 'auto_approved', 'needs_review', 'rejected', 'manual_je',
+  // 'duplicate'. ('approved' is NOT valid — F-N7 regression.) Semantically
+  // matches: this row was manually classified and a journal entry was
+  // created for it.
   const { error: uErr } = await supabase
     .from('pending_transactions')
     .update({
-      status: 'approved',
+      status: 'manual_je',
       je_id,
       reviewed_at: new Date().toISOString(),
       review_notes: body.review_notes ?? null,
