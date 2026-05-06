@@ -18,6 +18,7 @@ import { buildAmazonSettlementsSyncLine } from '@/lib/amazon/settlements-digest'
 import { buildOllamaTunnelHealthLine } from '@/lib/harness/ollama-tunnel-stats'
 import { buildUtilityBillSavedLine } from '@/lib/harness/utility-digest'
 import { buildSecurityDigestLine } from '@/lib/security/security-digest'
+import { buildAdvisorBackstopLine } from '@/lib/security/advisor-backstop'
 import { buildArmsLegsDispatchLine } from '@/lib/harness/arms-legs/dispatch-digest'
 import { buildSandboxDigestLine } from '@/lib/harness/sandbox/digest'
 import { buildChatUiDigestLine } from '@/lib/orb/tools/chat-ui-digest'
@@ -314,6 +315,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── Twin escalation queue — open count in last 24h (slice 2 of escalation loop) ──
   const twinEscalationsLine = await buildOpenEscalationsLine()
   messageToSend = `${messageToSend}\n${twinEscalationsLine}`
+
+  // ── Advisor backstop — surface NEW actionable Supabase advisor findings (F-L6 closure) ──
+  const advisorBackstopLine = await buildAdvisorBackstopLine()
+  messageToSend = `${messageToSend}\n${advisorBackstopLine}`
 
   characterCount = messageToSend.length
 

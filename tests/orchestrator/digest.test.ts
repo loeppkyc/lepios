@@ -30,6 +30,7 @@ const {
   mockBuildReconciliationMatchLine,
   mockBuildDeploySmokeStatsLine,
   mockBuildOpenEscalationsLine,
+  mockBuildAdvisorBackstopLine,
 } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -58,6 +59,7 @@ const {
   mockBuildReconciliationMatchLine: vi.fn(),
   mockBuildDeploySmokeStatsLine: vi.fn(),
   mockBuildOpenEscalationsLine: vi.fn(),
+  mockBuildAdvisorBackstopLine: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/service', () => ({
@@ -191,6 +193,11 @@ vi.mock('@/lib/harness/twin-escalations/digest', () => ({
   buildOpenEscalationsLine: mockBuildOpenEscalationsLine,
 }))
 
+// Mock advisor-backstop so buildAdvisorBackstopLine does not consume mockFrom slots.
+vi.mock('@/lib/security/advisor-backstop', () => ({
+  buildAdvisorBackstopLine: mockBuildAdvisorBackstopLine,
+}))
+
 import { composeMorningDigest, sendMorningDigest } from '@/lib/orchestrator/digest'
 import { MissingTelegramConfigError } from '@/lib/orchestrator/telegram'
 import type { TickResult } from '@/lib/orchestrator/types'
@@ -321,6 +328,8 @@ beforeEach(() => {
   mockBuildReconciliationMatchLine.mockResolvedValue('Reconciliation: no data')
   mockBuildDeploySmokeStatsLine.mockResolvedValue('Deploy smoke (24h): no runs')
   mockBuildOpenEscalationsLine.mockResolvedValue('Twin escalations (24h): 0 open')
+  // Default: advisor backstop healthy — no new findings beyond accepted list
+  mockBuildAdvisorBackstopLine.mockResolvedValue('Advisor: 0 new findings ✅')
 })
 
 // ── composeMorningDigest ──────────────────────────────────────────────────────
