@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import type { PnlResponse, MonthlyPnlRow } from '@/app/api/pnl/route'
 
@@ -190,6 +191,22 @@ export function LifePnlPage() {
           }}
         >
           Revenue (Amazon settlements) → COGS → Gross Profit → OpEx → Net Profit
+        </p>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            margin: '8px 0 0',
+          }}
+        >
+          Want to know where you sit right now? →{' '}
+          <Link
+            href="/net-worth"
+            style={{ color: 'var(--color-accent-gold)', textDecoration: 'underline' }}
+          >
+            Net Worth
+          </Link>
         </p>
       </div>
 
