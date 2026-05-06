@@ -176,11 +176,21 @@ This keeps §8.5 Accuracy Zone:
 
 ---
 
-## What Colin should review and answer
+## Decisions (delegated by Colin 2026-05-06)
 
-1. **Trust thresholds** — accept defaults, or adjust which numbers?
-2. **Sprint slot** — where does this live in §7.1 queue? (Sprint 11+? Interleaved with Sprint 6 Business Review Tier 2? Standalone "Sprint AI"?)
-3. **Cron schedule** — daily morning is the obvious answer for trading (pre-market) and sports (before games). Confirm 7am MT for both, or split?
-4. **Telegram bot routing** — picks go to which bot? Proposal: `loeppky_daily_bot` (matches "daily standup" semantics).
+Colin delegated all four open questions: _"just do what you think on all. once its in lepios i can see how everything works and change accordingly."_ Calls below.
 
-Once these four are answered, chunks A–D become independently buildable.
+1. **Trust thresholds** — **defaults stand** (5 metrics per domain as listed above). Stored in `trust_state` table per Chunk A; editable from settings UI per Chunk D. Adjust after first ~20 paper trades when real distribution is visible.
+
+2. **Sprint slot** — **standalone "Sprint AI Pick Engine"**, parallel-buildable with Sprint 6 BR Tier 2. Justification: independent file set, independent data model, no shared migrations. Two builder windows can work concurrently. ARCHITECTURE.md §7.1 queue is informally extended; formalize when chunks land.
+
+3. **Cron schedule** — split:
+   - **Trading picks scan:** 6:30am MT weekdays only (`30 12 * * 1-5` UTC). Pre-market window before US equities open at 7:30am MT. 1-hour cushion to review.
+   - **Sports picks scan:** 8:00am MT daily (`0 14 * * *` UTC). Earliest North-American sport games typically 11am+ MT, gives 3-hour review window.
+   - **Trading weights tune:** Sunday 9pm MT (`0 4 * * 1` UTC).
+   - **Sports weights tune:** Sunday 10pm MT (`0 5 * * 1` UTC).
+   - **Sports results fetch:** every hour via existing notifications-drain cron (avoids Vercel Hobby cron limit).
+
+4. **Telegram bot routing** — **`loeppky_daily_bot`**. Matches existing semantics ("daily queries, general alerts, personal OS status" per global CLAUDE.md). Format: one consolidated morning digest per domain (not per-pick spam). Critical-only individual alerts deferred until live mode.
+
+Once Chunk A schema lands, Chunks B and C become independently buildable; Chunk D follows after both have produced data.
