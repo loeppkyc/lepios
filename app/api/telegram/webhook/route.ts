@@ -5,6 +5,8 @@ import {
   parseCallbackData,
   parseGateCallbackData,
   parseImproveCallbackData,
+  parseApprovalCallbackData,
+  type ApprovalAction,
 } from '@/lib/harness/telegram-buttons'
 import {
   rollbackDeployment,
@@ -658,6 +660,200 @@ async function handleGateRollback(
   await editRollbackAck(chatId, messageId, originalText, result.ok, result.error).catch(() => {})
 }
 
+// ── Approval / grounding callback handler ────────────────────────────────────
+//
+// Handles ap: / re: / gp: / gpart: / gf: callbacks.
+// Performs a prefix-lookup against task_queue.id to resolve the full UUID,
+// then records the approval decision and acks the message.
+//
+// Collision guard: if >1 task matches the 8-char prefix, logs
+// callback_collision_detected and returns without acting.
+
+const APPROVAL_ACTION_LABELS: Record<ApprovalAction, string> = {
+  ap: 'approved',
+  re: 'rejected',
+  gp: 'grounding_pass',
+  gpart: 'grounding_partial',
+  gf: 'grounding_fail',
+}
+
+async function handleApprovalCallback(
+  action: ApprovalAction,
+  id8: string,
+  callbackReceivedAt: number,
+  chatId: number,
+  messageId: number,
+  originalText: string,
+  callbackQueryId: string
+): Promise<void> {
+  const db = createServiceClient()
+
+  // Prefix-lookup: first 8 hex chars of UUID (no dashes in id8)
+  // task_queue.id is a UUID like 40b1aa4b-c969-4d94-93f7-49ce29f3fc26
+  // The first segment of a UUID IS the first 8 hex chars, so we can match directly.
+  const { data: matches, error: lookupError } = await db
+    .from('task_queue')
+    .select('id, created_at')
+    .like('id', `${id8}%`)
+
+  if (lookupError) {
+    await logEvent({
+      task_type: 'approval_callback_lookup_error',
+      status: 'error',
+      output_summary: `approval prefix lookup failed: ${lookupError.message}`,
+      meta: { prefix: action, id8, error: lookupError.message },
+    })
+    return
+  }
+
+  const resolvedRows = (matches ?? []) as { id: string; created_at: string }[]
+  const deliveryLatencyMs =
+    resolvedRows.length === 1
+      ? callbackReceivedAt - new Date(resolvedRows[0].created_at).getTime()
+      : null
+
+  // Collision guard
+  if (resolvedRows.length > 1) {
+    try {
+      await db.from('agent_events').insert({
+        domain: 'telegram',
+        action: 'callback_collision_detected',
+        actor: 'callback-handler',
+        status: 'error',
+        task_type: 'callback_collision_detected',
+        output_summary: `callback_collision_detected: ${resolvedRows.length} tasks match prefix ${id8}`,
+        meta: {
+          prefix: action,
+          id8,
+          matched_ids: resolvedRows.map((r) => r.id),
+          match_count: resolvedRows.length,
+        },
+        tags: ['telegram', 'callback', 'collision'],
+      })
+    } catch {
+      // swallow
+    }
+
+    // F18 metric — collision status
+    try {
+      await db.from('agent_events').insert({
+        domain: 'telegram',
+        action: 'button_callback_received',
+        actor: 'callback-handler',
+        status: 'collision',
+        task_type: 'button_callback_received',
+        output_summary: `collision: ${resolvedRows.length} tasks match prefix ${id8}`,
+        meta: {
+          prefix: action,
+          id8,
+          resolved_task_id: null,
+          delivery_latency_ms: null,
+        },
+        tags: ['telegram', 'callback'],
+      })
+    } catch {
+      // swallow
+    }
+
+    await editTelegramMessage(
+      chatId,
+      messageId,
+      `${originalText}\nError: ambiguous prefix — ${resolvedRows.length} tasks match. Check agent_events for callback_collision_detected.`
+    ).catch(() => {})
+    return
+  }
+
+  // Not found
+  if (resolvedRows.length === 0) {
+    try {
+      await db.from('agent_events').insert({
+        domain: 'telegram',
+        action: 'button_callback_received',
+        actor: 'callback-handler',
+        status: 'not_found',
+        task_type: 'button_callback_received',
+        output_summary: `no task found for prefix ${id8}`,
+        meta: {
+          prefix: action,
+          id8,
+          resolved_task_id: null,
+          delivery_latency_ms: null,
+        },
+        tags: ['telegram', 'callback'],
+      })
+    } catch {
+      // swallow
+    }
+
+    await editTelegramMessage(
+      chatId,
+      messageId,
+      `${originalText}\nError: task not found for prefix ${id8}`
+    ).catch(() => {})
+    return
+  }
+
+  // Exactly one match — proceed
+  const fullTaskId = resolvedRows[0].id
+  const actionLabel = APPROVAL_ACTION_LABELS[action]
+
+  // F18 metric — success
+  try {
+    await db.from('agent_events').insert({
+      domain: 'telegram',
+      action: 'button_callback_received',
+      actor: 'callback-handler',
+      status: 'success',
+      task_type: 'button_callback_received',
+      output_summary: `${actionLabel} for task ${fullTaskId.slice(0, 8)}`,
+      meta: {
+        prefix: action,
+        id8,
+        resolved_task_id: fullTaskId,
+        delivery_latency_ms: deliveryLatencyMs,
+        callback_query_id: callbackQueryId,
+        chat_id: chatId,
+      },
+      tags: ['telegram', 'callback'],
+    })
+  } catch {
+    // swallow
+  }
+
+  // Record approval decision in task_queue where status transition is safe.
+  // ap → approved (valid enum value)
+  // re → queued  (reject: return to queue for coordinator to revise)
+  // gp / gpart / gf: grounding outcomes — log only, no automatic status change.
+  //   Coordinator reads the button_callback_received event and decides next step.
+  //   (grounding statuses require additional context: grounding_question constraint, etc.)
+  const statusMap: Partial<Record<ApprovalAction, string>> = {
+    ap: 'approved',
+    re: 'queued',
+  }
+  const newStatus = statusMap[action]
+
+  if (newStatus) {
+    try {
+      await db.from('task_queue').update({ status: newStatus }).eq('id', fullTaskId)
+    } catch {
+      // Non-fatal — the event was logged; status update is best-effort
+    }
+  }
+
+  const timestamp = new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Denver',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  await editTelegramMessage(
+    chatId,
+    messageId,
+    `${originalText}\n${actionLabel} at ${timestamp} MT`
+  ).catch(() => {})
+}
+
 // ── Improvement Engine handlers ───────────────────────────────────────────────
 
 /**
@@ -990,16 +1186,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true })
   }
 
+  const callbackReceivedAt = Date.now()
   const parsed = parseCallbackData(callbackQuery.data ?? '')
   const parsedGate = parseGateCallbackData(callbackQuery.data ?? '')
   const parsedImprove = parseImproveCallbackData(callbackQuery.data ?? '')
   const parsedPurposeReview = parsePurposeReviewCallback(callbackQuery.data ?? '')
+  const parsedApproval = parseApprovalCallbackData(callbackQuery.data ?? '')
 
   await logWebhookEvent(
     parsed?.agentEventId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate || parsedImprove || parsedPurposeReview ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove || parsedPurposeReview || parsedApproval
+      ? 'success'
+      : 'warning'
   )
 
   if (parsed) {
@@ -1105,6 +1305,16 @@ export async function POST(request: Request): Promise<NextResponse> {
         meta: { task_queue_id: parsedPurposeReview.taskQueueId, error: String(err) },
       })
     })
+  } else if (parsedApproval) {
+    await handleApprovalCallback(
+      parsedApproval.action,
+      parsedApproval.id8,
+      callbackReceivedAt,
+      callbackQuery.message.chat.id,
+      callbackQuery.message.message_id,
+      callbackQuery.message.text ?? '',
+      callbackQuery.id
+    )
   }
 
   return NextResponse.json({ ok: true })

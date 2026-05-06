@@ -4,6 +4,74 @@ export function buildCallbackData(action: 'up' | 'dn', agentEventId: string): st
   return `tf:${action}:${agentEventId}`
 }
 
+// ── Approval / grounding callback builders and parsers ────────────────────────
+//
+// Short format (all well under 64-byte Telegram limit):
+//   ap:{first_8_chars_of_task_id}   → Approve       (11 bytes)
+//   re:{first_8_chars_of_task_id}   → Reject/revise (11 bytes)
+//   gp:{first_8_chars_of_task_id}   → Grounding pass (11 bytes)
+//   gpart:{first_8_chars_of_task_id} → Grounding partial (14 bytes)
+//   gf:{first_8_chars_of_task_id}   → Grounding fail (11 bytes)
+//
+// The receiver does a prefix-lookup against task_queue.id to resolve
+// the full UUID. See webhook/route.ts handleApprovalCallback.
+
+export type ApprovalAction = 'ap' | 're' | 'gp' | 'gpart' | 'gf'
+
+export function buildApprovalCallbackData(action: ApprovalAction, taskId: string): string {
+  const id8 = taskId.replace(/-/g, '').slice(0, 8)
+  return `${action}:${id8}`
+}
+
+export function parseApprovalCallbackData(
+  data: string
+): { action: ApprovalAction; id8: string } | null {
+  const m = data.match(/^(ap|re|gp|gpart|gf):([0-9a-f]{8})$/)
+  if (!m) return null
+  return { action: m[1] as ApprovalAction, id8: m[2] }
+}
+
+/**
+ * Sends a Telegram message with Approve / Reject inline buttons using the
+ * short callback_data format. The taskId is the full UUID from task_queue.id.
+ * Falls back to plain postMessage when bot config is absent.
+ */
+export async function sendApprovalButtons(taskId: string, text: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+
+  if (!token || !chatId) {
+    return postMessage(text)
+  }
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'Approve',
+              callback_data: buildApprovalCallbackData('ap', taskId),
+            },
+            {
+              text: 'Reject',
+              callback_data: buildApprovalCallbackData('re', taskId),
+            },
+          ],
+        ],
+      },
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Telegram API error ${res.status}: ${body}`)
+  }
+}
+
 export function parseCallbackData(
   data: string
 ): { action: 'up' | 'dn'; agentEventId: string } | null {
