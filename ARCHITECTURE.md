@@ -49,8 +49,9 @@ LepiOS is a **situation room with a standing council of specialists** continuous
 
 **Life-domain agents (Money pillar, v1 priority):**
 
-- **Trading Agent** — decision support. Pre-market prep, setup summarization from sources Colin trusts, risk budget, P&L logging. **Does not generate trade signals for Colin to execute blindly.**
-- **Betting Agent** — decision support and honest logging. Bankroll rules, Kelly sizing math on Colin's picks (integrates existing Kelly Sizer component), tilt detection, ROI tracking. **Picks come from Colin.**
+- **Trading Agent** — generates AI-scored trade signals (5-factor scoring: trend / RSI / volume / momentum / level, with auto-tuning weights from past P&L), tracks predictions vs outcomes, gates paper→live based on a calibrated trust score. Colin reviews each signal; the system never executes a trade. See `docs/acceptance/ai-pick-engine-overview.md`.
+- **Betting Agent** — bankroll rules, Kelly sizing (integrates existing Kelly Sizer), tilt detection, ROI tracking, settlement bookkeeping.
+- **Sports Agent** — generates AI sports picks from live odds + Claude analysis, tracks calibration over time (rating-vs-actual, hit-rate by tier), gates paper→live based on trust score. Picks are AI-generated; Colin places the bet manually. See `docs/acceptance/ai-pick-engine-overview.md`.
 - **Amazon Agent** — web scouting for online arbitrage deals, monitoring High Demand tier 1 authors and Collectibles tiers, Telegram alerts when deals hit. Orchestrates the scan/list/ship workflow Colin already uses. **Hands-on sourcing through pallets stays Colin's.**
 - **Expenses Agent** — classifies business vs personal, Colin vs Megan; flags anomalies.
 
@@ -172,7 +173,8 @@ Multi-user HARD GATE from previous §7.3 still applies before any second user to
 ### 7.4 Shipped / deferred / dumped
 
 - **Shipped and holding:** Sprint 2 Betting tile (stays deployed at lepios-one.vercel.app, not active priority).
-- **Deferred to v3+:** Trading Journal, Life Compass, 3D Printer HQ.
+- **AI Pick Engine + Trust Gate (un-deferred 2026-05-06):** Trading signal generation and AI sports picks pulled forward from v3 into the active queue. Both run paper-mode by default; manual flip to live only after rolling calibration thresholds are met. Acceptance docs: `docs/acceptance/ai-pick-engine-*.md`.
+- **Deferred to v3+:** Life Compass, 3D Printer HQ.
 - **Dumped:** Dropbox Archiver (Streamlit-specific workflow, doesn't translate to web).
 - **Consolidated:** Arbitrage Scanner → Retail HQ; Retail Monitor → Retail HQ; Deal Tracker → Cashback HQ; Retirement Tracker → Lego Vault; Oura Health → Health; Coupon Lady → Grocery Tracker; Tax Return → Tax Centre.
 - **Confirmed dead in Streamlit (delete, don't port):** Book Scout, Scoutly, Expense Dashboard, Retail Scout, Product Intel, Shipments redirect. ~2,800 lines.
