@@ -52,7 +52,87 @@ function MonthRow({ row }: { row: MonthRollup }) {
   )
 }
 
-function SettlementDetail({ settlements }: { settlements: SettlementRow[] }) {
+function NotesCell({
+  settlementId,
+  initial,
+  onSave,
+}: {
+  settlementId: string
+  initial: string | null
+  onSave: (id: string, notes: string | null) => Promise<void>
+}) {
+  // NotesCell is keyed by settlementId in the parent table; when the year
+  // changes or the settlement set refreshes, this component remounts and
+  // `initial` picks up the new value — no sync effect needed.
+  const [draft, setDraft] = useState<string>(initial ?? '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function commit() {
+    const next = draft.trim()
+    const original = (initial ?? '').trim()
+    if (next === original) return
+    setSaving(true)
+    setErr(null)
+    try {
+      await onSave(settlementId, next.length === 0 ? null : next)
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'save failed')
+      setDraft(initial ?? '')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <input
+        type="text"
+        value={draft}
+        maxLength={500}
+        placeholder="—"
+        disabled={saving}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { void commit() }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur()
+          }
+          if (e.key === 'Escape') {
+            setDraft(initial ?? '');
+            (e.target as HTMLInputElement).blur()
+          }
+        }}
+        style={{
+          background: 'transparent',
+          border: '1px solid transparent',
+          borderRadius: 'var(--radius-sm)',
+          padding: '4px 6px',
+          fontFamily: 'var(--font-ui)',
+          fontSize: 'var(--text-small)',
+          color: 'var(--color-text-secondary)',
+          width: '100%',
+          minWidth: 160,
+          outline: 'none',
+          opacity: saving ? 0.5 : 1,
+        }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)' }}
+      />
+      {err && (
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.65rem', color: '#e5534b' }}>{err}</span>
+      )}
+    </div>
+  )
+}
+
+function SettlementDetail({
+  settlements,
+  onUpdateNotes,
+}: {
+  settlements: SettlementRow[]
+  onUpdateNotes: (id: string, notes: string | null) => Promise<void>
+}) {
   const [expanded, setExpanded] = useState(false)
   if (settlements.length === 0) return null
   return (
@@ -73,8 +153,8 @@ function SettlementDetail({ settlements }: { settlements: SettlementRow[] }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Period', 'Gross', 'Amazon Fees', 'Refunds', 'Reimb.', 'Net Payout', 'Status'].map((h, i) => (
-                  <th key={h} style={i === 0 ? s.thLeft : s.th}>{h}</th>
+                {['Period', 'Gross', 'Amazon Fees', 'Refunds', 'Reimb.', 'Net Payout', 'Status', 'Notes'].map((h, i) => (
+                  <th key={h} style={i === 0 ? s.thLeft : i === 7 ? { ...s.th, textAlign: 'left' as const } : s.th}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -91,6 +171,9 @@ function SettlementDetail({ settlements }: { settlements: SettlementRow[] }) {
                   <td style={{ ...s.td, fontWeight: 700, color: 'var(--color-pillar-health)' }}>{fmt(s2.netPayout)}</td>
                   <td style={{ ...s.td, color: s2.fundTransferStatus === 'SUCCESSFUL' ? 'var(--color-pillar-health)' : 'var(--color-accent-gold)', textAlign: 'left', fontFamily: 'var(--font-ui)', fontSize: 'var(--text-nano)' }}>
                     {s2.fundTransferStatus}
+                  </td>
+                  <td style={{ ...s.td, textAlign: 'left', padding: '4px 10px 4px 0' }}>
+                    <NotesCell settlementId={s2.id} initial={s2.notes} onSave={onUpdateNotes} />
                   </td>
                 </tr>
               ))}
@@ -109,6 +192,8 @@ export function PayoutsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing
+    // pattern; refactor to derived-loading state is out of scope for this gap-fill.
     setLoading(true)
     fetch(`/api/payouts?year=${year}`)
       .then(r => r.json())
@@ -121,6 +206,27 @@ export function PayoutsPage() {
   }, [year])
 
   const years = [CURRENT_YEAR, CURRENT_YEAR - 1]
+
+  async function handleUpdateNotes(id: string, notes: string | null) {
+    const res = await fetch(`/api/payouts/${encodeURIComponent(id)}/notes`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes }),
+    })
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    setData(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        settlements: prev.settlements.map(s2 =>
+          s2.id === id ? { ...s2, notes } : s2
+        ),
+      }
+    })
+  }
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
@@ -202,7 +308,7 @@ export function PayoutsPage() {
             </div>
           </div>
 
-          <SettlementDetail settlements={data.settlements} />
+          <SettlementDetail settlements={data.settlements} onUpdateNotes={handleUpdateNotes} />
         </>
       )}
 
