@@ -31,13 +31,33 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Multi-window development
 
-Multiple Claude Code sessions may run against this repo concurrently. To prevent windows from clobbering each other, every session must read [`.claude/CLAUDE.md`](.claude/CLAUDE.md) on startup and follow the coordination protocol it defines:
+Multiple Claude Code sessions may run against this repo concurrently. Every session reads [`.claude/CLAUDE.md`](.claude/CLAUDE.md) on startup and claims a scope; the pre-commit hook then enforces that scope on every commit.
 
-- **Scope contract** — each session sticks to the files in its assigned scope; out-of-scope edits go in [`notes/cross-window-suggestions.md`](notes/cross-window-suggestions.md) instead.
-- **Active-window registry** — sessions claim a branch by writing to `.claude/active-windows/<branch>.md` and delete the file on clean shutdown.
-- **Migration claims** — `.claude/migration-claims.json` is the single source of truth for the next free `supabase/migrations/<NNNN>_*.sql` slot. Reserve before creating; commit the claim alongside the migration.
+```bash
+# 1. See what's already claimed (and prune anything stale)
+node scripts/window-status.mjs --prune
+
+# 2. Claim a scope on the current branch (refuses if scope overlaps a live window)
+node scripts/window-start.mjs --scope "lib/auth/**" --scope "tests/auth/**"
+
+# 3. Work — commits outside the scope are rejected by the pre-commit hook
+
+# 4. On clean shutdown
+node scripts/window-end.mjs
+```
+
+**Enforced** (hooks abort the commit):
+
+- **Scope contract** — `.husky/pre-commit` runs `scripts/window-scope-check.mjs` against staged files. Out-of-scope files block the commit. Bypass once with `WINDOW_SCOPE_BYPASS=1 git commit ...`.
+- **Active claim required** — committing without first running `window-start.mjs` is blocked.
+- **Migration claims** — `.claude/migration-claims.json` is the next-free `supabase/migrations/<NNNN>_*.sql` slot. Pre-commit blocks unclaimed migration numbers.
 - **Shared seams** — edits to `package.json`, `middleware.ts`, `app/layout.tsx`, `tsconfig.json`, etc. require `[seam-approved]` in the commit message; enforced by `.husky/commit-msg`.
-- **Rebase discipline** — `.husky/pre-commit` aborts any commit when the branch is behind `origin/main`. `git pull --rebase` before committing; if you find yourself rebasing more than three times in a session, stop and tell the user the scope split isn't working.
+- **Rebase discipline** — `.husky/pre-commit` aborts any commit when the branch is behind `origin/main`.
+
+**Convention** (relies on Claude reading the protocol doc):
+
+- Out-of-scope ideas go in [`notes/cross-window-suggestions.md`](notes/cross-window-suggestions.md) instead of being acted on.
+- 3-strike loop guard: if a session rebases/conflict-resolves more than three times, stop and tell the user the scope split isn't working.
 
 ## Deploy on Vercel
 

@@ -4,6 +4,9 @@
 webhook.json
 .claude/settings.local.json
 
+# multi-window protocol — claim files are session-local coordination state
+.claude/active-windows/*.json
+
 # scratch / temp files
 .emb_q*.txt
 .smoke_embeddings.json
