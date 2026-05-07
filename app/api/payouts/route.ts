@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logEvent } from '@/lib/knowledge/client'
+import { computePace, type PaceResult } from '@/lib/payouts/benchmark'
 
 export const revalidate = 0
 
@@ -40,6 +42,8 @@ export interface PayoutsResponse {
     netPayout: number
     settlementCount: number
   }
+  /** F18 benchmark + pace — see lib/payouts/benchmark.ts */
+  benchmark: PaceResult
 }
 
 const MONTH_LABELS = [
@@ -142,5 +146,36 @@ export async function GET(request: Request) {
     settlementCount: settlements.length,
   }
 
-  return NextResponse.json({ year, settlements, monthlyRollups, ytd } satisfies PayoutsResponse)
+  // F18 benchmark — YTD net payout vs. linearly-prorated annual target.
+  const benchmark = computePace(ytd.netPayout, year)
+
+  // F18 capture — every fetch is logged with pace status, so a query against
+  // agent_events answers "is the payouts view trending behind/ahead?"
+  // without needing a separate metrics table.
+  void logEvent('payouts', 'payouts.viewed', {
+    actor: user.id,
+    status:
+      benchmark.status === 'behind'
+        ? 'warning'
+        : benchmark.status === 'ahead'
+          ? 'success'
+          : 'success',
+    meta: {
+      year,
+      settlement_count: settlements.length,
+      ytd_net_cad: ytd.netPayout,
+      monthly_target_cad: benchmark.monthlyTargetCad,
+      expected_ytd_cad: benchmark.expectedYtdCad,
+      ytd_pace_pct: benchmark.ytdPacePct,
+      pace_status: benchmark.status,
+    },
+  })
+
+  return NextResponse.json({
+    year,
+    settlements,
+    monthlyRollups,
+    ytd,
+    benchmark,
+  } satisfies PayoutsResponse)
 }
