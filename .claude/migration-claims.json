@@ -95,7 +95,13 @@
       "filename": "0158_biomarkers.sql",
       "claimed_at": "2026-05-07",
       "note": "Diet module v1 — biomarkers table with DB-trigger-derived status (low/normal/high) from value vs ref range. Applied to prod via MCP."
+    },
+    "0159": {
+      "branch": "feat/resource-budget-tracker",
+      "filename": "0159_harness_resource_budgets.sql",
+      "claimed_at": "2026-05-07",
+      "note": "P5-4 — central resource budget registry. Companion to scripts/check-budgets.mjs (pre-commit). Seeds vercel.crons (max 18), package.deps_total (max 300), vercel.env_vars (max 100, externally-synced placeholder)."
     }
   },
-  "next_available": 159
+  "next_available": 160
 }

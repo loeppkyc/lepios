@@ -42,6 +42,14 @@ node scripts/check-vercel-cron-count.mjs
 # Bypass: F18_CHECK_BYPASS=1 git commit ...
 node scripts/check-f18-compliance.mjs
 
+# ─── Resource budget gate ─────────────────────────────────────────────────
+# Generalizes the cron-count guard to a registry of file-resident budgets:
+# vercel.crons (≤18), package.deps_total (≤300). Externally-synced budgets
+# (Vercel env vars, RLS policies) live in the harness_resource_budgets DB
+# table and are reconciled by a future sync job. See docs/resource-budgets.md.
+# Bypass: BUDGETS_CHECK_BYPASS=1 git commit ...
+node scripts/check-budgets.mjs
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
