@@ -1,5 +1,9 @@
+// F18: bench=BENCHMARK_30D_REVENUE_CAD (lib/amazon/benchmark.ts); surface=AmazonPaceBadge widget at top of AmazonReportsPage
+// Capture: agent_events 'amazon.viewed' on every page render — see this file's logEvent call.
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { logEvent } from '@/lib/knowledge/client'
+import { computeAmazonPace } from '@/lib/amazon/benchmark'
 import type { OrdersRow } from '@/lib/amazon/orders-sync'
 import type { SettlementRow } from '@/lib/amazon/reports'
 import {
@@ -9,6 +13,7 @@ import {
   aggregateForStatusBreakdown,
 } from '@/lib/amazon/reports'
 import { AmazonKpiRow } from './_components/AmazonKpiRow'
+import { AmazonPaceBadge } from './_components/AmazonPaceBadge'
 import { AmazonDailyChart } from './_components/AmazonDailyChart'
 import { AmazonTopSellersTable } from './_components/AmazonTopSellersTable'
 import { AmazonSettlementsPanel } from './_components/AmazonSettlementsPanel'
@@ -98,6 +103,28 @@ export default async function AmazonReportsPage() {
   const topSellers = aggregateForTopSellers(orders, now)
   const statusBreakdown = aggregateForStatusBreakdown(orders, now)
 
+  // F18 benchmark — last-30d gross revenue vs. target pace.
+  const benchmark = computeAmazonPace(kpiData.grossRevenue)
+
+  // F18 capture — every page render is logged with pace status, so a query
+  // against agent_events answers "is the amazon view trending behind/ahead?"
+  // without needing a separate metrics table.
+  void logEvent('amazon', 'amazon.viewed', {
+    actor: user.id,
+    status: benchmark.status === 'behind' ? 'warning' : 'success',
+    meta: {
+      total_orders_30d: kpiData.totalOrders,
+      gross_revenue_30d_cad: kpiData.grossRevenue,
+      units_shipped_30d: kpiData.unitsShipped,
+      target_30d_cad: benchmark.targetCad,
+      expected_30d_cad: benchmark.expectedCad,
+      pace_pct: benchmark.pacePct,
+      pace_status: benchmark.status,
+      orders_error: ordersError ?? null,
+      settlements_error: settlementsError ?? null,
+    },
+  })
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-base)', padding: '24px' }}>
       {/* Cockpit top rail */}
@@ -143,6 +170,9 @@ export default async function AmazonReportsPage() {
           <ErrorCard message={`Settlements: ${settlementsError}`} />
         </div>
       )}
+
+      {/* F18 surfacing — last-30d revenue-vs-target pace indicator */}
+      <AmazonPaceBadge benchmark={benchmark} revenue30d={kpiData.grossRevenue} />
 
       {/* KPI row */}
       <AmazonKpiRow data={kpiData} />
