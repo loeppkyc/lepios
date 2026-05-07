@@ -124,7 +124,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Life',
     items: [
       { label: 'Health', href: null },
-      { label: 'Oura Health', href: null },
+      { label: 'Oura Health', href: '/oura' },
       { label: 'Life Compass', href: null },
       { label: 'Calendar', href: null },
       { label: 'Goals & Habits', href: null },
