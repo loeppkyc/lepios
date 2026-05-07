@@ -35,6 +35,13 @@ node scripts/window-scope-check.mjs
 # Bypass: VERCEL_CRON_CHECK_BYPASS=1 git commit ...
 node scripts/check-vercel-cron-count.mjs
 
+# ─── F18 compliance gate ──────────────────────────────────────────────────
+# Blocks new app/(cockpit)/<X>/page.tsx modules without metrics capture +
+# a `// F18: <bench>; <surface>` marker comment. See docs/f18-compliance.md
+# for the audit + retrofit roadmap.
+# Bypass: F18_CHECK_BYPASS=1 git commit ...
+node scripts/check-f18-compliance.mjs
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
