@@ -29,7 +29,43 @@
       "filename": "0142_ai_pick_engine_schema.sql",
       "claimed_at": "2026-05-07",
       "note": "AI Pick Engine Chunk A — predictions, trades, trust_state, prediction_weights tables + mode column on bets. See docs/acceptance/ai-pick-engine-chunk-a-schema.md. Note: originally claimed 0141 but lost the race to PR #109 — bumped after rebase, no schema impact (different tables)."
+    },
+    "0148": {
+      "branch": "feat/health-port",
+      "filename": "0148_vitals.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — vitals table (BP/weight/temp/HR/glucose/O2). Originally claimed 0142 but PR #110 took the slot during rebase; renumbered. Applied to prod via Supabase MCP under original name 0142_vitals — DB tracks by version stamp not filename."
+    },
+    "0149": {
+      "branch": "feat/health-port",
+      "filename": "0149_symptoms.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — symptoms table. Active = resolved_on IS NULL. Renumbered from 0143. Applied to prod via MCP."
+    },
+    "0150": {
+      "branch": "feat/health-port",
+      "filename": "0150_medications.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — medications table. Active boolean + start_date/end_date. Renumbered from 0144. Applied to prod via MCP."
+    },
+    "0151": {
+      "branch": "feat/health-port",
+      "filename": "0151_doctor_visits.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — doctor_visits table. Diagnosis/outcome/follow-up tracking. Renumbered from 0145. Applied to prod via MCP."
+    },
+    "0152": {
+      "branch": "feat/health-port",
+      "filename": "0152_workouts.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — workouts table. muscle_groups TEXT[]; supercompensation gauge math deferred to v1.1. Renumbered from 0146. Applied to prod via MCP."
+    },
+    "0153": {
+      "branch": "feat/health-port",
+      "filename": "0153_cycle_entries.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Health module v1 — cycle_entries table for Megan's endo monitoring. Multi-select pain_locations TEXT[]. Renumbered from 0147. Applied to prod via MCP."
     }
   },
-  "next_available": 143
+  "next_available": 154
 }
