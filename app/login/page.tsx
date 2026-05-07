@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -25,7 +25,7 @@ function passwordComplaint(pw: string): string | null {
   return null
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteParam = searchParams.get('invite') ?? ''
@@ -463,5 +463,16 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+// Next.js 15 requires useSearchParams() callers to be wrapped in <Suspense>.
+// LoginPageContent calls useSearchParams() to read invite/error params; this
+// wrapper provides the Suspense boundary so the page builds.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   )
 }
