@@ -21,9 +21,14 @@ if (process.env.WINDOW_SCOPE_BYPASS === '1') {
   process.exit(0)
 }
 
+// Always prune first — every commit is a chance to clean up dead-window claims
+// regardless of staged-file shape. P5-3: closes the orphan-claim gap where
+// empty/merge commits or self-claim-only commits skipped pruning.
+pruneStaleClaims()
+
 const staged = stagedFiles()
 if (staged.length === 0) {
-  // Empty/merge commits — nothing to check.
+  // Empty/merge commits — nothing to scope-check.
   process.exit(0)
 }
 
@@ -34,9 +39,6 @@ const allSelfClaim = staged.every((f) => SELF_CLAIM_PATTERN.test(f))
 if (allSelfClaim) {
   process.exit(0)
 }
-
-// Opportunistic stale-prune so old machines don't accumulate dead claims.
-pruneStaleClaims()
 
 const branch = currentBranch()
 const claim = loadClaimForBranch(branch)
