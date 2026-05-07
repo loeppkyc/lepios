@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+vi.mock('@/lib/auth/require-user', () => ({
+  requireUser: vi.fn(async () => ({
+    ok: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+    supabase: {},
+  })),
+}))
+
 // ── Mock SP-API client ────────────────────────────────────────────────────────
 
 const { mockSpApiConfigured, mockFetchOrders, mockFetchOrderItems } = vi.hoisted(() => ({

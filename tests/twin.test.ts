@@ -8,6 +8,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { isUncertain } from '@/lib/twin/uncertainty'
 
+vi.mock('@/lib/auth/require-user', () => ({
+  requireUser: vi.fn(async () => ({
+    ok: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    profile: { user_id: 'test-user', email: 'test@example.com', role: 'admin' },
+    supabase: {},
+  })),
+}))
+
 // ── Hoisted mock handles ──────────────────────────────────────────────────────
 
 const {

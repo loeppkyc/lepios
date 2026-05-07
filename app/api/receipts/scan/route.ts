@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { CATEGORIES } from '@/lib/types/expenses'
 import type { OcrResult } from '@/lib/types/receipts'
+import { requireUser } from '@/lib/auth/require-user'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 type AllowedType = (typeof ALLOWED_TYPES)[number]
@@ -30,6 +31,9 @@ Rules:
 - suggested_category: pick the single best match based on vendor and items purchased`
 
 export async function POST(request: Request) {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   let formData: FormData
   try {
     formData = await request.formData()
@@ -59,8 +63,11 @@ export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY not configured — receipt OCR requires Claude Vision. Set the env var or enter receipt manually.' },
-      { status: 503 },
+      {
+        error:
+          'ANTHROPIC_API_KEY not configured — receipt OCR requires Claude Vision. Set the env var or enter receipt manually.',
+      },
+      { status: 503 }
     )
   }
   const client = new Anthropic({ apiKey })

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 import type { BusinessExpense } from '@/lib/types/expenses'
 
 export const revalidate = 0
 
 export async function GET(request: Request) {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   const { searchParams } = new URL(request.url)
   const yearParam = searchParams.get('year')
   const year = yearParam ? parseInt(yearParam) : new Date().getFullYear()
@@ -13,8 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'year param required (YYYY)' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await gate.supabase
     .from('business_expenses')
     .select('*')
     .gte('date', `${year}-01-01`)

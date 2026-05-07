@@ -13,6 +13,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('@/lib/auth/require-user', () => ({
+  requireUser: vi.fn(async () => ({
+    ok: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+    supabase: {},
+  })),
+}))
+
 const { mockReadOsSheet } = vi.hoisted(() => ({
   mockReadOsSheet: vi.fn(),
 }))

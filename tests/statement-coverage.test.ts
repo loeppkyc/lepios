@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+
+vi.mock('@/lib/auth/require-user', () => ({
+  requireUser: vi.fn(async () => ({
+    ok: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+    supabase: {},
+  })),
+}))
+
 import {
   utcToEdmontonYearMonth,
   getCurrentYearMonths,
@@ -84,8 +94,9 @@ describe('getCurrentYearMonths', () => {
   it('months are zero-padded and sequential', () => {
     const months = getCurrentYearMonths()
     const year = new Date().getFullYear()
-    const expected = Array.from({ length: 12 }, (_, i) =>
-      `${year}-${String(i + 1).padStart(2, '0')}`
+    const expected = Array.from(
+      { length: 12 },
+      (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`
     )
     expect(months).toEqual(expected)
   })
@@ -183,7 +194,11 @@ describe('filename parsers', () => {
 
   it('CIBC dated: issue date, M-1 applies (onlineStatement_2026-01-14.pdf → covered Dec 2025)', () => {
     const parser = ACCOUNTS.find((a) => a.key === 'cibc')!.filenameParser
-    expect(parser('onlineStatement_2026-01-14.pdf')).toEqual({ year: 2026, month: 1, applyMinus1: true })
+    expect(parser('onlineStatement_2026-01-14.pdf')).toEqual({
+      year: 2026,
+      month: 1,
+      applyMinus1: true,
+    })
   })
 
   it('CIBC undated: returns null → server_modified fallback', () => {
@@ -200,7 +215,11 @@ describe('filename parsers', () => {
 
   it('TD Visa: month abbreviation parsed (TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf → covered Jan 2026)', () => {
     const parser = ACCOUNTS.find((a) => a.key === 'td_visa')!.filenameParser
-    expect(parser('TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf')).toEqual({ year: 2026, month: 2, applyMinus1: true })
+    expect(parser('TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf')).toEqual({
+      year: 2026,
+      month: 2,
+      applyMinus1: true,
+    })
   })
 
   it('Canadian Tire: date prefix parsed (2026-02-13-TriangleMC.pdf → covered Jan 2026)', () => {
@@ -210,7 +229,11 @@ describe('filename parsers', () => {
 
   it('TD USD: date parsed (View PDF Statement_2025-12-01.pdf → covered Nov 2025)', () => {
     const parser = ACCOUNTS.find((a) => a.key === 'td_usd')!.filenameParser
-    expect(parser('View PDF Statement_2025-12-01.pdf')).toEqual({ year: 2025, month: 12, applyMinus1: true })
+    expect(parser('View PDF Statement_2025-12-01.pdf')).toEqual({
+      year: 2025,
+      month: 12,
+      applyMinus1: true,
+    })
   })
 })
 
@@ -231,12 +254,11 @@ describe('NO_ACTIVITY overrides (GET-level)', () => {
         return new Response(JSON.stringify({ access_token: 'test-token' }), { status: 200 })
       }
       // Route list_folder calls by path
-      const body = JSON.parse((init as RequestInit)?.body as string ?? '{}') as { path?: string }
+      const body = JSON.parse(((init as RequestInit)?.body as string) ?? '{}') as { path?: string }
       if (typeof body.path === 'string' && body.path.includes('Costco')) {
-        return new Response(
-          JSON.stringify({ entries: cibcEntries, has_more: false }),
-          { status: 200 },
-        )
+        return new Response(JSON.stringify({ entries: cibcEntries, has_more: false }), {
+          status: 200,
+        })
       }
       return new Response(JSON.stringify({ entries: [], has_more: false }), { status: 200 })
     })
@@ -260,7 +282,11 @@ describe('NO_ACTIVITY overrides (GET-level)', () => {
     vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
     // onlineStatement_2026-04-15.pdf → parser → year=2026, month=4, applyMinus1=true → covered 2026-03
     mockDropbox([
-      { '.tag': 'file', name: 'onlineStatement_2026-04-15.pdf', server_modified: '2026-04-15T12:00:00Z' },
+      {
+        '.tag': 'file',
+        name: 'onlineStatement_2026-04-15.pdf',
+        server_modified: '2026-04-15T12:00:00Z',
+      },
     ])
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
     const res = await GET()
@@ -295,9 +321,11 @@ describe('env var trimming (F15 — Vercel CLI Windows CRLF)', () => {
     vi.stubEnv('DROPBOX_APP_KEY', 'validkey\r\n')
     vi.stubEnv('DROPBOX_APP_SECRET', 'validsecret\r\n')
     vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'validtoken\r\n')
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })
+      )
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
     await GET()
     // fetch was called (credentials were not empty after trim → auth attempted)

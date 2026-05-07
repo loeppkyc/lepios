@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { readOsSheet, parseDollar } from '@/lib/sheets/client'
+import { requireUser } from '@/lib/auth/require-user'
 
 export const revalidate = 3600
 
@@ -51,6 +52,9 @@ export interface MonthlyPnlResponse {
 }
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   let pnlRaw: string[][]
   let goalsRaw: string[][]
 

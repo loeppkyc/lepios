@@ -3,6 +3,7 @@ import pLimit from 'p-limit'
 import { spApiConfigured } from '@/lib/amazon/client'
 import { fetchOrders, fetchOrderItems, type SpOrder, type SpOrderItem } from '@/lib/amazon/orders'
 import { getOrderItemsBatch, upsertOrderItems } from '@/lib/amazon/order-items-cache'
+import { requireUser } from '@/lib/auth/require-user'
 
 // 15-minute server-side cache. Historical days are finalized — data does not change.
 // Do NOT use force-dynamic; that would make 10 × N orderItems calls on every page load.
@@ -226,6 +227,9 @@ function aggregateDay(
 }
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   if (!spApiConfigured()) {
     return NextResponse.json({ error: 'SP-API credentials not configured' }, { status: 503 })
   }
