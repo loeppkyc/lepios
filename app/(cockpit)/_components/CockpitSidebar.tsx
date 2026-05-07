@@ -25,6 +25,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Business Review', href: '/business-review' },
       { label: 'Life P&L', href: '/life-pnl' },
       { label: 'Net Worth', href: '/net-worth' },
+      { label: 'Accounts', href: '/accounts' },
       { label: 'Annual Review', href: '/annual-review' },
       { label: 'Trading Journal', href: null },
       { label: 'Sports Betting', href: null },
