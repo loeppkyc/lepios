@@ -5,7 +5,7 @@ set -e
 # Pre-commit can't read the commit message (it runs before the msg file exists),
 # so seam-approval lives here in commit-msg. The other half — rebase + migration
 # claim — runs in .husky/pre-commit.
-SEAM='package.json|package-lock.json|app/layout.tsx|middleware.ts|next.config|tailwind.config|tsconfig.json|^\.env\.example$|supabase/seed.sql'
+SEAM='package.json|package-lock.json|app/layout.tsx|middleware.ts|next.config|tailwind.config|tsconfig.json|^\.env\.example$|supabase/seed.sql|^\.gitignore$|^eslint\.config\.|^\.husky/(pre-commit|commit-msg|prepare-commit-msg|post-merge)$|^\.claude/CLAUDE\.md$|^scripts/window-(start|end|status|scope-check)\.mjs$|^scripts/lib/window-claim\.mjs$'
 TOUCHED=$(git diff --cached --name-only)
 if echo "$TOUCHED" | grep -E "$SEAM" >/dev/null; then
   if ! grep -q '\[seam-approved\]' "$1" 2>/dev/null; then

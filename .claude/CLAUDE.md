@@ -32,7 +32,11 @@ Hard rules (most are now enforced by `.husky/pre-commit` and `.husky/commit-msg`
 
 - **Scope contract — enforced.** Every commit is checked against the active claim's scope globs. Out-of-scope files block the commit. Bypass once with `WINDOW_SCOPE_BYPASS=1 git commit ...` only if the user has explicitly approved.
 - **No active claim — enforced.** A commit on a branch without an `active-windows` claim is blocked. Run `window-start.mjs` first.
-- **Shared seams — enforced.** Edits to `package.json`, `package-lock.json`, `app/layout.tsx`, `middleware.ts`, `next.config.*`, `tailwind.config.*`, `tsconfig.json`, `.env.example`, `supabase/seed.sql`, or any RLS policy on existing tables require `[seam-approved]` in the commit message. Per-edit user approval, every time.
+- **Shared seams — enforced.** Edits require `[seam-approved]` in the commit message — per-edit user approval, every time. Current seam set:
+  - **App boundaries:** `package.json`, `package-lock.json`, `app/layout.tsx`, `middleware.ts`, `next.config.*`, `tailwind.config.*`, `tsconfig.json`, `.env.example`, `eslint.config.*`, `.gitignore`
+  - **Schema:** `supabase/seed.sql`, any RLS policy on existing tables
+  - **Multi-window protocol files:** `.claude/CLAUDE.md`, `scripts/window-{start,end,status,scope-check}.mjs`, `scripts/lib/window-claim.mjs`, `.husky/{pre-commit,commit-msg,prepare-commit-msg,post-merge}`
+  - The protocol files are seamed because a silent edit from one window breaks every other window's enforcement layer — the very class of bug PR #118 (worktree enforcement) closed.
 - **Migration numbering — enforced.** Before creating a migration, check `.claude/migration-claims.json`, reserve the next integer in the same commit as the migration. Pre-commit hook blocks unclaimed migration numbers.
 - **Rebase before commit — enforced.** Pre-commit hook aborts if branch is behind `origin/main`. Run `git pull --rebase origin main` and retry.
 - **Before push:** refetch, rebase, re-run tests against rebased state.
