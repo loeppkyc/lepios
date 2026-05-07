@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import pLimit from 'p-limit'
 import { spApiConfigured } from '@/lib/amazon/client'
 import {
   fetchOrders,
@@ -11,8 +12,16 @@ import {
   type SpOrderItem,
   type DayPanelData,
 } from '@/lib/amazon/orders'
+import { getOrderItemsBatch, upsertOrderItems } from '@/lib/amazon/order-items-cache'
 
-export const revalidate = 60
+// Always serve fresh — `revalidate = 60` produced stale-while-revalidate
+// behavior: first hit after an overnight gap returned the previous day's
+// snapshot. Cache hits on amazon_order_items (DB) keep SP-API load low.
+export const dynamic = 'force-dynamic'
+
+// Cap concurrent SP-API /orderItems calls. Confirmed orders typically <20
+// per panel; misses are rare after the first cache fill.
+const ORDERITEMS_CONCURRENCY = 2
 
 export interface DebugOrder {
   id: string
@@ -35,26 +44,61 @@ export interface TodayYesterdayResponse {
   }
 }
 
-/** Build orderId → { revenue, tax } map from fetched order items. */
+function itemsToFinance(items: SpOrderItem[]): { revenue: number; tax: number } {
+  let revenue = 0
+  let tax = 0
+  for (const item of items) {
+    revenue += Number(item.ItemPrice?.Amount ?? 0)
+    tax += Number(item.ItemTax?.Amount ?? 0) + Number(item.ShippingTax?.Amount ?? 0)
+  }
+  return { revenue, tax }
+}
+
+/**
+ * Build orderId → { revenue, tax } map for confirmed orders.
+ *
+ * Cache-first (mirrors recent-days route):
+ *   1. Batch SELECT cached items for all confirmed orders in one query.
+ *   2. Fetch only cache misses, throttled at ORDERITEMS_CONCURRENCY.
+ *   3. Upsert misses (non-blocking — cache write failure never breaks the response).
+ *
+ * Pending orders are skipped — SP-API returns empty items for them and
+ * aggregateOrders excludes them from revenue/tax anyway.
+ */
 async function buildFinanceMap(
   orders: SpOrder[]
 ): Promise<Map<string, { revenue: number; tax: number }>> {
-  const confirmedIds = orders.filter((o) => o.OrderStatus !== 'Pending').map((o) => o.AmazonOrderId)
-
-  const allItems = await Promise.all(
-    confirmedIds.map((id) => fetchOrderItems(id).then((items) => ({ id, items })))
-  )
-
   const map = new Map<string, { revenue: number; tax: number }>()
-  for (const { id, items } of allItems) {
-    let revenue = 0
-    let tax = 0
-    for (const item of items as SpOrderItem[]) {
-      revenue += Number(item.ItemPrice?.Amount ?? 0)
-      tax += Number(item.ItemTax?.Amount ?? 0) + Number(item.ShippingTax?.Amount ?? 0)
-    }
-    map.set(id, { revenue, tax })
+
+  const confirmedOrders = orders.filter((o) => o.OrderStatus !== 'Pending')
+  if (confirmedOrders.length === 0) return map
+
+  const orderIds = confirmedOrders.map((o) => o.AmazonOrderId)
+
+  const cached = await getOrderItemsBatch(orderIds)
+  for (const [orderId, items] of cached) {
+    map.set(orderId, itemsToFinance(items))
   }
+
+  const misses = confirmedOrders.filter((o) => !cached.has(o.AmazonOrderId))
+  if (misses.length > 0) {
+    const limit = pLimit(ORDERITEMS_CONCURRENCY)
+    await Promise.all(
+      misses.map((order) =>
+        limit(async () => {
+          try {
+            const items = await fetchOrderItems(order.AmazonOrderId)
+            void upsertOrderItems(order.AmazonOrderId, items)
+            map.set(order.AmazonOrderId, itemsToFinance(items))
+          } catch {
+            // SP-API failure (429, network) — leave order absent; aggregateOrders
+            // falls back to $0 revenue. Better than failing the whole panel.
+          }
+        })
+      )
+    )
+  }
+
   return map
 }
 

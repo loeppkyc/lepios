@@ -111,6 +111,11 @@ function minutesAgo(isoTimestamp: string): string {
 
 // ── Main exported component ───────────────────────────────────────────────────
 
+// Auto-refresh interval — settlement reflects same-day withdrawals as soon as
+// SP-API publishes them. FBA inventory route is server-cached for 30 min;
+// polling at 15 min cadence is harmless (cache hit until ttl expires).
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000
+
 export function WhatYouOwePanel() {
   const [settlement, setSettlement] = useState<SettlementResponse | null>(null)
   const [settlementError, setSettlementError] = useState<string | null>(null)
@@ -125,41 +130,69 @@ export function WhatYouOwePanel() {
   // Fetch both routes independently — Constraint B-9: settlement renders immediately
   // without waiting for the 30-min-cached FBA route
   useEffect(() => {
-    fetch('/api/business-review/settlement')
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(body.error ?? `HTTP ${res.status}`)
-        }
-        return res.json() as Promise<SettlementResponse>
-      })
-      .then((payload) => {
-        setSettlement(payload)
-        setSettlementLoading(false)
-      })
-      .catch((err: unknown) => {
-        setSettlementError(err instanceof Error ? err.message : String(err))
-        setSettlementLoading(false)
-      })
+    let cancelled = false
+
+    const load = () => {
+      fetch('/api/business-review/settlement', { cache: 'no-store' })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string }
+            throw new Error(body.error ?? `HTTP ${res.status}`)
+          }
+          return res.json() as Promise<SettlementResponse>
+        })
+        .then((payload) => {
+          if (cancelled) return
+          setSettlement(payload)
+          setSettlementError(null)
+          setSettlementLoading(false)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setSettlementError(err instanceof Error ? err.message : String(err))
+          setSettlementLoading(false)
+        })
+    }
+
+    load()
+    const interval = setInterval(load, REFRESH_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   useEffect(() => {
-    fetch('/api/business-review/fba-inventory')
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(body.error ?? `HTTP ${res.status}`)
-        }
-        return res.json() as Promise<FbaInventoryResponse>
-      })
-      .then((payload) => {
-        setFbaInventory(payload)
-        setFbaLoading(false)
-      })
-      .catch((err: unknown) => {
-        setFbaError(err instanceof Error ? err.message : String(err))
-        setFbaLoading(false)
-      })
+    let cancelled = false
+
+    const load = () => {
+      fetch('/api/business-review/fba-inventory', { cache: 'no-store' })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string }
+            throw new Error(body.error ?? `HTTP ${res.status}`)
+          }
+          return res.json() as Promise<FbaInventoryResponse>
+        })
+        .then((payload) => {
+          if (cancelled) return
+          setFbaInventory(payload)
+          setFbaError(null)
+          setFbaLoading(false)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setFbaError(err instanceof Error ? err.message : String(err))
+          setFbaLoading(false)
+        })
+    }
+
+    load()
+    const interval = setInterval(load, REFRESH_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   if (settlementLoading && fbaLoading) {
