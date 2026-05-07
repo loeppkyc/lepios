@@ -19,60 +19,62 @@ If a module has zero of (1), (2), or (3), it cannot satisfy the ARCHITECTURE.md 
 
 ## Headline numbers
 
-- **38 cockpit modules** under `app/(cockpit)/` (live in production).
-- **3 modules with capture** (amazon, betting, bookkeeping) — log to `agent_events`. None have benchmarks or surfacing.
-- **2 modules with capture + DB-resident metrics** (oura, health) — `oura_daily` table, no benchmark, no surfacing.
-- **0 modules fully compliant** — no module currently has all three (capture + benchmark + surfacing).
-- **F18 compliance rate: 0%** by strict definition; **13% (5/38)** if you count any single dimension.
+> Last revised 2026-05-07 EOD after the second Tier-1 retrofit (amazon).
 
-This is the largest systemic technical debt in the project.
+- **38 cockpit modules** under `app/(cockpit)/` (live in production).
+- **2 modules fully compliant** — payouts (PR #127) and amazon (this PR). Pattern: capture via `agent_events` on read + `BENCHMARK_*` constant + PaceBadge widget.
+- **3 modules with capture only** (betting, bookkeeping, oura) — log to `agent_events` or DB but no benchmark or surfacing.
+- **1 module with partial capture + surfacing** (health) — harness consumes oura_daily indirectly.
+- **F18 compliance rate: 5%** by strict definition (2/38); **16% (6/38)** if you count any single dimension.
+
+Still the largest systemic technical debt in the project, but a reproducible retrofit pattern is now shipped twice — Tier 1 remaining: bookkeeping, business-review, net-worth.
 
 ## Per-module compliance table
 
 Status legend: ✅ shipped · ⚠️ partial · ❌ missing
 
-| Module                | Capture | Benchmark | Surfacing | Notes                                                                                    |
-| --------------------- | ------- | --------- | --------- | ---------------------------------------------------------------------------------------- |
-| **accounts**          | ❌      | ❌        | ❌        | Bank/CC/loan dashboard. Drives net-worth — high-leverage to instrument.                  |
-| **amazon**            | ⚠️      | ❌        | ❌        | `agent_events` writes from SP-API sync. No benchmark vs. Streamlit Q1 baseline.          |
-| **amazon-sales**      | ❌      | ❌        | ❌        | Sales charts. Should bench against Streamlit `26_Sales_Charts`.                          |
-| **annual-review**     | ❌      | ❌        | ❌        | Year-over-year wealth + milestones. Bench: prior-year delta.                             |
-| **balance-sheet**     | ❌      | ❌        | ❌        | Static view. Lower priority but trivial to surface.                                      |
-| **bank-register**     | ❌      | ❌        | ❌        | Reconciliation surface. Drives bookkeeping accuracy.                                     |
-| **betting**           | ⚠️      | ❌        | ❌        | Kelly Sizer. Shipped Sprint 2; agent_events on bet log. No surfacing.                    |
-| **bookkeeping**       | ⚠️      | ❌        | ❌        | agent_events on classify/reconcile. Bench: hours/month vs. Streamlit.                    |
-| **bookkeeping-hub**   | ❌      | ❌        | ❌        | Top-level hub view. Composite of sub-tiles.                                              |
-| **business-review**   | ❌      | ❌        | ❌        | Business metrics dashboard. Most-viewed daily — surfacing is the win.                    |
-| **cash-forecast**     | ❌      | ❌        | ❌        | 30-day forecast. Bench: actual vs. forecast variance.                                    |
-| **chat**              | ❌      | ❌        | ❌        | Twin chat. Bench: response success rate, escalation %.                                   |
-| **cogs**              | ❌      | ❌        | ❌        | COGS calculator. Bench: vs. Streamlit historical.                                        |
-| **debt-payoff**       | ❌      | ❌        | ❌        | Household debt schedule.                                                                 |
-| **diet**              | ❌      | ❌        | ❌        | Just shipped (PR #116, 2026-05-07). Bench candidate: weight target, biomarker ranges.    |
-| **gst-return**        | ❌      | ❌        | ❌        | Quarterly GST. Bench: filing accuracy vs. CRA.                                           |
-| **health**            | ⚠️      | ❌        | ❌        | Family health records (PR #115).                                                         |
-| **hit-lists**         | ❌      | ❌        | ❌        | Amazon deal lists. Bench: hit→list conversion %.                                         |
-| **import**            | ❌      | ❌        | ❌        | Data import surface. Internal tool.                                                      |
-| **inventory**         | ❌      | ❌        | ❌        | Inventory state. Bench: vs. Streamlit periodic-method baseline.                          |
-| **life-pnl**          | ❌      | ❌        | ❌        | Personal P&L. Bench: prior period delta + Colin target.                                  |
-| **mileage**           | ❌      | ❌        | ❌        | Vehicle mileage tracking.                                                                |
-| **money**             | ❌      | ❌        | ❌        | Top-level money hub.                                                                     |
-| **monthly-close**     | ❌      | ❌        | ❌        | Month-end ceremony. Bench: time-to-close vs. Streamlit.                                  |
-| **monthly-expenses**  | ❌      | ❌        | ❌        | Combined household expenses.                                                             |
-| **monthly-pnl**       | ❌      | ❌        | ❌        | Monthly P&L.                                                                             |
-| **net-worth**         | ❌      | ❌        | ❌        | Inline-edit net worth. Bench: Colin target ≥ 8%/yr growth. **High value to instrument.** |
-| **oura**              | ⚠️      | ❌        | ⚠️        | `oura_daily` table; harness consumes; no Colin-facing surfacing.                         |
-| **pallets**           | ❌      | ❌        | ❌        | FBA/MF pallet tracker.                                                                   |
-| **payouts**           | ❌      | ❌        | ❌        | Payout register with YTD variance. Bench already implicit (variance) — easy win.         |
-| **personal-expenses** | ❌      | ❌        | ❌        | Household sub-view.                                                                      |
-| **receipts**          | ❌      | ❌        | ❌        | Receipts capture (port pending).                                                         |
-| **reconciliation**    | ❌      | ❌        | ❌        | Bookkeeping reconciliation.                                                              |
-| **recurring**         | ❌      | ❌        | ❌        | Recurring subscriptions. Bench: cost trend month-over-month.                             |
-| **savings-goals**     | ❌      | ❌        | ❌        | Goal tracker — has progress but no instrumentation.                                      |
-| **scan**              | ❌      | ❌        | ❌        | PageProfit scanner (port pending).                                                       |
-| **subscriptions**     | ❌      | ❌        | ❌        | Subscription dashboard.                                                                  |
-| **tax-centre**        | ❌      | ❌        | ❌        | Tax docs hub.                                                                            |
-| **utility**           | ❌      | ❌        | ❌        | Utility costs tracker.                                                                   |
-| **vehicles**          | ❌      | ❌        | ❌        | Vehicle data + AI valuation. Bench: actual vs. AI valuation MAE.                         |
+| Module                | Capture | Benchmark | Surfacing | Notes                                                                                                  |
+| --------------------- | ------- | --------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| **accounts**          | ❌      | ❌        | ❌        | Bank/CC/loan dashboard. Drives net-worth — high-leverage to instrument.                                |
+| **amazon**            | ✅      | ✅        | ✅        | `'amazon.viewed'` on render + SP-API sync. Bench: BENCHMARK_30D_REVENUE_CAD. Surface: AmazonPaceBadge. |
+| **amazon-sales**      | ❌      | ❌        | ❌        | Sales charts. Should bench against Streamlit `26_Sales_Charts`.                                        |
+| **annual-review**     | ❌      | ❌        | ❌        | Year-over-year wealth + milestones. Bench: prior-year delta.                                           |
+| **balance-sheet**     | ❌      | ❌        | ❌        | Static view. Lower priority but trivial to surface.                                                    |
+| **bank-register**     | ❌      | ❌        | ❌        | Reconciliation surface. Drives bookkeeping accuracy.                                                   |
+| **betting**           | ⚠️      | ❌        | ❌        | Kelly Sizer. Shipped Sprint 2; agent_events on bet log. No surfacing.                                  |
+| **bookkeeping**       | ⚠️      | ❌        | ❌        | agent_events on classify/reconcile. Bench: hours/month vs. Streamlit.                                  |
+| **bookkeeping-hub**   | ❌      | ❌        | ❌        | Top-level hub view. Composite of sub-tiles.                                                            |
+| **business-review**   | ❌      | ❌        | ❌        | Business metrics dashboard. Most-viewed daily — surfacing is the win.                                  |
+| **cash-forecast**     | ❌      | ❌        | ❌        | 30-day forecast. Bench: actual vs. forecast variance.                                                  |
+| **chat**              | ❌      | ❌        | ❌        | Twin chat. Bench: response success rate, escalation %.                                                 |
+| **cogs**              | ❌      | ❌        | ❌        | COGS calculator. Bench: vs. Streamlit historical.                                                      |
+| **debt-payoff**       | ❌      | ❌        | ❌        | Household debt schedule.                                                                               |
+| **diet**              | ❌      | ❌        | ❌        | Just shipped (PR #116, 2026-05-07). Bench candidate: weight target, biomarker ranges.                  |
+| **gst-return**        | ❌      | ❌        | ❌        | Quarterly GST. Bench: filing accuracy vs. CRA.                                                         |
+| **health**            | ⚠️      | ❌        | ❌        | Family health records (PR #115).                                                                       |
+| **hit-lists**         | ❌      | ❌        | ❌        | Amazon deal lists. Bench: hit→list conversion %.                                                       |
+| **import**            | ❌      | ❌        | ❌        | Data import surface. Internal tool.                                                                    |
+| **inventory**         | ❌      | ❌        | ❌        | Inventory state. Bench: vs. Streamlit periodic-method baseline.                                        |
+| **life-pnl**          | ❌      | ❌        | ❌        | Personal P&L. Bench: prior period delta + Colin target.                                                |
+| **mileage**           | ❌      | ❌        | ❌        | Vehicle mileage tracking.                                                                              |
+| **money**             | ❌      | ❌        | ❌        | Top-level money hub.                                                                                   |
+| **monthly-close**     | ❌      | ❌        | ❌        | Month-end ceremony. Bench: time-to-close vs. Streamlit.                                                |
+| **monthly-expenses**  | ❌      | ❌        | ❌        | Combined household expenses.                                                                           |
+| **monthly-pnl**       | ❌      | ❌        | ❌        | Monthly P&L.                                                                                           |
+| **net-worth**         | ❌      | ❌        | ❌        | Inline-edit net worth. Bench: Colin target ≥ 8%/yr growth. **High value to instrument.**               |
+| **oura**              | ⚠️      | ❌        | ⚠️        | `oura_daily` table; harness consumes; no Colin-facing surfacing.                                       |
+| **pallets**           | ❌      | ❌        | ❌        | FBA/MF pallet tracker.                                                                                 |
+| **payouts**           | ✅      | ✅        | ✅        | `'payouts.viewed'` on API fetch. Bench: BENCHMARK_MONTHLY_NET_CAD. Surface: PaceBadge. (PR #127)       |
+| **personal-expenses** | ❌      | ❌        | ❌        | Household sub-view.                                                                                    |
+| **receipts**          | ❌      | ❌        | ❌        | Receipts capture (port pending).                                                                       |
+| **reconciliation**    | ❌      | ❌        | ❌        | Bookkeeping reconciliation.                                                                            |
+| **recurring**         | ❌      | ❌        | ❌        | Recurring subscriptions. Bench: cost trend month-over-month.                                           |
+| **savings-goals**     | ❌      | ❌        | ❌        | Goal tracker — has progress but no instrumentation.                                                    |
+| **scan**              | ❌      | ❌        | ❌        | PageProfit scanner (port pending).                                                                     |
+| **subscriptions**     | ❌      | ❌        | ❌        | Subscription dashboard.                                                                                |
+| **tax-centre**        | ❌      | ❌        | ❌        | Tax docs hub.                                                                                          |
+| **utility**           | ❌      | ❌        | ❌        | Utility costs tracker.                                                                                 |
+| **vehicles**          | ❌      | ❌        | ❌        | Vehicle data + AI valuation. Bench: actual vs. AI valuation MAE.                                       |
 
 ## F-rule enforcement state
 
