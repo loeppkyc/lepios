@@ -9,7 +9,7 @@
 
 ## What ships
 
-A single migration file (next available number, currently `0131_ai_pick_engine_schema.sql`) creating four schema additions:
+A single migration file `0142_ai_pick_engine_schema.sql` (claimed in `.claude/migration-claims.json`) creating four schema additions:
 
 1. `trades` table (new)
 2. `predictions` table (new)
@@ -25,19 +25,22 @@ Plus RLS policies, indexes, and a regenerated `lib/db/types.ts`. **No app code, 
 Before writing the migration, builder runs:
 
 ```bash
-# Confirm migration number is unused
-ls supabase/migrations/ | grep ^0131
+# Confirm migration number is unused (must match claim in .claude/migration-claims.json)
+ls supabase/migrations/ | grep ^0142
 
 # Confirm tables don't already exist
 grep -r "CREATE TABLE.*trades\b" supabase/migrations/
 grep -r "CREATE TABLE.*predictions\b" supabase/migrations/
 grep -r "CREATE TABLE.*trust_state\b" supabase/migrations/
 
-# Confirm bets schema (we ALTER it)
-grep -A 50 "CREATE TABLE.*bets" supabase/migrations/0001*.sql
+# Confirm bets schema via Supabase MCP (the original CREATE TABLE pre-dates this repo's
+# tracked migrations, so use information_schema rather than greppingmigration files):
+#   SELECT column_name, data_type, is_nullable, column_default
+#   FROM information_schema.columns
+#   WHERE table_schema='public' AND table_name='bets' ORDER BY ordinal_position;
 ```
 
-Per F-L3: never write a table or column name from memory. Per F-L1: builder operates on a feature branch (`harness/ai-pick-engine-chunk-a`), not main.
+Per F-L3: never write a table or column name from memory. Per F-L1: builder operates on a feature branch (`feat/ai-pick-engine-chunk-a`), not main.
 
 ---
 
@@ -94,7 +97,10 @@ CREATE TRIGGER trades_updated_at BEFORE UPDATE ON trades
 
 **Notes:**
 
-- `prediction_id` FK is forward-declared; `predictions` table is created in A.2 below — order matters in the migration file (A.2 first, then A.1).
+- `trades.prediction_id` references `predictions(id)` and creates a forward
+  dependency. Migration order: create `predictions` (A.2) without any FK to
+  `trades`, then create `trades` (A.1) with the `prediction_id` FK. Single
+  direction — see A.2 for why the reverse FK was dropped.
 - RLS is **permissive** (any authenticated user) until SPRINT5-GATE (§7.3). Mirrors current `bets` policy. MN-3 will tighten later.
 - `instrument_type` enum aligns with Streamlit's `MARKET_INSTRUMENTS` map (`tools/trading_predictions.py` line 21–38).
 
@@ -148,7 +154,9 @@ CREATE TABLE predictions (
 
   -- linkage
   bet_id uuid NULL REFERENCES bets(id),       -- if Colin acted on a sports pick
-  trade_id uuid NULL REFERENCES trades(id),   -- if Colin acted on a trade pick
+  -- trade_id intentionally omitted to avoid circular FK (trades.prediction_id is
+  -- the canonical link from trades → predictions; the reverse direction is
+  -- recoverable via that join).
   mode text NOT NULL DEFAULT 'paper' CHECK (mode IN ('paper', 'live')),
 
   person_handle text NOT NULL DEFAULT 'colin',
