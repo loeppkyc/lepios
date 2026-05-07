@@ -28,14 +28,63 @@ import { getCircuitState, CircuitStatus } from '@/lib/ollama/circuit'
 
 let _startupWarned = false
 
+// harness_config-resident OLLAMA_TUNNEL_URL — runtime config pattern (S-L1).
+// Survives Vercel env rotation. Hydrated lazily; sync getBaseUrl() reads the cache.
+// Cold-start path: first caller awaits hydrateOllamaConfig() at the top of the handler;
+// subsequent sync getBaseUrl() calls within the same request use the cached value.
+const HYDRATE_TTL_MS = 5 * 60 * 1000 // 5 min — short enough that secret rotations propagate quickly
+let _cachedTunnelUrl: string | null = null
+let _hydratedAt: number | null = null
+
+/**
+ * Read OLLAMA_TUNNEL_URL from harness_config and populate the module cache.
+ * Idempotent + TTL'd. Call at the top of any handler that uses Ollama, BEFORE
+ * any sync getBaseUrl() call. Errors are swallowed — falls back to process.env.
+ */
+export async function hydrateOllamaConfig(force = false): Promise<void> {
+  const now = Date.now()
+  if (!force && _hydratedAt !== null && now - _hydratedAt < HYDRATE_TTL_MS) {
+    return // cache fresh
+  }
+  try {
+    const db = createServiceClient()
+    const { data } = await db
+      .from('harness_config')
+      .select('value')
+      .eq('key', 'OLLAMA_TUNNEL_URL')
+      .maybeSingle()
+    const value = (data as { value: string } | null)?.value?.trim() || null
+    _cachedTunnelUrl = value && value.length > 0 ? value : null
+    _hydratedAt = now
+  } catch {
+    // Non-fatal — caller falls through to process.env via getBaseUrl()
+    _hydratedAt = now // mark hydrated so we don't thrash retries
+  }
+}
+
+/**
+ * Reset the module cache. Test-only — exported so unit tests can stub
+ * harness_config and force a re-read between assertions.
+ * @internal
+ */
+export function _resetOllamaConfigCache(): void {
+  _cachedTunnelUrl = null
+  _hydratedAt = null
+}
+
 export function getBaseUrl(): string {
-  const url = (process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434').replace(/\/$/, '')
+  // Prefer harness_config (hydrated cache) → process.env → localhost fallback
+  const raw = _cachedTunnelUrl ?? process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434'
+  const url = raw.replace(/\/$/, '')
   if (!_startupWarned && process.env.NODE_ENV === 'production' && url.includes('localhost')) {
     _startupWarned = true
     void logEvent('ollama', 'ollama.config_warning', {
       actor: 'system',
       status: 'warning',
-      meta: { reason: 'OLLAMA_TUNNEL_URL not set; using localhost fallback in production' },
+      meta: {
+        reason:
+          'OLLAMA_TUNNEL_URL not set in harness_config or process.env; using localhost fallback in production',
+      },
     })
   }
   return url
