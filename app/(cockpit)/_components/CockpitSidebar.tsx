@@ -116,7 +116,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Vehicles', href: '/vehicles' },
       { label: 'Utilities', href: null },
       { label: 'Phone Plans', href: null },
-      { label: 'Groceries', href: null },
+      { label: 'Groceries', href: '/diet' },
     ],
   },
   {

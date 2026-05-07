@@ -65,7 +65,37 @@
       "filename": "0153_cycle_entries.sql",
       "claimed_at": "2026-05-07",
       "note": "Health module v1 — cycle_entries table for Megan's endo monitoring. Multi-select pain_locations TEXT[]. Renumbered from 0147. Applied to prod via MCP."
+    },
+    "0154": {
+      "branch": "feat/diet-port",
+      "filename": "0154_grocery_inventory.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Diet module v1 — grocery_inventory table (item, category, qty, expiration tracking). Applied to prod via MCP."
+    },
+    "0155": {
+      "branch": "feat/diet-port",
+      "filename": "0155_grocery_receipts.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Diet module v1 — grocery_receipts table. Negative price = discount row (Streamlit convention preserved). Receipt OCR via Claude Vision deferred to v1.1. Applied to prod via MCP."
+    },
+    "0156": {
+      "branch": "feat/diet-port",
+      "filename": "0156_meal_log.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Diet module v1 — meal_log table with calories+macros. AI nutrition estimation deferred to v1.1. Applied to prod via MCP."
+    },
+    "0157": {
+      "branch": "feat/diet-port",
+      "filename": "0157_weight_log.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Diet module v1 — weight_log table. UNIQUE(weighed_on) for atomic upsert (Streamlit appends duplicates — fixed). TDEE projection deferred to v1.1. Applied to prod via MCP."
+    },
+    "0158": {
+      "branch": "feat/diet-port",
+      "filename": "0158_biomarkers.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Diet module v1 — biomarkers table with DB-trigger-derived status (low/normal/high) from value vs ref range. Applied to prod via MCP."
     }
   },
-  "next_available": 154
+  "next_available": 159
 }
