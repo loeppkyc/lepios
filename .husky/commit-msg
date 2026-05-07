@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -e
+
+# Multi-window protocol — shared-seam approval gate.
+# Pre-commit can't read the commit message (it runs before the msg file exists),
+# so seam-approval lives here in commit-msg. The other half — rebase + migration
+# claim — runs in .husky/pre-commit.
+SEAM='package.json|package-lock.json|app/layout.tsx|middleware.ts|next.config|tailwind.config|tsconfig.json|^\.env\.example$|supabase/seed.sql'
+TOUCHED=$(git diff --cached --name-only)
+if echo "$TOUCHED" | grep -E "$SEAM" >/dev/null; then
+  if ! grep -q '\[seam-approved\]' "$1" 2>/dev/null; then
+    echo "❌ Shared seam touched without [seam-approved] in commit msg."
+    echo "   Files matched: $(echo "$TOUCHED" | grep -E "$SEAM" | tr '\n' ' ')"
+    exit 1
+  fi
+fi

@@ -4,6 +4,25 @@
 # unless errexit is on). The hook then returns the last command's exit code.
 set -e
 
+# ─── Multi-window protocol — rebase + migration claim ─────────────────────
+# Seam-approved check lives in .husky/commit-msg (needs commit message).
+# Rebase + migration claim work fine here without the message.
+git fetch -q origin
+BASE=$(git merge-base HEAD origin/main)
+if [ "$(git rev-parse origin/main)" != "$BASE" ]; then
+  echo "❌ Branch behind origin/main. Rebase before commit."
+  exit 1
+fi
+
+TOUCHED=$(git diff --cached --name-only)
+for f in $(echo "$TOUCHED" | grep '^supabase/migrations/' || true); do
+  NUM=$(basename "$f" | grep -oE '^[0-9]+')
+  if [ -n "$NUM" ] && ! grep -q "\"$NUM\"" .claude/migration-claims.json 2>/dev/null; then
+    echo "❌ Migration $NUM not claimed in .claude/migration-claims.json"
+    exit 1
+  fi
+done
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
