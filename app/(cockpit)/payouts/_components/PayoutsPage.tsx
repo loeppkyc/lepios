@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { PayoutsResponse, MonthRollup, SettlementRow } from '@/app/api/payouts/route'
+import type { PaceResult } from '@/lib/payouts/benchmark'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -323,6 +324,41 @@ function SettlementDetail({
   )
 }
 
+/**
+ * F18 surfacing widget — YTD net payout vs. target pace.
+ * Bench source: lib/payouts/benchmark.ts (BENCHMARK_MONTHLY_NET_CAD).
+ */
+function PaceBadge({ benchmark, ytdNet }: { benchmark: PaceResult; ytdNet: number }) {
+  const { monthlyTargetCad, expectedYtdCad, ytdPacePct, status } = benchmark
+  const dollarDelta = ytdNet - expectedYtdCad
+  const tone =
+    status === 'ahead'
+      ? { dot: 'bg-emerald-500', text: 'text-emerald-400', label: 'AHEAD' }
+      : status === 'on_pace'
+        ? { dot: 'bg-amber-400', text: 'text-amber-300', label: 'ON PACE' }
+        : { dot: 'bg-red-500', text: 'text-red-400', label: 'BEHIND' }
+
+  return (
+    <div className="mb-6 flex items-center gap-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 font-mono text-[var(--text-small)]">
+      <span className={`inline-block h-2 w-2 rounded-full ${tone.dot}`} aria-hidden />
+      <span className={`text-xs font-bold tracking-wider uppercase ${tone.text}`}>
+        {tone.label} · {ytdPacePct}%
+      </span>
+      <span className="text-[var(--color-text-muted)]">
+        YTD ${ytdNet.toLocaleString('en-CA', { maximumFractionDigits: 0 })} · Expected $
+        {expectedYtdCad.toLocaleString('en-CA', { maximumFractionDigits: 0 })}
+      </span>
+      <span className={`ml-auto text-xs ${dollarDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {dollarDelta >= 0 ? '+' : ''}$
+        {dollarDelta.toLocaleString('en-CA', { maximumFractionDigits: 0 })}
+      </span>
+      <span className="text-[var(--color-text-disabled)]">
+        target ${monthlyTargetCad.toLocaleString('en-CA')}/mo
+      </span>
+    </div>
+  )
+}
+
 export function PayoutsPage() {
   const [year, setYear] = useState(CURRENT_YEAR)
   const [data, setData] = useState<PayoutsResponse | null>(null)
@@ -433,6 +469,8 @@ export function PayoutsPage() {
 
       {data && !loading && (
         <>
+          {/* F18 surfacing — YTD-vs-target pace indicator */}
+          <PaceBadge benchmark={data.benchmark} ytdNet={data.ytd.netPayout} />
           {/* YTD KPI strip */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
             {[
