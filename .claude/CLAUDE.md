@@ -5,13 +5,28 @@ You are not necessarily the only Claude Code working this repo right now.
 On session start:
 
 1. `git fetch && git status -sb` — confirm current with origin
-2. `node scripts/window-status.mjs` — see what other windows have claimed and prune stale entries (use `--prune` to actually delete)
+2. `node scripts/window-status.mjs` — see what other windows have claimed and prune stale entries (use `--prune` to actually delete). Claims live in the **main checkout**'s `.claude/active-windows/`, resolved via `git rev-parse --git-common-dir`, so this command shows every live window across all worktrees of the repo.
 3. Read this session's SCOPE CONTRACT (in user's first message). The user names which file globs your work is allowed to touch.
-4. Claim your window: `node scripts/window-start.mjs --scope "<glob>" [--scope "<glob>"...]`. The script:
+4. **If `window-status.mjs` shows any other live window, you MUST work in your own worktree** — claiming a window in the main checkout while others are live is refused by `window-start.mjs` (F-N8 prevention). To set up a worktree on Windows:
+
+   ```bash
+   # From the main checkout:
+   git worktree add ../lepios-<slug> <branch>
+   # PowerShell — junction node_modules + .husky/_ so lint-staged + husky still work:
+   New-Item -ItemType Junction -Path ..\lepios-<slug>\node_modules -Target ..\lepios\node_modules
+   New-Item -ItemType Junction -Path ..\lepios-<slug>\.husky\_ -Target ..\lepios\.husky\_
+   cd ../lepios-<slug>
+   ```
+
+   Single-window sessions can stay in the main checkout — the guard only fires when other windows are live. Emergency single-window bypass: `--allow-main-checkout`.
+
+5. Claim your window from inside the worktree: `node scripts/window-start.mjs --scope "<glob>" [--scope "<glob>"...]`. The script:
    - Refuses if working tree is dirty or branch is `main`
+   - Refuses if running in the main checkout while other windows are live (see step 4)
    - Refuses if another live window's scope overlaps yours
-   - Writes `.claude/active-windows/<branch>.json` (gitignored — local-only)
-5. On clean shutdown, run `node scripts/window-end.mjs` to release the claim.
+   - Writes `<main-checkout>/.claude/active-windows/<branch>.json` (shared across worktrees)
+
+6. On clean shutdown, run `node scripts/window-end.mjs` to release the claim.
 
 Hard rules (most are now enforced by `.husky/pre-commit` and `.husky/commit-msg`):
 

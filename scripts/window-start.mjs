@@ -3,6 +3,7 @@
 //
 // Usage:
 //   node scripts/window-start.mjs --scope <glob> [--scope <glob>...] [--note "<text>"]
+//                                  [--allow-main-checkout]
 //
 // Examples:
 //   node scripts/window-start.mjs --scope "lib/auth/**" --scope "tests/auth/**"
@@ -13,24 +14,29 @@
 //   2. Refuse to claim while on `main`
 //   3. Prune stale claims (heartbeat older than 30 minutes)
 //   4. Refuse if this branch already has a claim
-//   5. Detect scope overlap with other live windows; refuse if overlap
-//   6. Write `.claude/active-windows/<branch>.json` with branch, scope, started_at, pid
+//   5. Refuse if running in the main checkout while OTHER windows are live (F-N8 prevention) —
+//      bypass with --allow-main-checkout
+//   6. Detect scope overlap with other live windows; refuse if overlap
+//   7. Write `.claude/active-windows/<branch>.json` (resolved via git common-dir, so it is
+//      shared across all worktrees of this repo)
 //
 // On clean shutdown: `node scripts/window-end.mjs`
 
 import {
   currentBranch,
-  workingTreeClean,
+  isMainCheckout,
   loadAllClaims,
   loadClaimForBranch,
   pruneStaleClaims,
   scopeOverlaps,
+  workingTreeClean,
   writeClaim,
 } from './lib/window-claim.mjs'
 
 function parseArgs(argv) {
   const scope = []
   let note = null
+  let allowMainCheckout = false
   let i = 0
   while (i < argv.length) {
     const a = argv[i]
@@ -44,6 +50,9 @@ function parseArgs(argv) {
       if (!next) fail('--note requires a string argument')
       note = next
       i += 2
+    } else if (a === '--allow-main-checkout') {
+      allowMainCheckout = true
+      i += 1
     } else {
       fail(`unrecognized argument: ${a}`)
     }
@@ -54,7 +63,7 @@ function parseArgs(argv) {
         '  Example: node scripts/window-start.mjs --scope "lib/auth/**" --scope "tests/auth/**"'
     )
   }
-  return { scope, note }
+  return { scope, note, allowMainCheckout }
 }
 
 function fail(msg) {
@@ -68,7 +77,7 @@ function block(msg) {
 }
 
 function main() {
-  const { scope, note } = parseArgs(process.argv.slice(2))
+  const { scope, note, allowMainCheckout } = parseArgs(process.argv.slice(2))
 
   if (!workingTreeClean()) {
     block(
@@ -94,6 +103,34 @@ function main() {
         `   last_heartbeat: ${existing.last_heartbeat}\n` +
         `   pid: ${existing.pid}\n` +
         `   If this is stale, run: node scripts/window-end.mjs --force`
+    )
+  }
+
+  // F-N8 prevention: claiming in the main checkout while other windows are live drags
+  // uncommitted edits across branches on `git checkout`. Force every concurrent window
+  // into its own worktree.
+  const otherClaims = loadAllClaims().filter((c) => c.branch !== branch)
+  if (otherClaims.length > 0 && isMainCheckout() && !allowMainCheckout) {
+    const branchSlug = branch.replace(/[^a-zA-Z0-9._-]/g, '-')
+    block(
+      `Cannot claim a window in the MAIN checkout while ${otherClaims.length} other window(s) are live.\n` +
+        `   Reason: F-N8 — git checkout in a shared working tree drags uncommitted edits across branches.\n` +
+        `\n` +
+        `   Other live windows:\n` +
+        otherClaims.map((c) => `     - ${c.branch}`).join('\n') +
+        `\n\n` +
+        `   Fix: create a worktree and start the window from there:\n` +
+        `     git worktree add ../lepios-${branchSlug} ${branch}\n` +
+        `     # PowerShell — junction node_modules + .husky/_ for isolation:\n` +
+        `     New-Item -ItemType Junction -Path ..\\lepios-${branchSlug}\\node_modules -Target ..\\lepios\\node_modules\n` +
+        `     New-Item -ItemType Junction -Path ..\\lepios-${branchSlug}\\.husky\\_ -Target ..\\lepios\\.husky\\_\n` +
+        `     cd ../lepios-${branchSlug}\n` +
+        `     node scripts/window-start.mjs --scope "<glob>" ...\n` +
+        `\n` +
+        `   See memory: multi_window_worktree_pattern.md\n` +
+        `\n` +
+        `   To bypass once (single-window emergency, you accept F-N8 risk):\n` +
+        `     node scripts/window-start.mjs --allow-main-checkout --scope ...`
     )
   }
 

@@ -10,10 +10,38 @@ import {
   unlinkSync,
 } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-export const ACTIVE_DIR = '.claude/active-windows'
 export const STALE_MS = 30 * 60 * 1000 // 30 minutes — heartbeat older than this = window is dead
+
+/**
+ * Path to the active-windows claim directory. Always resolves to the MAIN checkout's
+ * `.claude/active-windows/` — even when called from a linked worktree — so claims
+ * are visible to every concurrent Claude Code window in the repo.
+ *
+ * F-N8 fix companion: before this change, each worktree had an isolated
+ * `.claude/active-windows/`, making cross-worktree scope-overlap detection
+ * impossible. Now a window in worktree A and a window in worktree B share one
+ * claim store and can detect each other.
+ *
+ * Tests set LEPIOS_ACTIVE_DIR_OVERRIDE to redirect I/O at a temp dir; read on every
+ * call (not memoized at module-load) so per-test mutation works.
+ */
+export function getActiveDir() {
+  const override = process.env.LEPIOS_ACTIVE_DIR_OVERRIDE
+  if (override) return override
+  // --git-common-dir always points at the main checkout's .git, including from a linked worktree.
+  const commonDir = execSync('git rev-parse --git-common-dir').toString().trim()
+  const mainCheckout = resolve(commonDir, '..')
+  return join(mainCheckout, '.claude', 'active-windows')
+}
+
+/** True iff the current working directory is the main checkout (not a linked worktree). */
+export function isMainCheckout() {
+  const gitDir = resolve(execSync('git rev-parse --git-dir').toString().trim())
+  const commonDir = resolve(execSync('git rev-parse --git-common-dir').toString().trim())
+  return gitDir === commonDir
+}
 
 /** Replace path separators so a branch like `feat/foo/bar` lands as one flat filename. */
 export function branchToFilename(branch) {
@@ -38,17 +66,19 @@ export function stagedFiles() {
 }
 
 export function ensureActiveDir() {
-  if (!existsSync(ACTIVE_DIR)) mkdirSync(ACTIVE_DIR, { recursive: true })
+  const dir = getActiveDir()
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }
 
 export function loadAllClaims() {
-  if (!existsSync(ACTIVE_DIR)) return []
-  return readdirSync(ACTIVE_DIR)
+  const dir = getActiveDir()
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => {
       try {
-        const data = JSON.parse(readFileSync(join(ACTIVE_DIR, f), 'utf8'))
-        return { ...data, _file: f, _path: join(ACTIVE_DIR, f) }
+        const data = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+        return { ...data, _file: f, _path: join(dir, f) }
       } catch {
         return null
       }
@@ -57,7 +87,7 @@ export function loadAllClaims() {
 }
 
 export function loadClaimForBranch(branch) {
-  const path = join(ACTIVE_DIR, branchToFilename(branch))
+  const path = join(getActiveDir(), branchToFilename(branch))
   if (!existsSync(path)) return null
   try {
     const data = JSON.parse(readFileSync(path, 'utf8'))
@@ -69,13 +99,13 @@ export function loadClaimForBranch(branch) {
 
 export function writeClaim(claim) {
   ensureActiveDir()
-  const path = join(ACTIVE_DIR, branchToFilename(claim.branch))
+  const path = join(getActiveDir(), branchToFilename(claim.branch))
   writeFileSync(path, JSON.stringify(claim, null, 2) + '\n')
   return path
 }
 
 export function deleteClaim(branch) {
-  const path = join(ACTIVE_DIR, branchToFilename(branch))
+  const path = join(getActiveDir(), branchToFilename(branch))
   if (existsSync(path)) {
     unlinkSync(path)
     return path
