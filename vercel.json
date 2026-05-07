@@ -71,10 +71,6 @@
     {
       "path": "/api/cron/cleanup-orphan-convs",
       "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron/night_watchman_scan",
-      "schedule": "0 4,13 * * *"
     }
   ]
 }
