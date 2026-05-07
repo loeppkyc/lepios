@@ -46,17 +46,20 @@ function makeGroupsResponse(groups: ReturnType<typeof makeGroup>[], nextToken?: 
   }
 }
 
-// Empty DDBR response — used in Promise.all interleave as 2nd mock call
-const DDBR_EMPTY = { transactions: [] }
+// Empty DDBR response — used in Promise.all interleave as 2nd mock call.
+// Shape mirrors real SP-API: { payload: { transactions, nextToken? } }.
+const DDBR_EMPTY = { payload: { transactions: [] } }
 
 function makeDdbr(cadAmount: number) {
   return {
-    transactions: [
-      {
-        transactionStatus: 'DEFERRED',
-        totalAmount: { currencyCode: 'CAD', currencyAmount: cadAmount },
-      },
-    ],
+    payload: {
+      transactions: [
+        {
+          transactionStatus: 'DEFERRED',
+          totalAmount: { currencyCode: 'CAD', currencyAmount: cadAmount },
+        },
+      ],
+    },
   }
 }
 
@@ -214,7 +217,7 @@ describe('fetchSettlementBalance', () => {
     expect(result.totalBalanceCad).toBe(99.99)
   })
 
-  it('puts Processing groups into inTransitCad — not excluded', async () => {
+  it('Processing groups do NOT contribute to totalBalanceCad — already-initiated payouts are not balance', async () => {
     const open = makeGroup({
       id: 'FEG-OPEN',
       processingStatus: 'Open',
@@ -233,13 +236,12 @@ describe('fetchSettlementBalance', () => {
 
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(1052.46)
-    expect(result.inTransitCad).toBe(5378.72)
     expect(result.deferredCad).toBe(0)
-    expect(result.totalBalanceCad).toBe(1052.46 + 5378.72)
-    expect(result.inTransitGroupsCount).toBe(1)
+    // Amazon "Total Balance" = open + deferred only. Excludes in-flight payouts.
+    expect(result.totalBalanceCad).toBe(1052.46)
   })
 
-  it('puts Closed groups with no FundTransferStatus into deferredCad', async () => {
+  it('puts Closed groups with no FundTransferStatus into deferredCad (DDBR fallback)', async () => {
     const closed = makeGroup({
       id: 'FEG-CL',
       processingStatus: 'Closed',
@@ -253,11 +255,10 @@ describe('fetchSettlementBalance', () => {
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(0)
     expect(result.deferredCad).toBe(3000.0)
-    expect(result.inTransitCad).toBe(0)
     expect(result.totalBalanceCad).toBe(3000.0)
   })
 
-  it('excludes Succeeded groups from all buckets', async () => {
+  it('Succeeded groups do not affect balance buckets', async () => {
     const succeeded = makeGroup({
       id: 'FEG-T',
       fundTransferStatus: 'Succeeded',
@@ -271,11 +272,10 @@ describe('fetchSettlementBalance', () => {
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(0)
     expect(result.deferredCad).toBe(0)
-    expect(result.inTransitCad).toBe(0)
     expect(result.totalBalanceCad).toBe(0)
   })
 
-  it('three-bucket split: open + deferred + inTransit + ddbrCad absent → correct totals', async () => {
+  it('open + closed-deferred fallback: totalBalanceCad excludes Processing groups', async () => {
     const open = makeGroup({
       id: 'FEG-1',
       processingStatus: 'Open',
@@ -307,11 +307,9 @@ describe('fetchSettlementBalance', () => {
     const result = await fetchSettlementBalance()
     expect(result.grossPendingCad).toBe(100.0)
     expect(result.deferredCad).toBe(250.0)
-    expect(result.inTransitCad).toBe(999.0)
-    expect(result.totalBalanceCad).toBe(1349.0)
+    expect(result.totalBalanceCad).toBe(350.0) // 100 + 250, no in-flight
     expect(result.openGroupsCount).toBe(1)
     expect(result.deferredGroupsCount).toBe(2)
-    expect(result.inTransitGroupsCount).toBe(1)
   })
 
   it('ddbrCad is null and ddbrAvailable is false when v2024-06-19 returns empty', async () => {
@@ -374,5 +372,130 @@ describe('fetchSettlementBalance', () => {
     expect(result.ddbrAvailable).toBe(false)
     // Groups still processed normally
     expect(result.grossPendingCad).toBe(0)
+  })
+
+  // ── DDBR-vs-FEG-deferred precedence ───────────────────────────────────────
+  // Same money, two API surfaces — never double-count.
+
+  it('DDBR replaces FEG-deferred when both present (no double-count)', async () => {
+    const closedFegDeferred = makeGroup({
+      id: 'FEG-CL',
+      processingStatus: 'Closed',
+      amount: 3000.0, // would land in fegDeferred under fallback
+      currencyCode: 'CAD',
+    })
+    mockSpFetch
+      .mockResolvedValueOnce(makeGroupsResponse([closedFegDeferred]))
+      .mockResolvedValueOnce(makeDdbr(7285.59)) // canonical Amazon "Deferred"
+
+    const result = await fetchSettlementBalance()
+    // deferredCad = DDBR canonical, NOT 3000 + 7285.59
+    expect(result.deferredCad).toBe(7285.59)
+    expect(result.totalBalanceCad).toBe(7285.59)
+    // FEG fallback path is silenced when DDBR is canonical
+    expect(result.deferredGroupsCount).toBe(0)
+  })
+
+  // ── lastPayout — most-recent transfer ─────────────────────────────────────
+
+  it('lastPayout is null when no Processing/Succeeded groups exist', async () => {
+    const open = makeGroup({
+      id: 'FEG-OPEN',
+      processingStatus: 'Open',
+      amount: 100.0,
+      currencyCode: 'CAD',
+    })
+    mockSpFetch.mockResolvedValueOnce(makeGroupsResponse([open])).mockResolvedValueOnce(DDBR_EMPTY)
+
+    const result = await fetchSettlementBalance()
+    expect(result.lastPayout).toBeNull()
+  })
+
+  it('lastPayout picks the most recent FundTransferDate across CAD groups', async () => {
+    const older = {
+      FinancialEventGroupId: 'FEG-OLD',
+      FundTransferStatus: 'Succeeded',
+      FundTransferDate: '2026-04-25T10:00:00Z',
+      OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 800.0 },
+    }
+    const newer = {
+      FinancialEventGroupId: 'FEG-NEW',
+      FundTransferStatus: 'Processing',
+      FundTransferDate: '2026-05-02T14:30:00Z',
+      OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 1013.9 },
+    }
+    mockSpFetch
+      .mockResolvedValueOnce({ payload: { FinancialEventGroupList: [older, newer] } })
+      .mockResolvedValueOnce(DDBR_EMPTY)
+
+    const result = await fetchSettlementBalance()
+    expect(result.lastPayout).toEqual({
+      amountCad: 1013.9,
+      transferDate: '2026-05-02T14:30:00Z',
+      status: 'Processing',
+    })
+  })
+
+  it('lastPayout ignores non-CAD groups', async () => {
+    const usdNewer = {
+      FinancialEventGroupId: 'FEG-USD',
+      FundTransferStatus: 'Succeeded',
+      FundTransferDate: '2026-05-05T00:00:00Z',
+      OriginalTotal: { CurrencyCode: 'USD', CurrencyAmount: 5000 },
+    }
+    const cadOlder = {
+      FinancialEventGroupId: 'FEG-CAD',
+      FundTransferStatus: 'Succeeded',
+      FundTransferDate: '2026-04-30T00:00:00Z',
+      OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 500.0 },
+    }
+    mockSpFetch
+      .mockResolvedValueOnce({ payload: { FinancialEventGroupList: [usdNewer, cadOlder] } })
+      .mockResolvedValueOnce(DDBR_EMPTY)
+
+    const result = await fetchSettlementBalance()
+    expect(result.lastPayout?.transferDate).toBe('2026-04-30T00:00:00Z')
+    expect(result.lastPayout?.amountCad).toBe(500.0)
+  })
+
+  it('lastPayout requires FundTransferDate — Processing groups without it are skipped', async () => {
+    const noDate = {
+      FinancialEventGroupId: 'FEG-NODATE',
+      FundTransferStatus: 'Processing',
+      OriginalTotal: { CurrencyCode: 'CAD', CurrencyAmount: 999.0 },
+      // FundTransferDate intentionally absent
+    }
+    mockSpFetch
+      .mockResolvedValueOnce({ payload: { FinancialEventGroupList: [noDate] } })
+      .mockResolvedValueOnce(DDBR_EMPTY)
+
+    const result = await fetchSettlementBalance()
+    expect(result.lastPayout).toBeNull()
+  })
+
+  // ── DDBR response-shape regression guard ──────────────────────────────────
+  // Real SP-API wraps in `payload`. Pre-2026-05-07 code read `data.transactions`
+  // directly and silently dropped all deferred. This test fails if the parsing
+  // path regresses.
+
+  it('parses DDBR transactions from payload-wrapped response (real SP-API shape)', async () => {
+    mockSpFetch.mockResolvedValueOnce(makeGroupsResponse([])).mockResolvedValueOnce({
+      payload: {
+        transactions: [
+          {
+            transactionStatus: 'DEFERRED',
+            totalAmount: { currencyCode: 'CAD', currencyAmount: 100.0 },
+          },
+          {
+            transactionStatus: 'DEFERRED',
+            totalAmount: { currencyCode: 'CAD', currencyAmount: 200.0 },
+          },
+        ],
+      },
+    })
+
+    const result = await fetchSettlementBalance()
+    expect(result.ddbrCad).toBe(300.0)
+    expect(result.ddbrAvailable).toBe(true)
   })
 })

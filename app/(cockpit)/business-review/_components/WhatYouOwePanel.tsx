@@ -7,12 +7,17 @@ import { DebugSection } from '@/components/cockpit/DebugSection'
 // Inline types — do NOT import from route files. Route handlers import lib/amazon/client
 // which uses Node.js `crypto`. Turbopack traverses the import type graph and leaks
 // server-only modules into the client bundle, silently breaking the component.
+interface LastPayout {
+  amountCad: number
+  transferDate: string
+  status: 'Processing' | 'Succeeded'
+}
+
 interface SettlementResponse {
   grossPendingCad: number
   deferredCad: number
-  inTransitCad: number
   totalBalanceCad: number
-  inTransitGroupsCount: number
+  lastPayout: LastPayout | null
   ddbrCad: number | null
   ddbrAvailable: boolean
   fetchedAt: string
@@ -107,6 +112,13 @@ function minutesAgo(isoTimestamp: string): string {
   if (mins < 1) return 'just now'
   if (mins === 1) return '1 min ago'
   return `${mins} min ago`
+}
+
+// ── Date formatting for last payout ───────────────────────────────────────────
+
+function shortDate(isoTimestamp: string): string {
+  const d = new Date(isoTimestamp)
+  return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
 }
 
 // ── Main exported component ───────────────────────────────────────────────────
@@ -209,7 +221,8 @@ export function WhatYouOwePanel() {
         ? fmt(settlement.totalBalanceCad)
         : '—'
 
-  const openBalanceValue = settlementLoading
+  // "Funds Available Now" — Amazon UI label for Standard open balance
+  const fundsAvailableValue = settlementLoading
     ? 'Loading…'
     : settlementError
       ? '—'
@@ -217,26 +230,32 @@ export function WhatYouOwePanel() {
         ? fmt(settlement.grossPendingCad)
         : '—'
 
-  const inTransitValue = settlementLoading
+  const deferredValue = settlementLoading
     ? 'Loading…'
     : settlementError
       ? '—'
       : settlement
-        ? fmt(settlement.inTransitCad)
+        ? fmt(settlement.deferredCad)
         : '—'
 
-  const ddbrValue = settlementLoading
+  // Sub-label flags FEG-fallback when DDBR API isn't returning data
+  const deferredSubLabel =
+    settlement && !settlement.ddbrAvailable && settlement.deferredCad === 0
+      ? 'Awaiting v2024-06-19 access'
+      : undefined
+
+  // Last payout — mirrors Amazon "Recent Payouts" line
+  const lastPayoutValue = settlementLoading
     ? 'Loading…'
     : settlementError
       ? '—'
-      : settlement
-        ? settlement.ddbrAvailable && settlement.ddbrCad !== null
-          ? fmt(settlement.ddbrCad)
-          : '—'
+      : settlement?.lastPayout
+        ? fmt(settlement.lastPayout.amountCad)
         : '—'
 
-  const ddbrSubLabel =
-    settlement && !settlement.ddbrAvailable ? 'Awaiting v2024-06-19 access' : undefined
+  const lastPayoutSubLabel = settlement?.lastPayout
+    ? `${shortDate(settlement.lastPayout.transferDate)} · ${settlement.lastPayout.status}`
+    : undefined
 
   // FBA units — fulfillable only (Constraint B-7)
   const fbaValue = fbaLoading
@@ -273,7 +292,7 @@ export function WhatYouOwePanel() {
         What You&apos;re Owed
       </span>
 
-      {/* 6-stat grid: 2 rows × 3 columns */}
+      {/* 6-stat grid: 2 rows × 3 columns — mirrors Amazon Payments page layout */}
       <div
         style={{
           display: 'grid',
@@ -281,13 +300,13 @@ export function WhatYouOwePanel() {
           gap: '16px 24px',
         }}
       >
-        {/* Row 1 */}
+        {/* Row 1 — balance breakdown matches Amazon "All Accounts" view */}
         <StatCell label="Total Balance" value={totalBalanceValue} sub={settlementSubLabel} />
-        <StatCell label="Open (Standard)" value={openBalanceValue} />
-        <StatCell label="In Transit" value={inTransitValue} />
+        <StatCell label="Funds Available Now" value={fundsAvailableValue} />
+        <StatCell label="Deferred" value={deferredValue} sub={deferredSubLabel} />
 
-        {/* Row 2 */}
-        <StatCell label="Deferred (DDBR)" value={ddbrValue} sub={ddbrSubLabel} />
+        {/* Row 2 — secondary signals */}
+        <StatCell label="Last Payout" value={lastPayoutValue} sub={lastPayoutSubLabel} />
         <StatCell label="FBA Units" value={fbaValue} sub={fbaSubLabel} />
         <StatCell label="Avg Cost / Unit" value="—" sub="Coming in Sprint 5" />
       </div>
