@@ -61,39 +61,32 @@ function DayPanel({
 }: {
   heading: string
   data: DayPanelData
-  /** Today panel includes pending orders in headline counts */
+  /** Today panel surfaces pending orders as a sub-line — never in the headline counts */
   showPendingIndicator: boolean
 }) {
-  // Today: count all orders including pending so "0 orders" never shows on an active day
-  const displayOrders = showPendingIndicator
-    ? data.confirmedCount + data.pendingCount
-    : data.confirmedCount
+  // Headline numbers always reflect CONFIRMED only — matches Amazon "Sales today
+  // so far". Pending orders are not sales and never appear in the bold headline.
+  const displayOrders = data.confirmedCount
+  const displayUnits = data.unitsSold
 
-  // Today: include pending units when there are no confirmed ones yet
-  const displayUnits =
-    showPendingIndicator && data.confirmedCount === 0 && data.pendingCount > 0
-      ? data.pendingUnits
-      : data.unitsSold
+  const revenueValue = data.confirmedCount > 0 ? `$${data.revenueCad.toFixed(2)}` : '$0.00'
 
-  // Revenue: show dollar amount for confirmed orders, "N pending" label otherwise
-  const revenueValue =
-    data.confirmedCount > 0
-      ? `$${data.revenueCad.toFixed(2)}`
-      : showPendingIndicator && data.pendingCount > 0
-        ? `${data.pendingCount} pending`
-        : '—'
-
-  const revenueSub =
-    data.confirmedCount > 0 && data.taxCad > 0
-      ? `+ $${data.taxCad.toFixed(2)} tax`
-      : data.confirmedCount > 0 && showPendingIndicator && data.pendingCount > 0
-        ? `+ ${data.pendingCount} pending`
-        : undefined
-
-  const ordersSub =
-    showPendingIndicator && data.confirmedCount > 0 && data.pendingCount > 0
-      ? `${data.confirmedCount} confirmed + ${data.pendingCount} pending`
+  // Sub-lines: always show pending count on Today panel when pending > 0.
+  // Tax sub-line only when there's confirmed revenue.
+  const pendingSub =
+    showPendingIndicator && data.pendingCount > 0
+      ? `+ ${data.pendingCount} pending order${data.pendingCount === 1 ? '' : 's'}`
       : undefined
+
+  const taxSub =
+    data.confirmedCount > 0 && data.taxCad > 0 ? `+ $${data.taxCad.toFixed(2)} tax` : undefined
+
+  // Revenue prefers tax sub-line when there's confirmed revenue + tax;
+  // otherwise falls back to pending indicator.
+  const revenueSub = taxSub ?? pendingSub
+
+  // Orders sub-line surfaces pending count whenever pending > 0 on Today.
+  const ordersSub = pendingSub
 
   return (
     <div
@@ -123,7 +116,7 @@ function DayPanel({
       >
         <StatRow label="Orders" value={displayOrders.toString()} sub={ordersSub} />
         <StatRow label="Revenue" value={revenueValue} sub={revenueSub} />
-        <StatRow label="Units" value={displayOrders > 0 ? displayUnits.toString() : '—'} />
+        <StatRow label="Units" value={displayUnits.toString()} />
         {/* Constraint 6: static payout label — no number */}
         <StatRow label="Payout" value="—" sub="Full payout estimate in Sprint 5" />
       </div>
