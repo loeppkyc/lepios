@@ -29,30 +29,52 @@ interface FinancialEventGroupsResponse {
 }
 
 interface ListTransactionsResponse {
-  transactions?: Array<{
-    transactionStatus?: string
-    totalAmount?: { currencyCode?: string; currencyAmount?: number }
-  }>
-  nextToken?: string
+  // Real SP-API shape: payload-wrapped. Production verification 2026-05-07 —
+  // the previous (unwrapped) shape silently dropped ALL deferred transactions
+  // ($7,285.59 missed). See scripts/probe-deferred-balance.mjs.
+  payload?: {
+    transactions?: Array<{
+      transactionStatus?: string
+      totalAmount?: { currencyCode?: string; currencyAmount?: number }
+    }>
+    nextToken?: string
+  }
 }
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+export interface LastPayout {
+  amountCad: number
+  /** ISO timestamp from FundTransferDate */
+  transferDate: string
+  /** 'Processing' (initiated, not yet landed) or 'Succeeded' (deposited) */
+  status: 'Processing' | 'Succeeded'
+}
+
 export interface SettlementBalance {
-  /** ProcessingStatus="Open" + no FundTransferStatus = currently accumulating */
+  /** ProcessingStatus="Open" + no FundTransferStatus = currently accumulating (Amazon "Standard, available now") */
   grossPendingCad: number
-  /** ProcessingStatus="Closed" + no FundTransferStatus = period ended, not yet disbursed */
+  /**
+   * Held-for-delivery balance (Amazon "Deferred transactions").
+   * Sourced from listTransactions v2024-06-19 DEFERRED status when available;
+   * falls back to financialEventGroups Closed-without-FTS for accounts without
+   * v2024-06-19 access. Never double-counted — DDBR replaces FEG-based deferred
+   * when present (the same money via two API surfaces).
+   */
   deferredCad: number
-  /** FundTransferStatus="Processing" = transfer initiated, not yet landed in bank */
-  inTransitCad: number
-  /** grossPendingCad + deferredCad + inTransitCad + (ddbrCad ?? 0) */
+  /** grossPendingCad + deferredCad — matches Amazon "All Accounts Total Balance" */
   totalBalanceCad: number
   openGroupsCount: number
   deferredGroupsCount: number
-  inTransitGroupsCount: number
   /**
-   * Delivery Date Based Reserve from v2024-06-19 listTransactions (DEFERRED+CAD).
-   * null when account is not yet migrated to that API (endpoint returns 0 transactions).
+   * Most recent payout group (CAD) by FundTransferDate. Mirrors Amazon's
+   * "Recent Payouts" line. Null if no transferred groups in the lookback window.
+   */
+  lastPayout: LastPayout | null
+  /**
+   * Raw DDBR sum from v2024-06-19 listTransactions (DEFERRED+CAD). null when
+   * the API returns 0 transactions for this account. When non-null, it is the
+   * canonical deferred number and `deferredCad` returns this value.
    */
   ddbrCad: number | null
   /** true when v2024-06-19 returned ≥1 DEFERRED CAD transaction; false = unavailable */
@@ -115,7 +137,7 @@ async function fetchDdbrBalance(): Promise<{ ddbrCad: number | null; ddbrAvailab
         params,
       })
 
-      for (const t of data.transactions ?? []) {
+      for (const t of data.payload?.transactions ?? []) {
         if (
           t.transactionStatus === 'DEFERRED' &&
           t.totalAmount?.currencyCode === 'CAD' &&
@@ -126,7 +148,7 @@ async function fetchDdbrBalance(): Promise<{ ddbrCad: number | null; ddbrAvailab
         }
       }
 
-      const next = data.nextToken
+      const next = data.payload?.nextToken
       if (!next) break
       params = { nextToken: next, maxResultsPerPage: '100' }
     }
@@ -140,13 +162,23 @@ async function fetchDdbrBalance(): Promise<{ ddbrCad: number | null; ddbrAvailab
 }
 
 /**
- * Fetch settlement balance across three buckets plus optional DDBR.
+ * Fetch settlement balance matching the Amazon Seller Central UI.
  *
- * Bucket rules (real FundTransferStatus enum from production):
- *   FTS absent   → grossPendingCad (Open) or deferredCad (Closed)
- *   FTS='Processing' → inTransitCad (transfer initiated, not yet landed)
- *   FTS='Succeeded'  → excluded (already paid out)
- *   FTS=anything else → excluded (unknown disbursement state)
+ * Categories from financialEventGroups (CAD only):
+ *   FTS absent + Open     → grossPendingCad (Standard, available now)
+ *   FTS absent + Closed   → fallback deferred (only when DDBR API unavailable)
+ *   FTS='Processing'      → payout in flight (used to compute lastPayout)
+ *   FTS='Succeeded'       → already paid out (used to compute lastPayout)
+ *
+ * Deferred (held-for-delivery): sourced from listTransactions v2024-06-19
+ * DEFERRED status when available — this is the canonical Amazon "Deferred
+ * transactions" number ($7,285.59 in production on 2026-05-07; the FEG
+ * Closed-without-FTS path returned $0 for the same balance, hence the DDBR
+ * preference).
+ *
+ * totalBalanceCad = grossPendingCad + deferredCad. Matches Amazon "All
+ * Accounts Total Balance". Does NOT include in-transit groups — those are
+ * already-initiated payouts, surfaced separately via lastPayout.
  *
  * Constraint B-2: only CAD groups included.
  * Constraint B-9: no caching — caller's route uses force-dynamic.
@@ -154,47 +186,56 @@ async function fetchDdbrBalance(): Promise<{ ddbrCad: number | null; ddbrAvailab
 export async function fetchSettlementBalance(): Promise<SettlementBalance> {
   const [groups, ddbr] = await Promise.all([fetchAllFinancialEventGroups(180), fetchDdbrBalance()])
 
-  let open = 0,
-    deferred = 0,
-    inTransit = 0
-  let openCount = 0,
-    deferredCount = 0,
-    inTransitCount = 0
+  let open = 0
+  let fegDeferred = 0
+  let openCount = 0
+  let fegDeferredCount = 0
+  let lastPayout: LastPayout | null = null
 
   for (const group of groups) {
     if (group.OriginalTotal?.CurrencyCode !== 'CAD') continue
 
     const amount = group.OriginalTotal.CurrencyAmount ?? 0
     const fts = group.FundTransferStatus
+    const transferDate = group.FundTransferDate
 
     if (!fts) {
       if (group.ProcessingStatus === 'Open') {
         open += amount
         openCount++
       } else {
-        // Closed + no FTS = period ended, payment not yet initiated
-        deferred += amount
-        deferredCount++
+        // Closed + no FTS = period ended, payment not yet initiated.
+        // Used as deferred fallback only when DDBR API has no data.
+        fegDeferred += amount
+        fegDeferredCount++
       }
-    } else if (fts === 'Processing') {
-      inTransit += amount
-      inTransitCount++
+    } else if ((fts === 'Processing' || fts === 'Succeeded') && transferDate) {
+      // Track most-recent payout to mirror Amazon "Recent Payouts" line.
+      if (!lastPayout || transferDate > lastPayout.transferDate) {
+        lastPayout = { amountCad: amount, transferDate, status: fts }
+      }
     }
-    // 'Succeeded' and any other truthy FTS → already disbursed, excluded
   }
 
   open = Math.round(open * 100) / 100
-  deferred = Math.round(deferred * 100) / 100
-  inTransit = Math.round(inTransit * 100) / 100
+  fegDeferred = Math.round(fegDeferred * 100) / 100
+
+  // DDBR is canonical when available; FEG-deferred is the legacy fallback.
+  // Never sum both — they describe the same money via different APIs.
+  const deferred = ddbr.ddbrCad !== null ? ddbr.ddbrCad : fegDeferred
+  const deferredCount = ddbr.ddbrCad !== null ? 0 : fegDeferredCount
+
+  if (lastPayout) {
+    lastPayout = { ...lastPayout, amountCad: Math.round(lastPayout.amountCad * 100) / 100 }
+  }
 
   return {
     grossPendingCad: open,
     deferredCad: deferred,
-    inTransitCad: inTransit,
-    totalBalanceCad: Math.round((open + deferred + inTransit + (ddbr.ddbrCad ?? 0)) * 100) / 100,
+    totalBalanceCad: Math.round((open + deferred) * 100) / 100,
     openGroupsCount: openCount,
     deferredGroupsCount: deferredCount,
-    inTransitGroupsCount: inTransitCount,
+    lastPayout,
     ddbrCad: ddbr.ddbrCad,
     ddbrAvailable: ddbr.ddbrAvailable,
     fetchedAt: new Date().toISOString(),

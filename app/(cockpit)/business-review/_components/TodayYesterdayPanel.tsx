@@ -176,19 +176,14 @@ function DebugOrderTable({
         <tbody>
           {orders.length === 0 && (
             <tr>
-              <td
-                colSpan={5}
-                style={{ padding: '4px 6px', color: 'var(--color-text-disabled)' }}
-              >
+              <td colSpan={5} style={{ padding: '4px 6px', color: 'var(--color-text-disabled)' }}>
                 No orders in window
               </td>
             </tr>
           )}
           {orders.map((o) => (
             <tr key={o.id}>
-              <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>
-                {'…' + o.id.slice(-10)}
-              </td>
+              <td style={{ padding: '2px 6px', whiteSpace: 'nowrap' }}>{'…' + o.id.slice(-10)}</td>
               <td
                 style={{
                   padding: '2px 6px',
@@ -249,6 +244,9 @@ function PanelSkeleton({ heading }: { heading: string }) {
 
 // ── Main exported component ───────────────────────────────────────────────────
 
+// Auto-refresh interval — keep Today/Yesterday counts current without manual reload.
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000
+
 export function TodayYesterdayPanel() {
   const [data, setData] = useState<TodayYesterdayResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -256,22 +254,36 @@ export function TodayYesterdayPanel() {
   const [devMode] = useDevMode()
 
   useEffect(() => {
-    fetch('/api/business-review/today-yesterday')
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string }
-          throw new Error(body.error ?? `HTTP ${res.status}`)
-        }
-        return res.json() as Promise<TodayYesterdayResponse>
-      })
-      .then((payload) => {
-        setData(payload)
-        setLoading(false)
-      })
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : String(err))
-        setLoading(false)
-      })
+    let cancelled = false
+
+    const load = () => {
+      fetch('/api/business-review/today-yesterday', { cache: 'no-store' })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string }
+            throw new Error(body.error ?? `HTTP ${res.status}`)
+          }
+          return res.json() as Promise<TodayYesterdayResponse>
+        })
+        .then((payload) => {
+          if (cancelled) return
+          setData(payload)
+          setError(null)
+          setLoading(false)
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          setError(err instanceof Error ? err.message : String(err))
+          setLoading(false)
+        })
+    }
+
+    load()
+    const interval = setInterval(load, REFRESH_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   if (loading) {
