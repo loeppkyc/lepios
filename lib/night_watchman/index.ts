@@ -69,7 +69,7 @@ export async function runScan(options: RunOptions): Promise<ScanReport> {
   const runId = await openRun(db, {
     scope: options.scope,
     triggerSource: options.triggerSource,
-    notes: dryRun ? 'dry_run' : null,
+    notes: dryRun ? 'dry_run' : undefined,
   })
 
   const startedAt = new Date()

@@ -195,6 +195,12 @@ registerCheck({
 })
 
 // ─── health.quota_burn ────────────────────────────────────────────────────────
+// Reads the real QuotaForecastResult shape:
+//   safe_to_start, reason, invocations_24h, cliff_threshold,
+//   estimated_remaining, recommended_wait_minutes
+// Fail when forecast says don't start (active 429 backoff or cliff risk).
+// Warn when estimated_remaining drops to single digits — tight runway but
+// no active backoff yet.
 registerCheck({
   key: 'health.quota_burn',
   category: 'health',
@@ -203,18 +209,18 @@ registerCheck({
   async run(): Promise<CheckResult> {
     try {
       const forecast = await forecastQuotaBeforeStart()
-      const tooHot = forecast.minutes_until_cliff != null && forecast.minutes_until_cliff < 30
-      const overBudget = forecast.over_budget === true
-      if (overBudget) {
+      if (!forecast.safe_to_start) {
+        const isCliff = forecast.reason === 'burn_rate_cliff_risk'
         return {
           key: 'health.quota_burn',
           category: 'health',
           status: 'fail',
-          severity: 'high',
+          severity: isCliff ? 'high' : 'medium',
           evidence: { forecast },
         }
       }
-      if (tooHot) {
+      // Tight runway: <10 calls left in the 24h window but not yet at cliff.
+      if (forecast.estimated_remaining >= 0 && forecast.estimated_remaining < 10) {
         return {
           key: 'health.quota_burn',
           category: 'health',
