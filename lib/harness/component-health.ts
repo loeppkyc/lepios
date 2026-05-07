@@ -26,17 +26,24 @@ export interface ComponentHealth extends ComponentHealthInput {
 }
 
 // ── deriveComponentHealth — pure ──────────────────────────────────────────────
+//
+// Status semantics (Colin, 2026-05-06):
+//   red   = error or not working (last event is an unrecovered failure)
+//   amber = something in the middle (still being built — completion_pct < 100)
+//   green = good and working (built, not currently broken)
+//
+// A component that failed earlier but has since recovered is green; the Last
+// Failure column carries the history. Absence of events does not flip a
+// fully-built component to red — silence is treated as "fine until proven
+// otherwise."
 
-const H24 = 24 * 3_600_000
 const H72 = 72 * 3_600_000
 
 export function deriveComponentHealth(
   component: ComponentHealthInput,
   events: ComponentEvent[],
-  now: Date = new Date()
+  _now: Date = new Date()
 ): ComponentHealth {
-  const nowMs = now.getTime()
-
   const successes = events
     .filter((e) => e.status === 'success')
     .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
@@ -51,30 +58,16 @@ export function deriveComponentHealth(
   const lastSuccessMs = lastSuccess ? new Date(lastSuccess.occurred_at).getTime() : null
   const lastFailureMs = lastFailure ? new Date(lastFailure.occurred_at).getTime() : null
 
-  const successAge = lastSuccessMs !== null ? nowMs - lastSuccessMs : Infinity
-  const failureAge = lastFailureMs !== null ? nowMs - lastFailureMs : Infinity
-
-  // Most recent event is failure: failure timestamp is newer than success (or no success exists)
   const mostRecentIsFailure =
     lastFailureMs !== null && (lastSuccessMs === null || lastFailureMs > lastSuccessMs)
 
   let health: HealthStatus
-
   if (mostRecentIsFailure) {
     health = 'red'
-  } else if (successAge <= H24) {
-    // Success within 24h. Amber if there was a failure within 72h that preceded the success.
-    const recentFailureBeforeSuccess =
-      lastFailureMs !== null &&
-      lastSuccessMs !== null &&
-      lastFailureMs < lastSuccessMs &&
-      failureAge <= H72
-    health = recentFailureBeforeSuccess ? 'amber' : 'green'
-  } else if (successAge <= H72) {
+  } else if (component.completion_pct < 100) {
     health = 'amber'
   } else {
-    // No success in 72h+ (includes no events at all)
-    health = 'red'
+    health = 'green'
   }
 
   return {

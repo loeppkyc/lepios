@@ -48,16 +48,14 @@ function warning(ageMs: number): ComponentEvent {
 }
 
 // ── deriveComponentHealth — status cases ──────────────────────────────────────
+//
+// Semantics (Colin, 2026-05-06):
+//   red   = last event is an unrecovered error
+//   amber = completion_pct < 100 (still being built)
+//   green = built and not currently broken
 
 describe('deriveComponentHealth', () => {
-  describe('red cases', () => {
-    it('no events → red', () => {
-      const result = deriveComponentHealth(makeComponent(), [], NOW)
-      expect(result.health).toBe('red')
-      expect(result.last_success).toBeNull()
-      expect(result.last_failure).toBeNull()
-    })
-
+  describe('red cases (broken)', () => {
     it('most recent event is failure → red', () => {
       const result = deriveComponentHealth(
         makeComponent(),
@@ -73,67 +71,80 @@ describe('deriveComponentHealth', () => {
       expect(result.health).toBe('red')
     })
 
-    it('success exists but is older than 72h → red', () => {
-      const result = deriveComponentHealth(makeComponent(), [success(H72 + 1)], NOW)
-      expect(result.health).toBe('red')
-    })
-
-    it('only warning events (no success or failure) → red (warning age > 72h treated as no signal)', () => {
-      // warnings don't count as success or failure; successAge = Infinity → red
-      const result = deriveComponentHealth(makeComponent(), [warning(H24)], NOW)
+    it('component still being built (50%) but currently failing → red (failure wins over completion)', () => {
+      const result = deriveComponentHealth(
+        makeComponent({ completion_pct: 50 }),
+        [failure(H24 - 1)],
+        NOW
+      )
       expect(result.health).toBe('red')
     })
   })
 
-  describe('green cases', () => {
-    it('success < 24h, no failures at all → green', () => {
+  describe('amber cases (in progress)', () => {
+    it('completion 50%, no events → amber', () => {
+      const result = deriveComponentHealth(makeComponent({ completion_pct: 50 }), [], NOW)
+      expect(result.health).toBe('amber')
+    })
+
+    it('completion 0%, no events → amber', () => {
+      const result = deriveComponentHealth(makeComponent({ completion_pct: 0 }), [], NOW)
+      expect(result.health).toBe('amber')
+    })
+
+    it('completion 99% with recent success → amber (still in progress)', () => {
+      const result = deriveComponentHealth(
+        makeComponent({ completion_pct: 99 }),
+        [success(H24 - 1)],
+        NOW
+      )
+      expect(result.health).toBe('amber')
+    })
+  })
+
+  describe('green cases (built and working)', () => {
+    it('completion 100%, no events → green', () => {
+      const result = deriveComponentHealth(makeComponent(), [], NOW)
+      expect(result.health).toBe('green')
+      expect(result.last_success).toBeNull()
+      expect(result.last_failure).toBeNull()
+    })
+
+    it('completion 100%, recent success → green', () => {
       const result = deriveComponentHealth(makeComponent(), [success(H24 - 1)], NOW)
       expect(result.health).toBe('green')
       expect(result.last_success).toBe(ago(H24 - 1))
     })
 
-    it('success < 24h, failure exists but older than 72h → green (old failure ignored)', () => {
-      // Failure is > 72h old — not "recent"
-      const result = deriveComponentHealth(
-        makeComponent(),
-        [success(H24 - 1), failure(H72 + 1)],
-        NOW
-      )
+    it('completion 100%, only old success (>72h) → green (silence is fine)', () => {
+      const result = deriveComponentHealth(makeComponent(), [success(H72 + 1)], NOW)
       expect(result.health).toBe('green')
     })
 
-    it('multiple successes within 24h → green, last_success is most recent', () => {
-      // ago(22h) = 14:00 UTC (more recent); ago(23h) = 13:00 UTC (older)
+    it('completion 100%, only warning events → green (warnings are not failures)', () => {
+      const result = deriveComponentHealth(makeComponent(), [warning(H24)], NOW)
+      expect(result.health).toBe('green')
+    })
+
+    it('completion 100%, recovered (failure then later success) → green', () => {
+      // Failure 48h ago, success 12h ago → currently working, history shows the failure
+      const result = deriveComponentHealth(
+        makeComponent(),
+        [failure(H24 * 2), success(H24 / 2)],
+        NOW
+      )
+      expect(result.health).toBe('green')
+      expect(result.last_failure).toBe(ago(H24 * 2))
+    })
+
+    it('multiple successes → green, last_success is most recent', () => {
       const result = deriveComponentHealth(
         makeComponent(),
         [success(H24 - 3_600_000), success(H24 - 7_200_000)],
         NOW
       )
       expect(result.health).toBe('green')
-      // H24 - 7_200_000 = 22h ago = more recent
       expect(result.last_success).toBe(ago(H24 - 7_200_000))
-    })
-  })
-
-  describe('amber cases', () => {
-    it('success within 24h but failure within 72h before the success → amber (recovered)', () => {
-      // Failure 48h ago, success 12h ago → recovered but recently failed
-      const result = deriveComponentHealth(
-        makeComponent(),
-        [failure(H24 * 2), success(H24 / 2)],
-        NOW
-      )
-      expect(result.health).toBe('amber')
-    })
-
-    it('success between 24h and 72h → amber (no event in 24-72h window)', () => {
-      const result = deriveComponentHealth(makeComponent(), [success(H24 + 1)], NOW)
-      expect(result.health).toBe('amber')
-    })
-
-    it('success at exactly 72h boundary (≤72h) → amber', () => {
-      const result = deriveComponentHealth(makeComponent(), [success(H72)], NOW)
-      expect(result.health).toBe('amber')
     })
   })
 
@@ -207,7 +218,7 @@ describe('getComponentsWithHealth', () => {
     expect(result).toEqual([])
   })
 
-  it('maps components with no matching events to red', async () => {
+  it('maps components in progress (completion < 100) with no matching events to amber', async () => {
     mockFrom
       .mockReturnValueOnce(
         makeComponentsBuilder([
@@ -223,7 +234,27 @@ describe('getComponentsWithHealth', () => {
 
     const result = await getComponentsWithHealth()
     expect(result).toHaveLength(1)
-    expect(result[0].health).toBe('red')
+    expect(result[0].health).toBe('amber')
+    expect(result[0].last_success).toBeNull()
+  })
+
+  it('maps fully-built components with no matching events to green', async () => {
+    mockFrom
+      .mockReturnValueOnce(
+        makeComponentsBuilder([
+          {
+            id: 'harness:built_thing',
+            display_name: 'Built Thing',
+            weight_pct: 4,
+            completion_pct: 100,
+          },
+        ])
+      )
+      .mockReturnValueOnce(makeEventsBuilder([]))
+
+    const result = await getComponentsWithHealth()
+    expect(result).toHaveLength(1)
+    expect(result[0].health).toBe('green')
     expect(result[0].last_success).toBeNull()
   })
 
@@ -254,7 +285,33 @@ describe('getComponentsWithHealth', () => {
     const compB = result.find((r) => r.id === 'harness:comp_b')!
 
     expect(compA.health).toBe('green')
-    expect(compB.health).toBe('red') // no events
+    expect(compB.health).toBe('green') // built (100%), no events but silence is fine
+  })
+
+  it('flags fully-built component as red when most recent event is an error', async () => {
+    const recentFailure = new Date(Date.now() - 1_000).toISOString()
+
+    mockFrom
+      .mockReturnValueOnce(
+        makeComponentsBuilder([
+          { id: 'harness:comp_a', display_name: 'A', weight_pct: 10, completion_pct: 100 },
+        ])
+      )
+      .mockReturnValueOnce(
+        makeEventsBuilder([
+          {
+            occurred_at: recentFailure,
+            status: 'error',
+            error_message: 'DB unreachable',
+            action: 'some_action',
+            meta: { id: 'harness:comp_a' },
+          },
+        ])
+      )
+
+    const result = await getComponentsWithHealth()
+    expect(result[0].health).toBe('red')
+    expect(result[0].last_error).toBe('DB unreachable')
   })
 
   it('ignores events with meta.id not matching any component slug', async () => {
@@ -279,7 +336,7 @@ describe('getComponentsWithHealth', () => {
       )
 
     const result = await getComponentsWithHealth()
-    expect(result[0].health).toBe('red') // event didn't match
+    expect(result[0].health).toBe('green') // built, no errors → green regardless of unmatched events
   })
 
   it('handles events with null meta gracefully', async () => {
@@ -302,6 +359,6 @@ describe('getComponentsWithHealth', () => {
       )
 
     const result = await getComponentsWithHealth()
-    expect(result[0].health).toBe('red') // null meta → no match
+    expect(result[0].health).toBe('green') // built, null meta event ignored, no errors
   })
 })
