@@ -17,7 +17,13 @@
       "filename": "0140_night_watchman.sql",
       "claimed_at": "2026-05-07",
       "note": "Night-watchman v2 — runs/check_results/incidents tables + 4 harness_config keys for killswitch+loop-guards. Applied to prod via Supabase MCP."
+    },
+    "0141": {
+      "branch": "chore/self-repair-wire-up",
+      "filename": "0141_self_repair_wire_up.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Self-repair wire-up — seed harness_config keys for Sentry/Vercel/Telegram-Vault-pointer with empty-string placeholders. Applied to prod via Supabase MCP. ON CONFLICT DO NOTHING — re-runnable, never clobbers populated values."
     }
   },
-  "next_available": 141
+  "next_available": 142
 }
