@@ -1,0 +1,17 @@
+{
+  "claimed": {
+    "0138": {
+      "branch": "security/lockdown-phase-0-4",
+      "filename": "0138_user_profiles_and_invites.sql",
+      "claimed_at": "2026-05-07",
+      "note": "In flight on PR #104 (security lockdown phase 1)"
+    },
+    "0139": {
+      "branch": "security/lockdown-phase-0-4",
+      "filename": "0139_rls_role_hardening.sql",
+      "claimed_at": "2026-05-07",
+      "note": "In flight on PR #104 (security lockdown phase 2)"
+    }
+  },
+  "next_available": 140
+}
