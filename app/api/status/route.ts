@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 import { getActiveSessions } from '@/lib/harness/window-tracker'
 import { getComponentsWithHealth } from '@/lib/harness/component-health'
 import { getIncidentLog, get90DayBars } from '@/lib/harness/status-data'
+import { requireUser } from '@/lib/auth/require-user'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'admin' })
+  if (!gate.ok) return gate.response
+
   try {
     const [sessions, components, incidents, bars] = await Promise.all([
       getActiveSessions(),

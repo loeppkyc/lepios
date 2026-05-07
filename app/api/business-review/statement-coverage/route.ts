@@ -1,13 +1,23 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 
 export const revalidate = 0
 
 // ── Month abbreviation helper ─────────────────────────────────────────────────
 
 const MONTH_ABBREVS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
 }
 
 /** Converts a 3-letter month abbreviation (case-insensitive) to 1–12, or null if unrecognized. */
@@ -197,7 +207,7 @@ export function cellStatus(
   cellYear: number,
   cellMonth: number,
   nowYear: number,
-  nowMonth: number,
+  nowMonth: number
 ): 'pending' | 'missing' {
   if (cellYear > nowYear) return 'pending'
   if (cellYear === nowYear && cellMonth >= nowMonth) return 'pending'
@@ -340,6 +350,9 @@ const NO_ACTIVITY: Record<string, string[]> = {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   // Kill signal 1: credentials check (trim first — see F15)
   if (
     !process.env.DROPBOX_APP_KEY?.trim() ||
@@ -361,10 +374,9 @@ export async function GET() {
   const { year: currentYear } = currentEdmontonYearMonth()
 
   // Load manual overrides from DB; fail open (empty set) if unavailable.
-  let manualOverrides = new Set<string>()
+  const manualOverrides = new Set<string>()
   try {
-    const supabase = await createClient()
-    const { data: rows } = await supabase
+    const { data: rows } = await gate.supabase
       .from('statement_coverage_overrides')
       .select('account_key, year_month')
     for (const row of rows ?? []) {

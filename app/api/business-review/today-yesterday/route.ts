@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import pLimit from 'p-limit'
 import { spApiConfigured } from '@/lib/amazon/client'
+import { requireUser } from '@/lib/auth/require-user'
 import {
   fetchOrders,
   fetchOrderItems,
@@ -113,6 +114,9 @@ function toDebugOrder(o: SpOrder): DebugOrder {
 }
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   if (!spApiConfigured()) {
     return NextResponse.json({ error: 'SP-API credentials not configured' }, { status: 503 })
   }

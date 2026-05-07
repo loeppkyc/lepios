@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { readOsSheet, parseDollar } from '@/lib/sheets/client'
+import { requireUser } from '@/lib/auth/require-user'
 
 export const revalidate = 3600
 
@@ -88,6 +89,9 @@ function extractSheet(raw: string[][]): SheetExtract {
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 export async function GET(request: Request) {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   const { searchParams } = new URL(request.url)
   const year = parseInt(searchParams.get('year') ?? String(new Date().getFullYear()), 10)
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const MODULES = [
@@ -16,17 +16,43 @@ const MODULES = [
 
 type Mode = 'signin' | 'signup' | 'forgot'
 
+const PASSWORD_MIN = 8
+
+function passwordComplaint(pw: string): string | null {
+  if (pw.length < PASSWORD_MIN) return `Password must be at least ${PASSWORD_MIN} characters.`
+  if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw))
+    return 'Password must contain at least one letter and one number.'
+  return null
+}
+
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteParam = searchParams.get('invite') ?? ''
+  const errorParam = searchParams.get('error')
+
+  // Signup tab is hidden unless an invite code is present in the URL.
+  const signupAllowed = inviteParam.length > 0
+
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState(inviteParam)
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Surface an unauthorized-redirect from middleware, etc.
+  useEffect(() => {
+    if (errorParam === 'unauthorized') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot mount-time message from URL param
+      setMessage({ type: 'error', text: 'Your session was rejected. Please sign in again.' })
+    }
+  }, [errorParam])
+
   function switchMode(next: Mode) {
+    if (next === 'signup' && !signupAllowed) return
     setMode(next)
     setMessage(null)
     setPassword('')
@@ -50,11 +76,43 @@ export default function LoginPage() {
         router.push('/business-review')
       }
     } else if (mode === 'signup') {
+      if (!inviteCode.trim()) {
+        setMessage({ type: 'error', text: 'Invite code required. Contact Colin for an invite.' })
+        setLoading(false)
+        return
+      }
       if (password !== confirmPassword) {
         setMessage({ type: 'error', text: 'Passwords do not match.' })
         setLoading(false)
         return
       }
+      const pwError = passwordComplaint(password)
+      if (pwError) {
+        setMessage({ type: 'error', text: pwError })
+        setLoading(false)
+        return
+      }
+
+      // Atomically consume the invite via SECURITY DEFINER RPC. Returns false if
+      // the code is invalid, expired, or exhausted. Done before signUp so a
+      // bogus code never produces an auth.users row.
+      const { data: consumed, error: rpcError } = await supabase.rpc('consume_invite_code', {
+        p_code: inviteCode.trim(),
+      })
+      if (rpcError) {
+        setMessage({ type: 'error', text: rpcError.message })
+        setLoading(false)
+        return
+      }
+      if (!consumed) {
+        setMessage({
+          type: 'error',
+          text: 'Invalid, expired, or exhausted invite code. Contact Colin for a new one.',
+        })
+        setLoading(false)
+        return
+      }
+
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) {
         setMessage({ type: 'error', text: error.message })
@@ -62,7 +120,7 @@ export default function LoginPage() {
       } else {
         setMessage({
           type: 'info',
-          text: 'Check your email for a confirmation link, then sign in.',
+          text: 'Account created. Check your email for a confirmation link, then sign in. Your account starts as pending — Colin will assign your access level.',
         })
         switchMode('signin')
         setLoading(false)
@@ -118,7 +176,7 @@ export default function LoginPage() {
           Edmonton · Alberta · Canada
         </p>
         <div className="mt-3">
-          <span className="rounded-sm border border-[var(--color-accent)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] font-semibold uppercase tracking-widest text-[var(--color-accent)]">
+          <span className="rounded-sm border border-[var(--color-accent)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[length:var(--text-nano)] font-semibold tracking-widest text-[var(--color-accent)] uppercase">
             LEPIOS
           </span>
         </div>
@@ -151,32 +209,34 @@ export default function LoginPage() {
           border: '1px solid var(--color-border)',
         }}
       >
-        {/* Tabs — hidden in forgot mode */}
+        {/* Tabs — hidden in forgot mode. Signup tab only appears with ?invite= */}
         {mode !== 'forgot' && (
           <div className="mb-6 flex gap-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-            {(['signin', 'signup'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => switchMode(tab)}
-                className="relative pb-3 text-sm font-semibold tracking-wide"
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  color: mode === tab ? 'var(--color-accent-gold)' : 'var(--color-text-muted)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {tab === 'signin' ? 'Sign In' : 'Create Account'}
-                {mode === tab && (
-                  <span
-                    className="absolute right-0 bottom-0 left-0 h-0.5 rounded-full"
-                    style={{ background: 'var(--color-accent-gold)' }}
-                  />
-                )}
-              </button>
-            ))}
+            {(['signin', 'signup'] as const)
+              .filter((tab) => tab === 'signin' || signupAllowed)
+              .map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => switchMode(tab)}
+                  className="relative pb-3 text-sm font-semibold tracking-wide"
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    color: mode === tab ? 'var(--color-accent-gold)' : 'var(--color-text-muted)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {tab === 'signin' ? 'Sign In' : 'Create Account'}
+                  {mode === tab && (
+                    <span
+                      className="absolute right-0 bottom-0 left-0 h-0.5 rounded-full"
+                      style={{ background: 'var(--color-accent-gold)' }}
+                    />
+                  )}
+                </button>
+              ))}
           </div>
         )}
 
@@ -213,6 +273,39 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Invite code — signup only */}
+          {mode === 'signup' && (
+            <div>
+              <label
+                className={labelCls}
+                style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-text-muted)' }}
+              >
+                Invite Code
+              </label>
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                required
+                autoComplete="off"
+                className={inputCls}
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  color: 'var(--color-text-primary)',
+                  letterSpacing: '0.08em',
+                }}
+              />
+              <p
+                className="mt-1 text-xs"
+                style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-text-muted)' }}
+              >
+                Invite-only. Contact Colin if you need access.
+              </p>
+            </div>
+          )}
+
           {/* Email */}
           <div>
             <label

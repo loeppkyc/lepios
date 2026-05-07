@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
 import { spApiConfigured } from '@/lib/amazon/client'
 import { fetchFbaInventory, type FbaInventoryResult } from '@/lib/amazon/inventory'
+import { requireUser } from '@/lib/auth/require-user'
 
 // Constraint B-8: 30-minute server-side cache — do NOT use force-dynamic here
 export const revalidate = 1800
 
-export interface FbaInventoryResponse extends FbaInventoryResult {}
+export type FbaInventoryResponse = FbaInventoryResult
 
 export async function GET() {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   if (!spApiConfigured()) {
     return NextResponse.json({ error: 'SP-API credentials not configured' }, { status: 503 })
   }

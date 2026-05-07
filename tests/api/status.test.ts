@@ -1,4 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('@/lib/auth/require-user', () => ({
+  requireUser: vi.fn(async () => ({
+    ok: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    profile: { user_id: 'test-user', email: 'test@example.com', role: 'admin' },
+    supabase: {},
+  })),
+}))
+
 import { GET } from '@/app/api/status/route'
 import { getActiveSessions } from '@/lib/harness/window-tracker'
 import { getComponentsWithHealth } from '@/lib/harness/component-health'

@@ -34,3 +34,17 @@ export function requireCronSecret(request: Request): NextResponse | null {
   }
   return null
 }
+
+/**
+ * Non-failing variant: returns true iff the request carries a valid Bearer
+ * CRON_SECRET. Returns false when the secret is missing or the header doesn't
+ * match — caller decides what to do (fall back to user auth, etc.).
+ *
+ * Used by routes that accept BOTH cron-secret and user-session auth, e.g.
+ * /api/twin/ask which is called by coordinator agents and by the admin UI.
+ */
+export function hasValidCronSecret(request: Request): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  return request.headers.get('authorization') === `Bearer ${secret}`
+}

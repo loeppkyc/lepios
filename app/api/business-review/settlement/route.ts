@@ -5,6 +5,7 @@ import {
   fetchAllFinancialEventGroups,
   type SettlementBalance,
 } from '@/lib/amazon/finances'
+import { requireUser } from '@/lib/auth/require-user'
 
 // Constraint B-9: fast route — no caching; finances returns one page (~82 groups), sub-second
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,9 @@ export const dynamic = 'force-dynamic'
 export type SettlementResponse = SettlementBalance
 
 export async function GET(request: Request) {
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
+
   if (!spApiConfigured()) {
     return NextResponse.json({ error: 'SP-API credentials not configured' }, { status: 503 })
   }

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 import type { BusinessExpense } from '@/lib/types/expenses'
 
 export const revalidate = 0
 
 export async function GET() {
-  const supabase = await createClient()
+  const gate = await requireUser({ minRole: 'business' })
+  if (!gate.ok) return gate.response
 
-  const { data, error } = await supabase
+  const { data, error } = await gate.supabase
     .from('business_expenses')
     .select('date, category, pretax, tax_amount, business_use_pct')
     .gte('date', '2020-01-01')
