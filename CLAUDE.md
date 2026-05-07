@@ -2,6 +2,8 @@
 
 Global rules live in `~/.claude/CLAUDE.md` and apply here too.
 
+**Multi-window protocol:** read `.claude/CLAUDE.md` on every session start. It defines the SCOPE CONTRACT, shared-seam files requiring approval, migration claim ritual, and rebase discipline that prevents one Claude window from clobbering another's work.
+
 **Single source of truth:** `ARCHITECTURE.md` at this project root. Read it before writing any code or making any design decision. If anything in this codebase contradicts it, flag it — do not silently fix it.
 
 ---
