@@ -30,7 +30,13 @@ export async function checkChatSummarize(): Promise<CheckResult> {
 
     if (convErr) throw new Error(convErr.message)
     if (!convs || convs.length === 0) {
-      return { name: 'chat_summarize', status: 'ok', flags, counts, duration_ms: Date.now() - start }
+      return {
+        name: 'chat_summarize',
+        status: 'pass',
+        flags,
+        counts,
+        duration_ms: Date.now() - start,
+      }
     }
 
     for (const conv of convs as { id: string; title: string | null }[]) {
@@ -49,7 +55,10 @@ export async function checkChatSummarize(): Promise<CheckResult> {
         .map((m) => {
           const parts = Array.isArray(m.content) ? m.content : []
           const text = parts
-            .filter((p): p is { type: string; text?: string } => p !== null && typeof p === 'object' && 'type' in p)
+            .filter(
+              (p): p is { type: string; text?: string } =>
+                p !== null && typeof p === 'object' && 'type' in p
+            )
             .filter((p) => p.type === 'text')
             .map((p) => p.text ?? '')
             .join('')
@@ -66,7 +75,11 @@ export async function checkChatSummarize(): Promise<CheckResult> {
       )
 
       if (!ollamaResult) {
-        flags.push({ severity: 'warn', message: 'Ollama unreachable — chat summarization skipped', entity_type: 'ollama' })
+        flags.push({
+          severity: 'warn',
+          message: 'Ollama unreachable — chat summarization skipped',
+          entity_type: 'ollama',
+        })
         break
       }
 
@@ -87,7 +100,7 @@ export async function checkChatSummarize(): Promise<CheckResult> {
 
     return {
       name: 'chat_summarize',
-      status: flags.some((f) => f.severity === 'critical') ? 'fail' : 'ok',
+      status: flags.some((f) => f.severity === 'critical') ? 'fail' : 'pass',
       flags,
       counts,
       duration_ms: Date.now() - start,

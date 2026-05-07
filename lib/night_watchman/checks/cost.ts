@@ -1,66 +1,31 @@
 // Cost checks — quota forecast vs budget, API spend spike vs 7-day baseline.
 
 import { createServiceClient } from '@/lib/supabase/service'
-import { forecastQuotaBeforeStart } from '@/lib/harness/quota-forecast'
 import { registerCheck } from '../registry'
 import type { CheckResult } from '../types'
 
 // ─── cost.quota_over_budget ───────────────────────────────────────────────────
-// Distinct from health.quota_burn — that one is about cliff time. This one is
-// about projected month-end spend.
+// Was designed against a forecast shape that didn't actually exist
+// (projected_month_end_spend_usd / month_budget_usd). The real
+// QuotaForecastResult has invocations_24h + cliff_threshold + estimated_remaining
+// — useful for cliff time, not month-end spend. v2.1 will introduce a real
+// projected-spend signal (likely from agent_events.cost_usd aggregation across
+// the month). For now this check stays registered as a slot but always returns
+// skipped.
 registerCheck({
   key: 'cost.quota_over_budget',
   category: 'cost',
   defaultSeverity: 'high',
   label: 'Projected month-end token spend within budget',
   async run(): Promise<CheckResult> {
-    try {
-      const forecast = await forecastQuotaBeforeStart()
-      const projected = forecast.projected_month_end_spend_usd
-      const budget = forecast.month_budget_usd
-      if (projected == null || budget == null) {
-        return {
-          key: 'cost.quota_over_budget',
-          category: 'cost',
-          status: 'skipped',
-          evidence: {
-            reason: 'forecast missing projected_month_end_spend_usd or month_budget_usd',
-            forecast,
-          },
-        }
-      }
-      const ratio = projected / budget
-      if (ratio > 1.0) {
-        return {
-          key: 'cost.quota_over_budget',
-          category: 'cost',
-          status: 'fail',
-          severity: ratio > 1.25 ? 'critical' : 'high',
-          evidence: { projected_usd: projected, budget_usd: budget, ratio },
-        }
-      }
-      if (ratio > 0.85) {
-        return {
-          key: 'cost.quota_over_budget',
-          category: 'cost',
-          status: 'warn',
-          severity: 'medium',
-          evidence: { projected_usd: projected, budget_usd: budget, ratio },
-        }
-      }
-      return {
-        key: 'cost.quota_over_budget',
-        category: 'cost',
-        status: 'ok',
-        evidence: { projected_usd: projected, budget_usd: budget, ratio },
-      }
-    } catch (err) {
-      return {
-        key: 'cost.quota_over_budget',
-        category: 'cost',
-        status: 'skipped',
-        evidence: { error: err instanceof Error ? err.message : String(err) },
-      }
+    return {
+      key: 'cost.quota_over_budget',
+      category: 'cost',
+      status: 'skipped',
+      evidence: {
+        reason:
+          'projected month-end spend not yet computed. Wire-up planned for night-watchman v2.1 — will aggregate agent_events.cost_usd against a budget config key.',
+      },
     }
   },
 })

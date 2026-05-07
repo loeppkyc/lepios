@@ -36,6 +36,26 @@ node scripts/pre-commit-safety.mjs
 # Layer 1 — deterministic checks (zero tokens, fast)
 npx lint-staged
 
+# Layer 1.5 — TypeScript type check on src (catches "module not found" + type
+# errors that vitest doesn't see — vitest doesn't compile-link the whole graph).
+# Triggered by hotfix #111 — a route imported a helper from an unmerged branch
+# and reached main because nothing pre-commit was checking the full module graph.
+#
+# Filters errors under tests/ so pre-existing test typing issues don't block
+# commits to src code. Adding a tsconfig.precommit.json that excludes tests/
+# is the cleaner long-term move, deferred to a follow-up.
+#
+# Cost: ~30-40s cold, faster on warm tree.
+# Skip with SKIP_TYPECHECK=1 (emergency hotfix only — the gate exists for a reason).
+if [ "${SKIP_TYPECHECK}" != "1" ]; then
+  ts_errors=$(npx tsc --noEmit 2>&1 | grep -E "^[a-zA-Z]" | grep "error TS" | grep -v "^tests/" || true)
+  if [ -n "$ts_errors" ]; then
+    echo "❌ TypeScript errors in src code (tests/ excluded):"
+    echo "$ts_errors"
+    exit 1
+  fi
+fi
+
 # Layer 2 — AI diff review (Sonnet, ~3-5s)
 # Skip if SKIP_AI_REVIEW=1 (e.g. in CI or explicit bypass)
 if [ "${SKIP_AI_REVIEW}" != "1" ]; then

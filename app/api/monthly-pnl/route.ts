@@ -3,8 +3,20 @@ import { readOsSheet, parseDollar } from '@/lib/sheets/client'
 
 export const revalidate = 3600
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December']
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 export interface MonthlyPnlRow {
   month: string
@@ -33,7 +45,7 @@ export interface GoalRow {
 
 export interface MonthlyPnlResponse {
   months: MonthlyPnlRow[]
-  totals: Omit<MonthlyPnlRow, 'month' | 'marginPct'> & { marginPct: number | null }
+  totals: MonthlyPnlRow
   comparison2025: MonthlyPnlRow | null
   goals: GoalRow[]
 }
@@ -109,9 +121,17 @@ export async function GET() {
     months,
     totals: totals ?? {
       month: '2026 YTD',
-      revenue: 0, units: 0, orders: 0, amazonFees: 0,
-      estPayout: 0, cogs: 0, grossProfit: 0, expenses: 0,
-      netProfit: 0, marginPct: null, sessions: 0,
+      revenue: 0,
+      units: 0,
+      orders: 0,
+      amazonFees: 0,
+      estPayout: 0,
+      cogs: 0,
+      grossProfit: 0,
+      expenses: 0,
+      netProfit: 0,
+      marginPct: null,
+      sessions: 0,
     },
     comparison2025,
     goals,
