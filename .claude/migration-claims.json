@@ -23,7 +23,13 @@
       "filename": "0141_self_repair_wire_up.sql",
       "claimed_at": "2026-05-07",
       "note": "Self-repair wire-up — seed harness_config keys for Sentry/Vercel/Telegram-Vault-pointer with empty-string placeholders. Applied to prod via Supabase MCP. ON CONFLICT DO NOTHING — re-runnable, never clobbers populated values."
+    },
+    "0142": {
+      "branch": "feat/ai-pick-engine-chunk-a",
+      "filename": "0142_ai_pick_engine_schema.sql",
+      "claimed_at": "2026-05-07",
+      "note": "AI Pick Engine Chunk A — predictions, trades, trust_state, prediction_weights tables + mode column on bets. See docs/acceptance/ai-pick-engine-chunk-a-schema.md. Note: originally claimed 0141 but lost the race to PR #109 — bumped after rebase, no schema impact (different tables)."
     }
   },
-  "next_available": 142
+  "next_available": 143
 }
