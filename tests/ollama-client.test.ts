@@ -26,6 +26,17 @@ vi.mock('@/lib/ollama/circuit', () => ({
   }),
 }))
 
+// ── Mock supabase service — hydrateOllamaConfig reads harness_config ──────────
+
+const { mockMaybeSingle, mockSupabaseFrom } = vi.hoisted(() => ({
+  mockMaybeSingle: vi.fn(),
+  mockSupabaseFrom: vi.fn(),
+}))
+
+vi.mock('@/lib/supabase/service', () => ({
+  createServiceClient: vi.fn(() => ({ from: mockSupabaseFrom })),
+}))
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 import {
@@ -36,6 +47,8 @@ import {
   extractConfidence,
   OllamaUnreachableError,
   getBaseUrl,
+  hydrateOllamaConfig,
+  _resetOllamaConfigCache,
 } from '@/lib/ollama/client'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -60,6 +73,17 @@ beforeEach(() => {
   delete process.env.OLLAMA_TUNNEL_URL
   delete process.env.OLLAMA_CODE_MODEL
   delete process.env.OLLAMA_EMBED_MODEL
+  // Reset module-level harness_config cache
+  _resetOllamaConfigCache()
+  // Default: harness_config has no row for OLLAMA_TUNNEL_URL
+  mockMaybeSingle.mockResolvedValue({ data: null, error: null })
+  mockSupabaseFrom.mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: mockMaybeSingle,
+      }),
+    }),
+  })
 })
 
 afterEach(() => {
@@ -81,6 +105,108 @@ describe('getBaseUrl', () => {
   it('strips trailing slash from OLLAMA_TUNNEL_URL', () => {
     process.env.OLLAMA_TUNNEL_URL = 'https://my-tunnel.example.com/'
     expect(getBaseUrl()).toBe('https://my-tunnel.example.com')
+  })
+})
+
+// ── hydrateOllamaConfig + harness_config preference ───────────────────────────
+
+describe('hydrateOllamaConfig + harness_config-resident config', () => {
+  it('prefers harness_config value over process.env after hydrate', async () => {
+    process.env.OLLAMA_TUNNEL_URL = 'https://from-env.example.com'
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://from-harness-config.example.com' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig()
+
+    expect(getBaseUrl()).toBe('https://from-harness-config.example.com')
+  })
+
+  it('strips trailing slash from harness_config value', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://tunnel.example.com/' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig()
+
+    expect(getBaseUrl()).toBe('https://tunnel.example.com')
+  })
+
+  it('falls back to process.env when harness_config row missing', async () => {
+    process.env.OLLAMA_TUNNEL_URL = 'https://from-env.example.com'
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null })
+
+    await hydrateOllamaConfig()
+
+    expect(getBaseUrl()).toBe('https://from-env.example.com')
+  })
+
+  it('falls back to process.env when harness_config value is empty/whitespace', async () => {
+    process.env.OLLAMA_TUNNEL_URL = 'https://from-env.example.com'
+    mockMaybeSingle.mockResolvedValue({ data: { value: '   ' }, error: null })
+
+    await hydrateOllamaConfig()
+
+    expect(getBaseUrl()).toBe('https://from-env.example.com')
+  })
+
+  it('falls back to localhost when neither harness_config nor process.env set', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null })
+
+    await hydrateOllamaConfig()
+
+    expect(getBaseUrl()).toBe('http://localhost:11434')
+  })
+
+  it('does NOT throw if harness_config read fails', async () => {
+    mockSupabaseFrom.mockImplementation(() => {
+      throw new Error('DB unreachable')
+    })
+
+    await expect(hydrateOllamaConfig()).resolves.toBeUndefined()
+    expect(getBaseUrl()).toBe('http://localhost:11434') // falls back cleanly
+  })
+
+  it('idempotent within TTL — second call without force does not re-query', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://tunnel-1.example.com' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig()
+    expect(mockMaybeSingle).toHaveBeenCalledTimes(1)
+    expect(getBaseUrl()).toBe('https://tunnel-1.example.com')
+
+    // Change the underlying mock to simulate harness_config update
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://tunnel-2.example.com' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig() // NOT forced — should hit cache
+    expect(mockMaybeSingle).toHaveBeenCalledTimes(1) // still 1
+    expect(getBaseUrl()).toBe('https://tunnel-1.example.com') // still cached value
+  })
+
+  it('force=true re-reads harness_config and updates cache', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://tunnel-1.example.com' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig()
+    expect(getBaseUrl()).toBe('https://tunnel-1.example.com')
+
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://tunnel-2.example.com' },
+      error: null,
+    })
+
+    await hydrateOllamaConfig(true)
+    expect(mockMaybeSingle).toHaveBeenCalledTimes(2)
+    expect(getBaseUrl()).toBe('https://tunnel-2.example.com')
   })
 })
 
