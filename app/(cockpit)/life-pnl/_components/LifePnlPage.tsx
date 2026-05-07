@@ -397,89 +397,92 @@ export function LifePnlPage() {
                 No expenses logged for {year}.
               </div>
             ) : (
-              <div style={{ padding: '10px 0' }}>
-                {data.categories.map((cat) => {
-                  const maxTotal = data.categories[0]?.total ?? 1
-                  const pct = (cat.total / maxTotal) * 100
-                  return (
-                    <div
-                      key={cat.category}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '6px 16px',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '0.65rem',
-                          fontWeight: 700,
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                          color: cat.isCogs
-                            ? 'var(--color-accent-gold)'
-                            : 'var(--color-text-disabled)',
-                          width: 40,
-                          flexShrink: 0,
-                          textAlign: 'center',
-                        }}
-                      >
-                        {cat.isCogs ? 'COGS' : 'OpEx'}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: 'var(--text-small)',
-                          color: 'var(--color-text-primary)',
-                          flex: 1,
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {cat.category}
-                      </span>
+              <>
+                <ExpenseDonut categories={data.categories} />
+                <div style={{ padding: '10px 0' }}>
+                  {data.categories.map((cat) => {
+                    const maxTotal = data.categories[0]?.total ?? 1
+                    const pct = (cat.total / maxTotal) * 100
+                    return (
                       <div
+                        key={cat.category}
                         style={{
-                          width: 160,
-                          height: 6,
-                          background: 'var(--color-surface-2)',
-                          borderRadius: 3,
-                          overflow: 'hidden',
-                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '6px 16px',
                         }}
                       >
-                        <div
+                        <span
                           style={{
-                            width: `${pct}%`,
-                            height: '100%',
-                            background: cat.isCogs
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            color: cat.isCogs
                               ? 'var(--color-accent-gold)'
                               : 'var(--color-text-disabled)',
-                            borderRadius: 3,
+                            width: 40,
+                            flexShrink: 0,
+                            textAlign: 'center',
                           }}
-                        />
+                        >
+                          {cat.isCogs ? 'COGS' : 'OpEx'}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 'var(--text-small)',
+                            color: 'var(--color-text-primary)',
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {cat.category}
+                        </span>
+                        <div
+                          style={{
+                            width: 160,
+                            height: 6,
+                            background: 'var(--color-surface-2)',
+                            borderRadius: 3,
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: '100%',
+                              background: cat.isCogs
+                                ? 'var(--color-accent-gold)'
+                                : 'var(--color-text-disabled)',
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.8rem',
+                            color: 'var(--color-text-muted)',
+                            width: 80,
+                            textAlign: 'right',
+                            flexShrink: 0,
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {fmtCad(cat.total)}
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '0.8rem',
-                          color: 'var(--color-text-muted)',
-                          width: 80,
-                          textAlign: 'right',
-                          flexShrink: 0,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {fmtCad(cat.total)}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
 
@@ -970,5 +973,140 @@ function SnapshotRowEditor({
         )}
       </td>
     </tr>
+  )
+}
+
+function ExpenseDonut({
+  categories,
+}: {
+  categories: { category: string; total: number; isCogs: boolean }[]
+}) {
+  const total = categories.reduce((s, c) => s + c.total, 0)
+  if (total === 0) return null
+
+  const cogsTotal = categories.filter((c) => c.isCogs).reduce((s, c) => s + c.total, 0)
+  const opexTotal = total - cogsTotal
+
+  const size = 180
+  const radius = 78
+  const innerRadius = 50
+  const cx = size / 2
+  const cy = size / 2
+
+  // Two slices: COGS + OpEx
+  const slices = [
+    { label: 'COGS', value: cogsTotal, color: 'var(--color-accent-gold)' },
+    { label: 'OpEx', value: opexTotal, color: 'var(--color-text-disabled)' },
+  ].filter((s) => s.value > 0)
+
+  let cum = -Math.PI / 2
+  const arcs = slices.map((slice) => {
+    const angle = (slice.value / total) * 2 * Math.PI
+    const start = cum
+    const end = cum + angle
+    cum = end
+    const x1 = cx + radius * Math.cos(start)
+    const y1 = cy + radius * Math.sin(start)
+    const x2 = cx + radius * Math.cos(end)
+    const y2 = cy + radius * Math.sin(end)
+    const xi1 = cx + innerRadius * Math.cos(start)
+    const yi1 = cy + innerRadius * Math.sin(start)
+    const xi2 = cx + innerRadius * Math.cos(end)
+    const yi2 = cy + innerRadius * Math.sin(end)
+    const largeArc = angle > Math.PI ? 1 : 0
+    const d = `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L ${xi2.toFixed(2)} ${yi2.toFixed(2)} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${xi1.toFixed(2)} ${yi1.toFixed(2)} Z`
+    return { d, slice }
+  })
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 20,
+        alignItems: 'center',
+        padding: '16px',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+        {arcs.map((arc, i) => (
+          <path key={i} d={arc.d} fill={arc.slice.color}>
+            <title>
+              {arc.slice.label}: {fmtCad(arc.slice.value)} (
+              {Math.round((arc.slice.value / total) * 100)}%)
+            </title>
+          </path>
+        ))}
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fontFamily="var(--font-mono)"
+          fontSize="12"
+          fontWeight="700"
+          fill="var(--color-text-primary)"
+        >
+          {fmtCad(total)}
+        </text>
+        <text
+          x={cx}
+          y={cy + 12}
+          textAnchor="middle"
+          fontFamily="var(--font-ui)"
+          fontSize="9"
+          letterSpacing="0.1em"
+          fill="var(--color-text-disabled)"
+        >
+          EXPENSES
+        </text>
+      </svg>
+      <div style={{ flex: 1, fontFamily: 'var(--font-ui)', fontSize: 'var(--text-small)' }}>
+        {slices.map((slice, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 2,
+                background: slice.color,
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                flex: 1,
+                color: 'var(--color-text-muted)',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                fontSize: '0.7rem',
+              }}
+            >
+              {slice.label}
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--color-text-primary)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {fmtCad(slice.value)}
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--color-text-disabled)',
+                fontSize: '0.7rem',
+                width: 40,
+                textAlign: 'right',
+              }}
+            >
+              {Math.round((slice.value / total) * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
