@@ -11,7 +11,13 @@
       "filename": "0139_rls_role_hardening.sql",
       "claimed_at": "2026-05-07",
       "note": "In flight on PR #104 (security lockdown phase 2)"
+    },
+    "0140": {
+      "branch": "feat/self-repair-night-watchman-v2",
+      "filename": "0140_night_watchman.sql",
+      "claimed_at": "2026-05-07",
+      "note": "Night-watchman v2 — runs/check_results/incidents tables + 4 harness_config keys for killswitch+loop-guards. Applied to prod via Supabase MCP."
     }
   },
-  "next_available": 140
+  "next_available": 141
 }
