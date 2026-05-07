@@ -5,6 +5,20 @@ Newest-first. Format: date · what happened · root cause · fix/workaround · w
 
 ---
 
+## F-N9 — F-L11 recurrence: 19th cron in vercel.json silently broke deploy pipeline for ~50 minutes (2026-05-07)
+
+- **What:** PR #109 (`chore: self-repair v2 wire-up`) added a 19th cron to `vercel.json` (`/api/cron/night_watchman_scan` at `*/30 4-13 * * *` — both over the count ceiling AND sub-hourly). Vercel Hobby plan silently rejected the entire config at validation, before any build ran. PRs #109, #110, #111 all merged with `Vercel: failure` GitHub status checks pointing to the same stale `vercel.link/3Fpeeb1` placeholder URL — Vercel's behavior when it skips deploy creation. Production stayed pinned to the last successful commit `bb8b4a8` (PR #107) for ~50 min while three subsequent PRs landed but didn't deploy. Caught when PR #110 (AI Pick Engine schema) couldn't merge and we dug into the build logs.
+- **Root cause:** Same failure class as F-L11. CLAUDE.md §9 documents F-L11 with the lesson "Any cron addition must be validated against Vercel Hobby limits before merge" — but no automated check existed, so the discipline relied on human memory across windows. The night-watchman v2 PR author wasn't aware of the limit; the Hobby cron count had crept up to exactly 18 (the empirical ceiling) without anyone noticing the headroom was gone.
+- **Fix/workaround:**
+  - Hotfix PR #112 removed the new cron entirely, returning vercel.json to the proven-working 18-cron count. Build pipeline resumed within 5 minutes of the fix landing. PR #110 then rebased + deployed clean.
+  - Night-watchman scan is currently in degraded state: its cron is gone, only the `/halt` killswitch route + manual API invocation work. Logged in PR #112 description for follow-up to either invoke from `/api/cron/night-tick` or upgrade to Pro plan.
+- **Next time:**
+  - **Same-session prevention shipped:** `scripts/check-vercel-cron-count.mjs` now runs in `.husky/pre-commit`. Counts `vercel.json` crons, blocks commits that exceed `MAX_CRONS = 18`, and blocks any sub-hourly schedule (`*/N` minute, multiple discrete minutes, or `*` minute). Bypass via `VERCEL_CRON_CHECK_BYPASS=1` only when explicitly upgrading the plan in the same commit. Pattern matches S-L11: name the failure, ship visibility + prevention same-day.
+  - **Production-deploy verification gap remains:** the deploy gate verifies tests + merge but doesn't confirm a Vercel deployment actually landed for the merged commit. F-L11 already named this; the smoke-test framework will eventually close it. For now, after merging anything that touches `vercel.json` or adds API routes, run `mcp__claude_ai_Vercel__list_deployments` with `since=now` to verify a new deployment appeared. (The pre-commit guard catches the cron-count regression class specifically; broader deploy-verification is still manual.)
+  - **Raise the ceiling intentionally, not accidentally:** if a future PR genuinely needs more than 18 crons, the right move is to upgrade to Pro and bump `MAX_CRONS` in the script in the same PR — not to bypass the guard. The guard should be the visible gate where the upgrade decision happens.
+
+---
+
 ## F-N8 — Concurrent-session contaminated working tree shipped Payouts UI without backend (2026-05-06)
 
 - **What:** PR #86 (advisor backstop monitor) was opened from a branch I'd just created (`harness/advisor-backstop-monitor`), but the squash-merge silently included unrelated Payouts UI changes — `PayoutsPage.tsx` with `NotesCell` references to `s2.notes`, plus a PATCH call to a route that didn't exist yet. Main TypeScript-built fine but the Payouts page would crash at runtime on the missing column. Live in production from `bab3d5a` (PR #86 squash) until `7b842ba` (PR #88 squash, ~10 minutes later, which carried the gap-fill backend an autonomous parallel session had pushed onto my branch in between). Migration 0132 (`amazon_settlements.notes`) had to be applied manually via Supabase MCP — nobody had DDL authority on prod from the autonomous loop.
