@@ -14,7 +14,9 @@ import {
   insertSmokePendingEvent,
   fetchMainCommits,
   fetchPRBody,
+  fetchDiffSummary,
 } from '@/lib/harness/deploy-gate'
+import { classifyRisk, tierPermits, type RiskTier } from '@/lib/harness/risk-classifier'
 import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
 import { runOllamaHealthSmoke } from '@/lib/harness/smoke-tests/ollama-health'
@@ -199,16 +201,91 @@ async function runMigrationGate(
   results.push(`${commit_sha}:migration-review-sent`)
 }
 
+const VALID_RISK_TIERS: ReadonlyArray<RiskTier> = ['off', 'low', 'medium', 'migration-allow']
+
+// Read DEPLOY_GATE_RISK_TIER from harness_config. Falls back to 'low' if
+// missing or unknown. F-L2 prevention: never read tier-policy from process.env.
+async function readRiskTier(): Promise<RiskTier> {
+  try {
+    const db = createServiceClient()
+    const { data } = await db
+      .from('harness_config')
+      .select('value')
+      .eq('key', 'DEPLOY_GATE_RISK_TIER')
+      .maybeSingle()
+    const raw = (data as { value?: string } | null)?.value?.trim()
+    if (raw && (VALID_RISK_TIERS as readonly string[]).includes(raw)) {
+      return raw as RiskTier
+    }
+  } catch {
+    // fall through to default
+  }
+  return 'low'
+}
+
 async function runAutoPromote(
   commit_sha: string,
   branch: string,
   taskId: string,
   results: string[]
 ): Promise<void> {
+  // Hard kill switch — backward compat. F-L11 sibling: never lose the
+  // ability to disable auto-promote without touching DB.
   const autoPromote = process.env.DEPLOY_GATE_AUTO_PROMOTE !== '0'
   if (!autoPromote) {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_promotion_skipped',
+        status: 'success',
+        output_summary: `auto-promote disabled (DEPLOY_GATE_AUTO_PROMOTE=0)`,
+        meta: { commit_sha, branch, task_id: taskId, reason: 'kill_switch' },
+      })
+    } catch {
+      // swallow
+    }
     results.push(`${commit_sha}:promotion-skipped`)
     return
+  }
+
+  // Risk-tier classification — overnight-autonomy Module A.
+  const configuredTier = await readRiskTier()
+  const diff = await fetchDiffSummary(commit_sha)
+  if (!diff.error) {
+    const cls = classifyRisk({
+      changed_files: diff.changed_files,
+      added_lines: diff.added_lines,
+      removed_lines: diff.removed_lines,
+      diff_text: diff.diff_text,
+    })
+    if (!tierPermits(configuredTier, cls.required_tier)) {
+      try {
+        await writeGateEvent({
+          task_type: 'deploy_gate_promotion_skipped',
+          status: 'success',
+          output_summary: `auto-promote skipped: required ${cls.required_tier}, configured ${configuredTier}`,
+          meta: {
+            commit_sha,
+            branch,
+            task_id: taskId,
+            reason: 'risk_tier',
+            required_tier: cls.required_tier,
+            configured_tier: configuredTier,
+            risk_score: cls.risk_score,
+            classifier_reasons: cls.reasons,
+            changed_files: diff.changed_files,
+            added_lines: diff.added_lines,
+          },
+        })
+      } catch {
+        // swallow
+      }
+      results.push(`${commit_sha}:promotion-skipped`)
+      return
+    }
+  } else {
+    // Diff fetch failed — fall through and trust the existing migration
+    // detection result. This preserves prior behavior on GitHub API hiccups
+    // rather than gating spuriously.
   }
 
   let mergeResult: { ok: boolean; merge_sha?: string; error?: string }

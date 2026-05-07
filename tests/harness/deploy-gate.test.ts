@@ -374,8 +374,9 @@ describe('GET /api/cron/deploy-gate-runner — happy path', () => {
     expect(body.processed).toBe(1)
     expect(body.results[0]).toContain('ready')
 
-    // processing + preview_ready + smoke_preview + schema_check = 4 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // processing + preview_ready + smoke_preview + schema_check + promotion_skipped = 5 inserts
+    // (Module A: kill switch logs deploy_gate_promotion_skipped per acceptance doc §3.1)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
 
     const processingRow = mockInsert.mock.calls[0][0]
     expect(processingRow.task_type).toBe('deploy_gate_processing')
@@ -564,8 +565,9 @@ describe('GET /api/cron/deploy-gate-runner — concurrency cap', () => {
     const body = await res.json()
 
     expect(body.processed).toBe(5) // capped at MAX_PER_TICK=5
-    // 4 inserts per trigger (processing + preview_ready + smoke_preview + schema_check) × 5 = 20
-    expect(mockInsert).toHaveBeenCalledTimes(20)
+    // 5 inserts per trigger (processing + preview_ready + smoke_preview + schema_check + promotion_skipped) × 5 = 25
+    // (Module A: kill switch logs deploy_gate_promotion_skipped per acceptance doc §3.1)
+    expect(mockInsert).toHaveBeenCalledTimes(25)
 
     // Each SHA processed exactly once — no duplicates
     const processingShas = mockInsert.mock.calls
@@ -731,8 +733,9 @@ describe('GET /api/cron/deploy-gate-runner — smoke check', () => {
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
 
-    // processing + preview_ready + smoke_preview + schema_check = 4 inserts
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // processing + preview_ready + smoke_preview + schema_check + promotion_skipped = 5 inserts
+    // (Module A: kill switch logs deploy_gate_promotion_skipped per acceptance doc §3.1)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
 
     const smokeRow = mockInsert.mock.calls[2][0]
     expect(smokeRow.task_type).toBe('deploy_gate_smoke_preview')
@@ -953,7 +956,8 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
 
     await GET(makeRequest())
 
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // processing + preview_ready + smoke + schema + promotion_skipped = 5 (Module A)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
     const schemaRow = mockInsert.mock.calls[3][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.status).toBe('success')
@@ -1032,8 +1036,9 @@ describe('GET /api/cron/deploy-gate-runner — schema check', () => {
 
     await GET(makeRequest())
 
-    // processing + schema_check = 2 inserts (no Vercel poll, no smoke re-run)
-    expect(mockInsert).toHaveBeenCalledTimes(2)
+    // processing + schema_check + promotion_skipped = 3 inserts (no Vercel poll, no smoke re-run)
+    // (Module A: kill switch logs deploy_gate_promotion_skipped per acceptance doc §3.1)
+    expect(mockInsert).toHaveBeenCalledTimes(3)
     const schemaRow = mockInsert.mock.calls[1][0]
     expect(schemaRow.task_type).toBe('deploy_gate_schema_check')
     expect(schemaRow.meta.commit_sha).toBe('smokeonly')
@@ -1155,7 +1160,7 @@ describe('deleteBranch', () => {
 // ── GET /api/cron/deploy-gate-runner — auto-promote (Chunk E) ─────────────────
 
 describe('GET /api/cron/deploy-gate-runner — auto-promote kill switch', () => {
-  it('pushes promotion-skipped to results when DEPLOY_GATE_AUTO_PROMOTE=0, no extra DB insert', async () => {
+  it('pushes promotion-skipped to results and logs deploy_gate_promotion_skipped when DEPLOY_GATE_AUTO_PROMOTE=0', async () => {
     // DEPLOY_GATE_AUTO_PROMOTE=0 already set in beforeEach
     const trigger = makeTriggerRow('f3f43eb', 3)
     mockFrom
@@ -1180,8 +1185,12 @@ describe('GET /api/cron/deploy-gate-runner — auto-promote kill switch', () => 
     const res = await GET(makeRequest())
     const body = await res.json()
 
-    // 4 inserts only (no deploy_gate_promoted row)
-    expect(mockInsert).toHaveBeenCalledTimes(4)
+    // 5 inserts: processing, preview_ready, smoke, schema_check, promotion_skipped
+    // (Module A: kill switch now logs deploy_gate_promotion_skipped per acceptance doc §3.1)
+    expect(mockInsert).toHaveBeenCalledTimes(5)
+    const skippedRow = mockInsert.mock.calls[4][0]
+    expect(skippedRow.task_type).toBe('deploy_gate_promotion_skipped')
+    expect(skippedRow.meta.reason).toBe('kill_switch')
     // results includes the promotion-skipped signal
     expect(body.results.some((r: string) => r.includes('promotion-skipped'))).toBe(true)
   })

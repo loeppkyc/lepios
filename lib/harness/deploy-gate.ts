@@ -186,6 +186,60 @@ export async function detectMigrations(
   return { has_migrations: migration_files.length > 0, migration_files }
 }
 
+export type DiffSummary = {
+  changed_files: string[]
+  added_lines: number
+  removed_lines: number
+  /** Concatenated patches for the changed files. May be empty on API failure. */
+  diff_text: string
+  error?: string
+}
+
+/**
+ * Fetch a diff summary for a commit (vs. main) suitable for feeding the
+ * risk classifier. Uses the same /compare endpoint as detectMigrations but
+ * extracts line counts and patch text.
+ *
+ * Spec: docs/sprint-5/overnight-autonomy-acceptance.md §3.2
+ */
+export async function fetchDiffSummary(commit_sha: string): Promise<DiffSummary> {
+  const empty: DiffSummary = { changed_files: [], added_lines: 0, removed_lines: 0, diff_text: '' }
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return { ...empty, error: 'config' }
+
+  let res: Response
+  try {
+    res = await fetch(`${GITHUB_API}/repos/${GITHUB_REPO}/compare/main...${commit_sha}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+  } catch {
+    return { ...empty, error: 'api_error' }
+  }
+
+  if (!res.ok) return { ...empty, error: 'api_error' }
+
+  let json: {
+    files?: Array<{ filename: string; additions?: number; deletions?: number; patch?: string }>
+  }
+  try {
+    json = await res.json()
+  } catch {
+    return { ...empty, error: 'api_error' }
+  }
+
+  const files = json.files ?? []
+  return {
+    changed_files: files.map((f) => f.filename),
+    added_lines: files.reduce((sum, f) => sum + (f.additions ?? 0), 0),
+    removed_lines: files.reduce((sum, f) => sum + (f.deletions ?? 0), 0),
+    diff_text: files.map((f) => f.patch ?? '').join('\n'),
+  }
+}
+
 export type MergeResult = {
   ok: boolean
   merge_sha?: string
