@@ -28,6 +28,12 @@ On session start:
 
 6. On clean shutdown, run `node scripts/window-end.mjs` to release the claim.
 
+### Optional during-session helpers
+
+- `node scripts/window-check-edits.mjs` — verify the working tree (modified + untracked + staged) is within the active claim's scope. Run periodically during long edit batches to catch drift before commit time. `--json` for machine output, `--quiet` for exit-code-only. Wires cleanly into a Claude Code `PostToolUse` hook on Edit/Write.
+- `node scripts/window-heartbeat.mjs` — bump the current claim's `last_heartbeat` so it doesn't get pruned by another window's startup. Useful in audit-only sessions or long idle gaps.
+- `node scripts/next-migration-number.mjs` — fetch origin/main + print the next-free migration number (4-digit padded). Avoids the migration-claim race when planning a new schema change.
+
 Hard rules (most are now enforced by `.husky/pre-commit` and `.husky/commit-msg`):
 
 - **Scope contract — enforced.** Every commit is checked against the active claim's scope globs. Out-of-scope files block the commit. Bypass once with `WINDOW_SCOPE_BYPASS=1 git commit ...` only if the user has explicitly approved.
