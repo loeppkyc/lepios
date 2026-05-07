@@ -23,6 +23,11 @@ for f in $(echo "$TOUCHED" | grep '^supabase/migrations/' || true); do
   fi
 done
 
+# ─── Multi-window protocol — scope contract ───────────────────────────────
+# Verifies every staged file falls within the active window's declared scope
+# on the current branch. Bypass: WINDOW_SCOPE_BYPASS=1 git commit ...
+node scripts/window-scope-check.mjs
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
