@@ -7,12 +7,17 @@
 //   { halted: true,  reason: "..." }   → halt
 //   { halted: false }                  → resume
 //
-// Auth: admin user only. Wiring this through the existing /api/telegram/webhook
-// to back a `/halt` chat command lives outside this PR's scope — logged in
-// notes/cross-window-suggestions.md.
+// Auth: Bearer $CRON_SECRET. The original design called for admin-user auth
+// via requireUser, but that helper is on the unmerged security/lockdown
+// branch (PR #104). When that lands, swap back to requireUser({minRole:'admin'}).
+// Cron-secret is sufficient for the killswitch — only Colin and the harness
+// have it, and the secret lives in harness_config behind admin-only RLS.
+//
+// Wiring this through /api/telegram/webhook to back a `/halt` chat command
+// lives outside this PR's scope — see notes/cross-window-suggestions.md.
 
 import { NextResponse } from 'next/server'
-import { requireUser } from '@/lib/auth/require-user'
+import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { setHalted } from '@/lib/night_watchman/loop-guards'
 import { sendDailyBot } from '@/lib/telegram/daily-bot'
@@ -21,8 +26,8 @@ import { renderHaltNotice, renderResumeNotice } from '@/lib/telegram/templates'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
-  const gate = await requireUser({ minRole: 'admin' })
-  if (!gate.ok) return gate.response
+  const unauthorized = requireCronSecret(request)
+  if (unauthorized) return unauthorized
 
   const body = (await request.json().catch(() => null)) as {
     halted?: boolean
@@ -50,7 +55,7 @@ export async function POST(request: Request) {
     status: 'success',
     meta: {
       reason: body.reason ?? null,
-      changed_by_user_id: gate.user.id,
+      auth_method: 'cron_secret',
       telegram_ok: tg.ok,
       telegram_message_id: tg.messageId ?? null,
     },
