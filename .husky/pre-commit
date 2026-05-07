@@ -28,6 +28,13 @@ done
 # on the current branch. Bypass: WINDOW_SCOPE_BYPASS=1 git commit ...
 node scripts/window-scope-check.mjs
 
+# ─── Vercel cron-count + cadence guard ────────────────────────────────────
+# Aborts a commit that would push vercel.json past Hobby plan limits.
+# Hobby silently rejects the entire config at validation — no deploy record
+# is created. See F-L11 (CLAUDE.md §9) and F-N9 (docs/claude-md/failures.md).
+# Bypass: VERCEL_CRON_CHECK_BYPASS=1 git commit ...
+node scripts/check-vercel-cron-count.mjs
+
 # Layer 0 — Safety Agent static check (regex-only, ~10ms, no Ollama)
 # Blocks destructive SQL / secret writes / force-push patterns in staged diff.
 # Bypass: SAFETY_BYPASS=1 git commit ...
