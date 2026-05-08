@@ -88,6 +88,27 @@ async function logEvent(
 export async function runPickup(runId: string): Promise<PickupResult> {
   const start = Date.now()
 
+  // Check HARNESS_HALTED from harness_config (runtime killswitch for coordinator loop)
+  try {
+    const dbHalt = createServiceClient()
+    const { data: haltRow } = await dbHalt
+      .from('harness_config')
+      .select('value')
+      .eq('key', 'HARNESS_HALTED')
+      .maybeSingle()
+    if (haltRow?.value === 'true') {
+      return {
+        ok: true,
+        claimed: null,
+        reason: 'halted',
+        run_id: runId,
+        duration_ms: Date.now() - start,
+      }
+    }
+  } catch {
+    // Fail open — missing flag never blocks pickup
+  }
+
   // Dry-run: peek without mutations, Telegram prefixed
   if (process.env.TASK_PICKUP_DRY_RUN) {
     const task = await peekTask()
@@ -349,11 +370,26 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   )
 
   // Step 5: Remote invocation — fire coordinator automatically when flag is set.
+  // Flag read order: env var (fast path) → harness_config (runtime override).
   // On failure: immediately unclaim the task (return to queued) so it isn't burned
   // through stale-reclaim retry_count. Log to agent_events + Telegram fire-and-forget.
   // No retries — duplicate /fire calls create duplicate sessions.
+  let remoteInvocationEnabled = Boolean(process.env.HARNESS_REMOTE_INVOCATION_ENABLED)
+  if (!remoteInvocationEnabled) {
+    try {
+      const dbRemote = createServiceClient()
+      const { data: remoteRow } = await dbRemote
+        .from('harness_config')
+        .select('value')
+        .eq('key', 'HARNESS_REMOTE_INVOCATION_ENABLED')
+        .maybeSingle()
+      remoteInvocationEnabled = remoteRow?.value === 'true'
+    } catch {
+      // Fail closed — if we can't read the flag, stay manual
+    }
+  }
   let telegramMsg = buildTelegramMessage(task)
-  if (process.env.HARNESS_REMOTE_INVOCATION_ENABLED) {
+  if (remoteInvocationEnabled) {
     const invokeResult = await fireCoordinator({ task_id: task.id, run_id: runId })
     if (invokeResult.ok) {
       telegramMsg = buildRemoteTelegramMessage(task, invokeResult.session_url)
