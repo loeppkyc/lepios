@@ -23,11 +23,17 @@ const EXEMPT_ROUTES: ReadonlyArray<{ path: string; reason: string }> = [
   { path: 'health/route.ts', reason: 'Public liveness endpoint for monitoring' },
 ]
 
-// Strong gates — single regex match is sufficient.
+// Strong gates — single regex match is sufficient. Domain-specific wrappers
+// (requireDietUser, requireHealthUser) delegate to requireUser internally;
+// they're recognized here so their consumers don't need to inline auth.getUser()
+// just to satisfy this test. If a new wrapper is added, register it here AND
+// confirm in code review that it ultimately calls requireUser().
 const STRONG_GATE_PATTERNS = [
   /requireUser\s*\(/,
   /requireCronSecret\s*\(/,
   /verifyWebhookSecret\s*\(/,
+  /requireDietUser\s*\(/,
+  /requireHealthUser\s*\(/,
 ] as const
 
 // Weaker pattern: an inline supabase.auth.getUser() session check followed by
