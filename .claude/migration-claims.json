@@ -113,7 +113,13 @@
       "filename": "0161_failures_log.sql",
       "claimed_at": "2026-05-08",
       "note": "T-006 Phase 1a — failures_log table with pattern_signature jsonb. Source of truth for /failures + docs/claude-md/failures.md (1b cron sync). Self-repair + Safety Agent both write to it; Safety Agent reads for pattern matching."
+    },
+    "0162": {
+      "branch": "feat/safety-agent-a-signals",
+      "filename": "0162_safety_agent_v2.sql",
+      "claimed_at": "2026-05-08",
+      "note": "T-002 Safety Agent v2 — Sub-phase A. task_queue.plan_loc + safety_decisions audit table + harness_config seed (SAFETY_WEIGHT_*, SAFETY_THRESHOLD_*)."
     }
   },
-  "next_available": 162
+  "next_available": 163
 }
