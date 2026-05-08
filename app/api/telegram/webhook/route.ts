@@ -18,10 +18,15 @@ import {
   handlePurposeReviewTextReply,
 } from '@/lib/purpose-review/handler'
 import { handleBudgetCommand } from '@/lib/work-budget/parser'
+import { decideApproval, parseSafetyCallbackData } from '@/lib/harness/safety/approval'
 import {
-  decideApproval,
-  parseSafetyCallbackData,
-} from '@/lib/harness/safety/approval'
+  handleRunCommand,
+  handleQueueAddCommand,
+  handleQueueRunCommand,
+  handleQueueStatusCommand,
+  handleHaltCommand,
+  handleResumeCommand,
+} from '@/lib/harness/coordinator-commands'
 
 export const dynamic = 'force-dynamic'
 
@@ -927,6 +932,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ ok: true })
     }
 
+    // Coordinator commands — fire-and-forget; always return 200
+    if (message?.text) {
+      const txt = message.text
+      if (txt.match(/^\/run(\s|$)/i)) {
+        void handleRunCommand(txt).catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+      if (txt.match(/^\/queue\s+add(\s|$)/i)) {
+        void handleQueueAddCommand(txt).catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+      if (txt.match(/^\/queue\s+run(\s|$)/i)) {
+        void handleQueueRunCommand().catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+      if (txt.match(/^\/queue\s+status(\s|$)/i)) {
+        void handleQueueStatusCommand().catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+      if (txt.match(/^\/halt(\s|$)/i)) {
+        void handleHaltCommand().catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+      if (txt.match(/^\/resume(\s|$)/i)) {
+        void handleResumeCommand().catch(() => {})
+        return NextResponse.json({ ok: true })
+      }
+    }
+
     // Check for purpose_review text reply: look for an awaiting_review task for this chat
     if (message?.text) {
       try {
@@ -1004,7 +1038,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     parsed?.agentEventId ?? parsedSafety?.approvalId ?? null,
     callbackQuery.from.id,
     callbackQuery.data ?? '',
-    parsed || parsedGate || parsedImprove || parsedPurposeReview || parsedSafety ? 'success' : 'warning'
+    parsed || parsedGate || parsedImprove || parsedPurposeReview || parsedSafety
+      ? 'success'
+      : 'warning'
   )
 
   if (parsedSafety) {
