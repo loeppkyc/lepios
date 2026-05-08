@@ -26,6 +26,7 @@ import { buildSelfRepairDigestLine } from '@/lib/harness/self-repair/digest'
 import { buildDeploySmokeStatsLine } from '@/lib/harness/smoke-tests/digest'
 import { buildOpenEscalationsLine } from '@/lib/harness/twin-escalations/digest'
 import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest'
+import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -319,6 +320,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── Advisor backstop — surface NEW actionable Supabase advisor findings (F-L6 closure) ──
   const advisorBackstopLine = await buildAdvisorBackstopLine()
   messageToSend = `${messageToSend}\n${advisorBackstopLine}`
+
+  // ── Safety Agent v2 — decisions in last 24h by routing action ────────────
+  const safetyAgentLine = await buildSafetyAgentDigestLine()
+  messageToSend = `${messageToSend}\n${safetyAgentLine}`
 
   characterCount = messageToSend.length
 

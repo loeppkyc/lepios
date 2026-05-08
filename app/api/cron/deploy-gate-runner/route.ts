@@ -19,6 +19,7 @@ import { runRouteHealthSmoke } from '@/lib/harness/smoke-tests/route-health'
 import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registration'
 import { runOllamaHealthSmoke } from '@/lib/harness/smoke-tests/ollama-health'
 import { parseBumpDirectives, applyBumps } from '@/lib/harness/component-bump'
+import { runSafetyGateCheck, type SafetyGateResult } from '@/lib/harness/safety/v2/gate-adapter'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +57,41 @@ async function writeGateEvent(params: {
     meta: params.meta,
     tags: ['deploy_gate', 'harness', 'chunk_b'],
   })
+}
+
+async function runAndRecordSafetyCheck(
+  commit_sha: string,
+  branch: string,
+  taskId: string,
+  results: string[]
+): Promise<SafetyGateResult> {
+  const safety = await runSafetyGateCheck({ commit_sha, branch, task_id: taskId, results })
+  // Only write a gate event when blocking — the deploy_gate_failed task_type is what
+  // marks the trigger as terminal so the next tick skips it. Non-blocking passes are
+  // already persisted in safety_decisions by runSafetyGateCheck; no extra event needed.
+  if (safety.blocking) {
+    try {
+      await writeGateEvent({
+        task_type: 'deploy_gate_failed',
+        status: 'error',
+        output_summary: `safety agent blocked deploy: ${safety.action} (score ${safety.score})`,
+        meta: {
+          commit_sha,
+          branch,
+          task_id: taskId,
+          reason: 'safety_agent_blocked',
+          safety_action: safety.action,
+          safety_tier: safety.tier,
+          safety_score: safety.score,
+          safety_decision_id: safety.sdId,
+          ...(safety.infra_error ? { infra_error: safety.infra_error } : {}),
+        },
+      })
+    } catch {
+      // swallow — event write failure must not override the safety decision
+    }
+  }
+  return safety
 }
 
 async function runSchemaCheck(
@@ -552,8 +588,16 @@ async function runGateRunner(): Promise<object> {
       continue
     }
 
-    // Smoke already passed in a prior tick — skip straight to schema check
+    // Smoke already passed in a prior tick — run Safety Agent then schema check
     if (smokePassedShas.has(commit_sha)) {
+      const safetyResult = await runAndRecordSafetyCheck(
+        commit_sha,
+        trigger.meta.branch ?? '',
+        trigger.meta.task_id ?? commit_sha,
+        results
+      )
+      if (safetyResult.blocking) continue
+
       const schemaResult = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
       if (schemaResult.outcome === 'schema-clean') {
         await runAutoPromote(
@@ -645,22 +689,30 @@ async function runGateRunner(): Promise<object> {
         // swallow — preview_ready already written
       }
       if (smokePassed) {
-        const schemaResult = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
-        if (schemaResult.outcome === 'schema-clean') {
-          await runAutoPromote(
-            commit_sha,
-            trigger.meta.branch ?? '',
-            trigger.meta.task_id ?? commit_sha,
-            results
-          )
-        } else if (schemaResult.outcome === 'schema-migrations') {
-          await runMigrationGate(
-            commit_sha,
-            trigger.meta.branch ?? '',
-            trigger.meta.task_id ?? commit_sha,
-            schemaResult.migration_files,
-            results
-          )
+        const safetyResult = await runAndRecordSafetyCheck(
+          commit_sha,
+          trigger.meta.branch ?? '',
+          trigger.meta.task_id ?? commit_sha,
+          results
+        )
+        if (!safetyResult.blocking) {
+          const schemaResult = await runSchemaCheck(commit_sha, trigger.meta.branch ?? '', results)
+          if (schemaResult.outcome === 'schema-clean') {
+            await runAutoPromote(
+              commit_sha,
+              trigger.meta.branch ?? '',
+              trigger.meta.task_id ?? commit_sha,
+              results
+            )
+          } else if (schemaResult.outcome === 'schema-migrations') {
+            await runMigrationGate(
+              commit_sha,
+              trigger.meta.branch ?? '',
+              trigger.meta.task_id ?? commit_sha,
+              schemaResult.migration_files,
+              results
+            )
+          }
         }
       }
     } else if (preview.status === 'error') {

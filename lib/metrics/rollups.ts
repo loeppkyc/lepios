@@ -14,10 +14,10 @@ import { createServiceClient } from '@/lib/supabase/service'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface DailySuccessRate {
-  day: string     // YYYY-MM-DD
+  day: string // YYYY-MM-DD
   total: number
   successes: number
-  rate: number    // 0–100
+  rate: number // 0–100
 }
 
 export interface DailyFlagCount {
@@ -39,18 +39,18 @@ export interface KnowledgeHealth {
   total: number
   avgConfidence: number
   usedLast7Days: number
-  decayedCount: number  // confidence < 0.2
+  decayedCount: number // confidence < 0.2
   byCategory: Record<string, number>
 }
 
 export interface AutonomousSummary {
-  successRate: number         // 0–100
+  successRate: number // 0–100
   totalEvents: number
-  errorRate: number           // 0–100
+  errorRate: number // 0–100
   avgDurationMs: number | null
   totalTokensUsed: number
-  safetyFlagsTotal: number    // total checks fired across all safety runs
-  blockingSafetyRuns: number  // safety runs where blocking=true
+  safetyFlagsTotal: number // total checks fired across all safety runs
+  blockingSafetyRuns: number // safety runs where blocking=true
   knowledgeAvgConfidence: number
   period: { days: number; from: string; to: string }
 }
@@ -126,8 +126,10 @@ export async function getSafetyFlagTrend(days: number): Promise<DailyFlagCount[]
     for (const row of data) {
       const day = dayKey(row.occurred_at)
       const existing = byDay.get(day) ?? { critical: 0, high: 0, medium: 0, low: 0 }
-      const breakdown = (row.meta as Record<string, unknown> | null)?.severity_breakdown as
-        Record<string, number> | undefined ?? {}
+      const breakdown =
+        ((row.meta as Record<string, unknown> | null)?.severity_breakdown as
+          | Record<string, number>
+          | undefined) ?? {}
       existing.critical += breakdown.critical ?? 0
       existing.high += breakdown.high ?? 0
       existing.medium += breakdown.medium ?? 0
@@ -137,7 +139,8 @@ export async function getSafetyFlagTrend(days: number): Promise<DailyFlagCount[]
 
     return Array.from(byDay.entries())
       .map(([day, c]) => ({
-        day, ...c,
+        day,
+        ...c,
         total: c.critical + c.high + c.medium + c.low,
       }))
       .sort((a, b) => a.day.localeCompare(b.day))
@@ -153,7 +156,7 @@ export async function getSafetyFlagTrend(days: number): Promise<DailyFlagCount[]
  */
 export async function getTopErrorTypes(
   days: number,
-  limit: number = 5,
+  limit: number = 5
 ): Promise<ErrorTypeSummary[]> {
   try {
     const supabase = createServiceClient()
@@ -193,7 +196,13 @@ export async function getTopErrorTypes(
  * Overview of the knowledge base: size, confidence distribution, recency.
  */
 export async function getKnowledgeHealth(): Promise<KnowledgeHealth> {
-  const empty: KnowledgeHealth = { total: 0, avgConfidence: 0, usedLast7Days: 0, decayedCount: 0, byCategory: {} }
+  const empty: KnowledgeHealth = {
+    total: 0,
+    avgConfidence: 0,
+    usedLast7Days: 0,
+    decayedCount: 0,
+    byCategory: {},
+  }
   try {
     const supabase = createServiceClient()
     const week = cutoffISO(7)
@@ -238,8 +247,13 @@ export async function getAutonomousRunSummary(days: number): Promise<AutonomousS
   const from = cutoffISO(days)
   const to = new Date().toISOString()
   const empty: AutonomousSummary = {
-    successRate: 0, totalEvents: 0, errorRate: 0, avgDurationMs: null,
-    totalTokensUsed: 0, safetyFlagsTotal: 0, blockingSafetyRuns: 0,
+    successRate: 0,
+    totalEvents: 0,
+    errorRate: 0,
+    avgDurationMs: null,
+    totalTokensUsed: 0,
+    safetyFlagsTotal: 0,
+    blockingSafetyRuns: 0,
     knowledgeAvgConfidence: 0,
     period: { days, from, to },
   }
@@ -263,15 +277,14 @@ export async function getAutonomousRunSummary(days: number): Promise<AutonomousS
     const durations = events
       .map((e) => e.duration_ms as number | null)
       .filter((d): d is number => d != null)
-    const avgDurationMs = durations.length > 0
-      ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
-      : null
+    const avgDurationMs =
+      durations.length > 0
+        ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
+        : null
 
     const totalTokensUsed = events.reduce((s, e) => s + ((e.tokens_used as number | null) ?? 0), 0)
 
-    const safetyEvents = events.filter(
-      (e) => e.domain === 'safety' && e.action === 'safety.check',
-    )
+    const safetyEvents = events.filter((e) => e.domain === 'safety' && e.action === 'safety.check')
     const safetyFlagsTotal = safetyEvents.reduce((s, e) => {
       const m = e.meta as Record<string, unknown> | null
       return s + ((m?.check_count as number | undefined) ?? 0)
@@ -291,6 +304,57 @@ export async function getAutonomousRunSummary(days: number): Promise<AutonomousS
       blockingSafetyRuns,
       knowledgeAvgConfidence: health.avgConfidence,
       period: { days, from, to },
+    }
+  } catch {
+    return empty
+  }
+}
+
+// ── 6. getSafetyDecisionStats ─────────────────────────────────────────────────
+
+export interface SafetyDecisionStats {
+  total: number
+  autoMerge: number
+  twinCleared: number
+  escalated: number
+  e2eFailed: number
+  period: string
+}
+
+/** Count safety_decisions rows for the last N hours, grouped by routing action. */
+export async function getSafetyDecisionStats(hours = 24): Promise<SafetyDecisionStats> {
+  const empty: SafetyDecisionStats = {
+    total: 0,
+    autoMerge: 0,
+    twinCleared: 0,
+    escalated: 0,
+    e2eFailed: 0,
+    period: `${hours}h`,
+  }
+  try {
+    const supabase = createServiceClient()
+    const since = new Date(Date.now() - hours * 3_600_000).toISOString()
+
+    const { data, error } = await supabase
+      .from('safety_decisions')
+      .select('action, e2e_pass')
+      .gte('decided_at', since)
+
+    if (error || !data) return empty
+
+    const rows = data as Array<{ action: string; e2e_pass: boolean | null }>
+    return {
+      total: rows.length,
+      autoMerge: rows.filter((r) => r.action === 'auto_merge').length,
+      twinCleared: rows.filter(
+        (r) => r.action === 'twin_proceed' || r.action === 'twin_unavailable'
+      ).length,
+      escalated: rows.filter(
+        (r) =>
+          r.action === 'colin_escalate' || r.action === 'twin_hold' || r.action === 'twin_escalate'
+      ).length,
+      e2eFailed: rows.filter((r) => r.e2e_pass === false).length,
+      period: `${hours}h`,
     }
   } catch {
     return empty

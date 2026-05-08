@@ -15,6 +15,7 @@ import {
   getTopErrorTypes,
   getKnowledgeHealth,
   getAutonomousRunSummary,
+  getSafetyDecisionStats,
   type DailySuccessRate,
   type DailyFlagCount,
   type ErrorTypeSummary,
@@ -429,14 +430,16 @@ export default async function AutonomousPage() {
     outputSummary: 'autonomous dashboard viewed',
   })
 
-  const [summary7, rates30, flagTrend14, topErrors7, knowledge, ollama] = await Promise.all([
-    getAutonomousRunSummary(7),
-    getDailySuccessRate(30),
-    getSafetyFlagTrend(14),
-    getTopErrorTypes(7, 6),
-    getKnowledgeHealth(),
-    healthCheck(),
-  ])
+  const [summary7, rates30, flagTrend14, topErrors7, knowledge, ollama, safetyStats] =
+    await Promise.all([
+      getAutonomousRunSummary(7),
+      getDailySuccessRate(30),
+      getSafetyFlagTrend(14),
+      getTopErrorTypes(7, 6),
+      getKnowledgeHealth(),
+      healthCheck(),
+      getSafetyDecisionStats(24),
+    ])
 
   // 7-day average from the rates data
   const last7Rates = rates30.slice(-7)
@@ -537,6 +540,42 @@ export default async function AutonomousPage() {
         />
         <OllamaStatusCard health={ollama} />
       </div>
+
+      {/* Safety Agent scorecard */}
+      {safetyStats.total > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            marginBottom: 20,
+            flexWrap: 'wrap',
+          }}
+        >
+          <ScoreTile
+            label="Safety auto-merged (24h)"
+            value={String(safetyStats.autoMerge)}
+            sub={`${safetyStats.total} total decisions`}
+            accent="var(--color-positive)"
+          />
+          <ScoreTile
+            label="Twin-cleared (24h)"
+            value={String(safetyStats.twinCleared)}
+            sub="twin_proceed + unavailable"
+          />
+          <ScoreTile
+            label="Escalated (24h)"
+            value={String(safetyStats.escalated)}
+            sub="colin / twin_hold / twin_escalate"
+            accent={safetyStats.escalated > 0 ? 'var(--color-warning)' : undefined}
+          />
+          <ScoreTile
+            label="E2E failed (24h)"
+            value={String(safetyStats.e2eFailed)}
+            sub="e2e_pass = false"
+            accent={safetyStats.e2eFailed > 0 ? 'var(--color-critical)' : undefined}
+          />
+        </div>
+      )}
 
       {/* Chart 1: Daily success rate */}
       <ChartSection title="Daily success rate" sub="last 30 days">
