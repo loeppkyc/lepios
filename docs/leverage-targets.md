@@ -71,74 +71,85 @@ Each invocation creates `window_sessions` row, executes through harness (builder
 
 ---
 
-### T-002 — Safety Agent (REVISED 2026-05-08)
+### Safety Agent (0% → done)
 
 - **Inventory row:** `harness-safety-agent`
 - **Status:** queued (description updated in `task_queue` row `edd5af72`)
 - **Build priority:** 2 (multiplier — closes AD2 barrier so T-001 + the prestage auto-merge from PR #133 can flip on)
 - **Current %:** 0
 - **Done %:** 100
+- **Spec version:** v2 (2026-05-08, overwrites previous T-002 spec). Triggered by F-N13 — autonomous UI verification gap surfaced during T-006 Phase 1c puppeteer attempt.
 
-**done_state:** Sub-agent invoked by coordinator on every PR before deploy gate. Runs: secret-scanning, schema-impact analysis (migration safety), test coverage delta, scope-creep check (LOC vs plan), known-failure pattern match. Computes a **risk score 0–100** weighted across signals.
+**done_state:** Sub-agent invoked by coordinator on every PR before deploy gate. Computes risk score 0–100 weighted across **six** signals:
 
-- **Risk <30 (low):** auto-merge → deploy → telegram only on a daily completion summary, **not per PR**.
-- **Risk 30–70 (medium):** query digital twin with PR context + comparable past decisions → twin returns **PROCEED / HOLD / ESCALATE**.
+1. Secret-scanning (token patterns, env leak detection)
+2. Schema-impact analysis (migration safety, RLS coverage)
+3. Test coverage delta (lines covered before vs after)
+4. Scope-creep check (LOC vs plan)
+5. Known-failure pattern match against `failures_log`
+6. **Puppeteer E2E pass on the done_state's surface URL(s) — required, not optional**
+
+**E2E flow:** builder runs puppeteer against the surface URL(s) specified in the module's done_state, executing user-visible interactions (page loads, form submits, button clicks, sort/filter actions, expected outcomes asserted). **E2E fail = automatic ESCALATE regardless of other signal scores.** E2E pass is required before risk score can clear auto-merge threshold.
+
+**Risk routing:**
+
+- **<30 (low) + E2E pass:** auto-merge → deploy → telegram on completion summary only
+- **30–70 (medium) + E2E pass:** query `digital_twin` with PR context → twin returns **PROCEED / HOLD / ESCALATE**
   - PROCEED → auto-merge
   - HOLD → pause + `decisions_log` row + retry after 24h
   - ESCALATE → telegram Colin
-- **Risk >70 (high):** skip twin, telegram Colin directly with risk breakdown + recommendation.
+- **>70 (high) OR E2E fail:** skip twin, telegram Colin directly with risk breakdown + puppeteer failure trace + recommendation
 
-**Never** prompts for approval on commits, pushes, or bash commands within the autonomous loop. Only escalates the **final merge decision** when above threshold.
+**Never** prompts for approval on commits, pushes, or bash commands within the autonomous loop. Only escalates the **final merge decision** when above threshold or E2E fails.
 
-#### Initial calibration values (Q-003, 2026-05-08)
+**metric:** % of merges completed without Colin involvement + E2E pass rate on first run
 
-These ship in `harness_config` as the starting point. Observe-only for 7 days, then tune. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+**benchmark:** ≥95% of low+medium-risk autonomous; 100% high-risk escalated; 0 missed criticals over 30-day window; **≥98% E2E pass on first run** for done_state-specced modules
 
-| Signal                                                                               | Weight           |
-| ------------------------------------------------------------------------------------ | ---------------- |
-| Secret detected (any)                                                                | +100 (auto-high) |
-| Migration with destructive ops (DROP, RENAME, NOT NULL on existing rows)             | +60              |
-| Migration additive only                                                              | +10              |
-| Test coverage drop > 5% vs base                                                      | +30              |
-| Test coverage drop > 15% vs base                                                     | +60              |
-| LOC delta > 2× planned                                                               | +20              |
-| Known-failure regex match (per-pattern, top match wins)                              | +25 to +50       |
-| Touches shared seam (`package.json`, `middleware.ts`, etc., per CLAUDE.md seam list) | +40              |
-| Touches `app/api/**` route handler net-new                                           | +15              |
-| All other signals quiet                                                              | base 5           |
+**surface:** telegram on ESCALATE or daily summary; `decisions_log` row per invocation; status dashboard "today: X auto-merged, Y twin-cleared, Z escalated, W E2E-failed"; puppeteer screenshots/traces archived in `failures_log` when E2E fails
+
+#### Initial calibration values (Q-003, 2026-05-08 — carried over from v1)
+
+These ship in `harness_config`. Observe-only for 7 days, then tune. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+
+| Signal                                                                         | Weight                 |
+| ------------------------------------------------------------------------------ | ---------------------- |
+| Secret detected (any)                                                          | +100 (auto-high)       |
+| Migration with destructive ops (DROP, RENAME, NOT NULL on existing rows)       | +60                    |
+| Migration additive only                                                        | +10                    |
+| Test coverage drop > 5% vs base                                                | +30                    |
+| Test coverage drop > 15% vs base                                               | +60                    |
+| LOC delta > 2× planned                                                         | +20                    |
+| Known-failure regex match against `failures_log` (per-pattern, top match wins) | +25 to +50             |
+| Touches shared seam (`package.json`, `middleware.ts`, etc.)                    | +40                    |
+| Touches `app/api/**` route handler net-new                                     | +15                    |
+| **Puppeteer E2E fail on any specified surface URL**                            | **automatic ESCALATE** |
+| All other signals quiet                                                        | base 5                 |
 
 **Tier thresholds:** Low <30 · Medium 30–70 · High >70.
 
-Weights and thresholds live in `harness_config` keys (`SAFETY_WEIGHT_*`, `SAFETY_THRESHOLD_*`) so calibration changes don't require a deploy.
-
-**metric:** % of merges completed without Colin involvement
-
-**benchmark:** ≥95% of low+medium-risk autonomous; 100% high-risk escalated; **0 missed criticals** over a 30-day window
-
-**surface:** telegram only on ESCALATE or daily summary; `decisions_log` row per invocation; status dashboard line: "today: X auto-merged, Y twin-cleared, Z escalated"
+Weights + thresholds live in `harness_config` keys (`SAFETY_WEIGHT_*`, `SAFETY_THRESHOLD_*`).
 
 #### Sub-modules implied (coordinator will break these down at Phase 1c)
 
-1. **Risk scorer** — pure function: signals → 0–100 score. Weights configurable in `harness_config`.
-2. **Signal modules** (each emits a contribution to the score):
-   - secret scanner (existing patterns + new: `.env.*`, key-shape regex)
-   - schema-impact analyzer (additive vs destructive, F-N7 search-path coverage)
-   - test coverage delta vs base branch
-   - scope-creep checker (LOC delta vs `plan_loc` if present)
-   - known-failure pattern match (regex against failures_log titles + bodies)
-3. **Twin arbiter route** — `/api/twin/safety-arbitrate` accepts PR context + comparable-decisions query; returns PROCEED / HOLD / ESCALATE
-4. **Comparable-decisions retrieval** — pgvector search over past `decisions_log` rows to find similar PRs and their outcomes
-5. **Decision router** — pure function: score → low/medium/high → action
-6. **HOLD retry-after-24h** — task_queue row created with run-after timestamp
-7. **Daily summary digest** — adds line to `morning_digest` aggregating low-risk auto-merges
-8. **Status dashboard counter** — live metric on `/autonomous` page
+1. **Risk scorer** — pure function: signals → 0–100 score
+2. **Signal modules** — secret scanner, schema-impact analyzer, test coverage delta, scope-creep checker, known-failure pattern match against `failures_log`
+3. **Puppeteer E2E runner** — given a list of surface URLs from done_state, drives them with a signed-in test user, captures screenshots/traces, asserts user-visible outcomes
+4. **Test-user session provisioning** — service role creates a test Supabase user; runner caches the session cookie. Resolves the F-N13 gap (build sessions cannot puppeteer auth-gated cockpit pages today)
+5. **Twin arbiter route** — `/api/twin/safety-arbitrate` accepts PR context + comparable-decisions query → PROCEED / HOLD / ESCALATE
+6. **Comparable-decisions retrieval** — pgvector search over past `decisions_log` rows
+7. **Decision router** — pure function: (score, e2e_pass) → action
+8. **HOLD retry-after-24h** — task_queue row with run-after timestamp
+9. **E2E failure archival** — on E2E fail, write to `failures_log` with screenshot path + trace, severity=critical, status=open
+10. **Daily summary digest** — morning_digest line aggregating low-risk auto-merges + E2E pass rate
+11. **Status dashboard counter** — `/autonomous` page metrics (auto-merged / twin-cleared / escalated / E2E-failed)
 
 #### Notes for coordinator Phase 1a
 
-- Replaces the simpler PASS/WARN/BLOCK design (original spec). Risk-scored + twin-arbiter is more nuanced and aligns with F19 (autonomous-share trending up).
-- The twin arbiter requires Twin Q&A to be functional (`twin-qa` row in inventory: 68%) — twin must reliably handle PR-context queries before this layer activates. May need a sub-task to harden twin first.
-- Risk-score weights: **resolved (Q-003)** — initial values in §Initial calibration values above. Read from `harness_config` keys.
-- Threshold tuning: **resolved (Q-003)** — Low <30 / Medium 30–70 / High >70. Observe-only for 7 days before flipping `auto-merge` on. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+- v2 changes from v1: **adds Puppeteer E2E as a 6th required signal**, with E2E fail = automatic ESCALATE regardless of other scores. Triggered by F-N13 finding during T-006 Phase 1c.
+- Twin arbiter requires Twin Q&A functional (`twin-qa` row currently 68%) — twin must reliably handle PR-context queries before medium-tier activates.
+- E2E runner needs a **test-user session strategy** (sub-module #4). This is the load-bearing new capability over v1 — without it, puppeteer can't drive auth-gated cockpit pages. Options: Supabase test-user with cached cookie, dev-mode auth bypass via `harness_config` flag, or magic-link-on-demand for the runner.
+- Done_state's `surface` field becomes load-bearing: it now drives the E2E runner's URL list. Modules that misspecify surface URLs will see E2E run against the wrong target.
 - Older Phase 1 task `9b9bca02` is marked completed in task_queue but inventory shows 0%. Phase 1a study should grep `lib/harness/safety/` for actual code before re-implementing.
 
 ---
