@@ -63,6 +63,27 @@ These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. B
 
 **Never** prompts for approval on commits, pushes, or bash commands within the autonomous loop. Only escalates the **final merge decision** when above threshold.
 
+#### Initial calibration values (Q-003, 2026-05-08)
+
+These ship in `harness_config` as the starting point. Observe-only for 7 days, then tune. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+
+| Signal                                                                               | Weight           |
+| ------------------------------------------------------------------------------------ | ---------------- |
+| Secret detected (any)                                                                | +100 (auto-high) |
+| Migration with destructive ops (DROP, RENAME, NOT NULL on existing rows)             | +60              |
+| Migration additive only                                                              | +10              |
+| Test coverage drop > 5% vs base                                                      | +30              |
+| Test coverage drop > 15% vs base                                                     | +60              |
+| LOC delta > 2× planned                                                               | +20              |
+| Known-failure regex match (per-pattern, top match wins)                              | +25 to +50       |
+| Touches shared seam (`package.json`, `middleware.ts`, etc., per CLAUDE.md seam list) | +40              |
+| Touches `app/api/**` route handler net-new                                           | +15              |
+| All other signals quiet                                                              | base 5           |
+
+**Tier thresholds:** Low <30 · Medium 30–70 · High >70.
+
+Weights and thresholds live in `harness_config` keys (`SAFETY_WEIGHT_*`, `SAFETY_THRESHOLD_*`) so calibration changes don't require a deploy.
+
 **metric:** % of merges completed without Colin involvement
 
 **benchmark:** ≥95% of low+medium-risk autonomous; 100% high-risk escalated; **0 missed criticals** over a 30-day window
@@ -89,8 +110,8 @@ These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. B
 
 - Replaces the simpler PASS/WARN/BLOCK design (original spec). Risk-scored + twin-arbiter is more nuanced and aligns with F19 (autonomous-share trending up).
 - The twin arbiter requires Twin Q&A to be functional (`twin-qa` row in inventory: 68%) — twin must reliably handle PR-context queries before this layer activates. May need a sub-task to harden twin first.
-- Risk-score weights: ASK COLIN at Phase 1b. They're calibration parameters and need his judgment for initial values (e.g., "secrets present = automatic high risk", "test coverage drop > 5% = +30 points").
-- Threshold tuning will need a 7-day observe-only run before flipping `auto-merge` on. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+- Risk-score weights: **resolved (Q-003)** — initial values in §Initial calibration values above. Read from `harness_config` keys.
+- Threshold tuning: **resolved (Q-003)** — Low <30 / Medium 30–70 / High >70. Observe-only for 7 days before flipping `auto-merge` on. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
 - Older Phase 1 task `9b9bca02` is marked completed in task_queue but inventory shows 0%. Phase 1a study should grep `lib/harness/safety/` for actual code before re-implementing.
 
 ---
@@ -124,7 +145,7 @@ These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. B
 **done_state:** `/scanner` runs as scanning station tied to an active pallet. Pallet records created on intake (`pallet_id`, source, date, cost; paid in batch end-of-month via AP table). Scan barcode → SP-API + Keepa → landed cost, margin, ROI, BSR trend, price history, tier classification (high-demand tier 1 / collectible tier / standard). Decision routes to one of three:
 
 - **GO (Amazon):** triggers condition grading sub-flow (Vision OCR + Amazon condition standards), then one-click list into current open FBA shipment with auto-set price + condition.
-- **BBV (kids book):** checks `bbv_inventory` by ISBN. If exists, increment count. If new, button creates new BBV listing.
+- **BBV (kids book):** calls BBV's `POST /api/inventory/upsert-by-isbn` (Option B per Q-001). Endpoint upserts by ISBN, returns existing-vs-new state for scanner UX. If new, scanner shows "create new BBV listing" button.
 - **DONATE (reject):** logged, moved on.
 
 Every scan tagged with `pallet_id`. `/pallets` dashboard shows per-pallet acceptance rate (% scanned hit GO), pallet P&L (realized revenue from sold items − pallet cost share), and ranking across all pallets to surface best/worst sourcing.
@@ -145,14 +166,16 @@ This target spans multiple discrete components. Listed here so the coordinator's
 4. **Tier classifier** — rule-based classification (high-demand tier 1 / collectible / standard); needs Colin's rules captured as data
 5. **Condition grading sub-flow** — Claude Vision OCR pipeline against Amazon condition standards
 6. **One-click FBA list** — current-open-shipment lookup, auto-set price + condition, push via SP-API
-7. **BBV dual-write** — ISBN check against `bbv_inventory`, increment-or-create flow ⚠️ open question below
+7. **BBV dual-write** — LepiOS calls BBV's `/api/inventory/upsert-by-isbn` route (Option B per Q-001 decision). BBV-side endpoint is a ~1-day add-on in the BBV repo: POST endpoint with F22 bearer-auth, idempotent upsert by ISBN, returns existing-vs-new state for scanner UX. LepiOS-side: thin client in `lib/bbv/client.ts` that holds a single `BBV_API_KEY` env var.
 8. **Donate logger** — minimal — just `scans.outcome='donate'`
 9. **Per-pallet analytics** — acceptance rate, ROI, ranking dashboard on `/pallets`
 10. **Active-pallet morning_digest line** — selects current pallet, computes today's stats
 
-#### Open architectural question — BBV cross-system access
+#### Decided — BBV cross-system access (Q-001, 2026-05-08): **Option B**
 
-BBV is a **separate Supabase project** (`oolgsvhupxutpicxxjfw`, `brick-and-book-vault`) with **Stripe LIVE**. LepiOS lives on a different project (`xpanlbcjueimeofgsara`). Three options for the BBV dual-write:
+LepiOS calls a BBV-side `POST /api/inventory/upsert-by-isbn` route with bearer auth (F22 cron-secret pattern). BBV controls its own writes; no shared service-role keys. BBV-side endpoint is a ~1-day add-on (route + auth + rate limit). LepiOS-side: thin client in `lib/bbv/client.ts` holds `BBV_API_KEY` env var.
+
+For audit purposes, the original three options considered:
 
 | Option                                 | How                                                                         | Pros                                | Cons                                                                               |
 | -------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
