@@ -932,31 +932,31 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ ok: true })
     }
 
-    // Coordinator commands — fire-and-forget; always return 200
+    // Coordinator commands — await so postMessage completes before function exits
     if (message?.text) {
       const txt = message.text
       if (txt.match(/^\/run(\s|$)/i)) {
-        void handleRunCommand(txt).catch(() => {})
+        await handleRunCommand(txt).catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/queue\s+add(\s|$)/i)) {
-        void handleQueueAddCommand(txt).catch(() => {})
+        await handleQueueAddCommand(txt).catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/queue\s+run(\s|$)/i)) {
-        void handleQueueRunCommand(txt).catch(() => {})
+        await handleQueueRunCommand(txt).catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/queue\s+status(\s|$)/i)) {
-        void handleQueueStatusCommand().catch(() => {})
+        await handleQueueStatusCommand().catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/halt(\s|$)/i)) {
-        void handleHaltCommand().catch(() => {})
+        await handleHaltCommand().catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/resume(\s|$)/i)) {
-        void handleResumeCommand().catch(() => {})
+        await handleResumeCommand().catch(() => {})
         return NextResponse.json({ ok: true })
       }
     }
