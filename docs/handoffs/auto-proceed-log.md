@@ -217,3 +217,22 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-08T00:00:00Z sprint=5 chunk=subdir-detection doc=docs/sprint-5/subdir-detection-acceptance.md
+cited_principles: [Beef-Up (§8.4 Check-Before-Build), Reversibility, F21 acceptance-first]
+trigger_match_evidence: |
+  §8.4 Check-Before-Build: walkDir in scripts/embed-streamlit-source.ts already solves subdir
+  recursion. Situation: scanner needs the same pattern. Adapt walkDir, not invent new logic.
+  Reversibility: no schema changes; file-only edits; revert is git revert. Fully reversible.
+reversibility_check: |
+  lib/scanners/streamlit-module-scanner.ts: add subdir branch — reversible (git revert, no cascade).
+  tests/streamlit-scanner.test.ts: add test — reversible (delete test).
+  docs/sprint-5/subdir-detection-acceptance.md: this file — reversible (delete).
+  No migrations. No external APIs. No env vars.
+confidence: high
+outcome: escalated
+escalation_reasons:
+  - standard_per_chunk_escalation (every acceptance doc goes to Colin)
+  - open_questions_require_decision (Q1: scope expansion, Q2: filename convention)

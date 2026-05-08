@@ -284,3 +284,19 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+
+# Bug Fix: subdir-detection (parallel track, 2026-05-08)
+
+# ============================================================
+
+bugfix_subdir_detection:
+  task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+  status: "awaiting_grounding"
+  description: "scanStreamlitModules skips Python package dirs (e.g. tax_centre/) — 6_Tax_Centre reports 148 lines, actual 7995"
+  acceptance_doc: "docs/sprint-5/subdir-detection-acceptance.md"
+  grounding_question: "Q1: include dead-ref detection in scope? Q2: filename convention for pkg dirs?"
+  coordinator_recommendation: "Defer Q1 (dead-ref detection needs its own audit doc first). Use bare dirname (option a) for Q2."
+  opened_at: "2026-05-08T00:00:00Z"
+  last_updated_at: "2026-05-08T00:00:00Z"
