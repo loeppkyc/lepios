@@ -4,6 +4,7 @@ import { runNightTick } from '@/lib/orchestrator/tick'
 import { runSandboxGc } from '@/lib/harness/sandbox/gc'
 import { runScan, scopeForNow } from '@/lib/night_watchman'
 import { createServiceClient } from '@/lib/supabase/service'
+import { exportFailuresMarkdown } from '@/lib/failures/export-markdown'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // night_watchman scan can take ~30-60s with all checks live
@@ -74,6 +75,45 @@ export async function GET(request: Request) {
       }
     }
 
+    // T-006 Phase 1b: failures_log → docs/claude-md/failures.md export.
+    // Co-located here per F-N9 (Vercel Hobby 18-cron limit; no 19th entry).
+    // Non-fatal — export failure does not fail the tick.
+    let failuresExportResult: Awaited<ReturnType<typeof exportFailuresMarkdown>> | null = null
+    try {
+      failuresExportResult = await exportFailuresMarkdown()
+      const db = createServiceClient()
+      await db.from('agent_events').insert({
+        domain: 'failures_log',
+        action: 'failures_log.export_markdown',
+        actor: 'night_tick',
+        status: failuresExportResult.ok ? 'success' : 'error',
+        meta: {
+          open_count: failuresExportResult.open_count,
+          recurring_count: failuresExportResult.recurring_count,
+          fixed_count: failuresExportResult.fixed_count,
+          total_rendered: failuresExportResult.total_rendered,
+          markdown_bytes: failuresExportResult.markdown_bytes,
+          error: failuresExportResult.error,
+        },
+        occurred_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      try {
+        const db = createServiceClient()
+        await db.from('agent_events').insert({
+          domain: 'failures_log',
+          action: 'failures_log.export_markdown',
+          actor: 'night_tick',
+          status: 'error',
+          error_message: msg.slice(0, 500),
+          occurred_at: new Date().toISOString(),
+        })
+      } catch {
+        // Best-effort log only
+      }
+    }
+
     return NextResponse.json({
       ...result,
       night_watchman: nightWatchmanReport
@@ -86,6 +126,7 @@ export async function GET(request: Request) {
             halted: nightWatchmanReport.halted,
           }
         : { error: nightWatchmanError },
+      failures_export: failuresExportResult ?? { ok: false, error: 'export step crashed' },
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown error'
