@@ -26,48 +26,87 @@ Each target lists: ID, status, done_state, metric, benchmark, surface, and the i
 
 These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. Build order is annotated by priority — multipliers first.
 
-### T-001 — Coordinator v1 remote invocation (REVISED 2026-05-08)
+### T-001 — Coordinator remote invocation (v1 shipped 2026-05-08; v2 in-flight)
 
 - **Inventory row:** `coordinator-agent`
-- **Status:** queued (description updated in `task_queue` row `393be0d3`)
-- **Build priority:** 1 (multiplier — unlocks fire-and-forget for T-003 through T-006)
-- **Current %:** 35
-- **Done %:** 100
+- **Status:** v1 shipped 100% (PR #156, 2026-05-08). v2 continuous-mode additions in-flight.
+- **Build priority:** 1 (multiplier — unlocks overnight autonomous runs)
+- **Done %:** 100 (v2 target: continuous mode fully autonomous)
 
-**done_state:** Coordinator runs without Colin typing in chat. Three triggers:
+#### v1 done_state (shipped)
 
-- **Telegram:** `/run <task>` fires single task; `/queue add <task>` adds to backlog; `/queue run` drains queue sequentially; `/halt` stops in-flight run.
-- **Cron:** scheduled sweeps (morning_digest, daily audits, weekly drift recompute) fire automatically.
-- **API:** `/api/coordinator/fire` authenticated endpoint accepts task payload, returns `window_session_id` immediately.
+Coordinator runs without Colin typing in chat. Three triggers:
 
-Each invocation creates `window_sessions` row, executes through harness (builder → safety_agent → digital_twin if needed → deploy gate), reports back to caller. **Loop-to-next:** when one task finishes (auto-merged or escalated), coordinator picks next from queue without Colin involvement. Telegram on **terminal events only** — completion summary, escalation request, or critical failure. **No "started" pings.**
+- **Telegram:** `/run <task>` fires single task; `/queue add <task>` adds to backlog; `/queue run` drains queue sequentially; `/halt` stops in-flight run; `/resume` re-enables.
+- **Cron:** `task-pickup` cron at 16:00 UTC fires daily.
+- **API:** `/api/coordinator/fire` (F22-compliant) accepts task payload, inserts into `task_queue`, kicks pickup. `/api/coordinator/complete` marks done + loop-to-next.
 
-**metric:** % of coordinator runs initiated without Colin chat involvement
+Loop-to-next: when one task finishes, coordinator picks next from queue without Colin involvement. `decisions_log` row per invocation. `/coordinator` cockpit page shows live queue. 25 tests green.
 
-**benchmark:** ≥80% remote-fired over 7-day window; **≥95% of completed tasks loop to next without prompt**
+#### v2 done_state — continuous mode additions (spec 2026-05-08)
 
-**surface:** telegram on completion/escalation/halt, status dashboard live counter (queued / running / completed today), `decisions_log` row per invocation, `/coordinator` cockpit page showing queue + active session
+Three additions layered on top of v1:
 
-#### Sub-modules implied (coordinator will break these down at Phase 1c)
+**v2.1 — Self-prioritization mode**
 
-1. **Telegram command parser** — extends existing webhook (`tf:` / `dg:` prefixes) with new `co:` prefix for `/run`, `/queue add`, `/queue run`, `/halt`
-2. **`/queue add` Telegram handler** — INSERT into `task_queue` from Telegram message (priority + description parsing)
-3. **`/queue run` drain loop** — sequential pickup of priority-1 → priority-N rows, looping until queue empty or quota cliff
-4. **`/halt` interrupt** — flips a `harness_config.HARNESS_HALTED` flag that pickup-runner checks each tick; in-flight session drains then stops
-5. **`/api/coordinator/fire` endpoint** — F22-compliant route accepting `{task: string, priority?: number, metadata?: {...}}`; INSERT into `task_queue`, kick pickup-runner, return `{window_session_id, task_id}` synchronously
-6. **Cron sweep registrations** — daily audit + weekly drift cron entries in `vercel.json` (seam edit)
-7. **Loop-to-next logic** — pickup-runner picks the next queued task immediately on completion; respects quota-forecast gate
-8. **Terminal-event Telegram filter** — extend `notifications-drain` to suppress "started" / "phase X completed" rows; only ship completion summary, escalation, halt
-9. **`/coordinator` cockpit page** — live counter + queue table + active session card (auto-refresh)
-10. **`window_sessions` table** — likely already exists per harness work; verify schema includes `triggered_by` enum (telegram/cron/api/colin-paste)
+`/run continuous` (and `/queue run continuous`) reads `docs/system-inventory.md`, ranks all modules by `weight × (1 − completion%)`, picks the top non-blocked, non-complete (<95%) target autonomously — no Colin input required. Inserts that module's task into `task_queue`, triggers pickup, logs pick reasoning (score, candidates considered, why chosen) to a `decisions_log` row. Skips modules where the "Why it matters" field contains the word "blocked" or where completion ≥ 95%.
 
-#### Notes for coordinator Phase 1a
+**v2.2 — Done-state auto-draft**
 
-- Replaces the simpler v0 "fire-and-forget on telegram" design (original spec). Three-trigger surface + loop-to-next is the actual unlock.
-- Telegram `co:` prefix follows existing pattern (`tf:` for thumbs, `dg:` for deploy gate). Webhook handler in `app/api/telegram/webhook/route.ts` already routes by prefix.
-- `/halt` is critical: without it, a runaway loop can't be stopped without redeploying.
-- Quota forecast (`harness-quota-forecast`, currently 100%) gates the drain loop — if forecast says risk, coordinator surfaces a Telegram and pauses instead of consuming budget.
-- `/coordinator` cockpit page complements the existing `/autonomous` page (rollups), focusing on live queue state.
+When `/run continuous` picks a module that has no done_state entry in `docs/leverage-targets.md` §10 (shows "no spec yet" in system-inventory.md), the harness drafts a candidate done_state using the Anthropic API (context: Streamlit source grep, README, recent commits, schema tables). Appends to `docs/leverage-targets.md` under a new `### [module-id] — auto-drafted` section tagged `[auto-drafted YYYY-MM-DD, review on next inspection]`. If the module has zero context to draft from (no Streamlit source, no schema refs, no README), skips it, picks next highest-leverage target instead, and telegrams Colin the skip reason.
+
+**v2.3 — Quota awareness**
+
+Harness checks Anthropic API / Claude Code routines usage before each continuous-mode pickup. Check fires at task start AND at 10-minute intervals (stored in `coordinator_run_state.last_quota_check_at`). Configurable threshold via `harness_config` key `HARNESS_QUOTA_THRESHOLD` (default `85`). When usage crosses threshold: finishes current sub-phase (no mid-task kill), halts cleanly, persists run state to `coordinator_run_state` table (modules shipped, current target, quota pct), sets `HARNESS_HALTED=true`, telegrams summary (modules shipped this run, % movement, quota remaining, ETA to refresh). `/run continuous` and `/resume` both check `coordinator_run_state` for a preserved run and resume from the saved position.
+
+**Schema additions (migration 0164):**
+
+- `coordinator_run_state` table — tracks active/halted continuous runs (mode, status, modules_shipped[], current_target, quota_pct_at_halt, last_quota_check_at, timestamps)
+- `harness_config` seeds: `HARNESS_QUOTA_THRESHOLD=85`, `HARNESS_CONTINUOUS_RUN_ID=`
+
+**New lib files:**
+
+- `lib/harness/auto-pick.ts` — inventory parser + ranker + decisions_log writer
+- `lib/harness/done-state-drafter.ts` — context gatherer + Anthropic API drafter + leverage-targets.md appender
+- `lib/harness/quota-monitor.ts` — usage poller + threshold check + halt writer
+
+**Command changes:**
+
+- `coordinator-commands.ts`: `handleRunCommand` detects 'continuous' keyword; `handleQueueRunCommand` accepts text arg for 'continuous' detection; `handleResumeCommand` checks coordinator_run_state for preserved state
+- `app/api/coordinator/complete/route.ts`: quota check before loop-to-next when continuous run active
+- `app/api/telegram/webhook/route.ts`: pass `txt` to `handleQueueRunCommand` for continuous detection
+
+**metric:** modules shipped per continuous run without Colin touch; quota-halt rate
+
+**benchmark:** ≥1 module picked and shipped autonomously per continuous run; 0 mid-task kills; quota halt telegrams delivered within 30s of threshold crossing
+
+**surface:** Telegram on run-start (module picked + reasoning), on each task completion (module shipped + next target), on halt (summary); `coordinator_run_state` table queryable via cockpit; `decisions_log` row per pick; `docs/leverage-targets.md` updated with auto-drafted specs
+
+**Integration test (CI gate for v2 ship):**
+
+1. Fire `/run continuous` → assert `coordinator_run_state` created with top leverage module as `current_target`
+2. Assert `decisions_log` row inserted with pick reasoning
+3. For a module with no done_state, assert `docs/leverage-targets.md` updated with auto-drafted section
+4. Set `HARNESS_QUOTA_THRESHOLD=1` → assert `coordinator_run_state.status='halted_quota'` + Telegram message logged
+
+#### v2 sub-modules
+
+1. **`coordinator_run_state` migration** — schema + harness_config seeds
+2. **`lib/harness/auto-pick.ts`** — parse system-inventory.md top leverage table, rank, skip blocked/≥95%, return top pick + ranked list
+3. **`lib/harness/done-state-drafter.ts`** — gather context (Streamlit grep, README, schema, commits), call Anthropic API, append to leverage-targets.md; skip + Telegram if no context
+4. **`lib/harness/quota-monitor.ts`** — poll usage (routines 429 guard + harness_config token counters), compare to HARNESS_QUOTA_THRESHOLD, write halt state
+5. **`coordinator-commands.ts` continuous mode** — detect `/run continuous` and `/queue run continuous`, call auto-pick, log to decisions_log, create coordinator_run_state row
+6. **`complete/route.ts` quota gate** — before loop-to-next in continuous mode, call quota-monitor; halt + telegram if over threshold
+7. **`webhook/route.ts` passthrough** — pass `txt` to `handleQueueRunCommand` for continuous detection
+8. **Integration test** — four assertions covering pick, draft, halt, resume
+
+#### Notes for v2
+
+- Auto-pick reads system-inventory.md from filesystem (`process.cwd()`). On Vercel, the repo files are bundled — safe to read at runtime.
+- Done-state drafter uses `ANTHROPIC_API_KEY` (already in Vercel env). Drafts at most once per module per run — idempotent check before drafting.
+- Quota monitor checks `harness_config` token counters (HARNESS_QUOTA_TOKENS_USED / HARNESS_QUOTA_TOKENS_LIMIT) as primary signal. Falls back to routines 429 guard. Fails open — guard errors never block pickup.
+- `/run continuous` never auto-starts a second continuous run if one is already active (check coordinator_run_state for status='running').
+- Do not auto-fire `/run continuous` on v2 ship — Colin verifies everything first.
 
 ---
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { onTaskComplete } from '@/lib/harness/pickup-runner'
+import { checkQuota, haltContinuousRun } from '@/lib/harness/quota-monitor'
+import { postMessage } from '@/lib/orchestrator/telegram'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,8 +96,73 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Fail open — if we can't read the flag, proceed with loop
   }
 
+  // Update continuous run state on task completion (non-fatal)
+  let continuousRunId: string | null = null
+  let completedModuleId: string | null = null
+  try {
+    // Read active continuous run id from harness_config
+    const { data: runIdRow } = await db
+      .from('harness_config')
+      .select('value')
+      .eq('key', 'HARNESS_CONTINUOUS_RUN_ID')
+      .maybeSingle()
+    continuousRunId = ((runIdRow?.value as string | undefined) ?? '').trim() || null
+
+    if (continuousRunId) {
+      // Look up module_id from the task metadata
+      const { data: taskRow } = await db
+        .from('task_queue')
+        .select('metadata')
+        .eq('id', taskId)
+        .maybeSingle()
+      const meta = (taskRow?.metadata ?? {}) as Record<string, unknown>
+      completedModuleId = (meta.module_id as string | undefined) ?? null
+
+      if (finalStatus === 'completed') {
+        const { data: runRow } = await db
+          .from('coordinator_run_state')
+          .select('modules_shipped, modules_shipped_count, modules_attempted_count')
+          .eq('id', continuousRunId)
+          .maybeSingle()
+
+        if (runRow) {
+          const shipped = (runRow.modules_shipped as string[]) ?? []
+          const updatedShipped =
+            completedModuleId && !shipped.includes(completedModuleId)
+              ? [...shipped, completedModuleId]
+              : shipped
+          await db
+            .from('coordinator_run_state')
+            .update({
+              modules_shipped: updatedShipped,
+              modules_shipped_count: updatedShipped.length,
+              modules_attempted_count: ((runRow.modules_attempted_count as number) ?? 0) + 1,
+            })
+            .eq('id', continuousRunId)
+        }
+      }
+    }
+  } catch {
+    // Non-fatal — continuous run tracking is best-effort
+    continuousRunId = null
+  }
+
   let loopedToNext = false
   if (!halted && finalStatus === 'completed') {
+    // Quota gate: check before looping when a continuous run is active
+    if (continuousRunId) {
+      try {
+        const quotaStatus = await checkQuota(continuousRunId)
+        if (quotaStatus.should_halt && !quotaStatus.skip_check) {
+          const halt = await haltContinuousRun(continuousRunId, quotaStatus)
+          void postMessage(halt.telegram_lines.join('\n')).catch(() => {})
+          return NextResponse.json({ ok: true, looped_to_next: false, halt_reason: 'quota' })
+        }
+      } catch {
+        // Quota check failure is non-fatal — proceed with loop
+      }
+    }
+
     // Check if queue is non-empty before triggering pickup
     try {
       const { count } = await db
