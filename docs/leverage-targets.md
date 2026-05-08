@@ -26,21 +26,48 @@ Each target lists: ID, status, done_state, metric, benchmark, surface, and the i
 
 These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. Build order is annotated by priority — multipliers first.
 
-### T-001 — Coordinator v1 remote invocation
+### T-001 — Coordinator v1 remote invocation (REVISED 2026-05-08)
 
 - **Inventory row:** `coordinator-agent`
-- **Status:** queued
-- **Build priority:** 1 (multiplier — unlocks fire-and-forget for T-003 through T-005)
+- **Status:** queued (description updated in `task_queue` row `393be0d3`)
+- **Build priority:** 1 (multiplier — unlocks fire-and-forget for T-003 through T-006)
 - **Current %:** 35
 - **Done %:** 100
 
-**done_state:** Coordinator invoked without Colin typing "Run task" in chat. Triggers: (1) telegram command `/run <task>` or `/run` from queue, (2) cron schedule for recurring sweeps (morning_digest, scheduled audits), (3) `/api/coordinator/fire` authenticated endpoint accepting task payload. Each invocation creates `window_session` row, runs harness, returns status to caller. Fire-and-forget — Colin gets telegram on completion, not start.
+**done_state:** Coordinator runs without Colin typing in chat. Three triggers:
 
-**metric:** % of coordinator runs that are remote-fired (no Colin chat involvement)
+- **Telegram:** `/run <task>` fires single task; `/queue add <task>` adds to backlog; `/queue run` drains queue sequentially; `/halt` stops in-flight run.
+- **Cron:** scheduled sweeps (morning_digest, daily audits, weekly drift recompute) fire automatically.
+- **API:** `/api/coordinator/fire` authenticated endpoint accepts task payload, returns `window_session_id` immediately.
 
-**benchmark:** ≥80% remote-fired over 7-day window
+Each invocation creates `window_sessions` row, executes through harness (builder → safety_agent → digital_twin if needed → deploy gate), reports back to caller. **Loop-to-next:** when one task finishes (auto-merged or escalated), coordinator picks next from queue without Colin involvement. Telegram on **terminal events only** — completion summary, escalation request, or critical failure. **No "started" pings.**
 
-**surface:** telegram on completion, status dashboard live counter, `decisions_log` row per invocation
+**metric:** % of coordinator runs initiated without Colin chat involvement
+
+**benchmark:** ≥80% remote-fired over 7-day window; **≥95% of completed tasks loop to next without prompt**
+
+**surface:** telegram on completion/escalation/halt, status dashboard live counter (queued / running / completed today), `decisions_log` row per invocation, `/coordinator` cockpit page showing queue + active session
+
+#### Sub-modules implied (coordinator will break these down at Phase 1c)
+
+1. **Telegram command parser** — extends existing webhook (`tf:` / `dg:` prefixes) with new `co:` prefix for `/run`, `/queue add`, `/queue run`, `/halt`
+2. **`/queue add` Telegram handler** — INSERT into `task_queue` from Telegram message (priority + description parsing)
+3. **`/queue run` drain loop** — sequential pickup of priority-1 → priority-N rows, looping until queue empty or quota cliff
+4. **`/halt` interrupt** — flips a `harness_config.HARNESS_HALTED` flag that pickup-runner checks each tick; in-flight session drains then stops
+5. **`/api/coordinator/fire` endpoint** — F22-compliant route accepting `{task: string, priority?: number, metadata?: {...}}`; INSERT into `task_queue`, kick pickup-runner, return `{window_session_id, task_id}` synchronously
+6. **Cron sweep registrations** — daily audit + weekly drift cron entries in `vercel.json` (seam edit)
+7. **Loop-to-next logic** — pickup-runner picks the next queued task immediately on completion; respects quota-forecast gate
+8. **Terminal-event Telegram filter** — extend `notifications-drain` to suppress "started" / "phase X completed" rows; only ship completion summary, escalation, halt
+9. **`/coordinator` cockpit page** — live counter + queue table + active session card (auto-refresh)
+10. **`window_sessions` table** — likely already exists per harness work; verify schema includes `triggered_by` enum (telegram/cron/api/colin-paste)
+
+#### Notes for coordinator Phase 1a
+
+- Replaces the simpler v0 "fire-and-forget on telegram" design (original spec). Three-trigger surface + loop-to-next is the actual unlock.
+- Telegram `co:` prefix follows existing pattern (`tf:` for thumbs, `dg:` for deploy gate). Webhook handler in `app/api/telegram/webhook/route.ts` already routes by prefix.
+- `/halt` is critical: without it, a runaway loop can't be stopped without redeploying.
+- Quota forecast (`harness-quota-forecast`, currently 100%) gates the drain loop — if forecast says risk, coordinator surfaces a Telegram and pauses instead of consuming budget.
+- `/coordinator` cockpit page complements the existing `/autonomous` page (rollups), focusing on live queue state.
 
 ---
 
@@ -213,13 +240,54 @@ For audit purposes, the original three options considered:
 
 ---
 
+### T-006 — Failures Log
+
+- **Inventory row:** `harness-failures-log` (new — added to inventory in same PR)
+- **Status:** queued
+- **Build priority:** 2 (multiplier — feeds T-002's known-failure-pattern signal; ships in parallel with T-002)
+- **Current %:** 0
+- **Done %:** 100
+
+**done_state:** `failures_log` table in Supabase + cockpit page at `/failures`. Every silent or surfaced failure recorded with: trigger context (workflow, PR, manual), expected vs actual behavior, root cause (filled post-analysis), fix commit sha, `pattern_signature` (jsonb fingerprint for matching future PRs), severity, status (open / fixing / fixed / recurring), occurrence count, `last_seen_at`. Self-repair and Safety Agent both write to it. Safety Agent reads it on every PR to pattern-match incoming changes against known failure signatures — flags risk if PR matches an open or recurring pattern. `/failures` page lists open + recurring at top, sortable, filterable, with one-click **"promote to harness test"** action that converts a logged failure into an integration test for the test pattern.
+
+**metric:** pattern recurrence rate (same failure signature hitting twice after fix)
+
+**benchmark:** <5% recurrence over rolling 30-day window; **0 critical-severity recurrences**
+
+**surface:** cockpit nav → `/failures`, telegram on critical or recurring detection, `safety_agent` risk-routing input, `morning_digest` line: "open failures: X, recurring: Y, fixed today: Z"
+
+#### Sub-modules implied (coordinator will break these down at Phase 1c)
+
+1. **Schema migration** — `failures_log` table with columns above; `pattern_signature` jsonb indexed for fast match
+2. **Pattern signature builder** — pure function: `failure_context → jsonb` (e.g., `{type: "test-fail", file: "tests/foo.test.ts", error_class: "AssertionError", regex_match: "...", touched_files: [...]}`)
+3. **Write path — self-repair integration** — `lib/harness/self-repair/` writes a row when detector + drafter run; status transitions handled by pipeline
+4. **Write path — manual log** — `/api/failures/log` POST endpoint for Colin or coordinator to log failures observed outside the harness
+5. **Read path — Safety Agent matcher** — given an incoming PR's diff signature, query `failures_log` for matches → contributes to risk score (T-002 sub-module #2: known-failure regex match)
+6. **Recurrence detector** — when a row's `pattern_signature` matches an existing `fixed` row, increment `occurrence_count`, flip status to `recurring`, fire telegram
+7. **`/failures` cockpit page** — list view with filters (status / severity / age), sort by `last_seen_at` and `occurrence_count`
+8. **"Promote to harness test" action** — generates a stub `tests/regression/<pattern_signature_hash>.test.ts` from the failure context; coordinator polishes during Phase 4
+
+#### Notes for coordinator Phase 1a
+
+- T-006 is a **dependency of T-002's known-failure regex match signal**. T-002 can ship first with that signal scoring 0; T-006 can ship in parallel and the signal activates as `failures_log` populates.
+- `pattern_signature` design is the load-bearing part — too coarse and matches everything; too fine and matches nothing. Worth a Phase 1b twin Q&A on initial signature shape.
+- Self-repair already writes to `agent_events` for failure detection; the integration is "also write a `failures_log` row" — additive, not replacement.
+- `/failures` cockpit page should live under operations (alongside `/autonomous`).
+- "Promote to harness test" is the F19 lever — every fixed failure becomes a test that prevents recurrence. This is what closes the recurrence loop and drives the <5% benchmark.
+
+---
+
 ## Build-order rationale
 
-T-001 and T-002 are **multipliers** — they make the other three ship without Colin in the loop:
+**Multipliers** (priority 1–2) make the rest ship without Colin in the loop:
 
-1. **T-001 (Coordinator remote)** — without it, every task still requires "Run task `<uuid>`" in chat. Build first so T-003/4/5 can execute overnight.
-2. **T-002 (Safety Agent)** — without it, the prestage auto-merge from PR #133 stays flagged off (AD2 barrier). Build second so subsequent PRs can auto-merge low-risk diffs.
-3. **T-003 / T-004 / T-005** — direct revenue and visibility wins. With T-001 and T-002 live, these can run in parallel coordinator windows overnight. Without them, ship one at a time by chat-paste.
+1. **T-001 (Coordinator remote)** — without it, every task still requires chat-paste. Build first so T-003/4/5/6 can execute overnight.
+2. **T-002 (Safety Agent)** — without it, prestage auto-merge from PR #133 stays flagged off (AD2 barrier). Build second so subsequent PRs auto-merge low-risk diffs.
+3. **T-006 (Failures Log)** — feeds T-002's known-failure-pattern signal. Ships in **parallel with T-002**; T-002 can launch with that signal scoring 0 and activate as `failures_log` populates.
+
+**Direct revenue / visibility** (priority 3) — with multipliers live, these run in parallel coordinator windows overnight:
+
+- **T-003 (Receipts)**, **T-005 (Net Worth)**, **T-004 (Scanner)** — fully unblocked except T-004 still waits on Q-002 (tier rules) for its classifier sub-module.
 
 ---
 
