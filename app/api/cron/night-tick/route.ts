@@ -93,6 +93,11 @@ export async function GET(request: Request) {
           fixed_count: failuresExportResult.fixed_count,
           total_rendered: failuresExportResult.total_rendered,
           markdown_bytes: failuresExportResult.markdown_bytes,
+          // F-N14 fix surfacing: include the GitHub commit info so morning_digest
+          // can show "skipped (no data change)" vs "committed sha=X" without
+          // re-querying the GitHub API.
+          skipped: failuresExportResult.skipped ?? false,
+          commit_sha: failuresExportResult.commit_sha ?? null,
           error: failuresExportResult.error,
         },
         occurred_at: new Date().toISOString(),
