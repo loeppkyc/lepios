@@ -44,21 +44,54 @@ These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. B
 
 ---
 
-### T-002 — Safety Agent
+### T-002 — Safety Agent (REVISED 2026-05-08)
 
 - **Inventory row:** `harness-safety-agent`
-- **Status:** queued
+- **Status:** queued (description updated in `task_queue` row `edd5af72`)
 - **Build priority:** 2 (multiplier — closes AD2 barrier so T-001 + the prestage auto-merge from PR #133 can flip on)
 - **Current %:** 0
 - **Done %:** 100
 
-**done_state:** Sub-agent invoked by coordinator on every PR before deploy gate. Runs: secret-scanning, schema-impact analysis (migration safety), test coverage delta, scope-creep check (LOC vs plan), known-failure pattern match against `failures_log`. Returns PASS / WARN / BLOCK with reasoning. BLOCK halts merge; WARN appends to PR + telegram; PASS auto-merges when all gates green.
+**done_state:** Sub-agent invoked by coordinator on every PR before deploy gate. Runs: secret-scanning, schema-impact analysis (migration safety), test coverage delta, scope-creep check (LOC vs plan), known-failure pattern match. Computes a **risk score 0–100** weighted across signals.
 
-**metric:** false-block rate vs missed-issue rate
+- **Risk <30 (low):** auto-merge → deploy → telegram only on a daily completion summary, **not per PR**.
+- **Risk 30–70 (medium):** query digital twin with PR context + comparable past decisions → twin returns **PROCEED / HOLD / ESCALATE**.
+  - PROCEED → auto-merge
+  - HOLD → pause + `decisions_log` row + retry after 24h
+  - ESCALATE → telegram Colin
+- **Risk >70 (high):** skip twin, telegram Colin directly with risk breakdown + recommendation.
 
-**benchmark:** <5% false-blocks, 0 missed criticals over 30-day window
+**Never** prompts for approval on commits, pushes, or bash commands within the autonomous loop. Only escalates the **final merge decision** when above threshold.
 
-**surface:** PR comments, telegram on BLOCK, `decisions_log` row per invocation
+**metric:** % of merges completed without Colin involvement
+
+**benchmark:** ≥95% of low+medium-risk autonomous; 100% high-risk escalated; **0 missed criticals** over a 30-day window
+
+**surface:** telegram only on ESCALATE or daily summary; `decisions_log` row per invocation; status dashboard line: "today: X auto-merged, Y twin-cleared, Z escalated"
+
+#### Sub-modules implied (coordinator will break these down at Phase 1c)
+
+1. **Risk scorer** — pure function: signals → 0–100 score. Weights configurable in `harness_config`.
+2. **Signal modules** (each emits a contribution to the score):
+   - secret scanner (existing patterns + new: `.env.*`, key-shape regex)
+   - schema-impact analyzer (additive vs destructive, F-N7 search-path coverage)
+   - test coverage delta vs base branch
+   - scope-creep checker (LOC delta vs `plan_loc` if present)
+   - known-failure pattern match (regex against failures_log titles + bodies)
+3. **Twin arbiter route** — `/api/twin/safety-arbitrate` accepts PR context + comparable-decisions query; returns PROCEED / HOLD / ESCALATE
+4. **Comparable-decisions retrieval** — pgvector search over past `decisions_log` rows to find similar PRs and their outcomes
+5. **Decision router** — pure function: score → low/medium/high → action
+6. **HOLD retry-after-24h** — task_queue row created with run-after timestamp
+7. **Daily summary digest** — adds line to `morning_digest` aggregating low-risk auto-merges
+8. **Status dashboard counter** — live metric on `/autonomous` page
+
+#### Notes for coordinator Phase 1a
+
+- Replaces the simpler PASS/WARN/BLOCK design (original spec). Risk-scored + twin-arbiter is more nuanced and aligns with F19 (autonomous-share trending up).
+- The twin arbiter requires Twin Q&A to be functional (`twin-qa` row in inventory: 68%) — twin must reliably handle PR-context queries before this layer activates. May need a sub-task to harden twin first.
+- Risk-score weights: ASK COLIN at Phase 1b. They're calibration parameters and need his judgment for initial values (e.g., "secrets present = automatic high risk", "test coverage drop > 5% = +30 points").
+- Threshold tuning will need a 7-day observe-only run before flipping `auto-merge` on. Same playbook as `DEPLOY_GATE_RISK_TIER` from PR #133.
+- Older Phase 1 task `9b9bca02` is marked completed in task_queue but inventory shows 0%. Phase 1a study should grep `lib/harness/safety/` for actual code before re-implementing.
 
 ---
 
