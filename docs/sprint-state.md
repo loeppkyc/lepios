@@ -268,6 +268,23 @@ commit: "b617167"
 opened_at: "2026-04-27T00:26:00Z"
 last_updated_at: "2026-04-27T00:40:00Z"
 
+hardening_h2:
+hardening_id: "H2"
+task_id: "646424f9-a032-4669-a9e2-77ee10b976f6"
+source_label: "postmortem_915d1fee"
+status: "awaiting_grounding"
+description: "Coordinator heartbeat — fix status filter bug + add cloud MCP fallback"
+acceptance_doc: "docs/sprint-5/h2-heartbeat-allowlist-acceptance.md"
+root_causes:
+  - "status_filter_bug: route line 40 .eq(status,'claimed') fails after coordinator sets status='running'"
+  - "cloud_sandbox_network: HTTP curl to lepios-one.vercel.app blocked in cloud coordinator runtime"
+part_a: "route fix — .eq('status','claimed') → .in('status',['claimed','running']) + new test"
+part_b: "coordinator.md protocol update — add Supabase MCP as primary heartbeat path (open Q: MCP-only or dual?)"
+awaiting_colin_approval_for: "acceptance doc + open Q on coordinator.md scope (MCP-only vs dual-path)"
+branch: "harness/task-646424f9-a032-4669-a9e2-77ee10b976f6"
+opened_at: "2026-05-08T00:05:00Z"
+last_updated_at: "2026-05-08T00:14:00Z"
+
 hardening_h3:
 hardening_id: "H3"
 task_id: "9b95359e-828d-46d9-8514-1a1ff16f4c31"

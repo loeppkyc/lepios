@@ -217,3 +217,27 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-08T00:10:00Z sprint=5 chunk=H2 doc=docs/sprint-5/h2-heartbeat-allowlist-acceptance.md
+cited_principles: [META-C]
+trigger_match_evidence: |
+  Situation: Hardening task H2 — fix coordinator heartbeat route status filter bug and add
+  cloud-mode Supabase MCP fallback. Route line 40 uses .eq('status', 'claimed') but coordinator
+  updates status to 'running' at startup; heartbeats always fail after that.
+  No cached principle matches "status filter bug fix in internal API route" exactly.
+  META-C condition (a) fails: no trigger-exact match in colin-principles.md.
+reversibility_check: |
+  Route change (line 40): one-line diff, fully reversible via git revert.
+  New test case: additive, reversible (delete test).
+  coordinator.md update (Part B): proposed only — coordinator cannot write .claude/agents/.
+    Reversible if implemented: revert to HTTP-only protocol.
+  acceptance doc: new file, fully reversible.
+  sprint-state.md update: document only, reversible.
+  All decisions: LOW cost to reverse.
+confidence: medium (bug is unambiguous; fix is correct; no principle match found → escalate per META-C)
+outcome: escalated
+escalation_reasons:
+  - meta_c_condition_a_fail: no cached principle matches this trigger exactly
+  - open_question: coordinator.md Part B scope (HTTP-only vs MCP-only vs dual path)
