@@ -289,19 +289,43 @@ export function TodayYesterdayPanel() {
   }
 
   if (error) {
+    // Friendly UX: don't dump raw SP-API JSON to the user. Most 5xx are
+    // Amazon-transient and self-heal on retry; the auto-refresh interval
+    // re-runs the fetch every 15 min. The technical detail is preserved in
+    // the dev-mode debug section for diagnosis.
+    const isUpstream = /SP-API|HTTP 5\d\d|InternalFailure|ServiceUnavailable/i.test(error)
+    const friendly = isUpstream
+      ? 'Amazon temporarily unavailable — retrying.'
+      : 'Could not load orders.'
     return (
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--color-border)',
-          padding: '20px 24px',
-          fontFamily: 'var(--font-ui)',
-          fontSize: 'var(--text-small)',
-          color: 'var(--color-critical)',
-        }}
-      >
-        Failed to load orders: {error}
+      <div>
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            padding: '20px 24px',
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          {friendly}
+        </div>
+        {devMode && (
+          <DebugSection heading="Debug — Today/Yesterday error">
+            <pre
+              style={{
+                color: 'var(--color-critical)',
+                fontSize: 'var(--text-nano)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              }}
+            >
+              {error}
+            </pre>
+          </DebugSection>
+        )}
       </div>
     )
   }

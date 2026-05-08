@@ -180,6 +180,34 @@ export async function spFetch<T>(
       continue
     }
 
+    // Amazon-side transient errors — InternalFailure (500), Bad Gateway (502),
+    // Service Unavailable (503), Gateway Timeout (504). Same backoff envelope
+    // as 429. Retry budget shared with 429; MAX_RETRIES=5 is plenty for both.
+    if (res.status >= 500 && res.status < 600) {
+      if (attempt === MAX_RETRIES) {
+        const text = await res.text()
+        throw new Error(
+          `SP-API ${method} ${path} (${res.status}): upstream error after ${MAX_RETRIES} retries. ${text.slice(0, 200)}`
+        )
+      }
+
+      const waitMs = Math.min(BASE_DELAY_MS * 2 ** attempt + Math.random() * 500, MAX_DELAY_MS)
+
+      void logEvent('amazon', 'sp_api.5xx_retry', {
+        actor: 'system',
+        status: 'warning',
+        meta: {
+          path,
+          status: res.status,
+          attempt: attempt + 1,
+          waitMs: Math.round(waitMs),
+        },
+      })
+
+      await sleep(waitMs)
+      continue
+    }
+
     if (!res.ok) {
       const text = await res.text()
       throw new Error(`SP-API ${method} ${path} (${res.status}): ${text.slice(0, 300)}`)
