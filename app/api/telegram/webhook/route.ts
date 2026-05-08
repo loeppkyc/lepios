@@ -944,7 +944,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/queue\s+run(\s|$)/i)) {
-        void handleQueueRunCommand().catch(() => {})
+        void handleQueueRunCommand(txt).catch(() => {})
         return NextResponse.json({ ok: true })
       }
       if (txt.match(/^\/queue\s+status(\s|$)/i)) {
