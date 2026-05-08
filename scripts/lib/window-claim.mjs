@@ -43,6 +43,23 @@ export function isMainCheckout() {
   return gitDir === commonDir
 }
 
+/**
+ * True iff the repo has any linked worktrees beyond the main checkout.
+ *
+ * F-N10 prevention companion: F-N8 fired only when other windows had LIVE claims.
+ * F-N10 (recurrence) showed the gap — between sessions, claims age out / get
+ * pruned, but the worktrees themselves persist. A new window in the main
+ * checkout can satisfy "no other claims live" yet still be using a repo whose
+ * persistent shape is multi-worktree. Forcing every window into a worktree once
+ * worktrees exist closes the F-N10 path.
+ */
+export function hasOtherWorktrees() {
+  const out = execSync('git worktree list --porcelain').toString()
+  // Each `worktree <path>` line marks one entry. >1 means at least one linked.
+  const count = (out.match(/^worktree /gm) ?? []).length
+  return count > 1
+}
+
 /** Replace path separators so a branch like `feat/foo/bar` lands as one flat filename. */
 export function branchToFilename(branch) {
   return `${branch.replace(/\//g, '__')}.json`
