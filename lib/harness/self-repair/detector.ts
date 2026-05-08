@@ -12,6 +12,8 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireCapability } from '@/lib/security/capability'
 import { httpRequest, telegram } from '@/lib/harness/arms-legs'
+import { logFailure } from '@/lib/failures/log'
+import { buildSignature } from '@/lib/failures/signature'
 
 export interface DetectedFailure {
   /** agent_events.id (string UUID) */
@@ -129,6 +131,24 @@ export async function detectNextFailure(): Promise<DetectedFailure | null> {
 
     // Acquire in-process lock
     _activeLocks.add(actionType)
+
+    // T-006 integration: log this detection to failures_log so the failures-
+    // learning loop sees it. Fire-and-forget: never block detection on a log
+    // write failure. Recurrence detection in logFailure() handles the case
+    // where this same actionType has been fixed previously.
+    void logFailure({
+      title: `self-repair detected: ${actionType}`,
+      trigger_context: 'self_repair',
+      trigger_ref: event.id,
+      what_happened: `agent_events row ${event.id.slice(0, 8)} (action=${actionType}) flagged for self-repair`,
+      pattern_signature: buildSignature({
+        type: 'silent-skip',
+        free_text: actionType,
+      }),
+      severity: 'medium',
+    }).catch(() => {
+      // Non-fatal — log writes must never block the detector
+    })
 
     return {
       eventId: event.id,
