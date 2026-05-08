@@ -21,12 +21,12 @@ This is the source of truth for **what exists, how complete it is, and where to 
 | Category                                          | Module count | Total weight | Earned (weighted) | Category % |
 | ------------------------------------------------- | ------------ | ------------ | ----------------- | ---------- |
 | Cockpit surfaces (LepiOS app)                     | 34           | 226          | 137.0             | **60.6%**  |
-| Autonomous harness                                | 39           | 234          | 169.0             | **72.2%**  |
+| Autonomous harness                                | 40           | 242          | 169.0             | **69.8%**  |
 | Shared infrastructure                             | 21           | 161          | 132.5             | **82.3%**  |
 | Knowledge / Twin / Rules / Measurement            | 9            | 72           | 41.5              | **57.6%**  |
 | Streamlit-baseline ports (LepiOS-side completion) | 23           | 156          | 78.0              | **50.0%**  |
 | Decisions / Security / Cross-cutting              | 10           | 62           | 42.5              | **68.5%**  |
-| **Total**                                         | **136**      | **911**      | **600.5**         | **65.9%**  |
+| **Total**                                         | **137**      | **919**      | **600.5**         | **65.3%**  |
 
 > The Streamlit baseline tracks **port progress**, not Streamlit's own completeness — Streamlit OS is fully functional. The rollup answers: "How much of the LepiOS replacement have we built?"
 
@@ -34,24 +34,25 @@ System-wide percentage is a **weighted average across 136 modules**. The two pil
 
 ---
 
-## Top 12 leverage gaps (system-wide)
+## Top leverage gaps (system-wide)
 
-Highest leverage = `(100 − completion%) × weight`. These are the prompts to fire next.
+Highest leverage = `(100 − completion%) × weight`. These are the prompts to fire next. Re-sorted on every shipped row per §Update Protocol.
 
-| Rank | ID                       | Module                           | %   | Weight | Leverage | Done-state spec                                                                 | Why it matters                                                                                      |
-| ---- | ------------------------ | -------------------------------- | --- | ------ | -------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1    | `cockpit-receipts`       | Receipts (camera + Vision OCR)   | 5   | 10     | 950      | [T-003](leverage-targets.md#t-003--receipts-camera--vision-ocr--reconciliation) | Daily-use revenue tool. 2640-line Streamlit baseline. Audit trail per transaction depends on it.    |
-| 2    | `cockpit-scan`           | Amazon Scanner (PageProfit)      | 10  | 10     | 900      | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Daily revenue tool. 3373-line Streamlit baseline. Highest-revenue module.                           |
-| 3    | `safety-agent`           | Pre-flight safety review         | 0   | 8      | 800      | [T-002](leverage-targets.md#t-002--safety-agent)                                | Blocks builder pre-commit + coordinator hand-off for destructive ops. Spec ready, code not started. |
-| 4    | `pageprofit-scanner`     | PageProfit (full Streamlit port) | 0   | 10     | 1000     | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Same as `cockpit-scan` from the port perspective — Streamlit version 100%, LepiOS 0%.               |
-| 5    | `cockpit-net-worth`      | Net Worth (full page)            | 20  | 8      | 640      | [T-005](leverage-targets.md#t-005--net-worth)                                   | Acceptance doc complete; migration 0133 not applied; page does not exist.                           |
-| 6    | `coordinator-agent`      | Sprint coordinator               | 35  | 9      | 585      | [T-001](leverage-targets.md#t-001--coordinator-v1-remote-invocation)            | v1 remote invocation deferred — still requires Colin paste to start a run.                          |
-| 7    | `behav-f17`              | Behavioral ingestion (F17)       | 5   | 7      | 665      | _(no spec yet)_                                                                 | 0/11 ingestion sources live. Long-arc lever for path-probability engine.                            |
-| 8    | `cockpit-money`          | Money pillar dashboard           | 55  | 9      | 405      | _(no spec yet)_                                                                 | P&L gauge hardcoded to 0%; depends on orders data wiring.                                           |
-| 9    | `builder-agent`          | Builder agent                    | 40  | 10     | 600      | _(no spec yet)_                                                                 | No formal flow test; safety-agent integration blocked.                                              |
-| 10   | `meas-f18`               | Measurement framework rollout    | 35  | 9      | 585      | _(no spec yet)_                                                                 | Only 5/15+ modules have full F18 contracts.                                                         |
-| 11   | `cockpit-hit-lists`      | Hit lists UI                     | 5   | 7      | 665      | _(no spec yet)_                                                                 | Telegram bot scans nightly; UI missing.                                                             |
-| 12   | `retail-scout-arbitrage` | Retail Scout / Arbitrage         | 0   | 7      | 700      | _(no spec yet)_                                                                 | Streamlit 100% (1632 + 800 + 1465 lines); LepiOS 0%.                                                |
+| Rank | ID                       | Module                           | %   | Weight | Leverage | Done-state spec                                                                 | Why it matters                                                                                                  |
+| ---- | ------------------------ | -------------------------------- | --- | ------ | -------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1    | `cockpit-receipts`       | Receipts (camera + Vision OCR)   | 5   | 10     | 950      | [T-003](leverage-targets.md#t-003--receipts-camera--vision-ocr--reconciliation) | Daily-use revenue tool. 2640-line Streamlit baseline. Audit trail per transaction depends on it.                |
+| 2    | `cockpit-scan`           | Amazon Scanner (PageProfit)      | 10  | 10     | 900      | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Daily revenue tool. 3373-line Streamlit baseline. Highest-revenue module.                                       |
+| 3    | `safety-agent`           | Pre-flight safety review         | 0   | 8      | 800      | [T-002](leverage-targets.md#t-002--safety-agent)                                | Blocks builder pre-commit + coordinator hand-off for destructive ops. Spec ready, code not started.             |
+| 3=   | `harness-failures-log`   | Failures log + `/failures` page  | 0   | 8      | 800      | [T-006](leverage-targets.md#t-006--failures-log)                                | Feeds T-002's known-failure-pattern signal. Self-repair + safety agent both write to it. New module 2026-05-08. |
+| 4    | `pageprofit-scanner`     | PageProfit (full Streamlit port) | 0   | 10     | 1000     | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Same as `cockpit-scan` from the port perspective — Streamlit version 100%, LepiOS 0%.                           |
+| 5    | `cockpit-net-worth`      | Net Worth (full page)            | 20  | 8      | 640      | [T-005](leverage-targets.md#t-005--net-worth)                                   | Acceptance doc complete; migration 0133 not applied; page does not exist.                                       |
+| 6    | `coordinator-agent`      | Sprint coordinator               | 35  | 9      | 585      | [T-001](leverage-targets.md#t-001--coordinator-v1-remote-invocation)            | v1 remote invocation deferred — still requires Colin paste to start a run.                                      |
+| 7    | `behav-f17`              | Behavioral ingestion (F17)       | 5   | 7      | 665      | _(no spec yet)_                                                                 | 0/11 ingestion sources live. Long-arc lever for path-probability engine.                                        |
+| 8    | `cockpit-money`          | Money pillar dashboard           | 55  | 9      | 405      | _(no spec yet)_                                                                 | P&L gauge hardcoded to 0%; depends on orders data wiring.                                                       |
+| 9    | `builder-agent`          | Builder agent                    | 40  | 10     | 600      | _(no spec yet)_                                                                 | No formal flow test; safety-agent integration blocked.                                                          |
+| 10   | `meas-f18`               | Measurement framework rollout    | 35  | 9      | 585      | _(no spec yet)_                                                                 | Only 5/15+ modules have full F18 contracts.                                                                     |
+| 11   | `cockpit-hit-lists`      | Hit lists UI                     | 5   | 7      | 665      | _(no spec yet)_                                                                 | Telegram bot scans nightly; UI missing.                                                                         |
+| 12   | `retail-scout-arbitrage` | Retail Scout / Arbitrage         | 0   | 7      | 700      | _(no spec yet)_                                                                 | Streamlit 100% (1632 + 800 + 1465 lines); LepiOS 0%.                                                            |
 
 ---
 
@@ -174,25 +175,26 @@ Highest leverage = `(100 − completion%) × weight`. These are the prompts to f
 
 ### 2d. Support modules
 
-| ID                            | Module                                 | State       | %   | Weight | Leverage | Evidence                                                                |
-| ----------------------------- | -------------------------------------- | ----------- | --- | ------ | -------- | ----------------------------------------------------------------------- |
-| `harness-attribution`         | Commit→task attribution                | partial     | 40  | 3      | 180      | `lib/harness/attribution.ts`, backfill incomplete                       |
-| `harness-process-efficiency`  | 4 efficiency signals                   | shipped     | 100 | 3      | 0        | `lib/harness/process-efficiency.ts`                                     |
-| `harness-improvement-engine`  | Feedback-loop scorer                   | partial     | 60  | 5      | 200      | `lib/harness/improvement-engine.ts`, signal_quality calibration pending |
-| `harness-branch-guard`        | `harness/task-{id}` branch enforcement | shipped     | 85  | 4      | 60       | `lib/harness/branch-guard.ts`                                           |
-| `harness-window-tracker`      | Coordinator session tracking           | shipped     | 100 | 3      | 0        | `lib/harness/window-tracker.ts`                                         |
-| `harness-stall-check`         | Coordinator stall detection            | partial     | 50  | 5      | 250      | `lib/harness/stall-check.ts`                                            |
-| `harness-source-content`      | Knowledge-base sync                    | partial     | 20  | 4      | 320      | `lib/harness/source-content.ts`                                         |
-| `harness-rollup`              | Weighted harness rollup                | shipped     | 100 | 2      | 0        | DB-verified rollup table (memory: 100% per 2026-05-05)                  |
-| `harness-component-bump`      | Auto-bump tracker on PR merge          | partial     | 60  | 2      | 80       | `lib/harness/component-bump.ts`                                         |
-| `harness-resource-budgets`    | Resource ceiling registry              | shipped     | 100 | 4      | 0        | Migration `0159_harness_resource_budgets.sql` (#131)                    |
-| `harness-telegram-thumbs`     | 👍/👎 feedback buttons                 | partial     | 85  | 6      | 90       | `lib/harness/telegram-buttons.ts`, wiring incomplete                    |
-| `harness-telegram-stats`      | Telegram usage stats                   | shipped     | 100 | 2      | 0        | `lib/harness/telegram-stats.ts`                                         |
-| `harness-telegram-escape`     | Message escape helper                  | shipped     | 100 | 2      | 0        | `lib/harness/telegram-escape.ts`                                        |
-| `harness-ollama-tunnel-stats` | Cloudflared tunnel metrics             | shipped     | 100 | 7      | 0        | `lib/harness/ollama-tunnel-stats.ts`, GPU-Day B4 verified               |
-| `harness-invoke-coordinator`  | Coordinator invocation wrapper         | shipped     | 100 | 7      | 0        | `app/api/harness/invoke-coordinator/route.ts`                           |
-| `harness-version`             | Harness version metadata               | shipped     | 100 | 2      | 0        | `lib/harness/version.ts`                                                |
-| `harness-status-data`         | Harness status dashboard data          | design-only | 0   | 2      | 200      | Not built                                                               |
+| ID                            | Module                                  | State       | %   | Weight | Leverage | Evidence                                                                                                   |
+| ----------------------------- | --------------------------------------- | ----------- | --- | ------ | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `harness-attribution`         | Commit→task attribution                 | partial     | 40  | 3      | 180      | `lib/harness/attribution.ts`, backfill incomplete                                                          |
+| `harness-process-efficiency`  | 4 efficiency signals                    | shipped     | 100 | 3      | 0        | `lib/harness/process-efficiency.ts`                                                                        |
+| `harness-improvement-engine`  | Feedback-loop scorer                    | partial     | 60  | 5      | 200      | `lib/harness/improvement-engine.ts`, signal_quality calibration pending                                    |
+| `harness-branch-guard`        | `harness/task-{id}` branch enforcement  | shipped     | 85  | 4      | 60       | `lib/harness/branch-guard.ts`                                                                              |
+| `harness-window-tracker`      | Coordinator session tracking            | shipped     | 100 | 3      | 0        | `lib/harness/window-tracker.ts`                                                                            |
+| `harness-stall-check`         | Coordinator stall detection             | partial     | 50  | 5      | 250      | `lib/harness/stall-check.ts`                                                                               |
+| `harness-source-content`      | Knowledge-base sync                     | partial     | 20  | 4      | 320      | `lib/harness/source-content.ts`                                                                            |
+| `harness-rollup`              | Weighted harness rollup                 | shipped     | 100 | 2      | 0        | DB-verified rollup table (memory: 100% per 2026-05-05)                                                     |
+| `harness-component-bump`      | Auto-bump tracker on PR merge           | partial     | 60  | 2      | 80       | `lib/harness/component-bump.ts`                                                                            |
+| `harness-resource-budgets`    | Resource ceiling registry               | shipped     | 100 | 4      | 0        | Migration `0159_harness_resource_budgets.sql` (#131)                                                       |
+| `harness-telegram-thumbs`     | 👍/👎 feedback buttons                  | partial     | 85  | 6      | 90       | `lib/harness/telegram-buttons.ts`, wiring incomplete                                                       |
+| `harness-telegram-stats`      | Telegram usage stats                    | shipped     | 100 | 2      | 0        | `lib/harness/telegram-stats.ts`                                                                            |
+| `harness-telegram-escape`     | Message escape helper                   | shipped     | 100 | 2      | 0        | `lib/harness/telegram-escape.ts`                                                                           |
+| `harness-ollama-tunnel-stats` | Cloudflared tunnel metrics              | shipped     | 100 | 7      | 0        | `lib/harness/ollama-tunnel-stats.ts`, GPU-Day B4 verified                                                  |
+| `harness-invoke-coordinator`  | Coordinator invocation wrapper          | shipped     | 100 | 7      | 0        | `app/api/harness/invoke-coordinator/route.ts`                                                              |
+| `harness-version`             | Harness version metadata                | shipped     | 100 | 2      | 0        | `lib/harness/version.ts`                                                                                   |
+| `harness-status-data`         | Harness status dashboard data           | design-only | 0   | 2      | 200      | Not built                                                                                                  |
+| `harness-failures-log`        | Failures log + `/failures` cockpit page | design-only | 0   | 8      | 800      | Spec at [T-006](leverage-targets.md#t-006--failures-log). Dependency of T-002's known-failure regex signal |
 
 **Harness summary:** 16 shipped at 100% / 9 shipped 80–99% / 9 partial / 5 design-only. **The deploy gate is the load-bearing victory** — without it nothing else autonomous can ship safely. **The safety agent is the highest-leverage gap that's not yet started.**
 
