@@ -80,21 +80,62 @@ These are the top-5 leverage gaps from `system-inventory.md`'s leverage table. B
 
 ---
 
-### T-004 — PageProfit / Amazon Scanner
+### T-004 — PageProfit / Amazon Scanner (REVISED 2026-05-08)
 
-- **Inventory row:** `cockpit-scan` + `pageprofit-scanner` (same module from two angles)
-- **Status:** queued
+- **Inventory rows:** `cockpit-scan` + `pageprofit-scanner` + `cockpit-pallets` (expanded scope)
+- **Status:** queued (description updated in `task_queue` row `896e2bb4`)
 - **Build priority:** 3 (parallel with T-003, T-005)
-- **Current %:** 10
+- **Current %:** 10 (scanner) / 88 (pallets, but for invoice scope only)
 - **Done %:** 100
 
-**done_state:** `/scanner` accepts ASIN or Amazon URL, fetches SP-API + Keepa, computes landed cost (purchase + prep + shipping + FBA fees + referral), margin, ROI, BSR trend (90d/180d/365d), price history. Caches <6h data. Sourcing decision panel: GO / HOLD / SKIP using Colin's tier rules (high-demand tier 1, collectible tier). Bulk scan accepts CSV of ASINs, returns ranked list.
+**done_state:** `/scanner` runs as scanning station tied to an active pallet. Pallet records created on intake (`pallet_id`, source, date, cost; paid in batch end-of-month via AP table). Scan barcode → SP-API + Keepa → landed cost, margin, ROI, BSR trend, price history, tier classification (high-demand tier 1 / collectible tier / standard). Decision routes to one of three:
 
-**metric:** GO/HOLD/SKIP agreement vs Colin's manual decision
+- **GO (Amazon):** triggers condition grading sub-flow (Vision OCR + Amazon condition standards), then one-click list into current open FBA shipment with auto-set price + condition.
+- **BBV (kids book):** checks `bbv_inventory` by ISBN. If exists, increment count. If new, button creates new BBV listing.
+- **DONATE (reject):** logged, moved on.
 
-**benchmark:** ≥90% agreement across 50-item sample
+Every scan tagged with `pallet_id`. `/pallets` dashboard shows per-pallet acceptance rate (% scanned hit GO), pallet P&L (realized revenue from sold items − pallet cost share), and ranking across all pallets to surface best/worst sourcing.
 
-**surface:** cockpit nav → `/scanner`, telegram on bulk completion
+**metric:** pallet acceptance rate + pallet-level ROI
+
+**benchmark:** rank all pallets; surface top + bottom performers; Colin uses ranking to evaluate sourcing channels (no fixed target — relative comparison)
+
+**surface:** cockpit nav → `/scanner` and `/pallets`, `morning_digest`: "Active pallet: X — Y scanned today, Z% accepted, $W projected ROI"
+
+#### Sub-modules implied (coordinator will break these down at Phase 1c)
+
+This target spans multiple discrete components. Listed here so the coordinator's Phase 1a study can scope each one:
+
+1. **Pallet intake** — intake form, `pallets` table extension if needed, AP integration
+2. **AP / accounts-payable table** — new schema for batch end-of-month payment workflow
+3. **Scanner station** — barcode capture, SP-API + Keepa fetch, decision panel UI
+4. **Tier classifier** — rule-based classification (high-demand tier 1 / collectible / standard); needs Colin's rules captured as data
+5. **Condition grading sub-flow** — Claude Vision OCR pipeline against Amazon condition standards
+6. **One-click FBA list** — current-open-shipment lookup, auto-set price + condition, push via SP-API
+7. **BBV dual-write** — ISBN check against `bbv_inventory`, increment-or-create flow ⚠️ open question below
+8. **Donate logger** — minimal — just `scans.outcome='donate'`
+9. **Per-pallet analytics** — acceptance rate, ROI, ranking dashboard on `/pallets`
+10. **Active-pallet morning_digest line** — selects current pallet, computes today's stats
+
+#### Open architectural question — BBV cross-system access
+
+BBV is a **separate Supabase project** (`oolgsvhupxutpicxxjfw`, `brick-and-book-vault`) with **Stripe LIVE**. LepiOS lives on a different project (`xpanlbcjueimeofgsara`). Three options for the BBV dual-write:
+
+| Option                                 | How                                                                         | Pros                                | Cons                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
+| **A** Shared Supabase service-role key | LepiOS holds BBV's service-role secret; writes directly                     | Simple, low latency                 | Cross-LIVE-system blast radius — a LepiOS bug can corrupt a Stripe-LIVE storefront |
+| **B** BBV exposes write API            | New `/api/inventory/upsert-by-isbn` route in BBV repo, called from LepiOS   | Clean boundary; BBV controls writes | Requires BBV-side work; auth/rate-limit needed                                     |
+| **C** Webhook + queue                  | LepiOS writes to a queue (Supabase function or shared bucket), BBV consumes | Eventual consistency; isolated      | Most code; eventual semantics may surprise scanner UX                              |
+
+**Recommendation:** B. Cleanest boundary, BBV controls its own writes, matches the existing F22 cron-secret auth pattern. Coordinator should confirm with Colin before Phase 1c.
+
+#### Notes for coordinator Phase 1a
+
+- The existing `/pallets` page (cockpit-pallets, currently 88% complete) tracks invoices + 12-month spend. The new dashboard responsibilities (acceptance rate, P&L ranking) are additive — don't replace the invoice form; extend.
+- The existing `/scan` page (cockpit-scan, currently 10%) is a 15-LOC stub. This is where most of the new code lives.
+- Streamlit baseline is `21_PageProfit.py` (3373 LOC) — port reference, not literal copy.
+- Tier classification rules: ASK COLIN at Phase 1b. He has them; they're not in the codebase yet.
+- Condition grading: Claude Vision quota implications — coordinator should call `/api/budget` before designing batch flows.
 
 ---
 

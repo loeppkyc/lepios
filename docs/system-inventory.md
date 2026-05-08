@@ -61,18 +61,18 @@ Highest leverage = `(100 − completion%) × weight`. These are the prompts to f
 
 ### 1a. Money
 
-| ID                        | Module                    | State   | %   | Weight | Leverage | Evidence                                                     |
-| ------------------------- | ------------------------- | ------- | --- | ------ | -------- | ------------------------------------------------------------ |
-| `cockpit-business-review` | Business Review           | shipped | 95  | 10     | 50       | `app/(cockpit)/business-review/page.tsx` (4 panels)          |
-| `cockpit-amazon`          | Amazon Reports (30d pace) | shipped | 92  | 10     | 80       | `app/(cockpit)/amazon/page.tsx`, F18 instrumented            |
-| `cockpit-money`           | Money pillar dashboard    | partial | 55  | 9      | 405      | `app/(cockpit)/money/page.tsx` — P&L gauge stub              |
-| `cockpit-payouts`         | Amazon payouts            | shipped | 93  | 8      | 56       | `app/(cockpit)/payouts/page.tsx`, recent F18 retrofit (#127) |
-| `cockpit-cogs`            | COGS entry                | shipped | 85  | 8      | 120      | `app/(cockpit)/cogs/page.tsx`                                |
-| `cockpit-inventory`       | Inventory (FBA + FIFO)    | shipped | 90  | 8      | 80       | `app/(cockpit)/inventory/page.tsx`                           |
-| `cockpit-pallets`         | Pallet invoices           | shipped | 88  | 7      | 84       | `app/(cockpit)/pallets/page.tsx`                             |
-| `cockpit-scan`            | Amazon barcode scanner    | stub    | 10  | 10     | 900      | 15-LOC stub — UI missing                                     |
-| `cockpit-hit-lists`       | Hit lists                 | stub    | 5   | 7      | 665      | UI missing; Telegram scan runs nightly                       |
-| `cockpit-amazon-sales`    | Amazon sales history      | stub    | 20  | 6      | 480      | Distinct from `/amazon` — historical drill                   |
+| ID                        | Module                    | State   | %   | Weight | Leverage | Evidence                                                                                                                                                                               |
+| ------------------------- | ------------------------- | ------- | --- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cockpit-business-review` | Business Review           | shipped | 95  | 10     | 50       | `app/(cockpit)/business-review/page.tsx` (4 panels)                                                                                                                                    |
+| `cockpit-amazon`          | Amazon Reports (30d pace) | shipped | 92  | 10     | 80       | `app/(cockpit)/amazon/page.tsx`, F18 instrumented                                                                                                                                      |
+| `cockpit-money`           | Money pillar dashboard    | partial | 55  | 9      | 405      | `app/(cockpit)/money/page.tsx` — P&L gauge stub                                                                                                                                        |
+| `cockpit-payouts`         | Amazon payouts            | shipped | 93  | 8      | 56       | `app/(cockpit)/payouts/page.tsx`, recent F18 retrofit (#127)                                                                                                                           |
+| `cockpit-cogs`            | COGS entry                | shipped | 85  | 8      | 120      | `app/(cockpit)/cogs/page.tsx`                                                                                                                                                          |
+| `cockpit-inventory`       | Inventory (FBA + FIFO)    | shipped | 90  | 8      | 80       | `app/(cockpit)/inventory/page.tsx`                                                                                                                                                     |
+| `cockpit-pallets`         | Pallet invoices           | shipped | 88  | 7      | 84       | `app/(cockpit)/pallets/page.tsx`. Expanded under [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner-revised-2026-05-08) — invoice scope = 88%; cohort acceptance/ROI is new |
+| `cockpit-scan`            | Amazon barcode scanner    | stub    | 10  | 10     | 900      | 15-LOC stub — UI missing. Expanded scope under [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner-revised-2026-05-08)                                                       |
+| `cockpit-hit-lists`       | Hit lists                 | stub    | 5   | 7      | 665      | UI missing; Telegram scan runs nightly                                                                                                                                                 |
+| `cockpit-amazon-sales`    | Amazon sales history      | stub    | 20  | 6      | 480      | Distinct from `/amazon` — historical drill                                                                                                                                             |
 
 ### 1b. Finances / Bookkeeping
 
@@ -286,15 +286,15 @@ Highest leverage = `(100 − completion%) × weight`. These are the prompts to f
 
 ### 5a. Core revenue (P0 ports)
 
-| ID                       | Module                                 | LepiOS % | Weight | Leverage | Streamlit lines | LepiOS evidence                                |
-| ------------------------ | -------------------------------------- | -------- | ------ | -------- | --------------- | ---------------------------------------------- |
-| `pageprofit-scanner`     | PageProfit (book/Lego scan)            | 0        | 10     | 1000     | 3373            | `app/(cockpit)/scan/` stub                     |
-| `receipts-hub`           | Receipts (Vision OCR + reconciliation) | 40       | 10     | 600      | 2640            | `app/(cockpit)/receipts/` partial              |
-| `shipment-manager`       | FBA inbound + box manifest             | 0        | 8      | 800      | 1176            | not started                                    |
-| `inventory-mgmt`         | Inventory + Lego Vault                 | 30       | 9      | 630      | 1094 + 760      | `app/(cockpit)/inventory/` partial             |
-| `amazon-sales-reporting` | Amazon sales + payouts                 | 90       | 10     | 100      | 404 + 212       | `app/(cockpit)/amazon-sales/`, payouts shipped |
-| `monthly-pl-rollup`      | Full monthly P&L                       | 85       | 10     | 150      | 2126            | `app/(cockpit)/monthly-pnl/`                   |
-| `bookkeeping-hub-port`   | Bookkeeping + statement reconcile      | 50       | 8      | 400      | 720 + 1034      | `app/(cockpit)/bookkeeping-hub/` partial       |
+| ID                       | Module                                 | LepiOS % | Weight | Leverage | Streamlit lines | LepiOS evidence                                                                                                                                                             |
+| ------------------------ | -------------------------------------- | -------- | ------ | -------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pageprofit-scanner`     | PageProfit (book/Lego scan)            | 0        | 10     | 1000     | 3373            | `app/(cockpit)/scan/` stub. Expanded under [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner-revised-2026-05-08) — 3-way routing GO/BBV/DONATE + pallet cohorts |
+| `receipts-hub`           | Receipts (Vision OCR + reconciliation) | 40       | 10     | 600      | 2640            | `app/(cockpit)/receipts/` partial                                                                                                                                           |
+| `shipment-manager`       | FBA inbound + box manifest             | 0        | 8      | 800      | 1176            | not started                                                                                                                                                                 |
+| `inventory-mgmt`         | Inventory + Lego Vault                 | 30       | 9      | 630      | 1094 + 760      | `app/(cockpit)/inventory/` partial                                                                                                                                          |
+| `amazon-sales-reporting` | Amazon sales + payouts                 | 90       | 10     | 100      | 404 + 212       | `app/(cockpit)/amazon-sales/`, payouts shipped                                                                                                                              |
+| `monthly-pl-rollup`      | Full monthly P&L                       | 85       | 10     | 150      | 2126            | `app/(cockpit)/monthly-pnl/`                                                                                                                                                |
+| `bookkeeping-hub-port`   | Bookkeeping + statement reconcile      | 50       | 8      | 400      | 720 + 1034      | `app/(cockpit)/bookkeeping-hub/` partial                                                                                                                                    |
 
 ### 5b. Operations (P1 ports)
 
