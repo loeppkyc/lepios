@@ -32,11 +32,15 @@ export type GateOutcome =
   | { kind: 'redirect-login' }
   | { kind: 'redirect-pending' }
   | { kind: 'redirect-home' } // signed-in user hitting /login
+  | { kind: 'redirect-session-expired' } // signed-in but absolute lifetime exceeded
 
 /**
  * Single source of truth for the middleware decision.
  * - Unauthenticated on a public path → allow.
  * - Unauthenticated on a protected path → redirect to /login.
+ * - Authenticated + session expired → redirect to /login?error=session_expired
+ *   (regardless of role; expiry overrides). Public paths still allowed since
+ *   middleware will sign the user out before redirecting.
  * - Authenticated but no profile → redirect to /pending-approval (signs them out at the page level).
  * - Authenticated + pending → redirect to /pending-approval (except already on it).
  * - Authenticated + non-admin on /admin → redirect to /pending-approval.
@@ -45,7 +49,8 @@ export type GateOutcome =
 export function gateRequest(
   pathname: string,
   hasUser: boolean,
-  role: UserRole | null
+  role: UserRole | null,
+  sessionExpired: boolean = false
 ): GateOutcome {
   const onLogin = pathname === '/login' || pathname.startsWith('/login/')
   const onPending = pathname === '/pending-approval' || pathname.startsWith('/pending-approval/')
@@ -54,6 +59,14 @@ export function gateRequest(
   if (!hasUser) {
     if (isPublicPath(pathname)) return { kind: 'allow' }
     return { kind: 'redirect-login' }
+  }
+
+  // Session-lifetime guard runs before any role-based logic. A user with a
+  // valid Supabase session but an exceeded absolute lifetime gets bounced
+  // through sign-out → /login. Public paths (login, auth callbacks) still
+  // skip this so the user can complete the re-auth flow.
+  if (sessionExpired && !isPublicPath(pathname)) {
+    return { kind: 'redirect-session-expired' }
   }
 
   // Authenticated but no profile row — treat as pending.

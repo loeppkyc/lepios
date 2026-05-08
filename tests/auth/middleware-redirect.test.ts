@@ -136,3 +136,55 @@ describe('gateRequest', () => {
     expect(gateRequest('/net-worth', true, 'admin')).toEqual({ kind: 'allow' })
   })
 })
+
+describe('gateRequest — session lifetime guard', () => {
+  // Default behavior unchanged: omitting sessionExpired arg = false.
+  it('legacy 3-arg call shape still works (sessionExpired defaults to false)', () => {
+    expect(gateRequest('/net-worth', true, 'admin')).toEqual({ kind: 'allow' })
+  })
+
+  it('authenticated + expired on protected path → redirect-session-expired', () => {
+    expect(gateRequest('/net-worth', true, 'admin', true)).toEqual({
+      kind: 'redirect-session-expired',
+    })
+  })
+
+  it('authenticated + expired on /accounts (admin role) → redirect-session-expired', () => {
+    expect(gateRequest('/accounts', true, 'admin', true)).toEqual({
+      kind: 'redirect-session-expired',
+    })
+  })
+
+  it('expired flag does NOT trigger on /login (user must reach login to re-auth)', () => {
+    // role here is admin, but middleware will also have signed them out before
+    // gateRequest sees them — this branch covers the case where the cookie
+    // expired but middleware has not yet completed signOut.
+    expect(gateRequest('/login', true, 'admin', true)).toEqual({ kind: 'redirect-home' })
+  })
+
+  it('expired flag does NOT trigger on /auth/callback', () => {
+    expect(gateRequest('/auth/callback', true, 'admin', true)).toEqual({ kind: 'allow' })
+  })
+
+  it('expired flag does NOT trigger on /pending-approval', () => {
+    expect(gateRequest('/pending-approval', true, 'pending', true)).toEqual({ kind: 'allow' })
+  })
+
+  it('unauthenticated user with expired flag → redirect-login (expired only matters with a session)', () => {
+    expect(gateRequest('/net-worth', false, null, true)).toEqual({ kind: 'redirect-login' })
+  })
+
+  it('expired flag overrides role-based redirects (pending + expired → expired wins)', () => {
+    expect(gateRequest('/net-worth', true, 'pending', true)).toEqual({
+      kind: 'redirect-session-expired',
+    })
+  })
+
+  it('expired flag overrides admin-path role check', () => {
+    // Without expired: business user on /admin → redirect-pending.
+    // With expired: should be redirect-session-expired (run signOut path first).
+    expect(gateRequest('/admin', true, 'business', true)).toEqual({
+      kind: 'redirect-session-expired',
+    })
+  })
+})

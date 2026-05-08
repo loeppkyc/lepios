@@ -48,6 +48,11 @@ function LoginPageContent() {
     if (errorParam === 'unauthorized') {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot mount-time message from URL param
       setMessage({ type: 'error', text: 'Your session was rejected. Please sign in again.' })
+    } else if (errorParam === 'session_expired') {
+      setMessage({
+        type: 'error',
+        text: 'Your session expired after 4 hours. Please sign in again.',
+      })
     }
   }, [errorParam])
 
@@ -72,6 +77,15 @@ function LoginPageContent() {
         setMessage({ type: 'error', text: error.message })
         setLoading(false)
       } else {
+        // Stamp the absolute-lifetime cookie before navigating. If this fails
+        // for any reason, middleware's bootstrap path will set the cookie on
+        // the next request — so a network glitch here doesn't lock the user
+        // out, just costs a few seconds of expiry-clock drift.
+        try {
+          await fetch('/api/auth/session-start', { method: 'POST' })
+        } catch {
+          // swallow — bootstrap covers the gap
+        }
         router.refresh()
         router.push('/business-review')
       }
