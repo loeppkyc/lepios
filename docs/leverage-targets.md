@@ -240,40 +240,51 @@ For audit purposes, the original three options considered:
 
 ---
 
-### T-006 — Failures Log
+### T-006 — Failures Log (REVISED 2026-05-08)
 
-- **Inventory row:** `harness-failures-log` (new — added to inventory in same PR)
-- **Status:** queued
+- **Inventory row:** `harness-failures-log`
+- **Status:** queued (description updated in `task_queue` row `ca95d54e`)
 - **Build priority:** 2 (multiplier — feeds T-002's known-failure-pattern signal; ships in parallel with T-002)
 - **Current %:** 0
 - **Done %:** 100
 
-**done_state:** `failures_log` table in Supabase + cockpit page at `/failures`. Every silent or surfaced failure recorded with: trigger context (workflow, PR, manual), expected vs actual behavior, root cause (filled post-analysis), fix commit sha, `pattern_signature` (jsonb fingerprint for matching future PRs), severity, status (open / fixing / fixed / recurring), occurrence count, `last_seen_at`. Self-repair and Safety Agent both write to it. Safety Agent reads it on every PR to pattern-match incoming changes against known failure signatures — flags risk if PR matches an open or recurring pattern. `/failures` page lists open + recurring at top, sortable, filterable, with one-click **"promote to harness test"** action that converts a logged failure into an integration test for the test pattern.
+**done_state:** `failures_log` table in Supabase + auto-exported markdown at [`docs/claude-md/failures.md`](claude-md/failures.md) linked from CLAUDE.md component #4. Every silent or surfaced failure recorded with: trigger context (workflow, PR, manual), expected vs actual behavior, root cause (filled post-analysis), fix commit sha, `pattern_signature` (jsonb fingerprint), severity, status (open / fixing / fixed / recurring), occurrence count, `last_seen_at`, **"lesson" field** (terse "what to do differently").
+
+Self-repair and Safety Agent both write to it. Safety Agent reads it on every PR to pattern-match incoming changes against known signatures — flags risk if PR matches an open or recurring pattern.
+
+**Cron syncs table → markdown nightly** (groups by status, sorts by severity, terse format: date / what happened / root cause / fix / lesson). CLAUDE.md component #4 references the markdown so every Claude Code session loads current failure context.
+
+`/failures` cockpit page lists open + recurring at top, sortable, filterable, with one-click **"promote to harness test"** action (converts logged failure into integration test) and **"manual entry" form** for failures Colin catches that the system missed.
 
 **metric:** pattern recurrence rate (same failure signature hitting twice after fix)
 
-**benchmark:** <5% recurrence over rolling 30-day window; **0 critical-severity recurrences**
+**benchmark:** <5% recurrence over rolling 30-day window; **0 critical-severity recurrences**; **100% of critical failures synced to markdown within 24h**
 
-**surface:** cockpit nav → `/failures`, telegram on critical or recurring detection, `safety_agent` risk-routing input, `morning_digest` line: "open failures: X, recurring: Y, fixed today: Z"
+**surface:** cockpit nav → `/failures`, telegram on critical or recurring detection, `safety_agent` risk-routing input, **CLAUDE.md framework component #4 reference**, `morning_digest` line: "open failures: X, recurring: Y, fixed today: Z"
 
 #### Sub-modules implied (coordinator will break these down at Phase 1c)
 
-1. **Schema migration** — `failures_log` table with columns above; `pattern_signature` jsonb indexed for fast match
+1. **Schema migration** — `failures_log` table with columns above (incl. `lesson` text); `pattern_signature` jsonb indexed for fast match
 2. **Pattern signature builder** — pure function: `failure_context → jsonb` (e.g., `{type: "test-fail", file: "tests/foo.test.ts", error_class: "AssertionError", regex_match: "...", touched_files: [...]}`)
 3. **Write path — self-repair integration** — `lib/harness/self-repair/` writes a row when detector + drafter run; status transitions handled by pipeline
-4. **Write path — manual log** — `/api/failures/log` POST endpoint for Colin or coordinator to log failures observed outside the harness
+4. **Write path — Safety Agent integration** — when Safety Agent BLOCKs or twin ESCALATEs, log a row capturing the signature
 5. **Read path — Safety Agent matcher** — given an incoming PR's diff signature, query `failures_log` for matches → contributes to risk score (T-002 sub-module #2: known-failure regex match)
 6. **Recurrence detector** — when a row's `pattern_signature` matches an existing `fixed` row, increment `occurrence_count`, flip status to `recurring`, fire telegram
-7. **`/failures` cockpit page** — list view with filters (status / severity / age), sort by `last_seen_at` and `occurrence_count`
-8. **"Promote to harness test" action** — generates a stub `tests/regression/<pattern_signature_hash>.test.ts` from the failure context; coordinator polishes during Phase 4
+7. **Markdown export cron** — nightly job reads `failures_log`, renders to `docs/claude-md/failures.md`. Groups: §Open · §Recurring · §Fixed (last 30 days). Per-row format: `### F-N{n} — <title>` followed by date, severity, what happened, root cause, fix commit, **lesson**. Idempotent (overwrites file). Critical failures sync within 24h (cron runs ≥daily).
+8. **CLAUDE.md component #4 reference** — verify the existing pointer in `lepios/CLAUDE.md §9` to `docs/claude-md/failures.md` still works post-export; no edit needed if the file path stays the same
+9. **`/failures` cockpit page** — list view with filters (status / severity / age), sort by `last_seen_at` and `occurrence_count`
+10. **"Promote to harness test" action** — generates a stub `tests/regression/<pattern_signature_hash>.test.ts` from the failure context; coordinator polishes during Phase 4
+11. **"Manual entry" form** — `/failures` page form Colin uses to log failures the system missed (POST `/api/failures/log` with hand-filled fields); auto-computes `pattern_signature` from form input
 
 #### Notes for coordinator Phase 1a
 
-- T-006 is a **dependency of T-002's known-failure regex match signal**. T-002 can ship first with that signal scoring 0; T-006 can ship in parallel and the signal activates as `failures_log` populates.
+- T-006 is a **dependency of T-002's known-failure regex match signal**. T-002 can ship first with that signal scoring 0; T-006 ships in parallel and the signal activates as `failures_log` populates.
+- The **table is source of truth, markdown is render**. Existing hand-written F-N entries in `docs/claude-md/failures.md` need to be migrated into the table before the cron overwrites the file. One-time backfill script in Phase 4.
 - `pattern_signature` design is the load-bearing part — too coarse and matches everything; too fine and matches nothing. Worth a Phase 1b twin Q&A on initial signature shape.
 - Self-repair already writes to `agent_events` for failure detection; the integration is "also write a `failures_log` row" — additive, not replacement.
-- `/failures` cockpit page should live under operations (alongside `/autonomous`).
+- The **CLAUDE.md auto-load** is the biggest leverage move: every new Claude Code session loads `docs/claude-md/failures.md` as part of context per `lepios/CLAUDE.md §9`. So the cron-export → CLAUDE.md → next session ingests context loop closes the F19 learn-from-failures cycle without manual transcription.
 - "Promote to harness test" is the F19 lever — every fixed failure becomes a test that prevents recurrence. This is what closes the recurrence loop and drives the <5% benchmark.
+- "Manual entry" form serves the case where Colin notices something the system missed (e.g., a UI regression caught visually that didn't trigger any agent_events row). Without it, those failures stay in his head and never feed the pattern matcher.
 
 ---
 
