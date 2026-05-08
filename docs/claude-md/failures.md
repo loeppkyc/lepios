@@ -1,28 +1,61 @@
 # LepiOS — Failure Log
 
-**Auto-generated from `failures_log` table.** Last updated: 2026-05-08T11:41:14.637Z.
+**Auto-generated from `failures_log` table.** Last data change: 2026-05-08T12:44:05.354399+00:00.
 Source of truth: `failures_log` table. Edit there (cockpit `/failures` form or via `POST /api/failures/log`).
 
 F-L1–F-L15 live in `CLAUDE.md §9` (canonical hand-written entries kept in prose).
 F-N entries below are auto-rendered from the table.
 
 ---
+## Open (2)
 
-## Fixed (last 30 days) (8)
+## F-N14 — F-N1 RECURRENCE — Phase 1b markdown export writeFile() fails in Vercel serverless (read-only filesystem) (2026-05-08)
 
-## F-N5 — /api/bookkeeping/\* shipped publicly accessible for ~5 hours (2026-05-05)
+- **What:** Phase 1b shipped lib/failures/export-markdown.ts with writeFile(MD_PATH, content) where MD_PATH is docs/claude-md/failures.md inside the repo tree. Local dev exported successfully; prod fails with EROFS: read-only file system, open '/var/task/docs/claude-md/failures.md'. The night-tick integration correctly catches the error and logs to agent_events with status=error, but the markdown file never updates from the table in production. F19 loop is broken in prod: failures_log table updates → markdown does NOT auto-render → CLAUDE.md component #4 stays stale → next Claude session loads outdated context.
+- **Root cause:** Same failure class as F-N1 (settings.json fix ignored in cloud sandbox): cloud-safe fixes must use DB-resident config or external API calls, not filesystem writes. writeFile to a repo path inside a Vercel serverless function ALWAYS fails because /var/task is read-only. F-N1 lesson was about config files; this generalizes to any filesystem write. The local-dev test passed because the script ran via tsx + dotenv against the actual filesystem.
+- **Fix/workaround:** (none — open)
+- **Lesson:** Pick one of three fixes: (a) commit the rendered markdown via GitHub API in the cron path (mirrors self-repair pr-opener pattern, F22-bearer-auth), (b) write to Supabase Storage bucket and update CLAUDE.md component #4 to read from a Storage URL or proxied route, (c) accept that the file is human-rendered: replace the cron call with a script developers run before commits. Recommendation: (a) — preserves the auto-update guarantee that F19 needs and matches existing patterns. Add a generic test for any new writeFile path: assert it targets /tmp or uses GitHub API, never repo paths inside route handlers. T-002 v2 E2E puppeteer would also catch this class via post-deploy smoke.
+- **Severity:** high
 
-- **What:** Five new bookkeeping API routes (reconcile GET, reconcile/approve POST, reconcile/reject POST, qb-export GET, qb-export/mark POST) used createServiceClient for DB writes but never checked auth.getUser(). Root middleware excludes /api/\* (API routes self-gate). Anyone hitting the URL could read needs_review queue, read all unexported JEs, write JEs via approve, mark JEs as exported. Live in production from c4c9e9c until a3425d9 (~5 hours).
+---
+
+## F-N13 — Puppeteer E2E verification of /failures page blocked by auth gate — no signed-in session available in build session (2026-05-08)
+
+- **What:** Phase 1c spec required puppeteer verification against /failures: load page, sort by severity, submit manual entry form, click promote-to-test, verify outcomes. Page uses requireUser() auth gate which redirects to /login without a signed-in Supabase session. Build session has no cached cookies and no test-mode auth bypass. Vercel preview URL inherits the same auth requirement. Result: puppeteer would only verify the redirect, not the full UI flow.
+- **Root cause:** Three structural gaps: (1) cockpit pages have no test-mode auth bypass, (2) puppeteer integration has no cached test-user session, (3) Vercel preview URLs require the same Supabase auth as prod (no preview-only bypass token). Each gap is reasonable on its own; in combination they make autonomous UI verification impossible from within a build session.
+- **Fix/workaround:** (none — verification deferred to T-002 v2)
+- **Lesson:** Exactly what T-002 v2 (Safety Agent E2E requirement) is designed to solve: Safety Agent runs puppeteer with a signed-in test user against the surface URL specified in done_state, with E2E pass required before merge. Until T-002 v2 ships, accept that build sessions cannot autonomously verify auth-gated UI; manual user testing is the only path. Track as: 'post-merge live verification by Colin' in PR test plan.
+- **Severity:** medium
+
+---
+
+## Recurring (1)
+
+## F-N10 — F-N8 RECURRENCE — concurrent Claude session contaminated working tree during T-006 Phase 1c build (2026-05-08)
+
+- **What:** During Phase 1c build (T-006 cockpit page), a parallel Claude session checked out branch audit/safety-agent-mapping while I was actively working on harness/phase-1c-failures-cockpit. The branch switch dragged unfamiliar staged file docs/lepios/safety-agent-audit.md into my working tree. window-check-edits caught the out-of-scope edit; pre-commit gate would have blocked the commit. My in-flight Phase 1c work was preserved via lint-staged auto-stash and recovered after switching back to the correct branch.
+- **Root cause:** Same as F-N8: parallel Claude sessions sharing the same git working tree. F-N8 lessons (pre-commit branch invariant, isolated worktrees) are still aspirational — branch guard runs on coordinator-initiated git ops only, not developer commits. Worktree isolation hasn't been adopted as default workflow yet.
+- **Fix/workaround:** recovered via git stash pop + git checkout (manual)
+- **Lesson:** F-N8 prescriptions still need shipping: (1) pre-commit branch invariant assertion, (2) pre-commit index invariant assertion, (3) parallel Claude sessions MUST use isolated git worktree checkouts (one worktree per session). The worktree fix is structural; the pre-commit invariants are the cheap defensive layer. Track: branch_drift_detected + unintended_staged_files in agent_events.
+- **Severity:** high
+
+---
+
+## Fixed (last 30 days) (10)
+
+## F-N5 — /api/bookkeeping/* shipped publicly accessible for ~5 hours (2026-05-05)
+
+- **What:** Five new bookkeeping API routes (reconcile GET, reconcile/approve POST, reconcile/reject POST, qb-export GET, qb-export/mark POST) used createServiceClient for DB writes but never checked auth.getUser(). Root middleware excludes /api/* (API routes self-gate). Anyone hitting the URL could read needs_review queue, read all unexported JEs, write JEs via approve, mark JEs as exported. Live in production from c4c9e9c until a3425d9 (~5 hours).
 - **Root cause:** New API routes were copied from existing patterns that used the SSR/anon client (RLS-gated by default). Switching to service_role for write capability removed the implicit RLS gate without adding an explicit auth gate. No checklist or lint rule caught it. The bookkeeping tests verified shape + business logic but not the security envelope.
 - **Fix/workaround:** commit a3425d9 (inline auth.getUser check + 401 smoke tests)
-- **Lesson:** Any new /api/\* route that uses createServiceClient must (a) call auth.getUser() for user-facing routes OR (b) use requireCronSecret(request) for cron-style routes. Worth a lint rule (no-restricted-syntax) plus 401 test case in same commit.
+- **Lesson:** Any new /api/* route that uses createServiceClient must (a) call auth.getUser() for user-facing routes OR (b) use requireCronSecret(request) for cron-style routes. Worth a lint rule (no-restricted-syntax) plus 401 test case in same commit.
 - **Severity:** critical
 
 ---
 
 ## F-N9 — F-L11 recurrence: 19th cron in vercel.json silently broke deploy pipeline for ~50 minutes (2026-05-07)
 
-- **What:** PR #109 (chore: self-repair v2 wire-up) added a 19th cron to vercel.json (/api/cron/night_watchman_scan at _/30 4-13 _ \* \* — both over the count ceiling AND sub-hourly). Vercel Hobby plan silently rejected the entire config at validation, before any build ran. PRs #109, #110, #111 all merged with Vercel: failure GitHub status checks. Production stayed pinned to last successful commit bb8b4a8 (PR #107) for ~50 min.
+- **What:** PR #109 (chore: self-repair v2 wire-up) added a 19th cron to vercel.json (/api/cron/night_watchman_scan at */30 4-13 * * * — both over the count ceiling AND sub-hourly). Vercel Hobby plan silently rejected the entire config at validation, before any build ran. PRs #109, #110, #111 all merged with Vercel: failure GitHub status checks. Production stayed pinned to last successful commit bb8b4a8 (PR #107) for ~50 min.
 - **Root cause:** Same failure class as F-L11. CLAUDE.md §9 documents F-L11 with the lesson "Any cron addition must be validated against Vercel Hobby limits before merge" — but no automated check existed, so the discipline relied on human memory across windows. The Hobby cron count had crept up to exactly 18 without anyone noticing.
 - **Fix/workaround:** PR #112 hotfix removed cron; pre-commit guard scripts/check-vercel-cron-count.mjs ships with MAX_CRONS=18
 - **Lesson:** Same-session prevention: pre-commit script counts vercel.json crons + blocks sub-hourly schedules. Production-deploy verification still manual — after merging anything that touches vercel.json or adds API routes, list_deployments to confirm. Raise ceiling intentionally (Pro plan upgrade) — never bypass guard.
@@ -72,11 +105,31 @@ F-N entries below are auto-rendered from the table.
 
 ## F-N3 — Coordinator default branch name triggered branch guard on every session start (2026-04-27)
 
-- **What:** Coordinator sessions auto-named branches claude/vibrant-heisenberg-\* (Claude default) instead of harness/task-{uuid}. Branch guard check ran after git operations; if task_id absent from invocation context, no expected branch name could be constructed.
+- **What:** Coordinator sessions auto-named branches claude/vibrant-heisenberg-* (Claude default) instead of harness/task-{uuid}. Branch guard check ran after git operations; if task_id absent from invocation context, no expected branch name could be constructed.
 - **Root cause:** Branch guard check ran AFTER git operations; if task_id absent from invocation context, no expected branch name could be constructed.
 - **Fix/workaround:** commit 5695edb (coordinator.md §Branch Naming requires task_id check before any git op)
 - **Lesson:** Any coordinator invocation missing task_id must STOP immediately — log branch_guard_triggered, reason=missing_task_id and exit. Do not proceed with a generated branch name.
 - **Severity:** medium
+
+---
+
+## F-N11 — Supabase query chain bug — .eq() after .limit() invalid (2026-05-08)
+
+- **What:** lib/failures/list.ts initial implementation chained .order(...).limit(200) BEFORE applying .eq() filters. Supabase JS client returns a thenable from .limit() that is no longer extendable with .eq() — calling .eq() on it threw TypeError: query.eq is not a function. Caught by failing test before commit.
+- **Root cause:** Misunderstanding of Supabase JS chain ordering. Filters (.eq, .in, .gte, etc.) must be added before terminal modifiers (.limit, .single, .maybeSingle, .order can come either side). Tests caught it because the mock builder returned a Promise from .limit() exactly like prod does.
+- **Fix/workaround:** commit on harness/phase-1c-failures-cockpit (lib/failures/list.ts restructure)
+- **Lesson:** Apply filters first, terminal modifiers last. Codify in a Supabase chain order helper or lint rule if this recurs.
+- **Severity:** low
+
+---
+
+## F-N12 — zod v4 z.record() signature changed — single-arg version errors at parse time (2026-05-08)
+
+- **What:** app/api/failures/promote/route.ts used z.record(z.unknown()) for the pattern_signature field. Schema build succeeded but parse errored: TypeError: Cannot read properties of undefined (reading _zod). Caught by failing test before commit.
+- **Root cause:** zod v4 changed z.record to require BOTH key and value schemas: z.record(z.string(), z.unknown()). Single-arg form silently accepts but returns a broken schema.
+- **Fix/workaround:** commit on harness/phase-1c-failures-cockpit (route.ts schema fix)
+- **Lesson:** When upgrading zod across major versions, search for z.record( usages and add explicit key schema. Consider a codemod or lint rule. zod v4 release notes flag this.
+- **Severity:** low
 
 ---
 
