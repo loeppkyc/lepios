@@ -16,6 +16,7 @@ import {
   getKnowledgeHealth,
   getAutonomousRunSummary,
   getSafetyDecisionStats,
+  getCoordinatorQueueStats,
   type DailySuccessRate,
   type DailyFlagCount,
   type ErrorTypeSummary,
@@ -430,7 +431,7 @@ export default async function AutonomousPage() {
     outputSummary: 'autonomous dashboard viewed',
   })
 
-  const [summary7, rates30, flagTrend14, topErrors7, knowledge, ollama, safetyStats] =
+  const [summary7, rates30, flagTrend14, topErrors7, knowledge, ollama, safetyStats, coordStats] =
     await Promise.all([
       getAutonomousRunSummary(7),
       getDailySuccessRate(30),
@@ -439,6 +440,7 @@ export default async function AutonomousPage() {
       getKnowledgeHealth(),
       healthCheck(),
       getSafetyDecisionStats(24),
+      getCoordinatorQueueStats(),
     ])
 
   // 7-day average from the rates data
@@ -537,6 +539,18 @@ export default async function AutonomousPage() {
           label="Knowledge entries"
           value={String(knowledge.total)}
           sub={`avg conf ${knowledge.avgConfidence.toFixed(2)} · ${knowledge.usedLast7Days} used (7d)`}
+        />
+        <ScoreTile
+          label="Coordinator queue"
+          value={String(coordStats.queued)}
+          sub={`${coordStats.running} running · ${coordStats.halted ? 'HALTED' : 'active'}`}
+          accent={
+            coordStats.halted
+              ? 'var(--color-critical)'
+              : coordStats.queued > 0
+                ? 'var(--color-info)'
+                : undefined
+          }
         />
         <OllamaStatusCard health={ollama} />
       </div>
