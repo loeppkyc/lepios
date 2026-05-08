@@ -119,7 +119,13 @@
       "filename": "0162_safety_agent_v2.sql",
       "claimed_at": "2026-05-08",
       "note": "T-002 Safety Agent v2 — Sub-phase A. task_queue.plan_loc + safety_decisions audit table + harness_config seed (SAFETY_WEIGHT_*, SAFETY_THRESHOLD_*)."
+    },
+    "0163": {
+      "branch": "harness/task-t001-coordinator-v1",
+      "filename": "0163_coordinator_v1.sql",
+      "claimed_at": "2026-05-08",
+      "note": "T-001 Coordinator v1 — add 'api' to task_queue.source, triggered_by to window_sessions, HARNESS_HALTED + HARNESS_REMOTE_INVOCATION_ENABLED to harness_config."
     }
   },
-  "next_available": 163
+  "next_available": 164
 }

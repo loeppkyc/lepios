@@ -310,7 +310,57 @@ export async function getAutonomousRunSummary(days: number): Promise<AutonomousS
   }
 }
 
-// ── 6. getSafetyDecisionStats ─────────────────────────────────────────────────
+// ── 6. getCoordinatorQueueStats ──────────────────────────────────────────────
+
+export interface CoordinatorQueueStats {
+  queued: number
+  running: number // claimed + running
+  completedToday: number
+  failedToday: number
+  halted: boolean
+}
+
+/** Current coordinator queue depth + halt state for the cockpit page. */
+export async function getCoordinatorQueueStats(): Promise<CoordinatorQueueStats> {
+  const empty: CoordinatorQueueStats = {
+    queued: 0,
+    running: 0,
+    completedToday: 0,
+    failedToday: 0,
+    halted: false,
+  }
+  try {
+    const supabase = createServiceClient()
+    const todayStart = new Date()
+    todayStart.setUTCHours(0, 0, 0, 0)
+    const todayISO = todayStart.toISOString()
+
+    const [{ data: live }, { data: finished }, { data: haltRow }] = await Promise.all([
+      supabase.from('task_queue').select('status').in('status', ['queued', 'claimed', 'running']),
+      supabase
+        .from('task_queue')
+        .select('status')
+        .in('status', ['completed', 'failed'])
+        .gte('completed_at', todayISO),
+      supabase.from('harness_config').select('value').eq('key', 'HARNESS_HALTED').maybeSingle(),
+    ])
+
+    const liveRows = (live ?? []) as { status: string }[]
+    const finishedRows = (finished ?? []) as { status: string }[]
+
+    return {
+      queued: liveRows.filter((r) => r.status === 'queued').length,
+      running: liveRows.filter((r) => r.status === 'claimed' || r.status === 'running').length,
+      completedToday: finishedRows.filter((r) => r.status === 'completed').length,
+      failedToday: finishedRows.filter((r) => r.status === 'failed').length,
+      halted: (haltRow as { value: string } | null)?.value === 'true',
+    }
+  } catch {
+    return empty
+  }
+}
+
+// ── 7. getSafetyDecisionStats ─────────────────────────────────────────────────
 
 export interface SafetyDecisionStats {
   total: number
