@@ -24,6 +24,7 @@
 
 import {
   currentBranch,
+  hasOtherWorktrees,
   isMainCheckout,
   loadAllClaims,
   loadClaimForBranch,
@@ -106,18 +107,35 @@ function main() {
     )
   }
 
-  // F-N8 prevention: claiming in the main checkout while other windows are live drags
-  // uncommitted edits across branches on `git checkout`. Force every concurrent window
-  // into its own worktree.
+  // F-N8/F-N10 prevention: claiming in the main checkout drags uncommitted edits
+  // across branches on `git checkout`. The original F-N8 guard (only fired when
+  // OTHER windows had live claims) recurred as F-N10 because between-session
+  // claim pruning created a window where the repo has worktrees but no live
+  // claims, so the guard passed but the F-N8 risk was still present.
+  //
+  // F-N10 fix: refuse main-checkout claim when ANY linked worktree exists,
+  // regardless of live claims. Once you've used worktrees in this repo, you
+  // must continue. The --allow-main-checkout escape hatch still exists for
+  // truly-single-window emergencies, but now requires explicit acknowledgement.
   const otherClaims = loadAllClaims().filter((c) => c.branch !== branch)
-  if (otherClaims.length > 0 && isMainCheckout() && !allowMainCheckout) {
+  const inMainCheckout = isMainCheckout()
+  const worktreesPresent = hasOtherWorktrees()
+  const wouldF8 = otherClaims.length > 0 // legacy F-N8 condition
+  const wouldF10 = worktreesPresent // new F-N10 condition
+
+  if (inMainCheckout && (wouldF8 || wouldF10) && !allowMainCheckout) {
     const branchSlug = branch.replace(/[^a-zA-Z0-9._-]/g, '-')
+    const reasonLine = wouldF8
+      ? `F-N8 — git checkout in a shared working tree drags uncommitted edits across branches (${otherClaims.length} live window(s)).`
+      : `F-N10 — repo has linked worktrees from prior sessions; main-checkout claim would re-introduce the F-N8 trap on the next concurrent window.`
+    const livesBlock =
+      otherClaims.length > 0
+        ? `\n   Other live windows:\n` + otherClaims.map((c) => `     - ${c.branch}`).join('\n')
+        : ''
     block(
-      `Cannot claim a window in the MAIN checkout while ${otherClaims.length} other window(s) are live.\n` +
-        `   Reason: F-N8 — git checkout in a shared working tree drags uncommitted edits across branches.\n` +
-        `\n` +
-        `   Other live windows:\n` +
-        otherClaims.map((c) => `     - ${c.branch}`).join('\n') +
+      `Cannot claim a window in the MAIN checkout.\n` +
+        `   Reason: ${reasonLine}` +
+        livesBlock +
         `\n\n` +
         `   Fix: create a worktree and start the window from there:\n` +
         `     git worktree add ../lepios-${branchSlug} ${branch}\n` +
@@ -129,7 +147,7 @@ function main() {
         `\n` +
         `   See memory: multi_window_worktree_pattern.md\n` +
         `\n` +
-        `   To bypass once (single-window emergency, you accept F-N8 risk):\n` +
+        `   To bypass once (single-window emergency, you accept F-N8/F-N10 risk):\n` +
         `     node scripts/window-start.mjs --allow-main-checkout --scope ...`
     )
   }
