@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 
 export interface DietAuthOk {
   ok: true
@@ -15,18 +15,19 @@ export interface DietAuthErr {
   response: NextResponse
 }
 
+/**
+ * Diet API auth gate — delegates to `requireUser()` so role/profile checks
+ * (approved + non-pending) are enforced uniformly with the rest of the app.
+ *
+ * Previously this only verified a Supabase session, which let `pending`
+ * users hit diet endpoints directly even though middleware blocked them
+ * in-browser. Closing that gap as part of the api-routes-locked-down
+ * sweep — defense in depth alongside RLS.
+ */
 export async function requireDietUser(): Promise<DietAuthOk | DietAuthErr> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return {
-      ok: false,
-      response: NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 }),
-    }
-  }
-  return { ok: true, supabase, user }
+  const result = await requireUser()
+  if (!result.ok) return { ok: false, response: result.response }
+  return { ok: true, supabase: result.supabase, user: result.user }
 }
 
 export async function logDietEvent(
