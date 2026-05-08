@@ -55,6 +55,19 @@ vi.mock('@/lib/harness/component-bump', () => ({
   applyBumps: mockApplyBumps,
 }))
 
+// Safety gate-adapter stubbed out so deploy-gate tests don't need to account
+// for the safety agent's DB calls. Gate-adapter behavior is tested separately
+// in tests/harness/safety/v2/gate-wire.test.ts.
+vi.mock('@/lib/harness/safety/v2/gate-adapter', () => ({
+  runSafetyGateCheck: vi.fn().mockResolvedValue({
+    blocking: false,
+    action: 'auto_merge',
+    tier: 'low',
+    score: 5,
+    sdId: null,
+  }),
+}))
+
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import {
