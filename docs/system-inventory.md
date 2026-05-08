@@ -38,20 +38,20 @@ System-wide percentage is a **weighted average across 136 modules**. The two pil
 
 Highest leverage = `(100 − completion%) × weight`. These are the prompts to fire next.
 
-| Rank | ID                       | Module                           | %   | Weight | Leverage | Why it matters                                                                                      |
-| ---- | ------------------------ | -------------------------------- | --- | ------ | -------- | --------------------------------------------------------------------------------------------------- |
-| 1    | `cockpit-receipts`       | Receipts (camera + Vision OCR)   | 5   | 10     | 950      | Daily-use revenue tool. 2640-line Streamlit baseline. Audit trail per transaction depends on it.    |
-| 2    | `cockpit-scan`           | Amazon Scanner (PageProfit)      | 10  | 10     | 900      | Daily revenue tool. 3373-line Streamlit baseline. Highest-revenue module.                           |
-| 3    | `safety-agent`           | Pre-flight safety review         | 0   | 8      | 800      | Blocks builder pre-commit + coordinator hand-off for destructive ops. Spec ready, code not started. |
-| 4    | `pageprofit-scanner`     | PageProfit (full Streamlit port) | 0   | 10     | 1000     | Same as `cockpit-scan` from the port perspective — Streamlit version 100%, LepiOS 0%.               |
-| 5    | `cockpit-net-worth`      | Net Worth (full page)            | 20  | 8      | 640      | Acceptance doc complete; migration 0133 not applied; page does not exist.                           |
-| 6    | `coordinator-agent`      | Sprint coordinator               | 35  | 9      | 585      | v1 remote invocation deferred — still requires Colin paste to start a run.                          |
-| 7    | `behav-f17`              | Behavioral ingestion (F17)       | 5   | 7      | 665      | 0/11 ingestion sources live. Long-arc lever for path-probability engine.                            |
-| 8    | `cockpit-money`          | Money pillar dashboard           | 55  | 9      | 405      | P&L gauge hardcoded to 0%; depends on orders data wiring.                                           |
-| 9    | `builder-agent`          | Builder agent                    | 40  | 10     | 600      | No formal flow test; safety-agent integration blocked.                                              |
-| 10   | `meas-f18`               | Measurement framework rollout    | 35  | 9      | 585      | Only 5/15+ modules have full F18 contracts.                                                         |
-| 11   | `cockpit-hit-lists`      | Hit lists UI                     | 5   | 7      | 665      | Telegram bot scans nightly; UI missing.                                                             |
-| 12   | `retail-scout-arbitrage` | Retail Scout / Arbitrage         | 0   | 7      | 700      | Streamlit 100% (1632 + 800 + 1465 lines); LepiOS 0%.                                                |
+| Rank | ID                       | Module                           | %   | Weight | Leverage | Done-state spec                                                                 | Why it matters                                                                                      |
+| ---- | ------------------------ | -------------------------------- | --- | ------ | -------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1    | `cockpit-receipts`       | Receipts (camera + Vision OCR)   | 5   | 10     | 950      | [T-003](leverage-targets.md#t-003--receipts-camera--vision-ocr--reconciliation) | Daily-use revenue tool. 2640-line Streamlit baseline. Audit trail per transaction depends on it.    |
+| 2    | `cockpit-scan`           | Amazon Scanner (PageProfit)      | 10  | 10     | 900      | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Daily revenue tool. 3373-line Streamlit baseline. Highest-revenue module.                           |
+| 3    | `safety-agent`           | Pre-flight safety review         | 0   | 8      | 800      | [T-002](leverage-targets.md#t-002--safety-agent)                                | Blocks builder pre-commit + coordinator hand-off for destructive ops. Spec ready, code not started. |
+| 4    | `pageprofit-scanner`     | PageProfit (full Streamlit port) | 0   | 10     | 1000     | [T-004](leverage-targets.md#t-004--pageprofit--amazon-scanner)                  | Same as `cockpit-scan` from the port perspective — Streamlit version 100%, LepiOS 0%.               |
+| 5    | `cockpit-net-worth`      | Net Worth (full page)            | 20  | 8      | 640      | [T-005](leverage-targets.md#t-005--net-worth)                                   | Acceptance doc complete; migration 0133 not applied; page does not exist.                           |
+| 6    | `coordinator-agent`      | Sprint coordinator               | 35  | 9      | 585      | [T-001](leverage-targets.md#t-001--coordinator-v1-remote-invocation)            | v1 remote invocation deferred — still requires Colin paste to start a run.                          |
+| 7    | `behav-f17`              | Behavioral ingestion (F17)       | 5   | 7      | 665      | _(no spec yet)_                                                                 | 0/11 ingestion sources live. Long-arc lever for path-probability engine.                            |
+| 8    | `cockpit-money`          | Money pillar dashboard           | 55  | 9      | 405      | _(no spec yet)_                                                                 | P&L gauge hardcoded to 0%; depends on orders data wiring.                                           |
+| 9    | `builder-agent`          | Builder agent                    | 40  | 10     | 600      | _(no spec yet)_                                                                 | No formal flow test; safety-agent integration blocked.                                              |
+| 10   | `meas-f18`               | Measurement framework rollout    | 35  | 9      | 585      | _(no spec yet)_                                                                 | Only 5/15+ modules have full F18 contracts.                                                         |
+| 11   | `cockpit-hit-lists`      | Hit lists UI                     | 5   | 7      | 665      | _(no spec yet)_                                                                 | Telegram bot scans nightly; UI missing.                                                             |
+| 12   | `retail-scout-arbitrage` | Retail Scout / Arbitrage         | 0   | 7      | 700      | _(no spec yet)_                                                                 | Streamlit 100% (1632 + 800 + 1465 lines); LepiOS 0%.                                                |
 
 ---
 
