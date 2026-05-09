@@ -29,7 +29,7 @@ function monthLabel(yyyyMM: string) {
   })
 }
 
-function fmt(n: number | null) {
+function fmt(n: number | null | undefined) {
   if (n === null || n === undefined) return '—'
   return n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -41,118 +41,6 @@ function toBase64(file: File): Promise<string> {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const s = {
-  card: {
-    backgroundColor: 'var(--color-surface)',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--color-border)',
-    padding: '20px 24px',
-  } as React.CSSProperties,
-
-  label: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-small)',
-    fontWeight: 600,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    color: 'var(--color-text-muted)',
-    display: 'block',
-    marginBottom: 4,
-  } as React.CSSProperties,
-
-  input: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 'var(--text-body)',
-    color: 'var(--color-text-primary)',
-    backgroundColor: 'var(--color-surface-2)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '6px 10px',
-    width: '100%',
-    outline: 'none',
-  } as React.CSSProperties,
-
-  select: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-body)',
-    color: 'var(--color-text-primary)',
-    backgroundColor: 'var(--color-surface-2)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '6px 10px',
-    width: '100%',
-    outline: 'none',
-  } as React.CSSProperties,
-
-  btnPrimary: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-small)',
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    padding: '8px 20px',
-    borderRadius: 'var(--radius-sm)',
-    border: 'none',
-    background: 'var(--color-pillar-money)',
-    color: '#fff',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  btnSecondary: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-small)',
-    fontWeight: 600,
-    padding: '7px 14px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--color-border)',
-    background: 'none',
-    color: 'var(--color-text-muted)',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  btnDanger: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-nano)',
-    fontWeight: 600,
-    padding: '4px 8px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid color-mix(in srgb, var(--color-critical) 40%, transparent)',
-    background: 'none',
-    color: 'var(--color-critical)',
-    cursor: 'pointer',
-  } as React.CSSProperties,
-
-  th: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-nano)',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: 'var(--color-text-disabled)',
-    padding: '0 10px 8px 0',
-    borderBottom: '1px solid var(--color-border)',
-    textAlign: 'left',
-  } as React.CSSProperties,
-
-  td: {
-    fontFamily: 'var(--font-ui)',
-    fontSize: 'var(--text-small)',
-    color: 'var(--color-text-secondary)',
-    padding: '8px 10px 8px 0',
-    borderBottom: '1px solid var(--color-border)',
-  } as React.CSSProperties,
-
-  tdMono: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 'var(--text-small)',
-    color: 'var(--color-text-primary)',
-    padding: '8px 0 8px 0',
-    borderBottom: '1px solid var(--color-border)',
-    textAlign: 'right',
-  } as React.CSSProperties,
 }
 
 // ── OcrForm — review / correct OCR result before saving ──────────────────────
@@ -191,50 +79,44 @@ function OcrForm({ initial, onSave, onCancel, saving }: OcrFormProps) {
     await onSave(f)
   }
 
-  const gridTwo: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
-
   return (
     <form onSubmit={handleSubmit} noValidate>
-      {err && (
-        <div
-          style={{
-            color: 'var(--color-critical)',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            marginBottom: 10,
-          }}
-        >
-          {err}
-        </div>
-      )}
-      <div style={{ ...gridTwo, marginBottom: 12 }}>
+      {err && <p className="mb-3 text-sm text-[var(--color-critical)]">{err}</p>}
+
+      <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
-          <label style={s.label}>Receipt Date</label>
+          <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+            Receipt Date
+          </label>
           <input
             type="date"
             value={f.receiptDate}
             onChange={(e) => set('receiptDate', e.target.value)}
-            style={s.input}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 font-mono text-sm text-[var(--color-text-primary)] outline-none"
           />
         </div>
         <div>
-          <label style={s.label}>Vendor</label>
+          <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+            Vendor
+          </label>
           <input
             type="text"
             value={f.vendor}
             onChange={(e) => set('vendor', e.target.value)}
-            style={s.input}
+            className="font-ui w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
             required
           />
         </div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <label style={s.label}>Category</label>
+      <div className="mb-3">
+        <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+          Category
+        </label>
         <select
           value={f.category}
           onChange={(e) => set('category', e.target.value)}
-          style={s.select}
+          className="font-ui w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
         >
           <option value="">— select —</option>
           {CATEGORIES.map((c) => (
@@ -245,9 +127,11 @@ function OcrForm({ initial, onSave, onCancel, saving }: OcrFormProps) {
         </select>
       </div>
 
-      <div style={{ ...gridTwo, marginBottom: 12 }}>
+      <div className="mb-4 grid grid-cols-2 gap-3">
         <div>
-          <label style={s.label}>Pre-Tax ($)</label>
+          <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+            Pre-Tax ($)
+          </label>
           <input
             type="number"
             min="0"
@@ -255,11 +139,13 @@ function OcrForm({ initial, onSave, onCancel, saving }: OcrFormProps) {
             value={f.pretax}
             onChange={(e) => set('pretax', e.target.value)}
             placeholder="0.00"
-            style={s.input}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 font-mono text-sm text-[var(--color-text-primary)] outline-none"
           />
         </div>
         <div>
-          <label style={s.label}>GST / Tax ($)</label>
+          <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+            GST / Tax ($)
+          </label>
           <input
             type="number"
             min="0"
@@ -267,30 +153,36 @@ function OcrForm({ initial, onSave, onCancel, saving }: OcrFormProps) {
             value={f.taxAmount}
             onChange={(e) => set('taxAmount', e.target.value)}
             placeholder="0.00"
-            style={s.input}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 font-mono text-sm text-[var(--color-text-primary)] outline-none"
           />
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={s.label}>Notes (optional)</label>
+      <div className="mb-4">
+        <label className="mb-1 block text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
+          Notes (optional)
+        </label>
         <input
           type="text"
           value={f.notes}
           onChange={(e) => set('notes', e.target.value)}
-          style={s.input}
+          className="font-ui w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
         />
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div className="flex gap-2">
         <button
           type="submit"
           disabled={saving}
-          style={{ ...s.btnPrimary, opacity: saving ? 0.6 : 1 }}
+          className="cursor-pointer rounded-[var(--radius-sm)] border-0 bg-[var(--color-pillar-money)] px-5 py-2 text-xs font-bold tracking-wider text-white uppercase disabled:opacity-60"
         >
           {saving ? 'Saving…' : 'Save Receipt'}
         </button>
-        <button type="button" onClick={onCancel} style={s.btnSecondary}>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]"
+        >
           Cancel
         </button>
       </div>
@@ -347,27 +239,11 @@ function MatchPicker({ receiptId, month, onMatched, onCancel }: MatchPickerProps
   }
 
   return (
-    <div
-      style={{ padding: '12px 0', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
-    >
+    <div className="flex flex-wrap items-center gap-2 py-3">
       {loading ? (
-        <span
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
-          Loading expenses…
-        </span>
+        <span className="font-ui text-sm text-[var(--color-text-disabled)]">Loading expenses…</span>
       ) : expenses.length === 0 ? (
-        <span
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
+        <span className="font-ui text-sm text-[var(--color-text-disabled)]">
           No unmatched expenses for this month.
         </span>
       ) : (
@@ -375,7 +251,7 @@ function MatchPicker({ receiptId, month, onMatched, onCancel }: MatchPickerProps
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            style={{ ...s.select, width: 'auto', minWidth: 280 }}
+            className="font-ui min-w-[280px] rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
           >
             <option value="">— pick an expense —</option>
             {expenses.map((e) => (
@@ -387,18 +263,16 @@ function MatchPicker({ receiptId, month, onMatched, onCancel }: MatchPickerProps
           <button
             onClick={handleLink}
             disabled={!selectedId || saving}
-            style={{
-              ...s.btnPrimary,
-              opacity: !selectedId || saving ? 0.5 : 1,
-              padding: '7px 14px',
-              fontSize: 'var(--text-nano)',
-            }}
+            className="cursor-pointer rounded-[var(--radius-sm)] border-0 bg-[var(--color-pillar-money)] px-3.5 py-1.5 text-xs font-bold tracking-wider text-white uppercase disabled:opacity-50"
           >
             {saving ? 'Linking…' : 'Link'}
           </button>
         </>
       )}
-      <button onClick={onCancel} style={s.btnSecondary}>
+      <button
+        onClick={onCancel}
+        className="cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]"
+      >
         Cancel
       </button>
     </div>
@@ -408,40 +282,224 @@ function MatchPicker({ receiptId, month, onMatched, onCancel }: MatchPickerProps
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: Receipt['match_status'] }) {
-  const styles: Record<Receipt['match_status'], React.CSSProperties> = {
-    matched: {
-      color: 'var(--color-positive, #4caf50)',
-      borderColor: 'color-mix(in srgb, var(--color-positive, #4caf50) 35%, transparent)',
-    },
-    review: {
-      color: 'var(--color-warning, #ff9800)',
-      borderColor: 'color-mix(in srgb, var(--color-warning, #ff9800) 35%, transparent)',
-    },
-    unmatched: { color: 'var(--color-text-disabled)', borderColor: 'var(--color-border)' },
+  const cls: Record<Receipt['match_status'], string> = {
+    matched:
+      'text-[var(--color-positive,#4caf50)] border-[color-mix(in_srgb,var(--color-positive,#4caf50)_35%,transparent)]',
+    review:
+      'text-[var(--color-warning,#ff9800)] border-[color-mix(in_srgb,var(--color-warning,#ff9800)_35%,transparent)]',
+    unmatched: 'text-[var(--color-text-disabled)] border-[var(--color-border)]',
   }
   const labels = { matched: 'Matched', review: 'Review', unmatched: 'Unmatched' }
   return (
     <span
-      style={{
-        fontFamily: 'var(--font-ui)',
-        fontSize: 'var(--text-nano)',
-        fontWeight: 700,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        padding: '2px 7px',
-        borderRadius: 'var(--radius-sm)',
-        border: '1px solid',
-        ...styles[status],
-      }}
+      className={`font-ui rounded-[var(--radius-sm)] border px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase ${cls[status]}`}
     >
       {labels[status]}
     </span>
   )
 }
 
+// ── Monthly summary strip ─────────────────────────────────────────────────────
+
+function MonthlySummary({ receipts }: { receipts: Receipt[] }) {
+  const totalSpend = receipts.reduce((s, r) => s + (r.total ?? 0), 0)
+  const totalGst = receipts.reduce((s, r) => s + (r.tax_amount ?? 0), 0)
+  const matched = receipts.filter((r) => r.match_status === 'matched').length
+  const unmatched = receipts.filter((r) => r.match_status !== 'matched').length
+  const matchPct = receipts.length > 0 ? Math.round((matched / receipts.length) * 100) : 0
+
+  return (
+    <div className="mb-4 grid grid-cols-4 gap-4">
+      {[
+        { label: 'Total Spend', value: `$${fmt(totalSpend)}`, highlight: false },
+        { label: 'GST ITCs', value: `$${fmt(totalGst)}`, highlight: false },
+        {
+          label: 'Matched',
+          value: `${matched} / ${receipts.length}`,
+          highlight: false,
+        },
+        {
+          label: 'Unmatched',
+          value: String(unmatched),
+          highlight: unmatched > 0,
+        },
+      ].map(({ label, value, highlight }) => (
+        <div
+          key={label}
+          className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-3"
+        >
+          <div className="mb-1 text-[10px] font-bold tracking-wider text-[var(--color-text-disabled)] uppercase">
+            {label}
+          </div>
+          <div
+            className={`font-mono text-base font-bold ${highlight ? 'text-[var(--color-critical)]' : 'text-[var(--color-text-primary)]'}`}
+          >
+            {value}
+          </div>
+          {label === 'Matched' && receipts.length > 0 && (
+            <div className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">{matchPct}%</div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Bookkeeper month view ─────────────────────────────────────────────────────
+
+function BookkeeperView({ receipts }: { receipts: Receipt[] }) {
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
+
+  function toggleMonth(m: string) {
+    setOpenMonths((prev) => {
+      const next = new Set(prev)
+      if (next.has(m)) next.delete(m)
+      else next.add(m)
+      return next
+    })
+  }
+
+  // Group by receipt_date month (fall back to upload_date)
+  const byMonth = new Map<string, Receipt[]>()
+  for (const r of receipts) {
+    const d = r.receipt_date ?? r.upload_date
+    const mk = d?.slice(0, 7) ?? 'unknown'
+    const arr = byMonth.get(mk) ?? []
+    arr.push(r)
+    byMonth.set(mk, arr)
+  }
+
+  const sortedMonths = Array.from(byMonth.keys()).sort().reverse()
+
+  if (sortedMonths.length === 0) {
+    return (
+      <p className="font-ui py-4 text-sm text-[var(--color-text-disabled)]">
+        No receipts to display.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {sortedMonths.map((mk) => {
+        const recs = byMonth.get(mk) ?? []
+        const totalSpend = recs.reduce((s, r) => s + (r.total ?? 0), 0)
+        const totalGst = recs.reduce((s, r) => s + (r.tax_amount ?? 0), 0)
+        const matchedCount = recs.filter((r) => r.match_status === 'matched').length
+        const open = openMonths.has(mk)
+        const allMatched = matchedCount === recs.length
+
+        // Category breakdown
+        const catMap = new Map<string, number>()
+        for (const r of recs) {
+          catMap.set(r.category, (catMap.get(r.category) ?? 0) + (r.total ?? 0))
+        }
+        const sortedCats = Array.from(catMap.entries()).sort((a, b) => b[1] - a[1])
+
+        return (
+          <div
+            key={mk}
+            className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]"
+          >
+            <button
+              onClick={() => toggleMonth(mk)}
+              className="flex w-full cursor-pointer items-center justify-between border-0 bg-[var(--color-surface-2)] px-4 py-3 text-left"
+            >
+              <span className="font-ui flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                <span>{allMatched ? '✓' : '!'}</span>
+                <span>{monthLabel(mk)}</span>
+                <span className="font-normal text-[var(--color-text-muted)]">
+                  {recs.length} receipts · ${fmt(totalSpend)} · ${fmt(totalGst)} GST
+                </span>
+                <span
+                  className={`text-xs ${allMatched ? 'text-[var(--color-positive,#4caf50)]' : 'text-[var(--color-warning,#ff9800)]'}`}
+                >
+                  {matchedCount}/{recs.length} matched
+                </span>
+              </span>
+              <span className="text-sm text-[var(--color-text-muted)]">{open ? '▲' : '▼'}</span>
+            </button>
+
+            {open && (
+              <div className="bg-[var(--color-surface)] px-4 py-3">
+                {/* Receipt list */}
+                <div className="mb-4 space-y-1">
+                  {recs
+                    .slice()
+                    .sort((a, b) => {
+                      const da = a.receipt_date ?? a.upload_date
+                      const db = b.receipt_date ?? b.upload_date
+                      return da < db ? -1 : 1
+                    })
+                    .map((r) => (
+                      <div
+                        key={r.id}
+                        className="font-ui flex items-center gap-2 text-xs text-[var(--color-text-secondary)]"
+                      >
+                        <span
+                          className={
+                            r.match_status === 'matched'
+                              ? 'text-[var(--color-positive,#4caf50)]'
+                              : 'text-[var(--color-warning,#ff9800)]'
+                          }
+                        >
+                          {r.match_status === 'matched' ? '✓' : '!'}
+                        </span>
+                        <span className="w-24 shrink-0 font-mono">
+                          {r.receipt_date ?? r.upload_date}
+                        </span>
+                        <span className="flex-1 truncate">{r.vendor || '—'}</span>
+                        <span className="font-mono">${fmt(r.total)}</span>
+                        <span className="max-w-[160px] truncate text-[var(--color-text-muted)]">
+                          {r.category}
+                        </span>
+                        {r.storage_path && (
+                          <a
+                            href={`/api/receipts/${r.id}/image`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 text-[var(--color-pillar-money)] underline"
+                          >
+                            Receipt
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                </div>
+
+                {/* Category breakdown */}
+                {sortedCats.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold tracking-wider text-[var(--color-text-disabled)] uppercase">
+                      By Category
+                    </div>
+                    <div className="space-y-0.5">
+                      {sortedCats.map(([cat, total]) => (
+                        <div key={cat} className="font-ui flex items-center gap-2 text-xs">
+                          <span className="flex-1 truncate text-[var(--color-text-secondary)]">
+                            {cat}
+                          </span>
+                          <span className="font-mono text-[var(--color-text-primary)]">
+                            ${fmt(total)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 type ScanState = 'idle' | 'scanning' | 'review'
+type ActiveTab = 'receipts' | 'bookkeeper'
 
 export function ReceiptsPage() {
   const currentYear = new Date().getFullYear()
@@ -450,6 +508,7 @@ export function ReceiptsPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const [month, setMonth] = useState(currentMonthStr)
+  const [activeTab, setActiveTab] = useState<ActiveTab>('receipts')
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -554,6 +613,7 @@ export function ReceiptsPage() {
               : null,
         category: form.category,
         notes: form.notes,
+        ocrSource: 'claude_vision',
         fileBase64: base64,
         fileName: pendingFile.name,
         fileType: pendingFile.type,
@@ -605,26 +665,10 @@ export function ReceiptsPage() {
   const matched = receipts.filter((r) => r.match_status === 'matched')
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 960, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[960px] px-8 py-7">
       {/* ── Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 24,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--color-pillar-money)',
-          }}
-        >
+      <div className="mb-6 flex items-center justify-between">
+        <span className="font-ui text-xs font-bold tracking-[0.1em] text-[var(--color-pillar-money)] uppercase">
           Receipts
         </span>
         <select
@@ -633,7 +677,7 @@ export function ReceiptsPage() {
             setMonth(e.target.value)
             setScanState('idle')
           }}
-          style={{ ...s.select, width: 200 }}
+          className="font-ui w-48 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
         >
           {months.map((m) => (
             <option key={m} value={m}>
@@ -644,7 +688,7 @@ export function ReceiptsPage() {
       </div>
 
       {/* ── Upload Zone ── */}
-      <div style={{ ...s.card, marginBottom: 16 }}>
+      <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         {scanState === 'idle' && (
           <>
             <div
@@ -652,35 +696,16 @@ export function ReceiptsPage() {
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${dragging ? 'var(--color-pillar-money)' : 'var(--color-border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                padding: '32px 24px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'border-color 0.15s',
-                backgroundColor: dragging
-                  ? 'color-mix(in srgb, var(--color-pillar-money) 4%, transparent)'
-                  : 'transparent',
-              }}
+              className={`cursor-pointer rounded-[var(--radius-sm)] border-2 border-dashed px-6 py-8 text-center transition-colors ${
+                dragging
+                  ? 'border-[var(--color-pillar-money)] bg-[color-mix(in_srgb,var(--color-pillar-money)_4%,transparent)]'
+                  : 'border-[var(--color-border)]'
+              }`}
             >
-              <div
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-body)',
-                  color: 'var(--color-text-muted)',
-                  marginBottom: 6,
-                }}
-              >
+              <div className="font-ui mb-1.5 text-sm text-[var(--color-text-muted)]">
                 Drop receipt here or click to browse
               </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-nano)',
-                  color: 'var(--color-text-disabled)',
-                }}
-              >
+              <div className="font-ui text-[10px] text-[var(--color-text-disabled)]">
                 JPEG · PNG · WebP · Max 4.5 MB
               </div>
             </div>
@@ -688,7 +713,7 @@ export function ReceiptsPage() {
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              style={{ display: 'none' }}
+              className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) void handleFile(f)
@@ -700,7 +725,7 @@ export function ReceiptsPage() {
               type="file"
               accept="image/*"
               capture="environment"
-              style={{ display: 'none' }}
+              className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) void handleFile(f)
@@ -709,58 +734,25 @@ export function ReceiptsPage() {
             />
             <button
               onClick={() => cameraInputRef.current?.click()}
-              style={{
-                ...s.btnPrimary,
-                marginTop: 12,
-                width: '100%',
-                padding: '12px 20px',
-                fontSize: 'var(--text-body)',
-                display: 'block',
-              }}
+              className="mt-3 block w-full cursor-pointer rounded-[var(--radius-sm)] border-0 bg-[var(--color-pillar-money)] px-5 py-3 text-sm font-bold tracking-wider text-white uppercase"
             >
               Take Photo
             </button>
             {scanError && (
-              <div
-                style={{
-                  marginTop: 10,
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-small)',
-                  color: 'var(--color-critical)',
-                }}
-              >
-                {scanError}
-              </div>
+              <p className="font-ui mt-2.5 text-sm text-[var(--color-critical)]">{scanError}</p>
             )}
           </>
         )}
 
         {scanState === 'scanning' && (
-          <div
-            style={{
-              padding: '24px 0',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-text-muted)',
-            }}
-          >
+          <p className="font-ui py-6 text-sm text-[var(--color-text-muted)]">
             Scanning receipt with Claude Vision…
-          </div>
+          </p>
         )}
 
         {scanState === 'review' && ocrForm && (
           <>
-            <div
-              style={{
-                marginBottom: 14,
-                fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-small)',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--color-text-muted)',
-              }}
-            >
+            <div className="font-ui mb-3.5 text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase">
               Review OCR Result — {pendingFile?.name}
             </div>
             <OcrForm
@@ -777,203 +769,189 @@ export function ReceiptsPage() {
         )}
       </div>
 
-      {/* ── Receipts List ── */}
-      <div style={s.card}>
-        {loadingReceipts && (
-          <div
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-text-disabled)',
-            }}
+      {/* ── Tab switcher ── */}
+      <div className="mb-4 flex gap-1 border-b border-[var(--color-border)] pb-0">
+        {(['receipts', 'bookkeeper'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`font-ui cursor-pointer border-t-0 border-r-0 border-b-2 border-l-0 bg-transparent px-4 py-2 text-xs font-bold tracking-wider uppercase transition-colors ${
+              activeTab === tab
+                ? 'border-b-[var(--color-pillar-money)] text-[var(--color-pillar-money)]'
+                : 'border-b-transparent text-[var(--color-text-muted)]'
+            }`}
           >
-            Loading…
-          </div>
-        )}
-        {fetchError && (
-          <div
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-critical)',
-            }}
-          >
-            Error: {fetchError}
-          </div>
-        )}
-        {!loadingReceipts && !fetchError && receipts.length === 0 && (
-          <div
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-small)',
-              color: 'var(--color-text-disabled)',
-            }}
-          >
-            No receipts uploaded for {monthLabel(month)} yet.
-          </div>
-        )}
+            {tab === 'receipts' ? 'Receipt List' : 'Bookkeeper View'}
+          </button>
+        ))}
+      </div>
 
-        {!loadingReceipts && !fetchError && receipts.length > 0 && (
-          <>
-            {/* Summary counts */}
-            <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
-              {[
-                { label: 'Total', count: receipts.length, color: 'var(--color-text-muted)' },
-                {
-                  label: 'Unmatched',
-                  count: unmatched.length,
-                  color:
-                    unmatched.length > 0 ? 'var(--color-critical)' : 'var(--color-text-disabled)',
-                },
-                {
-                  label: 'Review',
-                  count: review.length,
-                  color:
-                    review.length > 0
-                      ? 'var(--color-warning, #ff9800)'
-                      : 'var(--color-text-disabled)',
-                },
-                {
-                  label: 'Matched',
-                  count: matched.length,
-                  color: 'var(--color-positive, #4caf50)',
-                },
-              ].map(({ label, count, color }) => (
-                <div key={label}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: 'var(--text-nano)',
-                      color: 'var(--color-text-disabled)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                    }}
-                  >
-                    {label}
+      {/* ── Receipts List Tab ── */}
+      {activeTab === 'receipts' && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+          {loadingReceipts && (
+            <p className="font-ui text-sm text-[var(--color-text-disabled)]">Loading…</p>
+          )}
+          {fetchError && (
+            <p className="font-ui text-sm text-[var(--color-critical)]">Error: {fetchError}</p>
+          )}
+          {!loadingReceipts && !fetchError && receipts.length === 0 && (
+            <p className="font-ui text-sm text-[var(--color-text-disabled)]">
+              No receipts uploaded for {monthLabel(month)} yet.
+            </p>
+          )}
+
+          {!loadingReceipts && !fetchError && receipts.length > 0 && (
+            <>
+              <MonthlySummary receipts={receipts} />
+
+              {/* Receipt count summary */}
+              <div className="mb-4 flex gap-5">
+                {[
+                  {
+                    label: 'Total',
+                    count: receipts.length,
+                    color: 'text-[var(--color-text-muted)]',
+                  },
+                  {
+                    label: 'Unmatched',
+                    count: unmatched.length,
+                    color:
+                      unmatched.length > 0
+                        ? 'text-[var(--color-critical)]'
+                        : 'text-[var(--color-text-disabled)]',
+                  },
+                  {
+                    label: 'Review',
+                    count: review.length,
+                    color:
+                      review.length > 0
+                        ? 'text-[var(--color-warning,#ff9800)]'
+                        : 'text-[var(--color-text-disabled)]',
+                  },
+                  {
+                    label: 'Matched',
+                    count: matched.length,
+                    color: 'text-[var(--color-positive,#4caf50)]',
+                  },
+                ].map(({ label, count, color }) => (
+                  <div key={label}>
+                    <div className="font-ui text-[10px] tracking-wider text-[var(--color-text-disabled)] uppercase">
+                      {label}
+                    </div>
+                    <div className={`font-mono text-base font-bold ${color}`}>{count}</div>
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-body)',
-                      fontWeight: 700,
-                      color,
-                    }}
-                  >
-                    {count}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Date', 'Vendor', 'Category', 'Pre-Tax', 'GST', 'Total', 'Status', ''].map(
-                    (h) => (
-                      <th key={h} style={{ ...s.th, textAlign: h === '' ? 'right' : 'left' }}>
-                        {h}
-                      </th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((r) => (
-                  <Fragment key={r.id}>
-                    <tr>
-                      <td style={{ ...s.td, fontFamily: 'var(--font-mono)' }}>
-                        {r.receipt_date ?? r.upload_date}
-                      </td>
-                      <td style={s.td}>{r.vendor || '—'}</td>
-                      <td
-                        style={{
-                          ...s.td,
-                          color: 'var(--color-text-muted)',
-                          maxWidth: 140,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {r.category || '—'}
-                      </td>
-                      <td style={s.tdMono}>${fmt(r.pretax)}</td>
-                      <td style={{ ...s.tdMono, color: 'var(--color-text-muted)' }}>
-                        ${fmt(r.tax_amount)}
-                      </td>
-                      <td style={{ ...s.tdMono, fontWeight: 700 }}>${fmt(r.total)}</td>
-                      <td style={{ ...s.td, paddingLeft: 8 }}>
-                        <StatusBadge status={r.match_status} />
-                      </td>
-                      <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        {r.match_status !== 'matched' && (
-                          <button
-                            onClick={() => setMatchingId(matchingId === r.id ? null : r.id)}
-                            style={{
-                              ...s.btnSecondary,
-                              fontSize: 'var(--text-nano)',
-                              padding: '3px 8px',
-                              marginRight: 4,
-                            }}
-                          >
-                            {matchingId === r.id ? 'Cancel' : 'Link'}
-                          </button>
-                        )}
-                        {r.match_status === 'matched' && (
-                          <button
-                            onClick={async () => {
-                              const res = await fetch(`/api/receipts/${r.id}/match`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ expenseId: null }),
-                              })
-                              if (res.ok) setRefetchKey((k) => k + 1)
-                            }}
-                            style={{
-                              ...s.btnSecondary,
-                              fontSize: 'var(--text-nano)',
-                              padding: '3px 8px',
-                              marginRight: 4,
-                            }}
-                          >
-                            Unlink
-                          </button>
-                        )}
-                        <button onClick={() => handleDelete(r.id)} style={s.btnDanger}>
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-
-                    {/* Inline match picker */}
-                    {matchingId === r.id && (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          style={{
-                            padding: '0 0 8px 0',
-                            borderBottom: '1px solid var(--color-border)',
-                          }}
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    {['Date', 'Vendor', 'Category', 'Pre-Tax', 'GST', 'Total', 'Status', ''].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className={`font-ui border-b border-[var(--color-border)] pr-2.5 pb-2 text-[10px] font-bold tracking-wider text-[var(--color-text-disabled)] uppercase ${h === '' ? 'text-right' : 'text-left'}`}
                         >
-                          <MatchPicker
-                            receiptId={r.id}
-                            month={month}
-                            onMatched={() => {
-                              setMatchingId(null)
-                              setRefetchKey((k) => k + 1)
-                            }}
-                            onCancel={() => setMatchingId(null)}
-                          />
+                          {h}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipts.map((r) => (
+                    <Fragment key={r.id}>
+                      <tr>
+                        <td className="border-b border-[var(--color-border)] py-2 pr-2.5 font-mono text-sm text-[var(--color-text-secondary)]">
+                          {r.receipt_date ?? r.upload_date}
+                        </td>
+                        <td className="font-ui border-b border-[var(--color-border)] py-2 pr-2.5 text-sm text-[var(--color-text-secondary)]">
+                          {r.vendor || '—'}
+                        </td>
+                        <td className="font-ui max-w-[140px] overflow-hidden border-b border-[var(--color-border)] py-2 pr-2.5 text-sm text-ellipsis whitespace-nowrap text-[var(--color-text-muted)]">
+                          {r.category || '—'}
+                        </td>
+                        <td className="border-b border-[var(--color-border)] py-2 text-right font-mono text-sm text-[var(--color-text-primary)]">
+                          ${fmt(r.pretax)}
+                        </td>
+                        <td className="border-b border-[var(--color-border)] py-2 text-right font-mono text-sm text-[var(--color-text-muted)]">
+                          ${fmt(r.tax_amount)}
+                        </td>
+                        <td className="border-b border-[var(--color-border)] py-2 text-right font-mono text-sm font-bold text-[var(--color-text-primary)]">
+                          ${fmt(r.total)}
+                        </td>
+                        <td className="border-b border-[var(--color-border)] py-2 pr-2.5 pl-2">
+                          <StatusBadge status={r.match_status} />
+                        </td>
+                        <td className="border-b border-[var(--color-border)] py-2 text-right whitespace-nowrap">
+                          {r.match_status !== 'matched' && (
+                            <button
+                              onClick={() => setMatchingId(matchingId === r.id ? null : r.id)}
+                              className="mr-1 cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]"
+                            >
+                              {matchingId === r.id ? 'Cancel' : 'Link'}
+                            </button>
+                          )}
+                          {r.match_status === 'matched' && (
+                            <button
+                              onClick={async () => {
+                                const res = await fetch(`/api/receipts/${r.id}/match`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ expenseId: null }),
+                                })
+                                if (res.ok) setRefetchKey((k) => k + 1)
+                              }}
+                              className="mr-1 cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]"
+                            >
+                              Unlink
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="cursor-pointer rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--color-critical)_40%,transparent)] bg-transparent px-2 py-0.5 text-[10px] font-semibold text-[var(--color-critical)]"
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </div>
+
+                      {/* Inline match picker */}
+                      {matchingId === r.id && (
+                        <tr>
+                          <td colSpan={8} className="border-b border-[var(--color-border)] pb-2">
+                            <MatchPicker
+                              receiptId={r.id}
+                              month={month}
+                              onMatched={() => {
+                                setMatchingId(null)
+                                setRefetchKey((k) => k + 1)
+                              }}
+                              onCancel={() => setMatchingId(null)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Bookkeeper View Tab ── */}
+      {activeTab === 'bookkeeper' && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+          {loadingReceipts ? (
+            <p className="font-ui text-sm text-[var(--color-text-disabled)]">Loading…</p>
+          ) : (
+            <BookkeeperView receipts={receipts} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

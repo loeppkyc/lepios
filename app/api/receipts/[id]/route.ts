@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 
 // ── DELETE /api/receipts/[id] ─────────────────────────────────────────────────
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+  const gate = await requireUser()
+  if (!gate.ok) return gate.response
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { id } = await params
+  const { supabase } = gate
 
   // Fetch storage_path before deleting the record
   const { data: receipt, error: fetchError } = await supabase
@@ -26,6 +24,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   // Delete storage file if present
   if (receipt.storage_path) {
     await supabase.storage.from('receipts').remove([receipt.storage_path])
+  }
+
+  // If receipt was matched, clear hubdoc flag on the linked expense
+  if (receipt.matched_expense_id) {
+    await supabase
+      .from('business_expenses')
+      .update({ hubdoc: false })
+      .eq('id', receipt.matched_expense_id)
   }
 
   const { error } = await supabase.from('receipts').delete().eq('id', id)

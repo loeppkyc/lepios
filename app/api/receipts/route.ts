@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 import type { Receipt } from '@/lib/types/receipts'
 
 export const revalidate = 0
 
 // ── GET /api/receipts?month=YYYY-MM ──────────────────────────────────────────
+// Returns receipts where receipt_date falls in the given month.
+// Falls back to upload_date when receipt_date is null.
 
 export async function GET(request: Request) {
+  const gate = await requireUser()
+  if (!gate.ok) return gate.response
+
   const { searchParams } = new URL(request.url)
   const month = searchParams.get('month')
 
@@ -19,12 +24,17 @@ export async function GET(request: Request) {
   const from = `${month}-01`
   const to = `${month}-${String(lastDay).padStart(2, '0')}`
 
-  const supabase = await createClient()
+  const { supabase } = gate
+
+  // Fetch receipts whose receipt_date falls in the month (primary),
+  // OR whose upload_date falls in the month when receipt_date is null.
   const { data, error } = await supabase
     .from('receipts')
     .select('*')
-    .gte('upload_date', from)
-    .lte('upload_date', to)
+    .or(
+      `receipt_date.gte.${from},receipt_date.lte.${to},and(receipt_date.is.null,upload_date.gte.${from},upload_date.lte.${to})`
+    )
+    .order('receipt_date', { ascending: false, nullsFirst: false })
     .order('upload_date', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -44,6 +54,7 @@ interface CreateBody {
   category?: unknown
   notes?: unknown
   matchStatus?: unknown
+  ocrSource?: unknown
   // base64-encoded file sent separately from the scan step
   fileBase64?: unknown
   fileName?: unknown
@@ -51,6 +62,9 @@ interface CreateBody {
 }
 
 export async function POST(request: Request) {
+  const gate = await requireUser()
+  if (!gate.ok) return gate.response
+
   let body: CreateBody
   try {
     body = (await request.json()) as CreateBody
@@ -67,6 +81,7 @@ export async function POST(request: Request) {
     category,
     notes,
     matchStatus,
+    ocrSource,
     fileBase64,
     fileName,
     fileType,
@@ -81,11 +96,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { supabase } = gate
 
   let storagePath: string | null = null
 
@@ -117,12 +128,18 @@ export async function POST(request: Request) {
   }
 
   const vendorStr = (vendor as string).trim()
+  // Normalize vendor key: lowercase alphanumeric only
+  const vendorKey = vendorStr.toLowerCase().replace(/[^a-z0-9]/g, '')
   const pretaxNum = typeof pretax === 'number' ? pretax : null
   const taxNum = typeof taxAmount === 'number' ? taxAmount : 0
   const totalNum =
     typeof total === 'number' ? total : pretaxNum !== null ? pretaxNum + taxNum : null
   const categoryStr = typeof category === 'string' ? category.trim() : ''
   const notesStr = typeof notes === 'string' ? notes.trim() : ''
+  const ocrSourceStr =
+    typeof ocrSource === 'string' && ['claude_vision', 'email_import', 'manual'].includes(ocrSource)
+      ? (ocrSource as 'claude_vision' | 'email_import' | 'manual')
+      : 'manual'
 
   // Create the business_expenses row first (if we have enough data)
   let expenseId: string | null = null
@@ -148,6 +165,7 @@ export async function POST(request: Request) {
   const insert = {
     receipt_date: receiptDate ?? null,
     vendor: vendorStr,
+    vendor_key: vendorKey,
     pretax: pretaxNum,
     tax_amount: taxNum,
     total: totalNum,
@@ -155,6 +173,7 @@ export async function POST(request: Request) {
     storage_path: storagePath,
     match_status: expenseId ? 'matched' : matchStatus === 'review' ? 'review' : 'unmatched',
     notes: notesStr,
+    ocr_source: ocrSourceStr,
     ...(expenseId ? { matched_expense_id: expenseId } : {}),
   }
 
