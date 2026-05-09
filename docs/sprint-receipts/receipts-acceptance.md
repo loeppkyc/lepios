@@ -52,12 +52,13 @@ This sprint fixes all outstanding gaps identified in the Check-Before-Build audi
 - Vendor memory system (learned vendor → category) — useful but requires a separate `vendor_rules` table. Defer to v1.1.
 - Batch upload — single-receipt upload is the MVP path. Defer.
 - PDF support — only JPEG/PNG/WebP OCR for v1. PDF deferred.
+- **BookkeeperView YTD (v1 scope note):** The v1 bookkeeper accordion is single-month — it receives the receipts already filtered by the page's month selector, so it always renders one accordion panel. The Streamlit Bookkeeper View shows all months YTD in a single view (full-year accordion + YTD summary row). The YTD version requires a separate all-year fetch outside the month filter loop. Task queued: `receipts-bookkeeper-ytd` (priority 6). See task_queue for details.
 
 ---
 
 ## Files expected to change
 
-```
+```text
 supabase/migrations/0169_receipts_v2.sql           (new — add ocr_source + vendor_key columns)
 .claude/migration-claims.json                        (claim 0169)
 app/(cockpit)/receipts/_components/ReceiptsPage.tsx  (rewrite with Tailwind, add summary strip + bookkeeper view)
