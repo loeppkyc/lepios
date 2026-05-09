@@ -155,7 +155,7 @@ chunks_awaiting_grounding_stall_alert:
 
 active_chunk: "utility-tracker"
 active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
-active_chunk_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
+active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
 active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-26T00:08:12Z"
 active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
@@ -166,7 +166,7 @@ last_updated_at: "2026-04-26T01:22:00Z"
 
 prior_active_chunk: "notification-drain-dedup"
 prior_active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
-prior_active_chunk_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
+prior_active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
 prior_active_chunk_status: "awaiting-grounding"
 prior_active_chunk_colin_approved_at: "2026-04-26T00:08:12Z"
 prior_active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
@@ -219,7 +219,7 @@ status: "awaiting-grounding"
 acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
 study_doc: "docs/sprint-5/notification-drain-dedup-study.md"
 colin_approved_at: "2026-04-26T00:08:12Z"
-coordinator_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
+coordinator_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
 delegated_to_builder_at: "2026-04-26T01:16:00Z"
 build_complete_at: "2026-04-26T01:21:00Z"
 commit: "ea4f826"
@@ -286,20 +286,18 @@ opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
 
 # ============================================================
-
-# Subdir Detection Fix (scanner bug, filed 2026-04-28)
-
+# Scanner subdir fix (standalone bug fix, 2026-05-09)
 # ============================================================
 
-subdir_detection:
-  task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
-  status: "in-build"
-  description: "Fix scanStreamlitModules to detect Python package subdirs in pages/"
-  acceptance_doc: "docs/sprint-5/subdir-detection-acceptance.md"
-  affected_file: "lib/scanners/streamlit-module-scanner.ts"
-  colin_approved_at: "2026-05-09"
-  colin_answers: "q1=defer (no dead-ref detection), q2=option_a (filename = raw dir name)"
-  coordinator_task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
-  delegated_to_builder_at: "2026-05-09T00:00:00Z"
-  branch: "harness/task-3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
-  last_updated_at: "2026-05-09T00:00:00Z"
+scanner_subdir_fix:
+task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+status: "in-build"
+description: "Fix streamlit-module-scanner.ts subdir detection (option_a) + dead reference gotchas (scope_expansion)"
+acceptance_doc: "docs/sprint-5/scanner-subdir-fix-acceptance.md"
+affected_files: ["lib/scanners/streamlit-module-scanner.ts", "lib/scanners/spec-generator.ts", "tests/streamlit-scanner.test.ts"]
+grounding_checkpoint: "Colin runs scanner against real Streamlit OS pages/ — verify tax_centre line_count >= 6000 and at least one page has non-empty gotchas"
+coordinator_task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+colin_approved_at: "2026-05-09"
+delegated_to_builder_at: "2026-05-09T03:40:00Z"
+builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
+last_updated_at: "2026-05-09T03:40:00Z"

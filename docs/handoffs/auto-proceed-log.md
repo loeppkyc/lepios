@@ -236,3 +236,26 @@ outcome: escalated
 escalation_reasons:
   - standard_per_chunk_escalation (every acceptance doc goes to Colin)
   - open_questions_require_decision (Q1: scope expansion, Q2: filename convention)
+
+---
+
+2026-05-09T03:40:00Z sprint=5 chunk=scanner-subdir-fix doc=docs/sprint-5/scanner-subdir-fix-acceptance.md
+cited_principles: [explicit-colin-approval — cache_match not required]
+trigger_match_evidence: |
+  Colin explicitly approved this task via manual_db (approval_status=approved, approved_at=2026-05-09,
+  chosen_option=a, scope_expansion confirmed). Coordinator non-negotiable #2: "An acceptance doc
+  goes to builder only after (a) Colin approves it explicitly." Condition (a) satisfied.
+  cache_match_enabled: true (sprint-state.md explicit override, last_reviewed_by_colin_at: 2026-05-01)
+  but irrelevant — explicit approval supersedes cache-match gate.
+  Phase 5 grounding: PASS (actual_lines=7,995 >> 1000 threshold; Colin verified directly).
+reversibility_check: |
+  Acceptance doc: new file in docs/sprint-5/ — fully reversible (delete).
+  lib/scanners/streamlit-module-scanner.ts: additive change (new loop branch + new function).
+    Reversible: revert file via git. No schema, no migration, no destructive op.
+  lib/scanners/spec-generator.ts: adds gotchas field to TaskSpec interface.
+    Reversible: revert file. No consumers of TaskSpec currently check gotchas presence,
+    so adding the field is backwards-compatible; removing it would require checking for consumers.
+  tests/streamlit-scanner.test.ts: additive tests only. Reversible.
+  No shared seams touched. No migration. No API changes.
+confidence: high
+outcome: auto-proceeded (Colin explicit approval; reversible; sprint-5 cache_match_enabled=true)
