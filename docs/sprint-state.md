@@ -109,7 +109,21 @@ status: "in-build"
 cache_match_enabled: true
 cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-27T00:40:00Z"
+last_updated_at: "2026-05-09T00:00:00Z"
+
+f19_prime_s1_chunk:
+status: "in-build"
+task_id: "d4c6e2ae-2499-43ab-8129-84d4b5280be1"
+acceptance_doc: "docs/sprint-5/f19-prime-s1-acceptance.md"
+spec: "docs/harness/F19_PRIME_SPEC.md"
+colin_approved_via: "task_metadata_q_resolutions + do_not_auto_build=false"
+acceptance_doc_written_at: "2026-05-09T00:00:00Z"
+delegated_to_builder_at: "2026-05-09T00:00:00Z"
+migration_number: "0166"
+grounding_checkpoints:
+  - "SELECT id, source, chosen_path, metadata->>'f19_status' AS f19_status, decided_by FROM decisions_log WHERE source = 'f19_loop' ORDER BY decided_at DESC LIMIT 5"
+  - "SELECT column_name FROM information_schema.columns WHERE table_name = 'decisions_log' AND column_name = 'metadata'"
+  - "vitest tests/harness/f19 — expect AT1–AT6 all pass"
 
 chunks_planned:
 

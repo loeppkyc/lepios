@@ -191,6 +191,40 @@ proceed_reason: "Colin approved all 3 Q answers via task_queue metadata at 2026-
 
 ---
 
+2026-05-09T00:00:00Z sprint=5 chunk=f19-prime-s1 doc=docs/sprint-5/f19-prime-s1-acceptance.md
+cited_principles: ["Principle 2 (scope — additive migration + new files, no destructive ops)", "Principle 17 (no speculative infrastructure — spec section Slice 1 is the minimal demo)", "META-C (cache-match enabled per sprint-state.md 2026-05-01 update)"]
+trigger_match_evidence: |
+  Situation: greenfield TypeScript module pair (optimizer.ts + verifier.ts) + additive migration
+  (ADD COLUMN + extend CHECK). Pattern matches prior harness builds (coordinator-env, drain-403,
+  stall-alert) exactly: new files, new migration, no deletions, no RLS changes.
+
+  Colin approval path (a), not cache-match path (b): task metadata for
+  d4c6e2ae-2499-43ab-8129-84d4b5280be1 contains pre-populated q_resolutions for all four
+  open questions (Q1, Q6, Q8 + metadata column) and do_not_auto_build=false.
+  These were set by Colin when he queued the task 2026-04-28. The Q resolutions ARE the redline.
+
+  cache_match_enabled: true per sprint-state.md sprint_5 (updated 2026-05-01).
+  last_reviewed_by_colin_at: 2026-05-01 per this log's footer.
+reversibility_check: |
+  Migration 0166 (ADD COLUMN metadata jsonb): reversible — ALTER TABLE decisions_log
+  DROP COLUMN metadata. No FK references. No data loss.
+  Migration 0166 (extend source CHECK): reversible — drop new constraint, add back old.
+  Existing rows all have source values in the original enum; no rows have 'f19_loop' yet.
+  lib/harness/f19/optimizer.ts: new file — delete to revert.
+  lib/harness/f19/verifier.ts: new file — delete to revert.
+  tests/harness/f19/*.test.ts: new files — delete to revert.
+  Acceptance doc: new file — delete to revert.
+  sprint-state.md update: document only, reversible via git.
+  All decisions: LOW cost to reverse.
+confidence: high
+outcome: proceeding_to_builder_on_colin_direct_ratification
+proceed_reason: |
+  Task metadata q_resolutions + do_not_auto_build=false set by Colin at task creation
+  2026-04-28 — this is path (a) explicit Colin approval. cache_match_enabled=true as of
+  2026-05-01 also allows META-C path (b); both paths clear. Proceeding to builder.
+
+---
+
 2026-04-27T04:25:00Z sprint=5 chunk=utility-tracker doc=docs/sprint-5/utility-tracker-acceptance.md
 cited_principles: [cache_match_enabled: false — Phase 0 explicit override, Sprint 4 baseline carry-forward]
 trigger_match_evidence: |
