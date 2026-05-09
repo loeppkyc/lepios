@@ -1,20 +1,34 @@
 # LepiOS — Failure Log
 
-**Auto-generated from `failures_log` table.** Last data change: 2026-05-08T12:44:05.354399+00:00.
+**Auto-generated from `failures_log` table.** Last data change: 2026-05-09T03:27:49.596511+00:00.
 Source of truth: `failures_log` table. Edit there (cockpit `/failures` form or via `POST /api/failures/log`).
 
 F-L1–F-L15 live in `CLAUDE.md §9` (canonical hand-written entries kept in prose).
 F-N entries below are auto-rendered from the table.
 
 ---
-## Open (2)
+## Open (3)
 
-## F-N14 — F-N1 RECURRENCE — Phase 1b markdown export writeFile() fails in Vercel serverless (read-only filesystem) (2026-05-08)
+## F-N18 — Single-letter option replies (a/b/c) not handled — webhook_no_match for multi-option escalations (2026-05-09)
 
-- **What:** Phase 1b shipped lib/failures/export-markdown.ts with writeFile(MD_PATH, content) where MD_PATH is docs/claude-md/failures.md inside the repo tree. Local dev exported successfully; prod fails with EROFS: read-only file system, open '/var/task/docs/claude-md/failures.md'. The night-tick integration correctly catches the error and logs to agent_events with status=error, but the markdown file never updates from the table in production. F19 loop is broken in prod: failures_log table updates → markdown does NOT auto-render → CLAUDE.md component #4 stays stale → next Claude session loads outdated context.
-- **Root cause:** Same failure class as F-N1 (settings.json fix ignored in cloud sandbox): cloud-safe fixes must use DB-resident config or external API calls, not filesystem writes. writeFile to a repo path inside a Vercel serverless function ALWAYS fails because /var/task is read-only. F-N1 lesson was about config files; this generalizes to any filesystem write. The local-dev test passed because the script ran via tsx + dotenv against the actual filesystem.
-- **Fix/workaround:** (none — open)
-- **Lesson:** Pick one of three fixes: (a) commit the rendered markdown via GitHub API in the cron path (mirrors self-repair pr-opener pattern, F22-bearer-auth), (b) write to Supabase Storage bucket and update CLAUDE.md component #4 to read from a Storage URL or proxied route, (c) accept that the file is human-rendered: replace the cron call with a script developers run before commits. Recommendation: (a) — preserves the auto-update guarantee that F19 needs and matches existing patterns. Add a generic test for any new writeFile path: assert it targets /tmp or uses GitHub API, never repo paths inside route handlers. T-002 v2 E2E puppeteer would also catch this class via post-deploy smoke.
+- **What:** Coordinator escalated scanner subdir-detection grounding fail with 3 options (a/b/c). Colin replied "a" via Telegram at 03:22 UTC. Webhook received the message (HTTP 200, logged telegram_webhook POST received) but logged webhook_no_match — no handler matched.
+- **Expected:** Single-letter reply "a" to a multi-option awaiting_grounding escalation should set metadata.chosen_option and transition task_queue to queued, re-triggering coordinator.
+- **Actual:** Text handler in PR #160 only matches "approve"/"approved" and "reject"/"rejected". Single-letter "a", "b", "c" fell through all handlers to webhook_no_match log.
+- **Root cause:** PR #160 text handler checks: lc === "approve" || lc === "approved" || lc.startsWith("approve "). The letter "a" satisfies none of these. No fallback for multi-option single-letter responses. Gap is structural: every new escalation pattern (option selection, numeric replies, confirmation codes) needs its own handler branch.
+- **Fix/workaround:** _Open_
+- **Lesson:** Any new coordinator escalation pattern that expects a reply must enumerate the exact reply strings it accepts and add a webhook handler for each. Single-letter (a/b/c) option replies are a common coordinator pattern and must be handled generically: if task has awaiting_grounding status and metadata contains an options array, match reply against option keys and apply.
+- **Severity:** high
+
+---
+
+## F-N17 — Telegram approval handlers missing for awaiting_grounding / acceptance_doc_ready tasks (2026-05-09)
+
+- **What:** Coordinator escalated task 3dcf9706 (scanner_fix_subdir_detection) to awaiting_grounding. Colin sent inline button click ~02:12 UTC and text "Approved..." at 02:12:58 UTC. Both webhook POSTs returned 200 but task stayed at awaiting_grounding until manual DB UPDATE.
+- **Expected:** Inline button or text "Approved" should transition task from awaiting_grounding to approved and delegate to builder.
+- **Actual:** Both messages received (HTTP 200). Button click triggered answerCallbackQuery ack but fell through all 5 callback parsers. Text reply handler only queries status = awaiting_review — missed awaiting_grounding and acceptance_doc_ready.
+- **Root cause:** (1) None of 5 callback parsers (thumbs, gate, improve, purpose_review, safety) handle task_queue approval transitions. (2) Text-reply handler only queries status = awaiting_review; missing awaiting_grounding and acceptance_doc_ready.
+- **Fix/workaround:** _Open_
+- **Lesson:** Every new escalation status added to task_queue must be paired with a webhook handler — both a callback_query parser (inline buttons) and a text-reply branch. Missing handlers return 200 silently, invisible without Vercel log inspection.
 - **Severity:** high
 
 ---
@@ -41,7 +55,7 @@ F-N entries below are auto-rendered from the table.
 
 ---
 
-## Fixed (last 30 days) (10)
+## Fixed (last 30 days) (12)
 
 ## F-N5 — /api/bookkeeping/* shipped publicly accessible for ~5 hours (2026-05-05)
 
@@ -50,6 +64,16 @@ F-N entries below are auto-rendered from the table.
 - **Fix/workaround:** commit a3425d9 (inline auth.getUser check + 401 smoke tests)
 - **Lesson:** Any new /api/* route that uses createServiceClient must (a) call auth.getUser() for user-facing routes OR (b) use requireCronSecret(request) for cron-style routes. Worth a lint rule (no-restricted-syntax) plus 401 test case in same commit.
 - **Severity:** critical
+
+---
+
+## F-N14 — F-N1 RECURRENCE — Phase 1b markdown export writeFile() fails in Vercel serverless (read-only filesystem) (2026-05-08)
+
+- **What:** Phase 1b shipped lib/failures/export-markdown.ts with writeFile(MD_PATH, content) where MD_PATH is docs/claude-md/failures.md inside the repo tree. Local dev exported successfully; prod fails with EROFS: read-only file system, open '/var/task/docs/claude-md/failures.md'. The night-tick integration correctly catches the error and logs to agent_events with status=error, but the markdown file never updates from the table in production. F19 loop is broken in prod: failures_log table updates → markdown does NOT auto-render → CLAUDE.md component #4 stays stale → next Claude session loads outdated context.
+- **Root cause:** Same failure class as F-N1 (settings.json fix ignored in cloud sandbox): cloud-safe fixes must use DB-resident config or external API calls, not filesystem writes. writeFile to a repo path inside a Vercel serverless function ALWAYS fails because /var/task is read-only. F-N1 lesson was about config files; this generalizes to any filesystem write. The local-dev test passed because the script ran via tsx + dotenv against the actual filesystem.
+- **Fix/workaround:** 3c8330c2c0e0b1dd7d6432cd3f4763b7e194e2cc
+- **Lesson:** use GitHub API commits for any cron-driven content updates; never writeFile to repo paths in serverless (Vercel /var/task is read-only). Mirror the F22-bearer-auth pattern in lib/harness/self-repair/pr-opener.ts. Idempotency requires deterministic content (no Date.now() in render output). Live verified 2026-05-08: PR #148 merged → commit 3c8330c on prod → night-tick triggered → failures.md committed as c94133d on main → second invocation returned skipped:true (no duplicate commit). agent_events row failures_log.export_markdown shows status=success.
+- **Severity:** high
 
 ---
 
@@ -90,6 +114,18 @@ F-N entries below are auto-rendered from the table.
 - **Fix/workaround:** FTS fallback (S-L4 pattern)
 - **Lesson:** Any batch job must log per-chunk success/failure to agent_events or a dedicated table. Silent failures in a batch = unknown coverage, not zero failures.
 - **Severity:** high
+
+---
+
+## F-N15 — GitHub push protection blocks tests with literal Stripe/AWS/JWT token shapes (2026-05-08)
+
+- **What:** First push of T-002 Sub-phase A was rejected by GitHub secret scanning. The test fixtures contained literal `sk_live_X...` and `sk_test_X...` strings designed only to satisfy the secret detector regex. GitHub's static scanner sees the shape, not the meaning, and blocks the push.
+- **Expected:** Test asserts on regex-matching fixtures; push succeeds because the fixtures are obviously not real keys.
+- **Actual:** Push declined due to repository rule violations: "Stripe API Key" and "Stripe Test API Secret Key" detected in tests/harness/safety/v2/secret-signal.test.ts:32, 37, 81.
+- **Root cause:** GitHub push protection (different from secret scanning post-merge alerts) runs a static regex scan and blocks any push containing token-shaped strings, regardless of whether they're real. Test fixtures that match production detector regex are indistinguishable from leaked keys to the scanner.
+- **Fix/workaround:** c156474
+- **Lesson:** When writing tests that assert against secret-detection regex, build token fixtures at runtime via string concatenation (e.g. `['sk', 'live', 'X'.repeat(24)].join('_')`). Never put a literal token shape in source — even fake ones. Apply also to AWS / Supabase / JWT / GitHub PAT shapes.
+- **Severity:** medium
 
 ---
 
