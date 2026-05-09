@@ -22,6 +22,7 @@ export const maxDuration = 300 // 5 min — many checks fan out to slow APIs
 async function handle(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const url = new URL(request.url)
   const dryRun = url.searchParams.get('dry_run') === '1'

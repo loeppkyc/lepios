@@ -273,6 +273,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   // auth: see lib/auth/cron-secret.ts
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   try {
     const result = await runTimeoutCron()

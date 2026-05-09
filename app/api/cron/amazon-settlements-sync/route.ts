@@ -3,6 +3,7 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { createServiceClient } from '@/lib/supabase/service'
 import { syncSettlementsForRange } from '@/lib/amazon/settlements-sync'
 import { spApiConfigured } from '@/lib/amazon/client'
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   // auth: see lib/auth/cron-secret.ts
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const startTime = Date.now()
   const runId = crypto.randomUUID()

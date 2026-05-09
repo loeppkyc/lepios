@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   // auth: see lib/auth/cron-secret.ts
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   if (!process.env.TASK_PICKUP_ENABLED) {
     return NextResponse.json({ ok: false, reason: 'task-pickup-disabled', duration_ms: 0 })

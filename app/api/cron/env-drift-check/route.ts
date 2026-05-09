@@ -30,6 +30,7 @@ function mask4(value: string | null | undefined): string | null {
 export async function GET(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const db = createServiceClient()
   const started = Date.now()

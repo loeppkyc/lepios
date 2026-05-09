@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { runDaytimeTick } from '@/lib/orchestrator/daytime-tick'
 
 export const dynamic = 'force-dynamic'
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   // Feature flag — route exists but is inert until explicitly enabled
   if (!process.env.DAYTIME_TICK_ENABLED) {

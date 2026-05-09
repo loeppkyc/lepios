@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +49,7 @@ async function fetchOura<T>(endpoint: string, token: string, startDate: string, 
 export async function GET(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const db = createServiceClient()
   const started = Date.now()
