@@ -131,7 +131,13 @@
       "filename": "0164_coordinator_run_state.sql",
       "claimed_at": "2026-05-08",
       "note": "T-001 v2 — coordinator_run_state table for continuous-mode run tracking. Seeds HARNESS_QUOTA_THRESHOLD + HARNESS_CONTINUOUS_RUN_ID in harness_config."
+    },
+    "0165": {
+      "branch": "fix/harness-config-service-role-grants",
+      "filename": "0165_fix_harness_config_grants.sql",
+      "claimed_at": "2026-05-09",
+      "note": "Fix missing GRANT INSERT/UPDATE/DELETE on harness_config for service_role. Root cause: 0029 comment conflated RLS bypass with GRANT bypass. All other tables with missing write grants were audited and confirmed intentionally AD7-restricted."
     }
   },
-  "next_available": 165
+  "next_available": 166
 }
