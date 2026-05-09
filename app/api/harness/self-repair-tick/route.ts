@@ -33,6 +33,7 @@ import { openPR } from '@/lib/harness/self-repair/pr-opener'
 import { telegram } from '@/lib/harness/arms-legs'
 import { getCircuitState } from '@/lib/ollama/circuit'
 import type { NextRequest } from 'next/server'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 min max execution time

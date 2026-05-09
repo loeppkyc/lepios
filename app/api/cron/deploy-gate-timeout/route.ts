@@ -4,6 +4,7 @@ import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { deleteBranch } from '@/lib/harness/deploy-gate'
 import { httpRequest } from '@/lib/harness/arms-legs/http'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 

@@ -12,6 +12,7 @@ import {
   type StatementArrivalResult,
 } from '@/lib/gmail/classifiers/statement-arrivals'
 import { recordAttribution } from '@/lib/attribution/writer'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 

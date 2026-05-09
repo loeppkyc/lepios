@@ -20,6 +20,7 @@ import { runCronRegistrationSmoke } from '@/lib/harness/smoke-tests/cron-registr
 import { runOllamaHealthSmoke } from '@/lib/harness/smoke-tests/ollama-health'
 import { parseBumpDirectives, applyBumps } from '@/lib/harness/component-bump'
 import { runSafetyGateCheck, type SafetyGateResult } from '@/lib/harness/safety/v2/gate-adapter'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 

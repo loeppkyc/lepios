@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30

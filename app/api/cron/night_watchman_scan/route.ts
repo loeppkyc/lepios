@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { runScan, scopeForNow } from '@/lib/night_watchman'
 import { summarizeScan } from '@/lib/telegram/templates'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 min — many checks fan out to slow APIs
