@@ -155,7 +155,7 @@ chunks_awaiting_grounding_stall_alert:
 
 active_chunk: "utility-tracker"
 active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
-active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
+active_chunk_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
 active_chunk_status: "awaiting-grounding"
 active_chunk_colin_approved_at: "2026-04-26T00:08:12Z"
 active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
@@ -166,7 +166,7 @@ last_updated_at: "2026-04-26T01:22:00Z"
 
 prior_active_chunk: "notification-drain-dedup"
 prior_active_chunk_acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
-prior_active_chunk_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
+prior_active_chunk_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
 prior_active_chunk_status: "awaiting-grounding"
 prior_active_chunk_colin_approved_at: "2026-04-26T00:08:12Z"
 prior_active_chunk_delegated_to_builder_at: "2026-04-26T01:16:00Z"
@@ -219,7 +219,7 @@ status: "awaiting-grounding"
 acceptance_doc: "docs/sprint-5/notification-drain-dedup-acceptance.md"
 study_doc: "docs/sprint-5/notification-drain-dedup-study.md"
 colin_approved_at: "2026-04-26T00:08:12Z"
-coordinator_task_id: "c622d367-704d-4838-83bf-15a196c8c074"
+coordinator_task_id: "c622d367-704d-4838-83ff-15a196c8c074"
 delegated_to_builder_at: "2026-04-26T01:16:00Z"
 build_complete_at: "2026-04-26T01:21:00Z"
 commit: "ea4f826"
@@ -287,16 +287,19 @@ last_updated_at: "2026-04-27T00:14:00Z"
 
 # ============================================================
 
-# Bug Fix: subdir-detection (parallel track, 2026-05-08)
+# Subdir Detection Fix (scanner bug, filed 2026-04-28)
 
 # ============================================================
 
-bugfix_subdir_detection:
+subdir_detection:
   task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
-  status: "awaiting_grounding"
-  description: "scanStreamlitModules skips Python package dirs (e.g. tax_centre/) — 6_Tax_Centre reports 148 lines, actual 7995"
+  status: "in-build"
+  description: "Fix scanStreamlitModules to detect Python package subdirs in pages/"
   acceptance_doc: "docs/sprint-5/subdir-detection-acceptance.md"
-  grounding_question: "Q1: include dead-ref detection in scope? Q2: filename convention for pkg dirs?"
-  coordinator_recommendation: "Defer Q1 (dead-ref detection needs its own audit doc first). Use bare dirname (option a) for Q2."
-  opened_at: "2026-05-08T00:00:00Z"
-  last_updated_at: "2026-05-08T00:00:00Z"
+  affected_file: "lib/scanners/streamlit-module-scanner.ts"
+  colin_approved_at: "2026-05-09"
+  colin_answers: "q1=defer (no dead-ref detection), q2=option_a (filename = raw dir name)"
+  coordinator_task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+  delegated_to_builder_at: "2026-05-09T00:00:00Z"
+  branch: "harness/task-3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+  last_updated_at: "2026-05-09T00:00:00Z"

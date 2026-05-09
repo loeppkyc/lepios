@@ -1,160 +1,148 @@
-# Bug Fix: Scanner Subdir Detection
-**task_id:** 3dcf9706-ccc6-43d9-915a-7da9bf8d3c88  
-**filed_at:** 2026-04-28  
-**phase:** acceptance-doc-ready  
-**prepared_at:** 2026-05-08T00:00:00Z
+# Acceptance Doc — Subdir Detection Fix for `scanStreamlitModules`
+
+**Task ID:** 3dcf9706-ccc6-43d9-915a-7da9bf8d3c88  
+**Filed:** 2026-04-28  
+**Approved:** 2026-05-09 (Colin, via manual_db)  
+**Chunk:** subdir-detection  
+**Sprint:** 5 (parallel harness track)
 
 ---
 
 ## Scope
 
-Fix `scanStreamlitModules` to detect Python package directories (subdirectories containing `.py` files) in `pages/`, registering each as a `ModuleCandidate` with `line_count` = total lines across all `.py` files in that directory.
+Fix `lib/scanners/streamlit-module-scanner.ts` so that `scanStreamlitModules()` detects Python package directories inside `pages/` and registers them as `ModuleCandidate` entries alongside flat `.py` files.
 
-**Acceptance criterion:** Given a Streamlit root whose `pages/` directory contains both flat `.py` files AND a non-hidden, non-underscore-prefixed subdirectory containing `.py` files, `scanStreamlitModules` returns one `ModuleCandidate` per qualifying subdirectory (with `line_count` equal to the sum of all `.py` files in that dir). No subdirectory package is silently dropped.
-
-**Verification:** Running `npx tsx scripts/scan-streamlit-and-queue.ts` against the real Streamlit baseline produces a queue entry for `tax_centre/` (or `6_Tax_Centre/`) with `line_count` ≥ 1000 (currently reported as 148 because the package directory is skipped entirely).
+**One acceptance criterion:** After the fix, a call to `scanStreamlitModules(root)` where `pages/tax_centre/` is a directory containing `.py` files returns a `ModuleCandidate` with `filename = 'tax_centre'` — the same result shape as for flat `.py` files, with `line_count`, `external_apis`, `dependencies`, and all other fields populated from the package's entry point content.
 
 ---
 
 ## Out of Scope
 
-**Dead reference detection (scope_expansion from task metadata):** The task metadata includes a `scope_expansion` requesting that the scanner also detect function calls with no matching import and embed them in `spec.gotchas`. This involves:
-- A design decision on what constitutes a "dead reference" (false-positive risk is high)
-- A new `gotchas?: string[]` field on the `TaskSpec` interface
-- Changes to `spec-generator.ts` and `scan-streamlit-and-queue.ts`
+- Dead reference detection (deferred — Q1 answered `defer` by Colin 2026-05-09). Do NOT add detection of dead references (`show_load_time`, `dev_section`, `get_sheet` with no matching import) in this chunk. That is a separate future chunk.
+- Changes to `spec-generator.ts`, `streamlit-categories.ts`, or any other file unless strictly necessary for the scanner fix.
+- Changes to embed-streamlit-source.ts (already handles subdirs via `walkDir`).
 
-This expansion is **not included** in this acceptance doc. Colin must decide whether to include it (see Open Questions).
+---
 
-Note: `docs/follow-ups/2026-04-28-streamlit-dead-reference-audit.md` is referenced in the task metadata but does not exist. The scope expansion claim (34 dead references across 32 pages) is ungrounded until that doc is written.
+## Background / Bug
+
+`scanStreamlitModules` at line 96 of `lib/scanners/streamlit-module-scanner.ts`:
+
+```typescript
+if (statSync(fullPath).isDirectory()) continue  // ← BUG: skips all subdirs
+```
+
+This means Python package directories like `pages/tax_centre/` (which contains `colin_tax.py`) are silently skipped. The scanner reports 148 lines for the Tax Centre module when the actual implementation is 7,995 lines — a 54× undercount that causes incorrect complexity classification and missing API detection.
+
+The `embed-streamlit-source.ts` script already recurses subdirs correctly via its `walkDir` function (lines 211–226). Adapt the same pattern for `scanStreamlitModules`.
+
+---
+
+## Filename Convention for Package Directories (Q2 = option_a)
+
+When a subdirectory in `pages/` is detected as a package, store in `ModuleCandidate.filename` the **raw directory name with no trailing slash and no file extension**.
+
+Examples:
+- `pages/tax_centre/` → `filename: 'tax_centre'`
+- `pages/6_Tax_Centre/` → `filename: '6_Tax_Centre'`
+
+This preserves compatibility with `extractPageNumber` (which strips leading digits) and `extractTitle` (which strips `^\d+_` prefix and replaces `_` with spaces). The `.py` extension is omitted to signal to downstream consumers that this is a package, not a flat file.
+
+---
+
+## Implementation Guidance
+
+### Entry point selection for packages
+
+For a directory `pages/<dir>/`, read the first matching file in priority order:
+1. `pages/<dir>/__init__.py`
+2. `pages/<dir>/<dir>.py` (e.g., `tax_centre/tax_centre.py`)
+3. Any `.py` file in the directory (first alphabetically, skip files starting with `_`)
+
+If no `.py` file is found in the directory, skip it (not a Python package — just a data dir).
+
+### What to compute from entry point content
+
+Compute all `ModuleCandidate` fields from the entry point file's content exactly as for flat files:
+- `line_count` — line count of the entry point file only (not entire package)
+- `title` — from `st.title()` in the entry point, or derived from directory name
+- `page_number` — from numeric prefix in directory name (e.g., `6_Tax_Centre` → 6)
+- `category`, `confidence` — from `categorize(dirName, content)`
+- `complexity` — from `complexity(lineCount, importCount, tabCount)`
+- `external_apis` — from `detectExternalApis(content)`
+- `dependencies` — from `detectDependencies(content)`
+- `tab_count`, `import_count` — as usual
+
+### Sort order
+
+Packages sort alongside flat files using `page_number`. Packages with no numeric prefix in directory name sort to the end (page_number = null → 999).
 
 ---
 
 ## Files Expected to Change
 
-| File | Change |
-|------|--------|
-| `lib/scanners/streamlit-module-scanner.ts` | Add subdir recursion in `scanStreamlitModules` |
-| `tests/streamlit-scanner.test.ts` | Add test: subdir package registered with correct `line_count` |
-
-No schema changes. No migrations. No new dependencies.
+- `lib/scanners/streamlit-module-scanner.ts` — primary fix (lines 76–124)
+- `tests/streamlit-scanner.test.ts` — add test cases for subdir detection
 
 ---
 
 ## Check-Before-Build Findings
 
-**Existing pattern:** `walkDir` in `scripts/embed-streamlit-source.ts` (lines 211–226) already recurses into subdirectories, skipping `EXCLUDE_DIRS` and collecting `.py` files. The fix adapts this exact pattern.
-
-**Current behavior (line 97, `streamlit-module-scanner.ts`):**
-```typescript
-if (statSync(fullPath).isDirectory()) continue  // BUG: silently drops packages
-```
-
-**Target behavior:** when a directory is found in `pages/`, collect all `.py` files within it recursively, sum their line counts, and register ONE `ModuleCandidate` representing the package.
-
-**Builder should adapt this exact walkDir shape** (already exported from `scripts/embed-streamlit-source.ts` — do NOT import from the scripts dir into lib/scanners; inline a local helper or copy the relevant 10-line function body):
-
-```typescript
-function walkPyFiles(dir: string, results: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const fullPath = join(dir, entry)
-    const stat = statSync(fullPath)
-    if (stat.isDirectory()) {
-      walkPyFiles(fullPath, results)  // recurse — no exclusions needed here
-    } else if (entry.endsWith('.py')) {
-      results.push(fullPath)
-    }
-  }
-  return results
-}
-```
-
-**ModuleCandidate shape for a package directory** (e.g., `pages/tax_centre/`):
-- `filename`: use directory name as-is (e.g., `"tax_centre"`) — no `.py` suffix
-- `page_number`: null (directory has no page number prefix)  
-  _Exception: if dirname starts with `\d+_`, extract page number the same way as files_
-- `title`: `extractTitle` from combined content of all `.py` files in the dir (first match wins), with fallback to dir name → human title
-- `line_count`: sum of `content.split('\n').length` across all `.py` files
-- `import_count`, `tab_count`, `external_apis`, `dependencies`, `category`, `confidence`, `complexity`: derived from concatenated content of all `.py` files (same functions, same rules)
-
-**No change needed to `generateTaskSpec` or `scan-streamlit-and-queue.ts`** — `ModuleCandidate` shape is unchanged.
+- `walkDir` in `scripts/embed-streamlit-source.ts:211` — exact pattern to adapt. It uses `readdirSync` + `statSync().isDirectory()` + recursion. The scanner should do one-level-only subdir detection (not recursive), since Streamlit packages in `pages/` are never nested more than one level.
+- No existing subdir detection in `lib/scanners/streamlit-module-scanner.ts` — clean addition.
+- Tests in `tests/streamlit-scanner.test.ts` use `makeTempPages` helper that writes to `tmpdir()`. Extend it (or write a parallel `makeTempPagesWithSubdir` helper) to support creating subdirectories for the new test cases.
 
 ---
 
-## External Deps Tested
+## Test Plan
 
-None. This is a pure filesystem operation with no external API calls.
+New tests to add to `tests/streamlit-scanner.test.ts`:
+
+1. **Package dir with `__init__.py`** — `pages/tax_centre/__init__.py` present → `ModuleCandidate` returned with `filename='tax_centre'`, `line_count` matching content length, `page_number=null`
+2. **Package dir with numbered prefix** — `pages/6_Tax_Centre/__init__.py` → `filename='6_Tax_Centre'`, `page_number=6`
+3. **Package dir with no `__init__.py`, has matching `.py`** — `pages/foo_module/foo_module.py` → found
+4. **Package dir with no `.py` files at all** — skipped, not included in candidates
+5. **Mixed flat + subdir** — `pages/` has both flat `.py` files AND subdirs → all returned, sorted by page_number
+6. **Subdir starting with `_`** — skipped (e.g., `pages/_internal/`)
 
 ---
 
 ## Grounding Checkpoint
 
-1. `npx tsx scripts/scan-streamlit-and-queue.ts` against the real Streamlit baseline (at `../streamlit_app/`) produces a queue entry with `line_count` ≥ 1000 for the `tax_centre` package (or any other subdir package present in `pages/`).
-2. The existing flat-file entry `6_Tax_Centre.py` (148 lines) still appears as a separate `ModuleCandidate` — the fix adds subdirs, not replaces existing flat files.
-3. `npm test` — all tests pass including the new subdir test.
+Run the scanner against the actual Streamlit OS `pages/` directory:
+
+```bash
+node -e "
+const { scanStreamlitModules } = require('./lib/scanners/streamlit-module-scanner');
+const candidates = scanStreamlitModules('../streamlit_app');
+const taxCentre = candidates.find(c => c.filename.toLowerCase().includes('tax'));
+console.log('Tax Centre found:', taxCentre ? 'yes' : 'no');
+if (taxCentre) console.log(JSON.stringify(taxCentre, null, 2));
+console.log('Total candidates:', candidates.length);
+"
+```
+
+**Expected:** `tax_centre` (or `6_Tax_Centre`) appears in results with `line_count > 1000` (actual is ~7,995). If the scanner still reports 148 lines or null, the fix didn't work.
+
+Colin verifies this output. "Tests pass" is not sufficient grounding — the actual Streamlit source must be reachable.
 
 ---
 
 ## Kill Signals
 
-- If the Streamlit `pages/` directory has no subdirectory packages (all modules are flat `.py` files), this fix has no observable effect and is a no-op — still correct to ship but grounding checkpoint would need a synthetic fixture or local verification.
-- If combining all `.py` files in a package directory produces incorrect API/dep detection (e.g., a test file inside the package skews detection), that's a quality issue but not a kill signal — the line_count fix is the critical repair.
-
----
-
-## Open Questions (Colin decides)
-
-**Q1 — Scope expansion: dead reference detection (Part B)**
-
-The task metadata proposes also adding dead-reference detection to the scanner:
-> "scanner should detect dead references (show_load_time, dev_section, get_sheet with no matching import) and embed them in spec.gotchas"
-
-Claimed impact: 34 dead references across 32 pages, all BLOCKER severity for LepiOS ports. ~30 line addition.
-
-**What this would require:**
-- A heuristic to detect function calls where the called name is not imported in the file (e.g., regex: call matches `\b{name}\(` but no `import {name}` or `from X import ... {name}`)
-- A new `gotchas?: string[]` field on `TaskSpec` in `spec-generator.ts`
-- Test coverage for the detection heuristic
-- The referenced audit doc (`docs/follow-ups/2026-04-28-streamlit-dead-reference-audit.md`) does not exist — the 34-reference claim is ungrounded
-
-**Coordinator recommendation:** Defer Part B. The dead-reference audit doc should be written first (grounded claim), and the detection heuristic needs design review to avoid false positives. The subdir fix (Part A) is independently useful and unblocked.
-
-**Q2 — Package ModuleCandidate filename convention**
-
-Options for `filename` field of a subdir package:
-- (a) `"tax_centre"` — bare directory name (no `.py` suffix, no trailing slash)
-- (b) `"tax_centre/"` — trailing slash makes it visually clear it's a directory
-- (c) `"tax_centre/__init__.py"` — only if `__init__.py` exists (falls back to (a) if absent)
-
-Coordinator default: option (a). Makes downstream consumers (`generateTaskSpec`, `describeModule`) work with no changes. Colin can override.
+- If `pages/tax_centre/` turns out to be the only package-style directory and has fewer than 500 lines, the complexity signal impact is minor — defer the fix and close as low-priority. (Unlikely given the 7,995 line count reported in metadata.)
+- If detecting subdirs causes the scanner to emit false positives (non-module directories like `pages/assets/` or `pages/data/`) and filtering them is complex, escalate before over-engineering.
 
 ---
 
 ## Cached-Principle Decisions
 
-None — escalating to Colin for approval per standard flow. See META-C block below.
+None — this is a bug fix with no architectural decisions. Colin explicitly approved via `approval_status: approved` in task_queue metadata on 2026-05-09.
 
 ---
 
-## META-C Block
+## Open Questions
 
-```
-2026-05-08T00:00:00Z sprint=5 chunk=subdir-detection doc=docs/sprint-5/subdir-detection-acceptance.md
-cited_principles: [Beef-Up (§8.4 Check-Before-Build), Reversibility, F20-no-inline-style (not applicable — no UI), F21 acceptance-first]
-trigger_match_evidence: |
-  §8.4 Check-Before-Build: "verify it doesn't exist in the Streamlit OS baseline or this repo.
-  Default action: Beef-Up." — walkDir in embed-streamlit-source.ts is the existing pattern to adapt.
-  Situation: scanner needs subdir recursion; walkDir already solves exactly this. Adaptation, not invention.
-  Reversibility: "ALTER TYPE ADD VALUE is reversible-free... Hardcoded strings: reversible-with-grep."
-  Situation: no schema changes; file-only changes; revert is `git revert`. Fully reversible.
-reversibility_check: |
-  lib/scanners/streamlit-module-scanner.ts: add subdir branch — reversible (git revert, no dep cascade).
-  tests/streamlit-scanner.test.ts: add test — reversible (delete test, tests still pass).
-  docs/sprint-5/subdir-detection-acceptance.md: this file — reversible (delete).
-  No schema migrations. No external API calls. No env var changes.
-  All decisions: LOW cost to reverse.
-confidence: high
-```
-
-META-C result: **conditions met for high-confidence match on Part A**. However, coordinator does not self-approve. Sending to Colin for ratification because:
-1. This is the standard flow (every acceptance doc goes to Colin)
-2. Q1 (scope expansion) and Q2 (filename convention) require Colin's answer before builder can proceed cleanly
+None. Colin answered both open questions on 2026-05-09:
+- Q1 (`defer`) — dead-reference detection deferred
+- Q2 (`option_a`) — filename = raw directory name, no trailing slash, no extension
