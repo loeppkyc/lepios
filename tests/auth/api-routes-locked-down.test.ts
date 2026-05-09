@@ -21,6 +21,10 @@ const APP_API = join(process.cwd(), 'app', 'api')
 // Routes that are intentionally unauthenticated. Every entry needs a reason.
 const EXEMPT_ROUTES: ReadonlyArray<{ path: string; reason: string }> = [
   { path: 'health/route.ts', reason: 'Public liveness endpoint for monitoring' },
+  {
+    path: 'health/lease/route.ts',
+    reason: "Public dead-man's-switch — UptimeRobot pings unauthenticated",
+  },
 ]
 
 // Strong gates — single regex match is sufficient. Domain-specific wrappers
