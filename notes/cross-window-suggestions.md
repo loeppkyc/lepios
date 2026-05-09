@@ -75,3 +75,27 @@ Hard rule: do **not** make the change in the current session. Note it and move o
   6. Sandbox-gated repair surfaces — pick first eligible (e.g. cron-handler retry-loop tightening) and wire `attemptSandboxRepair()` to draft + sandbox + PR pipeline.
 
 ---
+
+## 2026-05-09 — Should /coordinator and /autonomous merge into one page?
+
+- Spotted by: `fix/coordinator-harness-state`
+- Files involved: `app/(dashboard)/coordinator/page.tsx`, `app/(dashboard)/autonomous/page.tsx`
+- Why noted: Colin asked about unifying these. /autonomous already has a "Coordinator" tile that duplicates /coordinator's loop-state display, so there is real overlap.
+
+**What each page does:**
+
+- `/coordinator` — task management view: queue depth, loop state, live queue list, recent completions. Answers "what is the harness doing right now?"
+- `/autonomous` — ops/analytics view: 30-day success rate, safety flag trends, error type bars, knowledge health, Ollama status, coordinator tile. Answers "how healthy is the system?"
+
+**Recommendation: don't merge, but do these two smaller things instead:**
+
+1. **Remove the Coordinator tile from /autonomous** — it now lives at full fidelity on /coordinator with the 4-state display and `stateChangedSub`. The mini-tile on /autonomous is redundant; a text link "→ Coordinator queue" is enough context.
+
+2. **Add cross-links** — `/coordinator` header links to `/autonomous`; `/autonomous` scorecard links to `/coordinator`. Costs 2 lines each.
+
+**Why not merge:**
+ the pages have different primary use cases. /coordinator is a live task console (you look at it when the harness fires or stalls). /autonomous is a trend dashboard (you look at it to evaluate scoring health over time). Merged into one page, the long chart section buries the live queue that's the reason you opened /coordinator in the first place. A tabbed layout could work but adds client-side state to two server components — not worth it.
+
+- Suggested action: PR to (a) remove Coordinator tile from /autonomous, replace with a `→ View queue` link, and (b) add `← Autonomous health` link in /coordinator header. ~10 lines total, no migration.
+
+---

@@ -155,7 +155,13 @@
       "filename": "0168_pg_cron_liveness_driver.sql",
       "claimed_at": "2026-05-09",
       "note": "F-N29 mitigation — pg_cron + pg_net liveness driver. Replaces daily-only Vercel Hobby crons with 3 DB-side jobs: heartbeat every 1 min, task-pickup every 5 min, notifications-drain every 5 min (offset 2 min). CRON_SECRET read at call-time from harness_config. Applied to prod via Supabase MCP."
+    },
+    "0169": {
+      "branch": "feat/receipts-port",
+      "filename": "0169_receipts_v2.sql",
+      "claimed_at": "2026-05-09",
+      "note": "Receipts port v2 — add ocr_source and vendor_key columns to receipts table. Additive migration, reversible."
     }
   },
-  "next_available": 169
+  "next_available": 170
 }

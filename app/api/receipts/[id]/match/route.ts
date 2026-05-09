@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth/require-user'
 
 // ── PATCH /api/receipts/[id]/match ────────────────────────────────────────────
 // Body: { expenseId: string } — links receipt to an expense and marks hubdoc=true
@@ -10,7 +10,11 @@ interface MatchBody {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireUser()
+  if (!gate.ok) return gate.response
+
   const { id } = await params
+  const { supabase } = gate
 
   let body: MatchBody
   try {
@@ -18,12 +22,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
   }
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { expenseId } = body
   const unlinking = expenseId === null || expenseId === undefined

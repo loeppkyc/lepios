@@ -4,7 +4,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
-import { getCoordinatorQueueStats } from '@/lib/metrics/rollups'
+import { getCoordinatorQueueStats, type HarnessState } from '@/lib/metrics/rollups'
 
 export const dynamic = 'force-dynamic'
 
@@ -195,6 +195,22 @@ function TaskList({ tasks }: { tasks: TaskRow[] }) {
   )
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function harnessStateAccent(state: HarnessState): string | undefined {
+  switch (state) {
+    case 'RUNNING':
+      return 'var(--color-positive)'
+    case 'STALLED':
+      return 'var(--color-warning)'
+    case 'HALTED':
+      return 'var(--color-critical)'
+    case 'IDLE':
+    default:
+      return undefined
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function CoordinatorPage() {
@@ -210,6 +226,15 @@ export default async function CoordinatorPage() {
   ])
 
   const recent = (recentRaw ?? []) as TaskRow[]
+
+  const stateChangedSub = (() => {
+    if (!stats.stateChangedAt) return `${stats.running} running · ${stats.queued} queued`
+    const ms = Date.now() - new Date(stats.stateChangedAt).getTime()
+    const m = Math.floor(ms / 60_000)
+    const since = m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`
+    return `since ${since} · ${stats.running} running · ${stats.queued} queued`
+  })()
+
   const live = recent.filter(
     (t) => t.status === 'queued' || t.status === 'claimed' || t.status === 'running'
   )
@@ -307,8 +332,9 @@ export default async function CoordinatorPage() {
         />
         <Tile
           label="Loop state"
-          value={stats.halted ? 'HALTED' : 'ACTIVE'}
-          accent={stats.halted ? 'var(--color-critical)' : 'var(--color-positive)'}
+          value={stats.state}
+          sub={stateChangedSub}
+          accent={harnessStateAccent(stats.state)}
         />
       </div>
 

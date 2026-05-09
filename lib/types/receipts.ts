@@ -7,6 +7,7 @@ export interface Receipt {
   upload_date: string // 'YYYY-MM-DD'
   receipt_date: string | null // 'YYYY-MM-DD'
   vendor: string
+  vendor_key: string
   pretax: number | null
   tax_amount: number
   total: number | null
@@ -15,6 +16,7 @@ export interface Receipt {
   match_status: MatchStatus
   matched_expense_id: string | null
   notes: string
+  ocr_source: 'manual' | 'claude_vision' | 'email_import'
   created_at: string
   updated_at: string
 }
