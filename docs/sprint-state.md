@@ -284,3 +284,35 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+# husky-precommit-key-fix (sprint-5 tooling, requeued 2026-04-24)
+# ============================================================
+
+husky_precommit_key_fix:
+chunk_id: "husky-precommit-key-fix"
+task_id: "efa60e5c-9a71-4dd9-9ce5-ce903068a439"
+sprint_id: "sprint-5"
+category: "tooling"
+severity: "high"
+status: "awaiting-colin-approval"
+acceptance_doc: "docs/sprint-5/husky-precommit-key-fix-acceptance.md"
+branch: "harness/task-efa60e5c-9a71-4dd9-9ce5-ce903068a439"
+opened_at: "2026-05-09T14:00:00Z"
+last_updated_at: "2026-05-09T14:10:00Z"
+description: >
+  Fix Layer 2 AI Reviewer never running: source ANTHROPIC_API_KEY (and Supabase creds)
+  from .env.local into .husky/pre-commit before the ai-review.mjs invocation.
+  Also: logSoftSkip() writes to agent_events for F17 signal.
+root_cause: >
+  pre-commit hook does not source .env.local → ANTHROPIC_API_KEY never in shell env →
+  Layer 2 has 100% bypass rate (138/138 commits). Soft-skip added 2026-05-05 prevents
+  hard block, but review still never runs.
+seam_change: true
+seam_file: ".husky/pre-commit"
+seam_requires: "[seam-approved] in commit message from Colin"
+open_questions:
+  - "Colin: ok to have builder commit the seam file change?"
+  - "Colin: use SUPABASE_SERVICE_ROLE_KEY in logSoftSkip for agent_events write (RLS requires admin)?"
+prior_dismissal: "synthetic verification run (2026-04-24) — synthetic agent_events rows, not real"
+requeued_by: "colin-instruction-2026-04-24"

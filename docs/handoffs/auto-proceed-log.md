@@ -217,3 +217,33 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-09T14:10:00Z sprint=5 chunk=husky-precommit-key-fix doc=docs/sprint-5/husky-precommit-key-fix-acceptance.md
+cited_principles: [seam-file-policy, F17, F18, META-C]
+trigger_match_evidence: |
+  cache_match_enabled = true for sprint-5 (as of 2026-05-01 override in sprint-state.md).
+  However, cache-match does not apply:
+  1. .husky/pre-commit is a SEAM file. Every seam-file edit requires [seam-approved] in commit
+     message and Colin's explicit per-edit authorization. No principle allows coordinator to
+     self-approve seam file changes. This is a hard escalation regardless of cache-match state.
+  2. Two open questions are personal decisions (seam approval delegation, credential approach).
+  3. Twin endpoint unreachable — all Phase 1b questions went unresolved to pending_colin_qs.
+  META-C not attempted — condition (b) "nothing in this session contradicts the cached decision"
+  is unsatisfiable when the decision itself is a personal one Colin hasn't delegated.
+reversibility_check: |
+  Acceptance doc docs/sprint-5/husky-precommit-key-fix-acceptance.md: new file, fully reversible.
+  docs/sprint-state.md update: document only, reversible via git.
+  Proposed .husky/pre-commit change: additive (sourcing block before Layer 2). Reversible by
+    removing the block. No behaviour change when .env.local absent.
+  Proposed scripts/ai-review.mjs change: logSoftSkip() gains optional Supabase write path.
+    Reversible by removing the DB write block. No change to happy path (review runs normally).
+  No schema migration, no new DB tables, no code changes in this coordinator run.
+  All coordinator outputs: LOW cost to reverse.
+confidence: high (escalation is correct and unambiguous — seam file requires Colin approval)
+outcome: escalated
+escalation_reasons:
+  - seam_file_change_requires_colin_seam_approved
+  - two_open_personal_decisions_unresolved
+  - twin_unreachable_questions_unresolved
