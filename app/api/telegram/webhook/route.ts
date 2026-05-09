@@ -1147,6 +1147,51 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
+    // Single-letter option reply (a/b/c/…) for awaiting_grounding multi-option escalations.
+    // Coordinator sends "Decision needed: (a) … (b) …" and Colin replies with the letter.
+    // Match any single [a-z] reply and apply it to the most-recent awaiting_grounding task.
+    if (message?.text) {
+      const optionLetter = message.text.toLowerCase().trim()
+      if (/^[a-z]$/.test(optionLetter)) {
+        try {
+          const { data: groundingTask } = await db
+            .from('task_queue')
+            .select('id, metadata')
+            .eq('status', 'awaiting_grounding')
+            .order('last_heartbeat_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (groundingTask) {
+            const taskId = (groundingTask as { id: string }).id
+            const existingMeta =
+              ((groundingTask as { metadata?: unknown }).metadata as Record<string, unknown>) ?? {}
+            await db
+              .from('task_queue')
+              .update({
+                status: 'queued',
+                priority: 1,
+                metadata: {
+                  ...existingMeta,
+                  chosen_option: optionLetter,
+                  option_chosen_via: 'telegram_text',
+                  option_chosen_at: new Date().toISOString(),
+                  option_chosen_by: fromUser ? String(fromUser.id) : null,
+                },
+              })
+              .eq('id', taskId)
+            void triggerPickup()
+            await postMessage(
+              `Option "${optionLetter}" recorded for task ${taskId.slice(0, 8)} — pickup triggered.`
+            ).catch(() => {})
+            return NextResponse.json({ ok: true })
+          }
+        } catch {
+          // DB error — fall through to no-match log
+        }
+      }
+    }
+
     // Plain message with no correlation match
     try {
       await db.from('agent_events').insert({
