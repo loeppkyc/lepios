@@ -27,6 +27,7 @@ import {
   handleHaltCommand,
   handleResumeCommand,
 } from '@/lib/harness/coordinator-commands'
+import { postMessage } from '@/lib/orchestrator/telegram'
 
 export const dynamic = 'force-dynamic'
 
@@ -806,6 +807,18 @@ async function handleImproveReview(chunkId: string, chatId: number): Promise<voi
   }
 }
 
+// Calls task-pickup cron so approved tasks are picked up immediately.
+async function triggerPickup(): Promise<void> {
+  // eslint-disable-next-line no-restricted-syntax -- forwarding CRON_SECRET as bearer to internal route (same pattern as complete/route.ts)
+  const secret = process.env.CRON_SECRET
+  if (!secret) return
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lepios-one.vercel.app'
+  await fetch(`${base}/api/cron/task-pickup`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secret}` },
+  }).catch(() => {})
+}
+
 // ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -909,6 +922,77 @@ export async function POST(request: Request): Promise<NextResponse> {
         status: 'response_received',
       })
       .eq('id', matchedId)
+
+    // If this is a coordinator task-approval button, transition the task_queue status inline.
+    // The coordinator exits after sending the Telegram message, so there is no polling process
+    // waiting for outbound_notifications — the webhook must act on it directly.
+    if (isCallback && callbackQuery?.data) {
+      try {
+        const cbParsed = JSON.parse(callbackQuery.data) as {
+          correlation_id?: unknown
+          action?: unknown
+        }
+        const correlationId =
+          typeof cbParsed.correlation_id === 'string' ? cbParsed.correlation_id : null
+        const cbAction = typeof cbParsed.action === 'string' ? cbParsed.action : null
+
+        if (correlationId && (cbAction === 'approve' || cbAction === 'reject')) {
+          const { data: pendingTask } = await db
+            .from('task_queue')
+            .select('id, metadata')
+            .ilike('id', `${correlationId}%`)
+            .in('status', ['awaiting_grounding', 'acceptance_doc_ready'])
+            .maybeSingle()
+
+          if (pendingTask) {
+            const taskId = (pendingTask as { id: string }).id
+            const existingMeta =
+              ((pendingTask as { metadata?: unknown }).metadata as Record<string, unknown>) ?? {}
+
+            if (cbAction === 'approve') {
+              await db
+                .from('task_queue')
+                .update({
+                  status: 'approved',
+                  metadata: {
+                    ...existingMeta,
+                    approved_via: 'telegram_button',
+                    approved_at: new Date().toISOString(),
+                    approved_by: fromUser ? String(fromUser.id) : null,
+                  },
+                })
+                .eq('id', taskId)
+              void triggerPickup()
+            } else {
+              await db
+                .from('task_queue')
+                .update({
+                  status: 'cancelled',
+                  metadata: { ...existingMeta, cancelled_via: 'telegram_button' },
+                })
+                .eq('id', taskId)
+            }
+
+            // Remove buttons from the Telegram message so it's clear it was acted on
+            const token = process.env.TELEGRAM_BOT_TOKEN
+            if (token) {
+              await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: callbackQuery.message.chat.id,
+                  message_id: callbackQuery.message.message_id,
+                  reply_markup: { inline_keyboard: [] },
+                }),
+              }).catch(() => {})
+            }
+          }
+        }
+      } catch {
+        // JSON parse error or DB error — non-fatal, outbound_notifications already updated
+      }
+    }
+
     return NextResponse.json({ ok: true })
   }
 
@@ -1002,6 +1086,64 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
       } catch {
         // DB error — fall through to no-match log
+      }
+    }
+
+    // Check for coordinator escalation text reply: "approve" / "reject" for awaiting_grounding or
+    // acceptance_doc_ready tasks. These statuses have no persistent polling process; the webhook
+    // is the only receiver.
+    if (message?.text) {
+      const lc = message.text.toLowerCase().trim()
+      const isApprove = lc === 'approve' || lc === 'approved' || lc.startsWith('approve ')
+      const isReject = lc === 'reject' || lc === 'rejected' || lc.startsWith('reject ')
+      if (isApprove || isReject) {
+        try {
+          const { data: escalatedTask } = await db
+            .from('task_queue')
+            .select('id, metadata')
+            .in('status', ['awaiting_grounding', 'acceptance_doc_ready'])
+            .order('last_heartbeat_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (escalatedTask) {
+            const taskId = (escalatedTask as { id: string }).id
+            const existingMeta =
+              ((escalatedTask as { metadata?: unknown }).metadata as Record<string, unknown>) ?? {}
+
+            if (isApprove) {
+              await db
+                .from('task_queue')
+                .update({
+                  status: 'approved',
+                  metadata: {
+                    ...existingMeta,
+                    approved_via: 'telegram_text',
+                    approved_at: new Date().toISOString(),
+                    approved_by: fromUser ? String(fromUser.id) : null,
+                    approval_text: message.text.slice(0, 200),
+                  },
+                })
+                .eq('id', taskId)
+              void triggerPickup()
+              await postMessage(`Approved task ${taskId.slice(0, 8)} — pickup triggered.`).catch(
+                () => {}
+              )
+            } else {
+              await db
+                .from('task_queue')
+                .update({
+                  status: 'cancelled',
+                  metadata: { ...existingMeta, cancelled_via: 'telegram_text' },
+                })
+                .eq('id', taskId)
+              await postMessage(`Cancelled task ${taskId.slice(0, 8)}.`).catch(() => {})
+            }
+            return NextResponse.json({ ok: true })
+          }
+        } catch {
+          // DB error — fall through to no-match log
+        }
       }
     }
 
