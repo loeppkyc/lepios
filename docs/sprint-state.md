@@ -284,3 +284,48 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+
+# F-N28 fixes (seeded 2026-05-09 by Colin)
+
+# ============================================================
+
+f_n28_fix_a:
+fix_label: "F-N28-fix-A"
+task_id: "165faf9c-80fc-403b-a138-92023530e5cd"
+kind: "harness_fix"
+status: "awaiting-colin-approval"
+description: "Coordinator drain redesign — remove drain calls, exit-on-notify pattern"
+acceptance_doc: "docs/sprint-5/f-n28-fix-a-acceptance.md"
+coordinator_task: "06874ae4-dd5b-4a00-82fa-964f3fdbae32"
+acceptance_doc_written_at: "2026-05-09T13:35:00Z"
+open_questions: 3
+files_likely_affected:
+  - ".claude/agents/coordinator.md"
+  - "app/api/harness/coordinator-resume/route.ts"
+  - "app/api/telegram-webhook/route.ts (or equivalent webhook handler)"
+
+f_n28_fix_b:
+fix_label: "F-N28-fix-B"
+task_id: "de3e9459-c1b5-407a-945b-dd73d9d92a67"
+kind: "cockpit_feature"
+status: "awaiting-colin-approval"
+description: "Pending approvals banner on /autonomous page"
+acceptance_doc: "docs/sprint-5/f-n28-fix-b-acceptance.md"
+coordinator_task: "06874ae4-dd5b-4a00-82fa-964f3fdbae32"
+acceptance_doc_written_at: "2026-05-09T13:38:00Z"
+open_questions: 3
+files_likely_affected:
+  - "app/api/harness/pending-approvals/route.ts"
+  - "app/(dashboard)/autonomous/_components/PendingApprovalsBanner.tsx"
+  - "app/(dashboard)/autonomous/page.tsx"
+
+pageprofit_scanner:
+task_id: "21360a0a-00ed-4600-9001-5fa4f7d4ba15"
+module_id: "pageprofit-scanner"
+status: "blocked"
+blocker: "Streamlit source (streamlit_app/pages/21_PageProfit.py) not accessible in coordinator cloud sandbox; Twin unreachable; Phase 1a cannot proceed"
+note: "Scanner data available in streamlit_modules table (3374 lines, tier 4, deps confirmed). Sprint-6 backlog has strategic overview (P2-1). Phase 1a requires access to actual source."
+resume_condition: "Run scanner-subdir-fix (builder task e6e1d374) first, or Colin provides PageProfit module summary from local Streamlit OS"
+last_updated_at: "2026-05-09T13:40:00Z"

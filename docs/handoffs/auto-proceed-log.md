@@ -9,6 +9,38 @@ last_reviewed_by_colin_at: 2026-05-01
 
 ---
 
+2026-05-09T13:30:00Z sprint=5 chunk=F-N28-fix-A doc=docs/sprint-5/f-n28-fix-a-acceptance.md
+cited_principles: [cache_match_enabled: true, escalated — material behavioral change to coordinator.md]
+trigger_match_evidence: |
+  F-N28-fix-A is a harness architectural change (remove drain calls from coordinator, new exit-on-notify
+  pattern). No existing principle directly authorizes removing drain calls — this changes how all
+  future coordinators send notifications. New terrain per escalation rule: "We've never done this before."
+  META-C not applicable. Escalating to Colin unconditionally.
+reversibility_check: |
+  coordinator.md change: fully reversible — revert the file.
+  coordinator-resume route: new file, reversible — delete it.
+  task_queue metadata keys (pending_notification_id, pending_notification_response): additive JSONB keys, reversible.
+confidence: low — cannot cache-match new coordinator lifecycle pattern
+outcome: escalated
+
+---
+
+2026-05-09T13:35:00Z sprint=5 chunk=F-N28-fix-B doc=docs/sprint-5/f-n28-fix-b-acceptance.md
+cited_principles: [cache_match_enabled: true, escalated — new cockpit UI component + harness API]
+trigger_match_evidence: |
+  F-N28-fix-B adds PendingApprovalsBanner to /autonomous page. New cockpit component + new API route.
+  Pattern-matches F20 (design system enforcement) and F18 (measurement) generally, but the specific
+  decision (banner placement, threshold, auth model) requires Colin judgment. New UI component
+  on an existing page requires Colin approval per phase 0 policy.
+reversibility_check: |
+  pending-approvals route: new file, reversible — delete it.
+  PendingApprovalsBanner.tsx: new file, reversible — delete and remove import.
+  autonomous/page.tsx edit: reversible — remove import + JSX element.
+confidence: medium — pattern-match on cockpit UI additions, but placement + auth open questions
+outcome: escalated
+
+---
+
 2026-04-27T00:00:00Z sprint=5 chunk=H3 doc=docs/sprint-5/h3-pickup-ordering-acceptance.md
 cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
 trigger_match_evidence: |
