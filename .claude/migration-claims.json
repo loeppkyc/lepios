@@ -137,7 +137,13 @@
       "filename": "0165_fix_harness_config_grants.sql",
       "claimed_at": "2026-05-09",
       "note": "Fix missing GRANT INSERT/UPDATE/DELETE on harness_config for service_role. Root cause: 0029 comment conflated RLS bypass with GRANT bypass. All other tables with missing write grants were audited and confirmed intentionally AD7-restricted."
+    },
+    "0166": {
+      "branch": "harness/task-d4c6e2ae-2499-43ab-8129-84d4b5280be1",
+      "filename": "0166_decisions_log_f19_state.sql",
+      "claimed_at": "2026-05-09",
+      "note": "F19' Slice 1 — decisions_log metadata column + f19_loop source value"
     }
   },
-  "next_available": 166
+  "next_available": 167
 }

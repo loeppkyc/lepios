@@ -1,0 +1,42 @@
+{
+  "task_id": "d4c6e2ae-2499-43ab-8129-84d4b5280be1",
+  "chunk_id": "f19-prime-s1",
+  "status": "complete",
+  "branch": "harness/task-d4c6e2ae-2499-43ab-8129-84d4b5280be1",
+  "commit": "e12dbf59f53e366b2d589926e51fd4c8748ec99c",
+  "files_created": [
+    "supabase/migrations/0166_decisions_log_f19_state.sql",
+    "lib/harness/f19/optimizer.ts",
+    "lib/harness/f19/verifier.ts",
+    "tests/harness/f19/optimizer.test.ts",
+    "tests/harness/f19/verifier.test.ts",
+    "tests/harness/f19/persistence.test.ts"
+  ],
+  "files_modified": [".claude/migration-claims.json"],
+  "migration": "0166",
+  "tests": {
+    "passing": 3452,
+    "failing": 22,
+    "new": 16,
+    "pre_existing_failing": 22
+  },
+  "acceptance_tests": {
+    "AT1": "pass",
+    "AT2": "pass",
+    "AT3": "pass",
+    "AT4": "pass",
+    "AT5a": "pass",
+    "AT5b": "pass",
+    "AT5c": "pass",
+    "AT6": "pass"
+  },
+  "grounding_checkpoint_required": "SELECT id, source, chosen_path, metadata->>'f19_status' AS f19_status FROM decisions_log WHERE source = 'f19_loop' LIMIT 5",
+  "unknowns": [
+    "22 pre-existing test failures in tests/scripts/, tests/architecture/, tests/multi-window/, tests/orchestrator/, tests/sandbox/ — none caused by this chunk"
+  ],
+  "next_chunk_blockers": [
+    "Migration 0166 not yet applied to production — Colin applies after PR merged to main"
+  ],
+  "tokens_used": 28000,
+  "timestamp": "2026-05-09T11:43:00Z"
+}
