@@ -217,3 +217,68 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-09T12:40:00Z sprint=4 chunk=D-v2 doc=docs/sprint-4/chunk-d-v2-acceptance.md
+cited_principles: [Q1-Q5-colin-resolutions-2026-04-24, META-C, F20, F17, F18]
+trigger_match_evidence: |
+  cache_match_enabled = true per sprint-state.md (cache_match_reason: "Twin endpoint verified
+  live 2026-05-01"). Phase 0 check: last_reviewed_by_colin_at = 2026-05-01 is AFTER
+  prior sprint close (harness-e2e closed 2026-04-22). Cache-match eligible.
+
+  Attempting META-C:
+
+  Decision 1 (arrival_month−1 = covered_month):
+    Principle trigger: Colin's Q1 resolution 2026-04-24: "Gmail scanner detects
+    statement-arrival emails per account (e.g. Bonvoy statement arrives ~Apr 20 = March
+    statement complete). Grid computes coverage from statement-arrival events."
+    Situation in doc: coverage rule is arrival_month−1 = covered_month, consistent with
+    the stated example (April arrival = March covered). ✓ exact match.
+
+  Decision 2 (Capital One excluded):
+    Principle trigger: Colin's Q3 resolution 2026-04-24: "Capital One (personal: True)
+    filtered out of Business Review grid entirely."
+    Situation in doc: BUSINESS_ACCOUNTS has 7 entries, capital_one absent. ✓ exact match.
+
+  Decision 3 (2025 Tax Year band kept):
+    Principle trigger: Colin's Q4 resolution 2026-04-24: "KEEP. Colin will be adding 2025
+    statements + QuickBooks + tax return data."
+    Situation in doc: band '2025 · Tax Year' with Jan–Dec 2025. ✓ exact match.
+
+  Decision 4 (current month = pending):
+    Principle trigger: Colin's Q2 resolution 2026-04-24: "Current month shows '—' until
+    statement-arrival email lands for that month."
+    Situation in doc: cellStatus(currentMonth, ...) returns 'pending' = shows '–'. ✓ exact match.
+
+  Decision 5 (RLS policy — pattern match, not explicit Colin approval):
+    Principle trigger: existing pattern on statement_coverage_overrides table
+    (policy: has_business_access() FOR ALL). gmail_statement_arrivals is read by the same
+    route authenticated by requireUser({ minRole: 'business' }).
+    Situation in doc: SELECT policy using has_business_access() added via migration.
+    This is a mechanical extrapolation, not a new business decision. Patterns consistent.
+
+  Nothing in session contradicts cached decisions. RLS finding (table exists, no policies)
+  is a technical discovery requiring an additive migration — consistent with Decision 5 above.
+
+reversibility_check: |
+  Route change (Dropbox → Gmail): reversible — revert route.ts via git.
+  New migration (SELECT policy on gmail_statement_arrivals): reversible — DROP POLICY single SQL.
+  statement-arrivals.ts update (STATEMENT_ACCOUNTS): reversible — revert via git.
+  Test file update: reversible — revert via git.
+  All decisions: LOW cost to reverse.
+  No DROP TABLE, no DELETE-no-WHERE, no destructive ops of any kind.
+  No writes to ledger, audit, tax, or financial tables.
+confidence: medium
+confidence_rationale: |
+  Decisions 1–4 are HIGH confidence (direct Colin resolutions, exact quote match).
+  Decision 5 (RLS policy) is MEDIUM confidence — it's a pattern-match inference, not an
+  explicit Colin approval. Additionally, removing Dropbox coverage (working in v1) is a
+  material regression until Gmail scanner is configured — Colin should review this trade-off.
+  Per META-C rules: confidence=medium → ESCALATE. Cannot cache-match.
+outcome: escalated
+escalation_reasons:
+- meta_c_confidence_medium (RLS decision is pattern-match inference, not explicit Colin approval)
+- material_regression (Dropbox-based view removed; grid shows all missing/pending until Gmail configured)
+- four_prerequisites_before_green_cells (Gmail env vars, classifier config, Gmail cron run, migration applied)
+- colin_review_warranted (significant data source change; Colin should confirm the trade-off)

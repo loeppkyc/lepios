@@ -39,9 +39,15 @@ audit_reminder: "Next sprint will run cache-match-disabled until Colin updates l
 # — see CLAUDE.md §1 and docs/feedback-loop-scoring.md.
 
 active_sprint: 4
-active_chunk: "D"
-active_chunk_acceptance_doc: "docs/sprint-4/chunk-d-acceptance.md"
-status: "awaiting-grounding"
+active_chunk: "D-v2"
+active_chunk_acceptance_doc: "docs/sprint-4/chunk-d-v2-acceptance.md"
+status: "awaiting-colin-approval"
+chunk_d_v2_acceptance_doc_written_at: "2026-05-09T12:40:00Z"
+chunk_d_v2_task_id: "b362b865-5cf7-4f81-ba24-4ded0b6d10b3"
+chunk_d_v2_blocker_cleared: "gmail-scanner task 14913742 completed 2026-04-25"
+chunk_d_v2_study_doc: "docs/sprint-4/chunk-d-v2-streamlit-study.md"
+chunk_d_v2_colin_resolutions: "recorded 2026-04-24, Q1-Q5 all answered"
+chunk_d_prior_build: "docs/sprint-4/chunk-d-handoff.json (Dropbox-based v1, superseded by v2)"
 chunk_d_build_complete_at: "2026-04-23T21:21:00Z"
 chunk_d_tests: "793 passing, 0 failing, 12 new"
 chunk_d_commits: ["7f8b1f8 (.env.example)", "dd4126e (implementation)", "d2b1176 (page wiring)"]
