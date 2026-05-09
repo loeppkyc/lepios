@@ -137,7 +137,13 @@
       "filename": "0165_fix_harness_config_grants.sql",
       "claimed_at": "2026-05-09",
       "note": "Fix missing GRANT INSERT/UPDATE/DELETE on harness_config for service_role. Root cause: 0029 comment conflated RLS bypass with GRANT bypass. All other tables with missing write grants were audited and confirmed intentionally AD7-restricted."
+    },
+    "0166": {
+      "branch": "feat/harness-heartbeat",
+      "filename": "0166_harness_heartbeat.sql",
+      "claimed_at": "2026-05-09",
+      "note": "Dead-man's-switch heartbeat — seeds LAST_HEARTBEAT_AT key in harness_config. Service_role GRANTs already in place from 0165. Companion: /api/health/lease endpoint + HeartbeatTile in CockpitSidebar."
     }
   },
-  "next_available": 166
+  "next_available": 167
 }

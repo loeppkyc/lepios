@@ -96,6 +96,25 @@ export async function runNightTick(): Promise<TickResult> {
     }
   }
 
+  // Heartbeat write — throws loud on failure (dead-man's-switch must be reliable).
+  // F-N21 lesson: use count:'exact' and guard 0-row updates.
+  {
+    const supabase = createServiceClient()
+    const now = new Date().toISOString()
+    const { error: hbError, count: hbCount } = await supabase
+      .from('harness_config')
+      .update({ value: now }, { count: 'exact' })
+      .eq('key', 'LAST_HEARTBEAT_AT')
+    if (hbError) {
+      throw new Error(`night_tick: heartbeat write failed — ${hbError.message}`)
+    }
+    if (hbCount !== 1) {
+      throw new Error(
+        `night_tick: heartbeat wrote ${hbCount ?? 0} rows — LAST_HEARTBEAT_AT missing from harness_config`
+      )
+    }
+  }
+
   // Write exactly one agent_events row — never throws to caller
   try {
     const supabase = createServiceClient()
