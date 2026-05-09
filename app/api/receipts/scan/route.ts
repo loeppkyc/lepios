@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { CATEGORIES } from '@/lib/types/expenses'
 import type { OcrResult } from '@/lib/types/receipts'
 import { requireUser } from '@/lib/auth/require-user'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 type AllowedType = (typeof ALLOWED_TYPES)[number]
@@ -59,6 +60,8 @@ export async function POST(request: Request) {
   }
 
   const base64 = Buffer.from(bytes).toString('base64')
+  const started = Date.now()
+  const actorId = gate.user.id
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -94,6 +97,13 @@ export async function POST(request: Request) {
     raw = block.type === 'text' ? block.text : ''
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
+    void logOcrEvent({
+      action: 'receipt.ocr.failed',
+      actorId,
+      durationMs: Date.now() - started,
+      errorMessage: msg,
+      meta: { error_class: 'api_error' },
+    })
     return NextResponse.json({ error: `OCR failed: ${msg}` }, { status: 502 })
   }
 
@@ -107,8 +117,57 @@ export async function POST(request: Request) {
   try {
     result = JSON.parse(cleaned) as OcrResult
   } catch {
+    void logOcrEvent({
+      action: 'receipt.ocr.failed',
+      actorId,
+      durationMs: Date.now() - started,
+      errorMessage: 'JSON parse failed',
+      meta: { error_class: 'parse_error', raw_excerpt: raw.slice(0, 200) },
+    })
     return NextResponse.json({ error: 'OCR returned unparseable response', raw }, { status: 502 })
   }
 
+  const ocrFields = [
+    result.vendor,
+    result.date,
+    result.pretax,
+    result.tax_amount,
+    result.total,
+    result.suggested_category,
+  ]
+  const confidence = ocrFields.filter((v) => v !== null).length / ocrFields.length
+  void logOcrEvent({
+    action: 'receipt.ocr.success',
+    actorId,
+    durationMs: Date.now() - started,
+    meta: { confidence, fields_found: ocrFields.filter((v) => v !== null).length },
+  })
+
   return NextResponse.json(result)
+}
+
+// ── Logging helper — never throws, never blocks the response ──────────────────
+
+async function logOcrEvent(opts: {
+  action: 'receipt.ocr.success' | 'receipt.ocr.failed'
+  actorId: string
+  durationMs: number
+  errorMessage?: string
+  meta: Record<string, unknown>
+}): Promise<void> {
+  try {
+    await createServiceClient()
+      .from('agent_events')
+      .insert({
+        domain: 'receipts',
+        action: opts.action,
+        actor: opts.actorId,
+        status: opts.action === 'receipt.ocr.success' ? 'success' : 'error',
+        duration_ms: opts.durationMs,
+        error_message: opts.errorMessage ?? null,
+        meta: opts.meta,
+      })
+  } catch {
+    // Logging must never break the caller
+  }
 }
