@@ -29,3 +29,20 @@ export const PalletIntakeSchema = z.object({
 })
 
 export type PalletIntakeInput = z.infer<typeof PalletIntakeSchema>
+
+export const PalletApRecordSchema = z.object({
+  pallet_id: z.string().uuid('pallet_id must be a valid UUID'),
+  invoice_month: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'invoice_month must be YYYY-MM-DD (first of month)'),
+  confirmed_cost_cad: z.number().positive('Confirmed cost must be positive'),
+  gst_amount_cad: z.number().min(0, 'GST must be >= 0'),
+  paid_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'paid_on must be YYYY-MM-DD')
+    .nullable()
+    .optional(),
+  notes: z.string().max(1000).nullable().optional(),
+})
+
+export type PalletApRecordInput = z.infer<typeof PalletApRecordSchema>

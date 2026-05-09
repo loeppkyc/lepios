@@ -1,10 +1,13 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import type {
   Pallet,
+  PalletApRecord,
+  PalletApRecordInsert,
   PalletInsert,
   PalletInvoice,
   PalletInvoiceInsert,
   PalletWithScanCount,
+  SettledPalletWithAp,
 } from './types'
 
 /** Returns pallet invoices ordered newest-first, capped at the given month window. */
@@ -99,4 +102,69 @@ export async function closePallet(id: string): Promise<void> {
     .eq('id', id)
     .eq('status', 'active')
   if (error) throw new Error(error.message)
+}
+
+// ── AP Records (sub-module 2) ─────────────────────────────────────────────
+
+/** Closed pallets that have no AP record yet — shown in the AP settlement section. */
+export async function listClosedPalletsAwaitingAp(): Promise<Pallet[]> {
+  const service = createServiceClient()
+  const { data, error } = await service
+    .from('pallets')
+    .select('id, source, intake_date, est_cost_cad, status, notes, created_at')
+    .eq('status', 'closed')
+    .order('intake_date', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  if (!data?.length) return []
+
+  const ids = data.map((p) => p.id as string)
+  const { data: existing, error: apError } = await service
+    .from('pallet_ap_records')
+    .select('pallet_id')
+    .in('pallet_id', ids)
+
+  if (apError) throw new Error(apError.message)
+
+  const settledSet = new Set((existing ?? []).map((r) => r.pallet_id as string))
+  return (data as Pallet[]).filter((p) => !settledSet.has(p.id))
+}
+
+/** Recently settled pallets with their AP record — for the settlement history table. */
+export async function listSettledPalletsWithAp(limit: number = 20): Promise<SettledPalletWithAp[]> {
+  const service = createServiceClient()
+  const { data, error } = await service
+    .from('pallet_ap_records')
+    .select(
+      'pallet_id, invoice_month, confirmed_cost_cad, gst_amount_cad, paid_on, pallets(id, source, intake_date, est_cost_cad, status, notes, created_at)'
+    )
+    .order('invoice_month', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+
+  return (
+    (data ?? []) as unknown as Array<{
+      pallet_id: string
+      invoice_month: string
+      confirmed_cost_cad: number
+      gst_amount_cad: number
+      paid_on: string | null
+      pallets: Pallet
+    }>
+  ).map((r) => ({
+    ...r.pallets,
+    confirmed_cost_cad: r.confirmed_cost_cad,
+    gst_amount_cad: r.gst_amount_cad,
+    invoice_month: r.invoice_month,
+    paid_on: r.paid_on,
+  }))
+}
+
+/** Insert an AP record. The DB trigger auto-settles the linked pallet. */
+export async function insertApRecord(insert: PalletApRecordInsert): Promise<PalletApRecord> {
+  const service = createServiceClient()
+  const { data, error } = await service.from('pallet_ap_records').insert(insert).select().single()
+  if (error) throw new Error(error.message)
+  return data as PalletApRecord
 }

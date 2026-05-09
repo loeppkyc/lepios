@@ -1,9 +1,13 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/service'
-import { PalletInvoiceInsertSchema, PalletIntakeSchema } from '@/lib/pallets/validation'
-import type { Pallet, PalletInvoice } from '@/lib/pallets/types'
-import { insertPallet, closePallet } from '@/lib/pallets/queries'
+import {
+  PalletInvoiceInsertSchema,
+  PalletIntakeSchema,
+  PalletApRecordSchema,
+} from '@/lib/pallets/validation'
+import type { Pallet, PalletApRecord, PalletInvoice } from '@/lib/pallets/types'
+import { insertPallet, closePallet, insertApRecord } from '@/lib/pallets/queries'
 
 export type SavePalletInvoiceResult =
   | { ok: true; invoice: PalletInvoice }
@@ -80,6 +84,44 @@ export async function savePallet(rawInput: unknown): Promise<SavePalletResult> {
   })
 
   return { ok: true, pallet }
+}
+
+export type SaveApRecordResult = { ok: true; record: PalletApRecord } | { ok: false; error: string }
+
+export async function saveApRecord(rawInput: unknown): Promise<SaveApRecordResult> {
+  const parsed = PalletApRecordSchema.safeParse(rawInput)
+  if (!parsed.success) {
+    const first = parsed.error.issues[0]
+    return { ok: false, error: `${first.path.join('.')}: ${first.message}` }
+  }
+
+  const { pallet_id, invoice_month, confirmed_cost_cad, gst_amount_cad, paid_on, notes } =
+    parsed.data
+
+  let record: PalletApRecord
+  try {
+    record = await insertApRecord({
+      pallet_id,
+      invoice_month,
+      confirmed_cost_cad,
+      gst_amount_cad,
+      paid_on: paid_on ?? null,
+      notes: notes ?? null,
+    })
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Database error' }
+  }
+
+  const service = createServiceClient()
+  await service.from('agent_events').insert({
+    domain: 'pageprofit',
+    action: 'pallet_ap_record_created',
+    actor: 'user',
+    status: 'success',
+    meta: { pallet_id, invoice_month, confirmed_cost_cad, gst_amount_cad },
+  })
+
+  return { ok: true, record }
 }
 
 export type ClosePalletResult = { ok: true } | { ok: false; error: string }

@@ -4,11 +4,14 @@ import {
   listPalletInvoices,
   sumPalletSpendLast12Months,
   listActivePalletsWithScanCount,
+  listClosedPalletsAwaitingAp,
+  listSettledPalletsWithAp,
 } from '@/lib/pallets/queries'
 import { PalletInvoiceForm } from './_components/PalletInvoiceForm'
 import { PalletInvoiceTable } from './_components/PalletInvoiceTable'
 import { PalletIntakeForm } from './_components/PalletIntakeForm'
 import { ActivePalletsList } from './_components/ActivePalletsList'
+import { PalletApSection } from './_components/PalletApSection'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,10 +22,12 @@ export default async function PalletsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [invoices, last12Total, activePallets] = await Promise.all([
+  const [invoices, last12Total, activePallets, closedPallets, settledPallets] = await Promise.all([
     listPalletInvoices(24),
     sumPalletSpendLast12Months(),
     listActivePalletsWithScanCount(),
+    listClosedPalletsAwaitingAp(),
+    listSettledPalletsWithAp(10),
   ])
 
   return (
@@ -69,6 +74,11 @@ export default async function PalletsPage() {
       {/* Active pallets list */}
       <div className="mt-4">
         <ActivePalletsList pallets={activePallets} />
+      </div>
+
+      {/* Sub-module 2: AP settlement (closed pallets + settled history) */}
+      <div className="mt-4">
+        <PalletApSection closedPallets={closedPallets} settledPallets={settledPallets} />
       </div>
 
       <hr className="border-border my-6" />
