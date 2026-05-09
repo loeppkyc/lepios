@@ -128,13 +128,20 @@ export function recordRepairAttempt(state: GuardState, checkKey: string): void {
   state.perCheck24hCounts.set(checkKey, (state.perCheck24hCounts.get(checkKey) ?? 0) + 1)
 }
 
-/** Set SELF_REPAIR_HALTED in harness_config. Used by /api/self-repair/halt. */
+/** Set HARNESS_HALTED in harness_config. Used by /api/self-repair/halt. */
 export async function setHalted(db: Db, halted: boolean): Promise<void> {
-  const { error } = await db
+  const { error, count } = await db
     .from('harness_config')
-    .update({ value: halted ? 'true' : 'false' })
-    .eq('key', 'SELF_REPAIR_HALTED')
+    .update({ value: halted ? 'true' : 'false' }, { count: 'exact' })
+    .eq('key', 'HARNESS_HALTED')
   if (error) {
     throw new Error(`night_watchman: setHalted failed — ${error.message}`)
+  }
+  // F-N21: a 0-row UPDATE silently no-ops. Throw so callers surface the gap
+  // rather than returning ok:true with no effect on the DB.
+  if (count !== 1) {
+    throw new Error(
+      `night_watchman: setHalted wrote ${count ?? 0} rows — HARNESS_HALTED key missing from harness_config`
+    )
   }
 }
