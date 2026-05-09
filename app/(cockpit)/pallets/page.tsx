@@ -1,8 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { listPalletInvoices, sumPalletSpendLast12Months } from '@/lib/pallets/queries'
+import {
+  listPalletInvoices,
+  sumPalletSpendLast12Months,
+  listActivePalletsWithScanCount,
+} from '@/lib/pallets/queries'
 import { PalletInvoiceForm } from './_components/PalletInvoiceForm'
 import { PalletInvoiceTable } from './_components/PalletInvoiceTable'
+import { PalletIntakeForm } from './_components/PalletIntakeForm'
+import { ActivePalletsList } from './_components/ActivePalletsList'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,9 +19,10 @@ export default async function PalletsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [invoices, last12Total] = await Promise.all([
+  const [invoices, last12Total, activePallets] = await Promise.all([
     listPalletInvoices(24),
     sumPalletSpendLast12Months(),
+    listActivePalletsWithScanCount(),
   ])
 
   return (
@@ -52,11 +59,21 @@ export default async function PalletsPage() {
             letterSpacing: '0.04em',
           }}
         >
-          Monthly pallet invoices · gross spend tracking
+          Pallet intake · active pallets · monthly invoices
         </p>
       </div>
 
-      {/* Invoice form */}
+      {/* Sub-module 1: pallet intake form */}
+      <PalletIntakeForm />
+
+      {/* Active pallets list */}
+      <div className="mt-4">
+        <ActivePalletsList pallets={activePallets} />
+      </div>
+
+      <hr className="border-border my-6" />
+
+      {/* Invoice form (legacy gross-spend tracker) */}
       <PalletInvoiceForm />
 
       {/* Invoices table + total tile */}
