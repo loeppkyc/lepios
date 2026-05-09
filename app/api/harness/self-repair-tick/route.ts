@@ -89,6 +89,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   // F22: cron secret auth
   const authError = requireCronSecret(request)
   if (authError) return authError
+  void upsertHeartbeat().catch(() => {})
 
   const db = createServiceClient()
   const started = new Date().toISOString()

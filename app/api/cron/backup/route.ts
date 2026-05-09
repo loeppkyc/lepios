@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,7 @@ const KNOWLEDGE_COLUMNS =
 export async function GET(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const db = createServiceClient()
   const today = new Date().toISOString().slice(0, 10)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,7 @@ export const maxDuration = 30
 export async function GET(request: Request) {
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const db = createServiceClient()
   const started = Date.now()

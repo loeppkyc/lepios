@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   // auth: see lib/auth/cron-secret.ts
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   const startTime = Date.now()
   const runId = crypto.randomUUID()

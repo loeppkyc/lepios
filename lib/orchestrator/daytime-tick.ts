@@ -6,6 +6,7 @@ import { checkSignalReview } from './checks/signal-review'
 import { fetchHistoricalContext, scoreDaytimeTick } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { CheckResult, DaytimeTickResult, TickStatus, QualityScore } from './types'
+import { upsertHeartbeat } from './heartbeat'
 
 const SIGNAL_REVIEW_TIMEOUT_MS = 100_000
 const DEFAULT_CHECK_TIMEOUT_MS = 15_000
@@ -103,6 +104,9 @@ export async function runDaytimeTick(): Promise<DaytimeTickResult> {
       scored_by: 'rule_based_v1_fallback',
     }
   }
+
+  // Heartbeat write — throws loud on failure (dead-man's-switch must be reliable).
+  await upsertHeartbeat()
 
   // Write exactly one agent_events row — never throws to caller
   try {

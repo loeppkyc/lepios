@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 import { runCalibration } from '@/lib/work-budget/calibrator'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   // auth: see lib/auth/cron-secret.ts
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
+  void upsertHeartbeat().catch(() => {})
 
   try {
     const result = await runCalibration()
