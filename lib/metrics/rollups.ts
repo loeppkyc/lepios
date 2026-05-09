@@ -10,6 +10,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { readHarnessState, type HarnessState } from '@/lib/harness/harness-state'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -318,9 +319,13 @@ export interface CoordinatorQueueStats {
   completedToday: number
   failedToday: number
   halted: boolean
+  state: HarnessState
+  stateChangedAt: string | null
 }
 
-/** Current coordinator queue depth + halt state for the cockpit page. */
+export { HarnessState }
+
+/** Current coordinator queue depth + 4-state harness model for the cockpit page. */
 export async function getCoordinatorQueueStats(): Promise<CoordinatorQueueStats> {
   const empty: CoordinatorQueueStats = {
     queued: 0,
@@ -328,6 +333,8 @@ export async function getCoordinatorQueueStats(): Promise<CoordinatorQueueStats>
     completedToday: 0,
     failedToday: 0,
     halted: false,
+    state: 'IDLE',
+    stateChangedAt: null,
   }
   try {
     const supabase = createServiceClient()
@@ -335,25 +342,25 @@ export async function getCoordinatorQueueStats(): Promise<CoordinatorQueueStats>
     todayStart.setUTCHours(0, 0, 0, 0)
     const todayISO = todayStart.toISOString()
 
-    const [{ data: live }, { data: finished }, { data: haltRow }] = await Promise.all([
-      supabase.from('task_queue').select('status').in('status', ['queued', 'claimed', 'running']),
+    const [harnessState, { data: finished }] = await Promise.all([
+      readHarnessState(),
       supabase
         .from('task_queue')
         .select('status')
         .in('status', ['completed', 'failed'])
         .gte('completed_at', todayISO),
-      supabase.from('harness_config').select('value').eq('key', 'HARNESS_HALTED').maybeSingle(),
     ])
 
-    const liveRows = (live ?? []) as { status: string }[]
     const finishedRows = (finished ?? []) as { status: string }[]
 
     return {
-      queued: liveRows.filter((r) => r.status === 'queued').length,
-      running: liveRows.filter((r) => r.status === 'claimed' || r.status === 'running').length,
+      queued: harnessState.queued,
+      running: harnessState.running,
       completedToday: finishedRows.filter((r) => r.status === 'completed').length,
       failedToday: finishedRows.filter((r) => r.status === 'failed').length,
-      halted: (haltRow as { value: string } | null)?.value === 'true',
+      halted: harnessState.halted,
+      state: harnessState.state,
+      stateChangedAt: harnessState.stateChangedAt,
     }
   } catch {
     return empty

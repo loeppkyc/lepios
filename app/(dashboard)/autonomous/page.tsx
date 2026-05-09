@@ -460,6 +460,19 @@ export default async function AutonomousPage() {
   const rateColor = (r: number) =>
     r >= 90 ? 'var(--color-positive)' : r >= 70 ? 'var(--color-warning)' : 'var(--color-critical)'
 
+  const coordStateSince = (() => {
+    if (!coordStats.stateChangedAt) return null
+    const ms = new Date().getTime() - new Date(coordStats.stateChangedAt).getTime()
+    const m = Math.floor(ms / 60_000)
+    return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`
+  })()
+  const coordStateSub = [
+    coordStateSince ? `since ${coordStateSince}` : null,
+    `${coordStats.running} running · ${coordStats.queued} queued`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <div
       style={{
@@ -541,15 +554,17 @@ export default async function AutonomousPage() {
           sub={`avg conf ${knowledge.avgConfidence.toFixed(2)} · ${knowledge.usedLast7Days} used (7d)`}
         />
         <ScoreTile
-          label="Coordinator queue"
-          value={String(coordStats.queued)}
-          sub={`${coordStats.running} running · ${coordStats.halted ? 'HALTED' : 'active'}`}
+          label="Coordinator"
+          value={coordStats.state}
+          sub={coordStateSub}
           accent={
-            coordStats.halted
+            coordStats.state === 'HALTED'
               ? 'var(--color-critical)'
-              : coordStats.queued > 0
-                ? 'var(--color-info)'
-                : undefined
+              : coordStats.state === 'STALLED'
+                ? 'var(--color-warning)'
+                : coordStats.state === 'RUNNING'
+                  ? 'var(--color-positive)'
+                  : undefined
           }
         />
         <OllamaStatusCard health={ollama} />
