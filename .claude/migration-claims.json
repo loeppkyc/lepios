@@ -161,7 +161,13 @@
       "filename": "0169_receipts_v2.sql",
       "claimed_at": "2026-05-09",
       "note": "Receipts port v2 — add ocr_source and vendor_key columns to receipts table. Additive migration, reversible."
+    },
+    "0170": {
+      "branch": "feat/dropbox-client",
+      "filename": "0170_dropbox_capability.sql",
+      "claimed_at": "2026-05-09",
+      "note": "Register net.outbound.dropbox + net.outbound.dropbox.content + net.outbound.npm + net.outbound.pypi in capability_registry. Seed DROPBOX_REFRESH_TOKEN / DROPBOX_APP_KEY / DROPBOX_APP_SECRET placeholders in harness_config."
     }
   },
-  "next_available": 170
+  "next_available": 171
 }

@@ -13,6 +13,12 @@ const HOST_ALLOW: Record<string, string> = {
   'net.outbound.github': 'api.github.com',
   'net.outbound.telegram': 'api.telegram.org',
   'net.outbound.openai': 'api.openai.com',
+  // OSS Radar sources (capabilities seeded in migration 0170)
+  'net.outbound.npm': 'registry.npmjs.org',
+  'net.outbound.pypi': 'pypi.org',
+  // Dropbox (capabilities seeded in migration 0170)
+  'net.outbound.dropbox': 'api.dropboxapi.com',
+  'net.outbound.dropbox.content': 'content.dropboxapi.com',
 }
 
 export interface HttpRequestArgs {
