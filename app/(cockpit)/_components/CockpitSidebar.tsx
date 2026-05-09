@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDevMode } from '@/lib/hooks/useDevMode'
+import { HeartbeatTile } from './HeartbeatTile'
 
 interface NavItem {
   label: string
@@ -317,6 +318,9 @@ export function CockpitSidebar() {
               }}
             />
           </div>
+
+          {/* ── Heartbeat tile ── */}
+          <HeartbeatTile />
 
           {/* ── Nav sections ── */}
           <nav
