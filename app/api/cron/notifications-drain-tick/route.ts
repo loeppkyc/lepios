@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { GET as drainGET } from '@/app/api/harness/notifications-drain/route'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 

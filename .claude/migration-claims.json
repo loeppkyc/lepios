@@ -149,7 +149,13 @@
       "filename": "0167_harness_state.sql",
       "claimed_at": "2026-05-09",
       "note": "4-state harness model — seeds HARNESS_STATE + HARNESS_STATE_CHANGED_AT in harness_config. Companion: lib/harness/harness-state.ts (computeHarnessState + readHarnessState), extended /api/health/lease (STALLED→503), and cockpit coordinator tile."
+    },
+    "0168": {
+      "branch": "feat/pg-cron-liveness-driver",
+      "filename": "0168_pg_cron_liveness_driver.sql",
+      "claimed_at": "2026-05-09",
+      "note": "F-N29 mitigation — pg_cron + pg_net liveness driver. Replaces daily-only Vercel Hobby crons with 3 DB-side jobs: heartbeat every 1 min, task-pickup every 5 min, notifications-drain every 5 min (offset 2 min). CRON_SECRET read at call-time from harness_config. Applied to prod via Supabase MCP."
     }
   },
-  "next_available": 168
+  "next_available": 169
 }

@@ -4,6 +4,7 @@ import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { runPickup } from '@/lib/harness/pickup-runner'
 import { runStallCheck } from '@/lib/harness/stall-check'
 import { checkPurposeReviewTimeouts } from '@/lib/purpose-review/timeout'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 

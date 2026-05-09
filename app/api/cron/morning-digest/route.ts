@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { sendMorningDigest } from '@/lib/orchestrator/digest'
+import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
 
