@@ -1,6 +1,6 @@
 # LepiOS — Failure Log
 
-**Auto-generated from `failures_log` table.** Last data change: 2026-05-09T03:27:49.596511+00:00.
+**Auto-generated from `failures_log` table.** Last data change: 2026-05-09T13:50:05.755526+00:00.
 Source of truth: `failures_log` table. Edit there (cockpit `/failures` form or via `POST /api/failures/log`).
 
 F-L1–F-L15 live in `CLAUDE.md §9` (canonical hand-written entries kept in prose).
@@ -55,7 +55,7 @@ F-N entries below are auto-rendered from the table.
 
 ---
 
-## Fixed (last 30 days) (12)
+## Fixed (last 30 days) (19)
 
 ## F-N5 — /api/bookkeeping/* shipped publicly accessible for ~5 hours (2026-05-05)
 
@@ -64,6 +64,54 @@ F-N entries below are auto-rendered from the table.
 - **Fix/workaround:** commit a3425d9 (inline auth.getUser check + 401 smoke tests)
 - **Lesson:** Any new /api/* route that uses createServiceClient must (a) call auth.getUser() for user-facing routes OR (b) use requireCronSecret(request) for cron-style routes. Worth a lint rule (no-restricted-syntax) plus 401 test case in same commit.
 - **Severity:** critical
+
+---
+
+## F-N29 — Vercel Hobby daily-only crons break heartbeat DMS and autonomous coordinator loop (2026-05-09)
+
+- **What:** LAST_HEARTBEAT_AT was only updated when a Vercel cron fired (max once/day on Hobby plan). Dead-man switch threshold is 15 min, so health/lease returned stale constantly. task-pickup and notifications-drain-tick were also daily-only, breaking the continuous coordinator loop.
+- **Expected:** Heartbeat updates every minute; task-pickup and drain fire every 5 minutes to keep the autonomous loop alive.
+- **Actual:** All three high-frequency paths were gated behind Vercel Hobby daily-only crons. The harness appeared healthy in isolation but was functionally dead between daily ticks.
+- **Root cause:** Vercel Hobby plan hard-limits all cron jobs to daily schedule regardless of configuration. Sub-15-min triggers require either Vercel Pro or a DB-side scheduler.
+- **Fix/workaround:** d732a57
+- **Lesson:** DB-side pg_cron is the correct mitigation for any sub-hourly scheduling need on Vercel Hobby. pg_net provides fire-and-forget HTTP calls from DB context. CRON_SECRET must be read from harness_config (not process.env) since pg functions run as postgres user, not Next.js.
+- **Severity:** high
+
+---
+
+## F-N28 — Approval prompt fails to send via Telegram — coordinator marks task awaiting-colin-approval but inline buttons never reach user (2026-05-09)
+
+- **What:** Coordinator completed Chunk D v2 (b362b865) — study, twin Q&A, 20% loop, and acceptance doc all done. It inserted an outbound_notifications row (7ecdddd8) with the approval inline keyboard, then tried to trigger the drain immediately via bash curl. The drain returned HTTP 403 because CRON_SECRET is not available in the coordinator sandbox bash environment. Coordinator logged drain_trigger_failed + coordinator_await_timeout and planned to "poll on next invocation." No next invocation was scheduled. Task sat at awaiting_grounding with notification at attempts=0/pending. Colin had to manually insert the delegate_to_builder row (a169f782) via Supabase MCP.
+- **Expected:** After coordinator inserts an outbound_notifications approval row, the notification drains within the next cron cycle (max 60s) and Colin receives the Telegram message with inline approve/reject buttons.
+- **Actual:** Notification sat pending for 22+ minutes. No Telegram message delivered. Coordinator exited without scheduling a re-poll. Task stuck. Colin had no visibility into the approval being ready without checking the DB directly.
+- **Root cause:** Two-part root cause: (1) Coordinator attempts immediate drain via bash curl using CRON_SECRET from env — but CRON_SECRET is not exported into the coordinator sandbox bash environment, so every immediate drain attempt returns 403. The "poll on next invocation" fallback never fires because the coordinator session ended. (2) No cockpit indicator or Telegram fallback exists to surface pending approval requests when the primary notification channel silently fails. Variant of F-N17 (awaiting_grounding handler missing) and F-N22/23 (message construction failures) — but this instance is drain-403, not handler gap.
+- **Fix/workaround:** _Open_
+- **Lesson:** Two fixes required: (1) coordinator should not attempt immediate drain via bash; it should rely on the cron cycle and log the notification_row_id it is waiting on, then on the NEXT invocation check if the row has been responded to before proceeding — this avoids the 403 path entirely. (2) cockpit /autonomous page should display any pending outbound_notifications rows that have requires_response=true and attempts=0 as a visible alert ("N approvals waiting") so Colin sees them without Telegram. Every unsent approval must have a DB-visible fallback.
+- **Severity:** high
+
+---
+
+## F-N21 — setHalted writes to non-existent SELF_REPAIR_HALTED key — silent no-op via /api/self-repair/halt (2026-05-09)
+
+- **What:** setHalted() called .update().eq(key, SELF_REPAIR_HALTED) but that key does not exist in harness_config. Superseded by HARNESS_HALTED in migration 0163. Supabase JS UPDATE matched 0 rows, returned no error, and the route returned ok:true.
+- **Expected:** HARNESS_HALTED flips to true in harness_config; caller gets ok:true and the repair loop stops
+- **Actual:** UPDATE matched 0 rows (wrong key name), no error raised, route returned ok:true — harness never actually halted. Every call to the killswitch endpoint was silently discarded.
+- **Root cause:** setHalted() used the wrong config key. SELF_REPAIR_HALTED was the original night_watchman design key; HARNESS_HALTED is the key seeded by migration 0163 when the coordinator harness was wired up. The function was never updated to match.
+- **Fix/workaround:** 51c61b5799aad3b6a4741bd12687096505683dab
+- **Lesson:** Any single-key .update() that returns 0 rows should throw, not silently succeed. Add count:exact to .update() and guard count !== 1 with a hard error. Companion to F-N20: wrong key name is another form of silent no-op — both are invisible to callers without a row-count guard.
+- **Severity:** high
+
+---
+
+## F-N20 — Silent grant gap on service_role writes — harness_config UPDATE always failed (2026-05-09)
+
+- **What:** harness_config had RLS enabled but service_role was only granted SELECT. Every app-side write via createServiceClient() (halt, resume, HARNESS_CONTINUOUS_RUN_ID update) was silently denied with permission denied. The halt command surfaced it via Telegram DB error. No alert was ever raised — writes failed silently since the table was created in migration 0029.
+- **Expected:** createServiceClient() writes to harness_config succeed. /halt sets HARNESS_HALTED=true. /resume clears it. startContinuousRun() saves run ID to HARNESS_CONTINUOUS_RUN_ID.
+- **Actual:** All write operations on harness_config returned PostgreSQL error 42501 (permission denied) for the authenticator role. Postgres log showed the denial. Supabase advisors flagged rls_enabled_no_policy but no alert fired — gap only discovered when Colin attempted /halt and received a Telegram DB error message.
+- **Root cause:** Migration 0029_harness_config.sql had the comment: "Service role bypasses RLS by default — no explicit policy needed." TRUE for RLS row-level policies; FALSE for PostgreSQL GRANT enforcement. service_role bypasses RLS but still requires GRANT INSERT/UPDATE/DELETE at the table level. No GRANT statements were included, so Supabase applied only a minimal SELECT grant.
+- **Fix/workaround:** 8c80bcf
+- **Lesson:** service_role bypasses RLS policies but NOT PostgreSQL GRANT enforcement. Every new table migration must include GRANT INSERT, UPDATE, DELETE ON table TO service_role (unless intentionally AD7 restricted). All service client write calls must check error.code 42501 and alert — silent write failures hide this class of bug for months.
+- **Severity:** high
 
 ---
 
@@ -114,6 +162,42 @@ F-N entries below are auto-rendered from the table.
 - **Fix/workaround:** FTS fallback (S-L4 pattern)
 - **Lesson:** Any batch job must log per-chunk success/failure to agent_events or a dedicated table. Silent failures in a batch = unknown coverage, not zero failures.
 - **Severity:** high
+
+---
+
+## F-N26 — Heartbeat scoped to single cron path — system appeared stale despite being alive (2026-05-09)
+
+- **What:** LAST_HEARTBEAT_AT in harness_config was only written by runNightTick() (8 AM UTC cron). All 16 other cron routes and harness paths (daytime-tick, task-pickup, morning-digest, self-repair-tick, etc.) made no heartbeat write. The /api/health/lease dead-mans-switch read LAST_HEARTBEAT_AT and returned status=stale for all 23+ hours between night runs, even when the system was actively processing tasks.
+- **Expected:** Cockpit heartbeat tile shows green (status=alive, age_seconds<900) whenever any cron or harness path has fired in the last 15 minutes.
+- **Actual:** Cockpit showed stale all day. /api/health/lease returned status=stale even when task-pickup, morning-digest, and other crons were actively running. The only green window was within 15 min of the 8 AM night_tick.
+- **Root cause:** Heartbeat write was inlined in runNightTick() as a single-site implementation rather than a shared utility. No other path imported or called any heartbeat write function. The DMS was only as alive as the one cron that happened to own the write.
+- **Fix/workaround:** _Open_
+- **Lesson:** Factor the heartbeat upsert into a shared utility (lib/orchestrator/heartbeat.ts). Call it from every recurring cron route (fire-and-forget, non-blocking) and from lib-level tick paths (throws-loud). Any new cron route must include import + void upsertHeartbeat().catch(() => {}) immediately after the auth check.
+- **Severity:** medium
+
+---
+
+## F-N27 — ACTIVE/HALTED binary masked stall failures — STALLED indistinguishable from IDLE at glance level (2026-05-09)
+
+- **What:** Coordinator queue tile displayed ACTIVE when HARNESS_HALTED=false, regardless of whether tasks were actually progressing. A stalled harness (queued>0, running=0, not halted) was visually indistinguishable from a healthy idle harness. /api/health/lease returned 200 alive for both.
+- **Expected:** Cockpit and dead-man's-switch should distinguish IDLE (queue empty, healthy) from STALLED (tasks queued but no worker processing them). STALLED should surface as a warning tile and 503 on the lease endpoint.
+- **Actual:** Binary ACTIVE/HALTED model only checked HARNESS_HALTED flag. A STALLED harness — tasks in queue, zero workers, kill switch off — showed as ACTIVE. External monitoring saw the system as healthy while work was stuck.
+- **Root cause:** ACTIVE was defined as NOT halted, not as loop_working. HALTED is an explicit operator kill-switch; STALLED is an emergent condition needing detection: queued>0 AND running=0 AND not halted.
+- **Fix/workaround:** _Open_
+- **Lesson:** Any binary health indicator on a queue-based system needs at least 4 states: RUNNING (processing), IDLE (empty, healthy), STALLED (work blocked), HALTED (operator kill). The dead-man's-switch endpoint should reflect computed state, not just heartbeat age.
+- **Severity:** medium
+
+---
+
+## F-N25 — Harness loop has no liveness signal — crashed night_tick invisible until manual check (2026-05-09)
+
+- **What:** night_tick cron runs nightly but wrote no heartbeat timestamp anywhere. A failed cron invocation, Vercel function timeout, or DB write error left the harness silently dead with no surfacing path. Colin had no way to know the loop had stopped without checking Vercel logs or agent_events manually.
+- **Expected:** Any loop failure surfaces within 15 minutes via /api/health/lease returning 503 and cockpit tile turning red
+- **Actual:** No heartbeat mechanism existed. Loop death was invisible. No dead-man's-switch, no stale-detection endpoint, no cockpit indicator.
+- **Root cause:** Harness was designed with checks and agent_events logging but no liveness timestamp. The dead-man's-switch pattern (write a timestamp each run, alert if stale) was never implemented alongside the loop itself.
+- **Fix/workaround:** e80fe14
+- **Lesson:** Every autonomous loop must write a liveness timestamp on each successful run. The timestamp must be readable by a public health endpoint and surfaced in the cockpit. Threshold: 15m stale = dead. The heartbeat write must throw on failure (F-N21 lesson: count:exact guard) — a silent heartbeat write failure defeats the entire DMS purpose.
+- **Severity:** medium
 
 ---
 
