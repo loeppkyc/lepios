@@ -156,31 +156,11 @@ export async function fireCoordinator(params: {
     },
   })
 
-  // Update rolling 24h invocation counter and clear any active backoff cursor.
+  // Atomically increment rolling 24h invocation counter and clear backoff cursor.
+  // Uses a Postgres function (migration 0177) to prevent concurrent-fire races.
   try {
     const db2 = createServiceClient()
-    const { data: configRows } = await db2
-      .from('harness_config')
-      .select('key, value')
-      .in('key', ['ROUTINES_INVOCATIONS_TODAY', 'ROUTINES_INVOCATIONS_WINDOW_START'])
-    const get = (k: string) =>
-      (configRows as { key: string; value: string }[] | null)?.find((r) => r.key === k)?.value ?? ''
-    const windowStart = get('ROUTINES_INVOCATIONS_WINDOW_START')
-    const windowStartMs = windowStart ? new Date(windowStart).getTime() : 0
-    const WINDOW_MS = 24 * 60 * 60 * 1_000
-    const isNewWindow = !windowStartMs || Date.now() - windowStartMs > WINDOW_MS
-    const currentCount = isNewWindow ? 0 : parseInt(get('ROUTINES_INVOCATIONS_TODAY'), 10) || 0
-    await db2
-      .from('harness_config')
-      .update({ value: String(currentCount + 1) })
-      .eq('key', 'ROUTINES_INVOCATIONS_TODAY')
-    await db2.from('harness_config').update({ value: '' }).eq('key', 'ROUTINES_BACKOFF_UNTIL')
-    if (isNewWindow) {
-      await db2
-        .from('harness_config')
-        .update({ value: new Date().toISOString() })
-        .eq('key', 'ROUTINES_INVOCATIONS_WINDOW_START')
-    }
+    await db2.rpc('increment_routines_counter')
   } catch {
     // Non-fatal — forecast falls back to agent_events count
   }
