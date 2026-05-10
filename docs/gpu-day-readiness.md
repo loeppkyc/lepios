@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 91.0 / 100
+## Total Readiness: 95.7 / 100
 
 ---
 
@@ -19,11 +19,11 @@ _The GPU Day enabler. Without this category, the upgrade has nothing to run on._
 | A1  | Ollama installed + 7B model running                                   | 2      | 100% | 2.00         | `qwen2.5-coder:7b` confirmed at 8.14 tok/s                           |
 | A2  | Cline installed + wired (VS Code)                                     | 5      | 100% | 5.00         | `.clinerules` present; first task attempted                          |
 | A3  | Smoke test passed + tok/s recorded                                    | 3      | 100% | 3.00         | F18 table: 66.5s / 379 tok / 8.14 tok/s (2026-04-27)                 |
-| A4  | First real ship via Ollama                                            | 5      | 25%  | 1.25         | `tests/api/status.test.ts` generated but untracked/not committed yet |
+| A4  | First real ship via Ollama                                            | 5      | 70%  | 3.50         | local-AI dashboard shipped MID batch 2 (page.tsx 59 LOC + LocalAIShell 150+ LOC, live); /api/twin/ask + safety-arbitrate live with 410 LOC tests + 7 callers; lib/ollama/client.ts (518 LOC) + circuit breaker (126 LOC) in prod; safety LLM review in deploy gate. **Held at 70%:** active HTTP 530s on ollama.embed in every overnight cron (2026-05-09/10 06:xx UTC); ollama.generate failed at 19:01 immediately after health success at 18:59. FTS fallback working as designed — degraded-mode functional but inference not reliable. |
 | A5  | Triage rubric written + F18 metrics active                            | 4      | 100% | 4.00         | `docs/ollama-triage.md` complete with decision tree + route list     |
 | A6  | `gpu-day-checklist.md` written                                        | 3      | 100% | 3.00         | `docs/gpu-day-checklist.md` — full 6-step upgrade path               |
 | A7  | GPU swap path documented (model upgrade, config delta, speed targets) | 3      | 100% | 3.00         | 7B→14B config diff table, CUDA verification steps, tok/s targets     |
-|     | **Category total**                                                    | **25** |      | **21.25**    |                                                                      |
+|     | **Category total**                                                    | **25** |      | **23.50**    |                                                                      |
 
 ---
 
@@ -67,8 +67,8 @@ _4 of 6 already won._
 | D3  | Oura Health grounding doc                   | 4      | 100% | 4.00         | `docs/sprint-5/grounding/oura-health.md` confirmed                                                                 |
 | D4  | Scanner Phone grounding doc                 | 4      | 100% | 4.00         | `docs/sprint-5/grounding/scanner-phone.md` confirmed                                                               |
 | D5  | Inventory grounding doc                     | 2      | 0%   | 0.00         | Next batch — explicitly not started                                                                                |
-| D6  | Local_AI / Retail_Monitor decision resolved | 2      | 50%  | 1.00         | Both held with documented reasoning in `docs/sprint-5/next-autonomous-batch-2026-04-28.md`; decisions not yet made |
-|     | **Category total**                          | **20** |      | **17.00**    |                                                                                                                    |
+| D6  | Local_AI / Retail_Monitor decision resolved | 2      | 75%  | 1.50         | **Local_AI resolved:** local-AI ops dashboard shipped MID batch 2 (app/(cockpit)/local-ai/ + /api/local-ai/status live). Decision made = building it. **Retail_Monitor still pending** — no decision yet. |
+|     | **Category total**                          | **20** |      | **17.50**    |                                                                                                                    |
 
 ---
 
@@ -76,10 +76,10 @@ _4 of 6 already won._
 
 | #   | Line item                                          | Weight | Pct | Contribution | Notes                                                                                                    |
 | --- | -------------------------------------------------- | ------ | --- | ------------ | -------------------------------------------------------------------------------------------------------- |
-| E1  | `KEEPA_API_KEY` verified in Vercel                 | 4      | 50% | 2.00         | Sprint 3 PageProfit shipped (implies key was live), but no recent verification; give it benefit of doubt |
+| E1  | `KEEPA_API_KEY` verified in Vercel                 | 4      | 100% | 4.00         | T2 audit 2026-05-10: hit-lists page (HitListClient.tsx 483 LOC) + BsrSparkline wired into ScannerClient.tsx + lib/keepa/ (67+144+57 LOC) all confirmed live in production with callers. Key demonstrably active. |
 | E2  | `OURA_ACCESS_TOKEN` in `harness_config`            | 3      | 100% | 3.00         | **Complete 2026-05-05.** `OURA_TOKEN` (key name) confirmed in `harness_config`. `/api/cron/oura-sync` triggered manually: `{"ok":true,"days":30}`. 30 rows in `oura_daily` table (Apr 5–May 4). |
 | E3  | Staged-batch env vars audited (Dropbox, n8n, etc.) | 3      | 100% | 3.00         | **Complete 2026-05-05.** `docs/env-audit-2026-05-05.md` shipped: 38 Vercel vars + 5 harness_config + 70 code refs cross-referenced. Caught **CRITICAL F-E1** (chat route hits localhost in production — `OLLAMA_BASE_URL` unset) + **F-E2** (UI label drift) — both fixed. 6 follow-up items flagged with severity and action owner. |
-|     | **Category total**                                 | **10** |     | **8.00**     |                                                                                                          |
+|     | **Category total**                                 | **10** |     | **10.00**    |                                                                                                          |
 
 ---
 
@@ -87,25 +87,24 @@ _4 of 6 already won._
 
 | Category                | Weight  | Earned    | %         |
 | ----------------------- | ------- | --------- | --------- |
-| A — Ollama Pipeline     | 25      | 21.25     | 85%       |
+| A — Ollama Pipeline     | 25      | 23.50     | 94%       |
 | B — Harness Reliability | 30      | 29.70     | 99%       |
 | C — Doctrine + Docs     | 15      | 15.00     | 100%      |
-| D — Staged Batch        | 20      | 17.00     | 85%       |
-| E — Env + Secrets       | 10      | 8.00      | 80%       |
-| **Total**               | **100** | **90.95** | **91.0%** |
+| D — Staged Batch        | 20      | 17.50     | 87.5%     |
+| E — Env + Secrets       | 10      | 10.00     | 100%      |
+| **Total**               | **100** | **95.70** | **95.7%** |
 
 ---
 
 ## Top 3 Highest-Leverage Items
 
-| Rank    | Item                                                         | Weight | Gap  | Leverage |
-| ------- | ------------------------------------------------------------ | ------ | ---- | -------- |
-| 1       | B4 — Cloudflared tunnel as Windows service (task `d82411e1`) | 8      | 100% | 8.0      |
-| 2 (tie) | C3 — Safety Agent doctrine resolved                          | 4      | 100% | 4.0      |
-| 2 (tie) | C5 — Status page spec'd or shipped                           | 4      | 100% | 4.0      |
-| 4       | A4 — First real ship via Ollama                              | 5      | 75%  | 3.75     |
+| Rank | Item                                                | Weight | Gap  | Pts remaining |
+| ---- | --------------------------------------------------- | ------ | ---- | ------------- |
+| 1    | D5 — Inventory grounding doc                        | 2      | 100% | 2.00          |
+| 2    | A4 — Fix Ollama 530s (embed + generate reliability) | 5      | 30%  | 1.50          |
+| 3    | D6 — Retail_Monitor decision resolved               | 2      | 25%  | 0.50          |
 
-B4 alone adds **8 points** — moves readiness from 64.0% to 72.0%. C3 + C5 together add another 8.
+**4.0 pts remaining total.** Fix the overnight 530s (tunnel sleeping, PC hibernation) to gain 1.5 pts on A4 alone — biggest single mover left.
 
 ---
 
@@ -126,7 +125,9 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-05-05 MDT — Decision sweep with Colin: B6 → 100% (SQL backdoor accepted), C3 → 100% (Safety Agent: build, Phase 1 queued as task `9b9bca02`), C5 → 100% (Status page deferred, morning_digest covers surface). 5 spec/decision docs written, 3 tasks queued, 1 task closed. C category now 100%. Total: 81.0% → **91.0%**.
+2026-05-10 MDT — T5 deeper sweep: A4 25%→70% (local-AI dashboard + twin/knowledge live with 11+ callers, but active HTTP 530s on ollama.embed in overnight crons and ollama.generate failing after health success — inference unreliable, architecture shipped). D6 50%→75% (Local_AI resolved by dashboard ship; Retail_Monitor still pending). E1 50%→100% (Keepa hit-lists + BSR sparkline confirmed live in T2 audit). Total: 91.0% → **95.7%** (+4.7 pts).
+
+Previously: 2026-05-05 MDT — Decision sweep with Colin: B6 → 100% (SQL backdoor accepted), C3 → 100% (Safety Agent: build, Phase 1 queued as task `9b9bca02`), C5 → 100% (Status page deferred, morning_digest covers surface). 5 spec/decision docs written, 3 tasks queued, 1 task closed. C category now 100%. Total: 81.0% → **91.0%**.
 
 Previously: 2026-05-05 MDT — E3 → 100%. `docs/env-audit-2026-05-05.md` shipped. **Caught CRITICAL F-E1** (chat route hit localhost in prod — `OLLAMA_BASE_URL` unset) + F-E2 (UI label drift) — both fixed by setting Vercel env vars. 6 follow-ups flagged. Total: 78.0% → 81.0%.
 
