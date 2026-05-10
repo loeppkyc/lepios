@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 95.7 / 100
+## Total Readiness: 96.0 / 100
 
 ---
 
@@ -37,9 +37,9 @@ _Without reliable drain + tunnel, autonomous ships are deaf-and-dumb post-GPU._
 | B2  | F18 surfacing gap closed (task `434ac58a`)                            | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                                                                                                                                            |
 | B3  | BUMP parser fix (task `90a47e2e`)                                     | 5      | 100% | 5.00         | PR #35 shipped                                                                                                                                                                                                                                            |
 | B4  | Tunnel reliability — cloudflared as Windows service (task `d82411e1`) | 8      | 100% | 8.00         | **Shipped 2026-05-04.** cloudflared v2025.8.1 installed as AUTO_START Windows service. `OLLAMA_TUNNEL_URL=https://ollama.loeppky.xyz` already set in Vercel. Acceptance test: 10/10 embed requests @ 194ms avg, 0 failures. F18 logged. Survives reboots. |
-| B5  | Coordinator branch-naming bug fixed                                   | 2      | 85%  | 1.70         | F-N3 documented; `coordinator.md` updated (staged in git) with pre-git task_id guard; `branch_guard_triggered` events logging                                                                                                                             |
+| B5  | Coordinator branch-naming bug fixed                                   | 2      | 100% | 2.00         | F-N3 documented; `coordinator.md` committed with full branch-naming guard (pre-git task_id check, stray-branch deletion, branch drift re-verify before any write); `branch_guard_triggered` events logging to `agent_events` confirmed in coordinator.md §Branch Naming. "(staged in git)" note was stale — file is live and fully committed.                                                                                                                             |
 | B6  | Direct SQL audit gap resolved (task `305a9528`)                       | 2      | 100% | 2.00         | **Resolved 2026-05-05.** Decision: accept as designed. `docs/decisions/sql-direct-write-backdoor.md`. Task `305a9528` marked completed in `task_queue`. SQL is a privileged Colin-only backdoor; F18 surfacing covers agent operations only.                                                                                                                                                                                                                                |
-|     | **Category total**                                                    | **30** |      | **29.70**    |                                                                                                                                                                                                                                                           |
+|     | **Category total**                                                    | **30** |      | **30.00**    |                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -88,11 +88,11 @@ _4 of 6 already won._
 | Category                | Weight  | Earned    | %         |
 | ----------------------- | ------- | --------- | --------- |
 | A — Ollama Pipeline     | 25      | 23.50     | 94%       |
-| B — Harness Reliability | 30      | 29.70     | 99%       |
+| B — Harness Reliability | 30      | 30.00     | 100%      |
 | C — Doctrine + Docs     | 15      | 15.00     | 100%      |
 | D — Staged Batch        | 20      | 17.50     | 87.5%     |
 | E — Env + Secrets       | 10      | 10.00     | 100%      |
-| **Total**               | **100** | **95.70** | **95.7%** |
+| **Total**               | **100** | **96.00** | **96.0%** |
 
 ---
 
@@ -104,7 +104,7 @@ _4 of 6 already won._
 | 2    | A4 — Fix Ollama 530s (embed + generate reliability) | 5      | 30%  | 1.50          |
 | 3    | D6 — Retail_Monitor decision resolved               | 2      | 25%  | 0.50          |
 
-**4.0 pts remaining total.** Fix the overnight 530s (tunnel sleeping, PC hibernation) to gain 1.5 pts on A4 alone — biggest single mover left.
+**3.7 pts remaining total (96.0% → 99.7% ceiling).** Fix the overnight 530s (tunnel sleeping, PC hibernation) to gain 1.5 pts on A4 alone — biggest single mover left.
 
 ---
 
@@ -125,7 +125,9 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-05-10 MDT — T5 deeper sweep: A4 25%→70% (local-AI dashboard + twin/knowledge live with 11+ callers, but active HTTP 530s on ollama.embed in overnight crons and ollama.generate failing after health success — inference unreliable, architecture shipped). D6 50%→75% (Local_AI resolved by dashboard ship; Retail_Monitor still pending). E1 50%→100% (Keepa hit-lists + BSR sparkline confirmed live in T2 audit). Total: 91.0% → **95.7%** (+4.7 pts).
+2026-05-10 MDT — B5 85%→100%: `coordinator.md` "(staged in git)" note was stale — file confirmed fully committed with complete branch-naming guard (task_id check + stray-branch deletion + pre-write drift re-verify). B category now 100%. Total: **95.7% → 96.0%** (+0.3 pts).
+
+Previously: 2026-05-10 MDT — T5 deeper sweep: A4 25%→70% (local-AI dashboard + twin/knowledge live with 11+ callers, but active HTTP 530s on ollama.embed in overnight crons and ollama.generate failing after health success — inference unreliable, architecture shipped). D6 50%→75% (Local_AI resolved by dashboard ship; Retail_Monitor still pending). E1 50%→100% (Keepa hit-lists + BSR sparkline confirmed live in T2 audit). Total: 91.0% → **95.7%** (+4.7 pts).
 
 Previously: 2026-05-05 MDT — Decision sweep with Colin: B6 → 100% (SQL backdoor accepted), C3 → 100% (Safety Agent: build, Phase 1 queued as task `9b9bca02`), C5 → 100% (Status page deferred, morning_digest covers surface). 5 spec/decision docs written, 3 tasks queued, 1 task closed. C category now 100%. Total: 81.0% → **91.0%**.
 
