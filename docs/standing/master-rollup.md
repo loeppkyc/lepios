@@ -14,15 +14,25 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 <!-- AUTO-ROLLUP:START -->
 <!-- Regenerated automatically by /api/admin/rollup/refresh — do not edit between fences -->
-<!-- Pending first run — POST /api/admin/rollup/refresh to populate -->
+<!-- Last run: 2026-05-09 21:03 MT (2026-05-10T03:03:50.000Z) -->
 
 ## Portfolio Rollup
 
-| Track                 | Rollup | Weight | Source |
-| --------------------- | ------ | ------ | ------ |
-| _(pending first run)_ | —      | —      | —      |
+| Track                      | Rollup     | Weight | Source                                          |
+| -------------------------- | ---------- | ------ | ----------------------------------------------- |
+| **Autonomous Harness**     | **100.0%** | 20%    | db                                              |
+| **Product Components**     | **88.0%**  | 5%     | db                                              |
+| **Amazon Pipeline**        | **56.1%**  | 40%    | doc_parse (doc stale — last updated 2026-05-01) |
+| **Local Sales**            | **0.0%**   | 5%     | hardcoded                                       |
+| **Streamlit Port Backlog** | **0.0%**   | 15%    | db ⚠ undercount                                 |
+| **GPU Day Readiness**      | **91.0%**  | 15%    | doc_parse                                       |
 
-**Strategic rollup: pending first run**
+**Strategic rollup: 60.5%** (first run)
+
+Strategic math: T1 20%×100.0=20.00 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 · T3 5%×0.0=0.00 · T4 15%×0.0=0.00 · T5 15%×91.0=13.65 · **sum=60.50**
+
+> T2 Amazon Pipeline: doc-sourced, last human-updated 2026-05-01. Does not auto-update — edit `docs/lepios/amazon-pipeline-rollup.md` to reflect new PRs.
+> T4 Streamlit Port: tier-weighted, known undercount until `feat/streamlit-modules-lock` lands port_status sync. PageProfit and other live branches not yet reflected.
 
 <!-- AUTO-ROLLUP:END -->
 
