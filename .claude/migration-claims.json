@@ -293,7 +293,13 @@
       "filename": "0193_repricer_rules.sql",
       "claimed_at": "2026-05-10",
       "note": "Reselling cluster — repricer_rules + repricer_log tables. Replaces Google Sheets Repricer Rules + Repricer Log tabs. File renumbered from 0191 (collision with feat/insurance-sports-cluster); DB applied as 0191_repricer_rules via MCP — CREATE TABLE IF NOT EXISTS makes re-apply safe."
+    },
+    "0194": {
+      "branch": "feat/retail-cluster",
+      "filename": "0194_retail_watchlist.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Retail cluster — retail_watchlist table: product watchlist with flip-profit fields. Renumbered from 0191 (sports collision) then 0192 (reselling collision)."
     }
   },
-  "next_available": 194
+  "next_available": 195
 }
