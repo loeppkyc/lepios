@@ -284,3 +284,20 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+# Scanner subdir fix (standalone bug fix, 2026-05-09)
+# ============================================================
+
+scanner_subdir_fix:
+task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+status: "in-build"
+description: "Fix streamlit-module-scanner.ts subdir detection (option_a) + dead reference gotchas (scope_expansion)"
+acceptance_doc: "docs/sprint-5/scanner-subdir-fix-acceptance.md"
+affected_files: ["lib/scanners/streamlit-module-scanner.ts", "lib/scanners/spec-generator.ts", "tests/streamlit-scanner.test.ts"]
+grounding_checkpoint: "Colin runs scanner against real Streamlit OS pages/ — verify tax_centre line_count >= 6000 and at least one page has non-empty gotchas"
+coordinator_task_id: "3dcf9706-ccc6-43d9-915a-7da9bf8d3c88"
+colin_approved_at: "2026-05-09"
+delegated_to_builder_at: "2026-05-09T03:40:00Z"
+builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
+last_updated_at: "2026-05-09T03:40:00Z"

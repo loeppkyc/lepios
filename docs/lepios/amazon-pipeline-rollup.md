@@ -1,6 +1,7 @@
 # LepiOS Amazon Pipeline — Component Rollup
 
-Last recomputed: 2026-05-01 (row 6 → 100%; row 11 → 25% acceptance doc PR #52; row 17 → 25% acceptance doc PR #55)
+Last updated: 2026-05-10
+Last recomputed: 2026-05-10 (rows 11/12/14/19 bumped from shipped work; row 22 added for settlement three-bucket)
 Owner: Colin
 Cadence: recompute after each PR merge or meaningful state change
 
@@ -25,8 +26,8 @@ Reconciliation is the keystone — without it the pipeline is disconnected inges
 | 8         | SP-API financial events parser                       | 8       | 100%       | 8.00         | PR #43 merged, 34 tests pass                                                            |
 | 9         | SP-API backfill script                               | 4       | 100%       | 4.00         | PR #43 merged, $0.01 gate                                                               |
 | 10        | Financial events migration (0057)                    | 2       | 100%       | 2.00         | PR #43 merged, pure DDL                                                                 |
-| 11        | Reconciliation engine (orders ↔ events ↔ COGS)       | 10      | 25%        | 2.50         | keystone — acceptance doc landed (PR #52); builder not started                          |
-| 12        | Reconciliation UI / drift report                     | 6       | 0%         | 0.00         | not started                                                                             |
+| 11        | Reconciliation engine (orders ↔ events ↔ COGS)       | 10      | 65%        | 6.50         | lib/reconciliation/scoring.ts (scoreMatch + greedyPair), /api/reconciliation/auto-match + candidates, 33 tests, F18 wired, digest line, bookkeeping reconcile-approval UI |
+| 12        | Reconciliation UI / drift report                     | 6       | 30%        | 1.80         | app/(cockpit)/reconciliation/page.tsx + bookkeeping/reconcile/ shipped; full drift report + inline approval UX deferred |
 | 13        | GST calc module                                      | 6       | 100%       | 6.00         | PR #39 merged, 68 tests, $0 drift                                                       |
 | 14        | GST UI / business-review surfacing                   | 4       | 10%        | 0.40         | partial — /business-review exists, low-contrast bug                                     |
 | 15        | Income tax / CPP projection                          | 6       | 0%         | 0.00         | baseline ~$2,100, no module                                                             |
