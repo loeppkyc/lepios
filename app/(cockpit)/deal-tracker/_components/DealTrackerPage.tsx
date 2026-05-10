@@ -205,15 +205,18 @@ function AddItemForm({ onAdd }: { onAdd: () => void }) {
 function PriceHistoryTab({ items }: { items: DealTrackerItem[] }) {
   const [selectedId, setSelectedId] = useState<string>(items[0]?.id ?? '')
   const [history, setHistory] = useState<DealPriceHistory[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loadedFor, setLoadedFor] = useState<string | null>(null)
+  const isLoading = !!selectedId && selectedId !== loadedFor
 
   useEffect(() => {
     if (!selectedId) return
-    setLoading(true)
     fetch(`/api/deal-tracker/history?item_id=${selectedId}`)
       .then((r) => r.json())
-      .then((d) => setHistory(d.history ?? []))
-      .finally(() => setLoading(false))
+      .then((d) => {
+        setHistory(d.history ?? [])
+        setLoadedFor(selectedId)
+      })
+      .catch(() => setLoadedFor(selectedId))
   }, [selectedId])
 
   if (!items.length) return <p className="text-sm text-[var(--color-text-secondary)]">No items tracked yet.</p>
@@ -238,13 +241,13 @@ function PriceHistoryTab({ items }: { items: DealTrackerItem[] }) {
         </Select>
       </div>
 
-      {loading && <p className="text-sm text-[var(--color-text-secondary)]">Loading…</p>}
+      {isLoading && <p className="text-sm text-[var(--color-text-secondary)]">Loading…</p>}
 
-      {!loading && history.length === 0 && (
+      {!isLoading && history.length === 0 && (
         <p className="text-sm text-[var(--color-text-secondary)]">No price history yet for this item.</p>
       )}
 
-      {!loading && history.length > 0 && (
+      {!isLoading && history.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm text-[var(--color-text-secondary)]">
             {selectedItem?.product} — {history.length} data point{history.length !== 1 ? 's' : ''}
@@ -290,15 +293,21 @@ export function DealTrackerPage() {
   const [err, setErr] = useState('')
 
   async function load() {
-    setLoading(true)
     const res = await fetch('/api/deal-tracker')
     const d = await res.json()
     if (!res.ok) setErr(d.error ?? 'Failed to load.')
     else setItems(d.items ?? [])
-    setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    fetch('/api/deal-tracker')
+      .then((r) => r.json())
+      .then((d) => {
+        setItems(d.items ?? [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
   async function handleUpdatePrice(id: string, price: number) {
     await fetch('/api/deal-tracker', {

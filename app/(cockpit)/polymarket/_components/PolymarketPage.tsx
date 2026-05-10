@@ -215,14 +215,20 @@ export function PolymarketPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null)
 
   async function load() {
-    setLoading(true)
     const res = await fetch('/api/polymarket')
     const d = await res.json()
     setPredictions(d.predictions ?? [])
-    setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    fetch('/api/polymarket')
+      .then((r) => r.json())
+      .then((d) => {
+        setPredictions(d.predictions ?? [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
   const open = useMemo(() => predictions.filter((p) => !p.resolved), [predictions])
   const resolved = useMemo(() => predictions.filter((p) => p.resolved), [predictions])
