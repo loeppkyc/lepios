@@ -209,7 +209,13 @@
       "filename": "0177_routines_counter_atomic.sql",
       "claimed_at": "2026-05-10",
       "note": "Task da21ea58 — replace read-modify-write quota counter in invoke-coordinator.ts with atomic Postgres function increment_routines_counter(). FOR UPDATE row lock prevents concurrent-fire race on ROUTINES_INVOCATIONS_TODAY."
+    },
+    "0178": {
+      "branch": "task/a1f630c9-restore-backoff-clear",
+      "filename": "0178_restore_backoff_clear.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Task a1f630c9 — restore ROUTINES_BACKOFF_UNTIL clear in increment_routines_counter(). Was present in PR #201, dropped in #202 sync. Single CREATE OR REPLACE adding one UPDATE line."
     }
   },
-  "next_available": 178
+  "next_available": 179
 }
