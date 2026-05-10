@@ -199,12 +199,29 @@ export async function runSafetyGateCheck(params: {
   const diffResult = await fetchPRDiffInput(commit_sha, branch)
   if (!diffResult.input) {
     results.push(`${commit_sha}:safety-diff-fetch-failed`)
+    // Write an audit row so safety_decisions is never 0 — observable even when
+    // GITHUB_TOKEN is absent or the API is down.
+    const sdId = await persistSafetyDecision({
+      commit_sha,
+      branch,
+      pr_number: null,
+      task_id,
+      findings: [],
+      score: { score: 0, tier: 'low', contributions: [], secret_auto_high: false },
+      e2e: null,
+      twin_decision: null,
+      twin_raw: null,
+      action: 'auto_merge',
+      tier: 'low',
+      reason: `infra_error:${diffResult.error ?? 'unknown'}`,
+      archived_failure_ids: [],
+    }).catch(() => null)
     return {
       blocking: false,
       action: 'auto_merge',
       tier: 'low',
       score: 0,
-      sdId: null,
+      sdId,
       infra_error: diffResult.error,
     }
   }
@@ -224,12 +241,27 @@ export async function runSafetyGateCheck(params: {
     })
   } catch {
     results.push(`${commit_sha}:safety-agent-exception`)
+    const sdId = await persistSafetyDecision({
+      commit_sha,
+      branch,
+      pr_number: null,
+      task_id,
+      findings: [],
+      score: { score: 0, tier: 'low', contributions: [], secret_auto_high: false },
+      e2e: null,
+      twin_decision: null,
+      twin_raw: null,
+      action: 'auto_merge',
+      tier: 'low',
+      reason: 'infra_error:exception',
+      archived_failure_ids: [],
+    }).catch(() => null)
     return {
       blocking: false,
       action: 'auto_merge',
       tier: 'low',
       score: 0,
-      sdId: null,
+      sdId,
       infra_error: 'exception',
     }
   }
