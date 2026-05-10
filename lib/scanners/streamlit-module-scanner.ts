@@ -3,7 +3,7 @@ import { join, basename } from 'path'
 import { categorize } from './streamlit-categories'
 
 export interface ModuleCandidate {
-  filename: string         // "60_Amazon_Orders.py"
+  filename: string         // "60_Amazon_Orders.py" or "tax_centre" (subdir)
   page_number: number | null
   title: string            // derived from filename or st.title() call
   category: string
@@ -14,6 +14,7 @@ export interface ModuleCandidate {
   line_count: number
   tab_count: number        // count of st.tabs( calls — UI complexity signal
   import_count: number
+  gotchas: string[]        // dead references detected at scan time — BLOCKER-severity for ports
 }
 
 const EXTERNAL_API_PATTERNS: [RegExp, string][] = [
@@ -31,6 +32,28 @@ const EXTERNAL_API_PATTERNS: [RegExp, string][] = [
 ]
 
 const IMPORT_PATTERN = /(?:from utils\.(\w+)|from pages\.(\w+)|import utils\.(\w+))/g
+
+// Dead references: function calls whose definition or required import is absent in the file.
+// These are BLOCKER-severity for any LepiOS port. importGuard, if present, suppresses the flag.
+const DEAD_REFERENCE_PATTERNS: Array<{
+  callPattern: RegExp
+  importGuard?: RegExp
+  label: string
+}> = [
+  {
+    callPattern: /\bshow_load_time\s*\(/,
+    label: 'show_load_time called but not imported/defined',
+  },
+  {
+    callPattern: /\bdev_section\s*\(/,
+    label: 'dev_section called but not imported/defined',
+  },
+  {
+    callPattern: /\bget_sheet\s*\(/,
+    importGuard: /gspread|from utils\.sheets|import sheets/,
+    label: 'get_sheet called but sheets not imported',
+  },
+]
 
 function extractTitle(filename: string, content: string): string {
   // Try st.title("...") first
@@ -66,6 +89,16 @@ function detectDependencies(content: string): string[] {
   return deps
 }
 
+function detectDeadReferences(content: string): string[] {
+  const found: string[] = []
+  for (const { callPattern, importGuard, label } of DEAD_REFERENCE_PATTERNS) {
+    if (!callPattern.test(content)) continue
+    if (importGuard && importGuard.test(content)) continue
+    found.push(label)
+  }
+  return found
+}
+
 function complexity(lineCount: number, importCount: number, tabCount: number): 'small' | 'medium' | 'large' {
   const score = lineCount + importCount * 10 + tabCount * 50
   if (score < 350) return 'small'
@@ -88,15 +121,69 @@ export function scanStreamlitModules(rootPath: string): ModuleCandidate[] {
   const candidates: ModuleCandidate[] = []
 
   for (const entry of entries) {
-    // Skip hidden, underscore-prefixed, non-.py files, and subdirectories
     if (entry.startsWith('_') || entry.startsWith('.')) continue
-    if (!entry.endsWith('.py')) continue
     const fullPath = join(pagesDir, entry)
+
+    let stat
     try {
-      if (statSync(fullPath).isDirectory()) continue
+      stat = statSync(fullPath)
     } catch {
       continue
     }
+
+    // Part A — subdir detection: stub __init__.py packages (e.g. pages/tax_centre/)
+    if (stat.isDirectory()) {
+      const initPath = join(fullPath, '__init__.py')
+      let initContent: string
+      try {
+        initContent = readFileSync(initPath, 'utf-8')
+      } catch {
+        continue // no __init__.py → not a Streamlit package, skip
+      }
+      if (initContent.split('\n').length >= 10) continue // non-stub package, skip
+
+      // Stub fallthrough: use the largest non-underscore .py file in the subdir
+      let subEntries: string[]
+      try {
+        subEntries = readdirSync(fullPath)
+      } catch {
+        continue
+      }
+      const ranked = subEntries
+        .filter((f) => f.endsWith('.py') && !f.startsWith('_') && f !== '__init__.py')
+        .map((f) => {
+          try { return { f, size: statSync(join(fullPath, f)).size } } catch { return null }
+        })
+        .filter((x): x is { f: string; size: number } => x !== null)
+        .sort((a, b) => b.size - a.size)
+
+      if (ranked.length === 0) continue
+      const largestFile = ranked[0].f
+      const content = readFileSync(join(fullPath, largestFile), 'utf-8')
+      const lines = content.split('\n')
+      const lineCount = lines.length
+      const importCount = lines.filter((l) => l.trim().startsWith('import ') || l.trim().startsWith('from ')).length
+      const tabCount = (content.match(/st\.tabs\s*\(/g) ?? []).length
+      const { category, confidence } = categorize(entry, content)
+
+      candidates.push({
+        filename: entry, // directory name, e.g. 'tax_centre'
+        page_number: extractPageNumber(entry),
+        title: extractTitle(entry, content),
+        category,
+        confidence,
+        complexity: complexity(lineCount, importCount, tabCount),
+        external_apis: detectExternalApis(content),
+        dependencies: detectDependencies(content),
+        line_count: lineCount,
+        tab_count: tabCount,
+        import_count: importCount,
+        gotchas: detectDeadReferences(content),
+      })
+      continue
+    }
+
+    if (!entry.endsWith('.py')) continue
 
     const content = readFileSync(fullPath, 'utf-8')
     const lines = content.split('\n')
@@ -117,6 +204,7 @@ export function scanStreamlitModules(rootPath: string): ModuleCandidate[] {
       line_count: lineCount,
       tab_count: tabCount,
       import_count: importCount,
+      gotchas: detectDeadReferences(content),
     })
   }
 

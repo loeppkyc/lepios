@@ -10,7 +10,9 @@ function makeTempPages(files: Record<string, string>): string {
   const root = join(tmpdir(), `lepios-scanner-test-${Date.now()}`)
   mkdirSync(join(root, 'pages'), { recursive: true })
   for (const [name, content] of Object.entries(files)) {
-    writeFileSync(join(root, 'pages', name), content, 'utf-8')
+    const filePath = join(root, 'pages', name)
+    mkdirSync(join(filePath, '..'), { recursive: true })
+    writeFileSync(filePath, content, 'utf-8')
   }
   return root
 }
@@ -66,6 +68,76 @@ describe('streamlit-scanner', () => {
       expect(Array.isArray(spec.audit_hints)).toBe(true)
       expect(['critical', 'high', 'medium', 'low']).toContain(spec.priority)
       expect(['small', 'medium', 'large']).toContain(spec.estimated_weight)
+      expect(Array.isArray(spec.gotchas)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  // Part A: subdir detection tests
+  it('subdir with stub __init__.py falls through to largest .py file', () => {
+    const bigContent = Array.from({ length: 110 }, (_, i) => `# line ${i}`).join('\n') +
+      '\nimport streamlit as st\nst.title("Tax Centre")\n'
+    const root = makeTempPages({
+      'tax_centre/__init__.py': '# stub\nimport streamlit\n',
+      'tax_centre/colin_tax.py': bigContent,
+    })
+    try {
+      const candidates = scanStreamlitModules(root)
+      expect(candidates).toHaveLength(1)
+      expect(candidates[0].filename).toBe('tax_centre')
+      expect(candidates[0].line_count).toBeGreaterThanOrEqual(100)
+      expect(candidates[0].title).toContain('Tax Centre')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('subdir with non-stub __init__.py (>= 10 lines) is skipped', () => {
+    const fatInit = Array.from({ length: 15 }, (_, i) => `# line ${i}`).join('\n')
+    const root = makeTempPages({
+      'big_module/__init__.py': fatInit,
+      'big_module/main.py': Array.from({ length: 200 }, (_, i) => `# line ${i}`).join('\n'),
+    })
+    try {
+      const candidates = scanStreamlitModules(root)
+      expect(candidates).toHaveLength(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  // Part B: dead reference detection tests
+  it('detects show_load_time dead reference', () => {
+    const root = makeTempPages({
+      '50_Dashboard.py': [
+        'import streamlit as st',
+        'st.title("Dashboard")',
+        'show_load_time(start)',
+      ].join('\n'),
+    })
+    try {
+      const candidates = scanStreamlitModules(root)
+      expect(candidates).toHaveLength(1)
+      expect(candidates[0].gotchas.some((g) => /show_load_time/.test(g))).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does NOT flag get_sheet when sheets is imported', () => {
+    const root = makeTempPages({
+      '30_Finance.py': [
+        'from utils.sheets import get_sheet',
+        'import streamlit as st',
+        'st.title("Finance")',
+        "data = get_sheet('mysheet')",
+      ].join('\n'),
+    })
+    try {
+      const candidates = scanStreamlitModules(root)
+      expect(candidates).toHaveLength(1)
+      expect(candidates[0].gotchas.some((g) => /get_sheet/.test(g))).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
