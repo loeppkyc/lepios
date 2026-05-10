@@ -19,6 +19,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { preClaimQuotaCheck } from '@/lib/harness/quota-guard'
+import { guardedWrite } from '@/lib/supabase/service-write'
 
 export interface QuotaStatus {
   usage_pct: number
@@ -246,14 +247,14 @@ export async function haltContinuousRun(
 
   // Set HARNESS_HALTED=true
   try {
-    await db.from('harness_config').update({ value: 'true' }).eq('key', 'HARNESS_HALTED')
+    await guardedWrite(db.from('harness_config').update({ value: 'true' }).eq('key', 'HARNESS_HALTED'), 'harness_config', 'update')
   } catch {
     // Non-fatal
   }
 
   // Clear HARNESS_CONTINUOUS_RUN_ID
   try {
-    await db.from('harness_config').update({ value: '' }).eq('key', 'HARNESS_CONTINUOUS_RUN_ID')
+    await guardedWrite(db.from('harness_config').update({ value: '' }).eq('key', 'HARNESS_CONTINUOUS_RUN_ID'), 'harness_config', 'update')
   } catch {
     // Non-fatal
   }
