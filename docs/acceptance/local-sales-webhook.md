@@ -1,9 +1,12 @@
 # Acceptance Doc — Local Sales Webhook Ingestion
 
+Last updated: 2026-05-10
 Sprint: backlog (not yet assigned)
 Date: 2026-05-01
 Branch: new harness task branch (assign at sprint intake)
 Status: DRAFT — awaiting Colin promotion to builder
+
+T3 rollup milestone: **Acceptance doc written (25%)**. Builder task not yet assigned (50% gate). PR not merged (100% gate).
 
 ---
 

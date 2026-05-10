@@ -1,12 +1,16 @@
+import { existsSync } from 'fs'
+import { join } from 'path'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { TrackResult } from '../types'
 
-// T3 has 3 items (acceptance doc written, builder task assigned, PR merged).
-// Acceptance doc exists → 25%. Builder task assigned → 50%. PR merged → 100%.
-// Auto-detection: check task_queue for a row pointing to the local-sales acceptance doc.
+const ACCEPTANCE_DOC = join(process.cwd(), 'docs/acceptance/local-sales-webhook.md')
+
+// T3 has 3 milestones: acceptance doc written → 25%, builder task assigned → 50%, PR merged → 100%.
+// Doc check uses fs.existsSync (same pattern as T2). Task detection via task_queue description match.
 export async function computeT3(): Promise<TrackResult> {
   const t0 = Date.now()
   try {
+    const docExists = existsSync(ACCEPTANCE_DOC)
     const db = createServiceClient()
     const { data } = await db
       .from('task_queue')
@@ -18,8 +22,8 @@ export async function computeT3(): Promise<TrackResult> {
     let rollup_pct = 0
 
     if (!taskRow) {
-      // Acceptance doc exists but no task queued yet
-      rollup_pct = 0
+      // Spec written (doc exists) but not yet assigned to builder
+      rollup_pct = docExists ? 25 : 0
     } else if (taskRow.status === 'completed') {
       rollup_pct = 100
     } else {
