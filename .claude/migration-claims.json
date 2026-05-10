@@ -299,7 +299,19 @@
       "filename": "0194_retail_watchlist.sql",
       "claimed_at": "2026-05-10",
       "note": "Retail cluster — retail_watchlist table: product watchlist with flip-profit fields. Renumbered from 0191 (sports collision) then 0192 (reselling collision)."
+    },
+    "0195": {
+      "branch": "feat/keepa-product-intel-cluster",
+      "filename": "0195_keepa_price_alerts.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Keepa/Product Intel cluster — keepa_price_alerts table. Renumbered 0191→0193→0195 (multi-collision)."
+    },
+    "0196": {
+      "branch": "feat/keepa-product-intel-cluster",
+      "filename": "0196_keepa_deals.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Keepa/Product Intel cluster — keepa_deals table. Renumbered 0192→0194→0196 (multi-collision)."
     }
   },
-  "next_available": 195
+  "next_available": 197
 }
