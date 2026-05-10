@@ -7,6 +7,7 @@
  */
 
 import QualityTrends from './_components/QualityTrends'
+import { PendingApprovalsBanner } from '@/components/cockpit/PendingApprovalsBanner'
 import { logEvent } from '@/lib/knowledge/client'
 import { healthCheck, type OllamaHealthResult } from '@/lib/ollama/client'
 import {
@@ -492,6 +493,8 @@ export default async function AutonomousPage() {
           marginBottom: 24,
         }}
       />
+
+      <PendingApprovalsBanner />
 
       <QualityTrends />
 
