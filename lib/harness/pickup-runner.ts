@@ -334,7 +334,45 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   const task = await claimTask(runId)
 
   if (!task) {
+    // F18: distinguish genuine empty queue from module-locked skip.
+    // If tasks exist in 'queued' status after claimTask returned null, they were
+    // excluded by the module-lock filter in claim_next_task(). Log separately so
+    // the morning digest can surface "N tasks blocked by module locks today".
+    let skippedCount = 0
+    try {
+      const db = createServiceClient()
+      const { count } = await db
+        .from('task_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'queued')
+      skippedCount = count ?? 0
+    } catch {
+      // Non-fatal — diagnostic only; falls back to queue-empty label
+    }
+
     const duration_ms = Date.now() - start
+    if (skippedCount > 0) {
+      await logEvent(
+        runId,
+        'warning',
+        null,
+        'task.skipped.module_locked',
+        duration_ms,
+        'task_pickup',
+        {
+          skipped_count: skippedCount,
+        }
+      )
+      return {
+        ok: true,
+        claimed: null,
+        reason: 'module-locked',
+        run_id: runId,
+        duration_ms,
+        ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+      }
+    }
+
     await logEvent(runId, 'success', null, 'queue-empty', duration_ms)
     return {
       ok: true,
