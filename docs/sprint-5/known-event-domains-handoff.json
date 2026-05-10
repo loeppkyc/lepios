@@ -1,0 +1,19 @@
+{
+  "task_id": "782a885e-6910-44f2-843c-0df872077378",
+  "chunk_id": "known-event-domains",
+  "status": "complete",
+  "commit": "0355cc7be670f593c840bf7392eada93f772ac53",
+  "branch": "harness/task-782a885e-6910-44f2-843c-0df872077378",
+  "tests": {
+    "passing": 3355,
+    "failing": 93,
+    "notes": "93 pre-existing failures across 14 test files (deploy-gate, pickup-runner, continuous-mode, window-claim, api-auth-coverage, search-path-coverage, self-repair — none related to orchestrator/config). No new failures introduced by this change."
+  },
+  "files_changed": ["lib/orchestrator/config.ts"],
+  "grounding_checkpoint_required": "none",
+  "unknowns": [
+    "93 pre-existing test failures exist in the suite (not introduced by this chunk). Coordinator should note these for triage if not already tracked."
+  ],
+  "next_chunk_blockers": [],
+  "completed_at": "2026-05-10T03:27:00Z"
+}
