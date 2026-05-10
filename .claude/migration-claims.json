@@ -275,7 +275,13 @@
       "filename": "0186_add_streamlit_port_evidence.sql",
       "claimed_at": "2026-05-10",
       "note": "Second-pass sweep — adds port_evidence TEXT column to streamlit_modules. 29 modules flipped to complete: 13 COMPOUND_PORTED + 12 SUPERSEDED + 4 OBSOLETE. Inventory 152→184/234 (65.0%→78.6%)."
+    },
+    "0191": {
+      "branch": "feat/insurance-sports-cluster",
+      "filename": "0191_sports_picks.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Sports Intel MID cluster — sports_picks table (replaces Google Sheets Sports_Picks_Log). Ports: utils/sports_odds.py, utils/sports_coach.py, tools/sports_predictions.py."
     }
   },
-  "next_available": 191
+  "next_available": 192
 }
