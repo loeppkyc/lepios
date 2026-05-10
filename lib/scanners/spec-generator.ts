@@ -9,6 +9,7 @@ export interface TaskSpec {
   estimated_weight: 'small' | 'medium' | 'large'
   prereqs: string[]
   audit_hints: string[]
+  gotchas: string[]  // dead references detected at scan time — BLOCKER-severity for ports
 }
 
 const PRIORITY_MAP: Record<Category, TaskSpec['priority']> = {
@@ -114,6 +115,7 @@ export function generateTaskSpec(candidate: ModuleCandidate): TaskSpec {
     estimated_weight: candidate.complexity,
     prereqs: derivePrereqs(candidate),
     audit_hints: deriveAuditHints(candidate),
+    gotchas: candidate.gotchas,
   }
 }
 
