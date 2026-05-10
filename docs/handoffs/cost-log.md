@@ -4,6 +4,11 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 
 ---
 
+2026-05-10T04:20:00Z coordinator sprint=T003 chunk=T003-study phase=1a tokens_in=~18000 tokens_out=~6000 escalated=true auto_proceeded=false
+  reason: 4 open design questions (receipt_lines table shape, reconciliation target, camera OCR completeness, extraction method)
+  twin_blocked: true (sandbox cannot reach lepios-one.vercel.app)
+  pre_condition: gmail-scanner grounding required before T003-A builds
+
 2026-04-27T00:00:00Z coordinator sprint=5 chunk=H3 phase=1a-1d tokens_in=~18000 tokens_out=~6000 escalated=true auto_proceeded=false
 
 2026-04-19T12:00:00-06:00 coordinator sprint=4 chunk=null phase=1 tokens_in=~18000 tokens_out=~4500 escalated=true auto_proceeded=false

@@ -284,3 +284,33 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+
+# T-003 — Receipts (Camera + Vision OCR + Reconciliation)
+
+# ============================================================
+
+t003:
+  leverage_target_id: "T-003"
+  task_id: "91adca3c-06a5-4b69-8d9e-dd4e51b2a224"
+  status: "awaiting-colin-approval"
+  phase: "1a-complete-awaiting-colin-questions"
+  study_doc: "docs/sprint-t003/t003-streamlit-study.md"
+  opened_at: "2026-05-10T03:35:00Z"
+  last_updated_at: "2026-05-10T04:15:00Z"
+  branch: "harness/task-91adca3c-06a5-4b69-8d9e-dd4e51b2a224"
+  twin_blocked: true
+  twin_block_reason: "coordinator sandbox cannot reach lepios-one.vercel.app (Host not in allowlist)"
+  pending_colin_questions:
+    - "receipt_lines: new table vs extending receipts with source_email_id + line_items JSONB"
+    - "bank/CC reconciliation target: transactions.receipt_id FK or different table?"
+    - "camera OCR /receipts page: considered complete for T-003, or needs 90-day/sort/filter changes?"
+    - "extraction method: Claude text API vs rule-based regex for body_text → structured fields"
+  proposed_chunks:
+    - "T003-A: Gmail extraction pipeline (source_email_id + line_items migration + extraction cron)"
+    - "T003-B: /receipts 90-day view + sort/filter (API + UI updates)"
+    - "T003-C: Bank/CC reconciliation (link receipts to transactions; F20 fix on ReconciliationPage)"
+    - "T003-D: morning_digest line (X new receipts, Y unreconciled)"
+  pre_condition: "Sprint 5 gmail-scanner must be grounded before T003-A ships meaningfully"
+  pre_condition_status: "gmail-scanner awaiting grounding (env vars + migration 0022 in prod needed)"
