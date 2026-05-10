@@ -14,17 +14,39 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const month = searchParams.get('month')
+  const yearParam = searchParams.get('year')
 
+  const { supabase } = gate
+
+  // ── Year (YTD) query path ─────────────────────────────────────────────────
+  if (yearParam) {
+    if (!/^\d{4}$/.test(yearParam)) {
+      return NextResponse.json({ error: 'year param must be YYYY' }, { status: 400 })
+    }
+    const from = `${yearParam}-01-01`
+    const to = `${yearParam}-12-31`
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('*')
+      .or(
+        `receipt_date.gte.${from},receipt_date.lte.${to},and(receipt_date.is.null,upload_date.gte.${from},upload_date.lte.${to})`
+      )
+      .order('receipt_date', { ascending: false, nullsFirst: false })
+      .order('upload_date', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ receipts: (data ?? []) as Receipt[] })
+  }
+
+  // ── Month query path ──────────────────────────────────────────────────────
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
-    return NextResponse.json({ error: 'month param required (YYYY-MM)' }, { status: 400 })
+    return NextResponse.json({ error: 'month or year param required (YYYY-MM or YYYY)' }, { status: 400 })
   }
 
   const [year, mo] = month.split('-').map(Number)
   const lastDay = new Date(year, mo, 0).getDate()
   const from = `${month}-01`
   const to = `${month}-${String(lastDay).padStart(2, '0')}`
-
-  const { supabase } = gate
 
   // Fetch receipts whose receipt_date falls in the month (primary),
   // OR whose upload_date falls in the month when receipt_date is null.

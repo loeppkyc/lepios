@@ -347,8 +347,19 @@ function MonthlySummary({ receipts }: { receipts: Receipt[] }) {
 
 // ── Bookkeeper month view ─────────────────────────────────────────────────────
 
-function BookkeeperView({ receipts }: { receipts: Receipt[] }) {
+const BK_PAGE_SIZE = 100
+const BK_LOAD_STEP = 50
+
+interface BookkeeperViewProps {
+  receipts: Receipt[]
+  ytdMode?: boolean
+  year?: number
+  fetchMs?: number
+}
+
+function BookkeeperView({ receipts, ytdMode = false, year, fetchMs }: BookkeeperViewProps) {
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
+  const [monthVisible, setMonthVisible] = useState<Record<string, number>>({})
 
   function toggleMonth(m: string) {
     setOpenMonths((prev) => {
@@ -357,6 +368,10 @@ function BookkeeperView({ receipts }: { receipts: Receipt[] }) {
       else next.add(m)
       return next
     })
+  }
+
+  function showMore(mk: string) {
+    setMonthVisible((prev) => ({ ...prev, [mk]: (prev[mk] ?? BK_PAGE_SIZE) + BK_LOAD_STEP }))
   }
 
   // Group by receipt_date month (fall back to upload_date)
@@ -379,8 +394,30 @@ function BookkeeperView({ receipts }: { receipts: Receipt[] }) {
     )
   }
 
+  const benchmarkExceeded = fetchMs !== undefined && fetchMs > 1000
+
   return (
     <div className="space-y-2">
+      {ytdMode && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2">
+          <span className="font-ui text-[10px] font-bold tracking-wider text-[var(--color-text-disabled)] uppercase">
+            {year} YTD
+          </span>
+          <span className="font-mono text-xs text-[var(--color-text-muted)]">
+            {receipts.length.toLocaleString()} receipts
+          </span>
+          <span className="font-ui text-xs text-[var(--color-text-muted)]">
+            {sortedMonths.length} month{sortedMonths.length !== 1 ? 's' : ''}
+          </span>
+          {fetchMs !== undefined && (
+            <span
+              className={`font-mono text-[10px] ${benchmarkExceeded ? 'text-[var(--color-warning,#ff9800)]' : 'text-[var(--color-text-disabled)]'}`}
+            >
+              loaded in {fetchMs}ms{benchmarkExceeded ? ' · exceeds 1s benchmark' : ''}
+            </span>
+          )}
+        </div>
+      )}
       {sortedMonths.map((mk) => {
         const recs = byMonth.get(mk) ?? []
         const totalSpend = recs.reduce((s, r) => s + (r.total ?? 0), 0)
@@ -424,47 +461,71 @@ function BookkeeperView({ receipts }: { receipts: Receipt[] }) {
               <div className="bg-[var(--color-surface)] px-4 py-3">
                 {/* Receipt list */}
                 <div className="mb-4 space-y-1">
-                  {recs
-                    .slice()
-                    .sort((a, b) => {
+                  {/* Column header with MT timezone note */}
+                  <div className="font-ui mb-1 flex items-center gap-2 text-[9px] font-bold tracking-wider text-[var(--color-text-disabled)] uppercase">
+                    <span className="w-3 shrink-0" />
+                    <span className="w-24 shrink-0">Date (MT)</span>
+                    <span className="flex-1">Vendor</span>
+                    <span className="w-16 text-right">Total</span>
+                    <span className="max-w-[160px]">Category</span>
+                    <span className="w-12" />
+                  </div>
+                  {(() => {
+                    const sortedRecs = recs.slice().sort((a, b) => {
                       const da = a.receipt_date ?? a.upload_date
                       const db = b.receipt_date ?? b.upload_date
                       return da < db ? -1 : 1
                     })
-                    .map((r) => (
-                      <div
-                        key={r.id}
-                        className="font-ui flex items-center gap-2 text-xs text-[var(--color-text-secondary)]"
-                      >
-                        <span
-                          className={
-                            r.match_status === 'matched'
-                              ? 'text-[var(--color-positive,#4caf50)]'
-                              : 'text-[var(--color-warning,#ff9800)]'
-                          }
-                        >
-                          {r.match_status === 'matched' ? '✓' : '!'}
-                        </span>
-                        <span className="w-24 shrink-0 font-mono">
-                          {r.receipt_date ?? r.upload_date}
-                        </span>
-                        <span className="flex-1 truncate">{r.vendor || '—'}</span>
-                        <span className="font-mono">${fmt(r.total)}</span>
-                        <span className="max-w-[160px] truncate text-[var(--color-text-muted)]">
-                          {r.category}
-                        </span>
-                        {r.storage_path && (
-                          <a
-                            href={`/api/receipts/${r.id}/image`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 text-[var(--color-pillar-money)] underline"
+                    const visible = monthVisible[mk] ?? BK_PAGE_SIZE
+                    const shownRecs = sortedRecs.slice(0, visible)
+                    const remaining = sortedRecs.length - visible
+                    return (
+                      <>
+                        {shownRecs.map((r) => (
+                          <div
+                            key={r.id}
+                            className="font-ui flex items-center gap-2 text-xs text-[var(--color-text-secondary)]"
                           >
-                            Receipt
-                          </a>
+                            <span
+                              className={
+                                r.match_status === 'matched'
+                                  ? 'text-[var(--color-positive,#4caf50)]'
+                                  : 'text-[var(--color-warning,#ff9800)]'
+                              }
+                            >
+                              {r.match_status === 'matched' ? '✓' : '!'}
+                            </span>
+                            <span className="w-24 shrink-0 font-mono">
+                              {r.receipt_date ?? r.upload_date}
+                            </span>
+                            <span className="flex-1 truncate">{r.vendor || '—'}</span>
+                            <span className="font-mono">${fmt(r.total)}</span>
+                            <span className="max-w-[160px] truncate text-[var(--color-text-muted)]">
+                              {r.category}
+                            </span>
+                            {r.storage_path && (
+                              <a
+                                href={`/api/receipts/${r.id}/image`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 text-[var(--color-pillar-money)] underline"
+                              >
+                                Receipt
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                        {remaining > 0 && (
+                          <button
+                            onClick={() => showMore(mk)}
+                            className="font-ui mt-2 cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-3 py-1.5 text-[10px] font-semibold text-[var(--color-text-muted)]"
+                          >
+                            Show {Math.min(BK_LOAD_STEP, remaining)} more ({remaining} remaining)
+                          </button>
                         )}
-                      </div>
-                    ))}
+                      </>
+                    )
+                  })()}
                 </div>
 
                 {/* Category breakdown */}
@@ -507,12 +568,20 @@ export function ReceiptsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
+  const [viewMode, setViewMode] = useState<'month' | 'ytd'>('month')
   const [month, setMonth] = useState(currentMonthStr)
   const [activeTab, setActiveTab] = useState<ActiveTab>('receipts')
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loadingReceipts, setLoadingReceipts] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [refetchKey, setRefetchKey] = useState(0)
+
+  // YTD state
+  const [ytdReceipts, setYtdReceipts] = useState<Receipt[]>([])
+  const [ytdLoading, setYtdLoading] = useState(false)
+  const [ytdError, setYtdError] = useState<string | null>(null)
+  const [ytdRefetchKey, setYtdRefetchKey] = useState(0)
+  const [ytdFetchMs, setYtdFetchMs] = useState<number | null>(null)
 
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [scanError, setScanError] = useState<string | null>(null)
@@ -550,6 +619,39 @@ export function ReceiptsPage() {
       cancelled = true
     }
   }, [month, refetchKey])
+
+  // ── Load YTD receipts (full year fetch, Edmonton MT Jan 1 cutoff) ──
+  useEffect(() => {
+    if (viewMode !== 'ytd') return
+    let cancelled = false
+    const t0 = performance.now()
+
+    async function loadYtd() {
+      setYtdLoading(true)
+      setYtdError(null)
+      try {
+        const res = await fetch(`/api/receipts?year=${currentYear}`)
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(body.error ?? `HTTP ${res.status}`)
+        }
+        const data = (await res.json()) as { receipts: Receipt[] }
+        if (!cancelled) {
+          setYtdReceipts(data.receipts)
+          setYtdFetchMs(Math.round(performance.now() - t0))
+        }
+      } catch (e: unknown) {
+        if (!cancelled) setYtdError(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setYtdLoading(false)
+      }
+    }
+
+    void loadYtd()
+    return () => {
+      cancelled = true
+    }
+  }, [viewMode, currentYear, ytdRefetchKey])
 
   // ── Scan a file ──
   async function handleFile(file: File) {
@@ -631,6 +733,7 @@ export function ReceiptsPage() {
       setPendingFile(null)
       setOcrForm(null)
       setRefetchKey((k) => k + 1)
+      setYtdRefetchKey((k) => k + 1)
     } catch (e: unknown) {
       setScanError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -642,7 +745,10 @@ export function ReceiptsPage() {
   async function handleDelete(id: string) {
     if (!confirm('Delete this receipt?')) return
     const res = await fetch(`/api/receipts/${id}`, { method: 'DELETE' })
-    if (res.ok) setRefetchKey((k) => k + 1)
+    if (res.ok) {
+      setRefetchKey((k) => k + 1)
+      setYtdRefetchKey((k) => k + 1)
+    }
   }
 
   // ── Drag-drop handlers ──
@@ -668,23 +774,51 @@ export function ReceiptsPage() {
     <div className="mx-auto max-w-[960px] px-8 py-7">
       {/* ── Header ── */}
       <div className="mb-6 flex items-center justify-between">
-        <span className="font-ui text-xs font-bold tracking-[0.1em] text-[var(--color-pillar-money)] uppercase">
-          Receipts
-        </span>
-        <select
-          value={month}
-          onChange={(e) => {
-            setMonth(e.target.value)
-            setScanState('idle')
-          }}
-          className="font-ui w-48 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {monthLabel(m)}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <span className="font-ui text-xs font-bold tracking-[0.1em] text-[var(--color-pillar-money)] uppercase">
+            Receipts
+          </span>
+          {/* View mode toggle */}
+          <div className="flex overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)]">
+            {(['month', 'ytd'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => {
+                  setViewMode(mode)
+                  if (mode === 'ytd') setActiveTab('bookkeeper')
+                }}
+                className={`font-ui cursor-pointer border-0 px-3 py-1 text-[10px] font-bold tracking-wider uppercase transition-colors ${
+                  viewMode === mode
+                    ? 'bg-[var(--color-pillar-money)] text-white'
+                    : 'bg-[var(--color-surface-2)] text-[var(--color-text-muted)]'
+                }`}
+              >
+                {mode === 'month' ? 'This Month' : 'YTD'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {viewMode === 'month' ? (
+          <select
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value)
+              setScanState('idle')
+            }}
+            className="font-ui w-48 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm text-[var(--color-text-primary)] outline-none"
+          >
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthLabel(m)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="font-mono text-xs text-[var(--color-text-muted)]">
+            {currentYear} YTD
+          </span>
+        )}
       </div>
 
       {/* ── Upload Zone ── */}
@@ -771,19 +905,26 @@ export function ReceiptsPage() {
 
       {/* ── Tab switcher ── */}
       <div className="mb-4 flex gap-1 border-b border-[var(--color-border)] pb-0">
-        {(['receipts', 'bookkeeper'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`font-ui cursor-pointer border-t-0 border-r-0 border-b-2 border-l-0 bg-transparent px-4 py-2 text-xs font-bold tracking-wider uppercase transition-colors ${
-              activeTab === tab
-                ? 'border-b-[var(--color-pillar-money)] text-[var(--color-pillar-money)]'
-                : 'border-b-transparent text-[var(--color-text-muted)]'
-            }`}
-          >
-            {tab === 'receipts' ? 'Receipt List' : 'Bookkeeper View'}
-          </button>
-        ))}
+        {(['receipts', 'bookkeeper'] as const).map((tab) => {
+          const disabledInYtd = tab === 'receipts' && viewMode === 'ytd'
+          return (
+            <button
+              key={tab}
+              onClick={() => {
+                if (disabledInYtd) return
+                setActiveTab(tab)
+              }}
+              disabled={disabledInYtd}
+              className={`font-ui cursor-pointer border-t-0 border-r-0 border-b-2 border-l-0 bg-transparent px-4 py-2 text-xs font-bold tracking-wider uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                activeTab === tab
+                  ? 'border-b-[var(--color-pillar-money)] text-[var(--color-pillar-money)]'
+                  : 'border-b-transparent text-[var(--color-text-muted)]'
+              }`}
+            >
+              {tab === 'receipts' ? 'Receipt List' : 'Bookkeeper View'}
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Receipts List Tab ── */}
@@ -945,7 +1086,22 @@ export function ReceiptsPage() {
       {/* ── Bookkeeper View Tab ── */}
       {activeTab === 'bookkeeper' && (
         <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          {loadingReceipts ? (
+          {viewMode === 'ytd' ? (
+            ytdLoading ? (
+              <p className="font-ui text-sm text-[var(--color-text-disabled)]">
+                Loading {currentYear} YTD receipts…
+              </p>
+            ) : ytdError ? (
+              <p className="font-ui text-sm text-[var(--color-critical)]">Error: {ytdError}</p>
+            ) : (
+              <BookkeeperView
+                receipts={ytdReceipts}
+                ytdMode
+                year={currentYear}
+                fetchMs={ytdFetchMs ?? undefined}
+              />
+            )
+          ) : loadingReceipts ? (
             <p className="font-ui text-sm text-[var(--color-text-disabled)]">Loading…</p>
           ) : (
             <BookkeeperView receipts={receipts} />
