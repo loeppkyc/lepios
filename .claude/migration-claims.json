@@ -203,7 +203,13 @@
       "filename": "0176_coordinator_module_lock.sql",
       "claimed_at": "2026-05-10",
       "note": "Add harness_module_id bridge column to streamlit_modules + rewrite claim_next_task() with LEFT JOIN to skip tasks whose matched module is locked (in_progress_branch or manual_owner set). Seed: pages/21_PageProfit.py → pageprofit-scanner. Companion: pickup-runner.ts module-locked diagnostic shim."
+    },
+    "0177": {
+      "branch": "task/da21ea58-atomic-quota",
+      "filename": "0177_routines_counter_atomic.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Task da21ea58 — replace read-modify-write quota counter in invoke-coordinator.ts with atomic Postgres function increment_routines_counter(). FOR UPDATE row lock prevents concurrent-fire race on ROUTINES_INVOCATIONS_TODAY."
     }
   },
-  "next_available": 177
+  "next_available": 178
 }
