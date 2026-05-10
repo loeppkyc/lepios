@@ -26,7 +26,7 @@ export async function computeT4(): Promise<TrackResult> {
     return {
       track: 't4',
       label: 'Streamlit Port Backlog',
-      strategic_weight_pct: 15,
+      strategic_weight_pct: 13.5,
       source: 'db',
       rollup_pct,
       raw_pts: doneCount,
@@ -42,7 +42,7 @@ export async function computeT4(): Promise<TrackResult> {
     return {
       track: 't4',
       label: 'Streamlit Port Backlog',
-      strategic_weight_pct: 15,
+      strategic_weight_pct: 13.5,
       source: 'db',
       rollup_pct: 0,
       raw_pts: 0,

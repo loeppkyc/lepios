@@ -5,6 +5,7 @@ import { computeT2 } from './sources/t2-amazon'
 import { computeT3 } from './sources/t3-local-sales'
 import { computeT4 } from './sources/t4-streamlit'
 import { computeT5 } from './sources/t5-gpu-day'
+import { computeT6 } from './sources/t6-parked-backlog'
 import type { RollupReport, TrackResult } from './types'
 
 async function fetchPrevStrategicPct(): Promise<number | null> {
@@ -54,7 +55,7 @@ async function logToAgentEvents(report: RollupReport): Promise<void> {
 export async function computeRollup(): Promise<RollupReport> {
   const start = Date.now()
 
-  const [prevPct, t1, t1b, t2, t3, t4, t5] = await Promise.all([
+  const [prevPct, t1, t1b, t2, t3, t4, t5, t6] = await Promise.all([
     fetchPrevStrategicPct(),
     computeT1(),
     computeT1b(),
@@ -62,9 +63,10 @@ export async function computeRollup(): Promise<RollupReport> {
     computeT3(),
     computeT4(),
     computeT5(),
+    computeT6(),
   ])
 
-  const tracks: TrackResult[] = [t1, t1b, t2, t3, t4, t5]
+  const tracks: TrackResult[] = [t1, t1b, t2, t3, t4, t5, t6]
 
   const strategic_pct =
     Math.round(

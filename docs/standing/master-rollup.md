@@ -40,16 +40,16 @@ Strategic math: T1 20%×100.0=20.00 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 �
 
 ## Track Summary
 
-| #   | Track                    | Items         | %            | Strategic weight | Source                                                                            |
-| --- | ------------------------ | ------------- | ------------ | ---------------- | --------------------------------------------------------------------------------- |
-| 1   | Autonomous Harness       | 21 components | **61.6%**    | 20%              | `harness_components` — live DB, queried 2026-05-01                                |
-| 1b  | Product Components       | 7 components  | **88.0%**    | 5%               | `product_components` — live DB, queried 2026-05-01                                |
-| 2   | Amazon Pipeline          | 21 components | **56.1%**    | 40%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
-| 3   | Local Sales              | 3 items       | **0%**       | 5%               | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
-| 4   | Streamlit Port Backlog   | 234 modules   | **0%**       | 15%              | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
-| 5   | GPU Day Readiness        | 27 line items | **71.0%**    | 15%              | `docs/gpu-day-readiness.md`                                                       |
-| 6   | Life Tracks              | 3 items       | visible only | unweighted       | memory; no capture infrastructure                                                 |
-| 7   | Parked / Future Products | 8 ideas       | 0% by design | unweighted       | `docs/harness/PENDING_ADDITIONS.md`                                               |
+| #   | Track                  | Items         | %            | Strategic weight | Source                                                                            |
+| --- | ---------------------- | ------------- | ------------ | ---------------- | --------------------------------------------------------------------------------- |
+| 1   | Autonomous Harness     | 21 components | **61.6%**    | 18%              | `harness_components` — live DB, queried 2026-05-01                                |
+| 1b  | Product Components     | 7 components  | **88.0%**    | 4.5%             | `product_components` — live DB, queried 2026-05-01                                |
+| 2   | Amazon Pipeline        | 21 components | **56.1%**    | 36%              | `docs/lepios/amazon-pipeline-rollup.md`                                           |
+| 3   | Local Sales            | 3 items       | **0%**       | 4.5%             | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
+| 4   | Streamlit Port Backlog | 234 modules   | **0%**       | 13.5%            | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
+| 5   | GPU Day Readiness      | 27 line items | **96.0%**    | 13.5%            | `docs/gpu-day-readiness.md`                                                       |
+| 6   | Parked Backlog         | 41 items      | **0.0%**     | 10%              | `docs/standing/parked-backlog.md`                                                 |
+| L1  | Life Tracks            | 3 items       | visible only | unweighted       | memory; no capture infrastructure                                                 |
 
 ---
 
@@ -233,32 +233,24 @@ Utility Tracker (52_Utility_Tracker.py) is the only ported module with a complet
 
 ---
 
-## T6 — Life Tracks
+## T6 — Parked Backlog
 
-Visible but unweighted. No % contribution to either portfolio rollup. No infrastructure for systematic tracking exists yet; items are captured here so they don't disappear between sessions.
+**Rollup: 0.0 / 100** · source: `docs/standing/parked-backlog.md`, added 2026-05-10  
+28 items across 4 tiers. Score = resolved (delivered + dropped) / total × 100. Starts at 0% — climbs as items ship or are explicitly dropped.
+
+See [`docs/standing/parked-backlog.md`](parked-backlog.md) for the full item list and update instructions.
+
+---
+
+## L1 — Life Tracks
+
+Visible but unweighted. No % contribution to portfolio rollup. Items are captured here so they don't disappear between sessions.
 
 | Track                 | Status                                          |
 | --------------------- | ----------------------------------------------- |
 | USA move planning     | Referenced in prior sessions; no doc, no module |
-| Tesla API integration | Parked idea; no spec                            |
-| Edge injury insurance | Parked idea; no spec                            |
-
----
-
-## T7 — Parked / Future Products
-
-0% by design — holding queue, not in any sprint.
-
-| Idea                                    | Gate / notes                                       | Source            |
-| --------------------------------------- | -------------------------------------------------- | ----------------- |
-| Amazon legal tool (IP pre-screener)     | No hard gate; parked                               | PENDING_ADDITIONS |
-| Building permit pre-screener            | No hard gate; parked                               | PENDING_ADDITIONS |
-| dev_market_intel ("Keepa for dev work") | Hard problem: no public completed-job feeds        | PENDING_ADDITIONS |
-| training_pipeline (LoRA 7B fine-tune)   | Gates: GPU + 6 months corpus + fine-tuning skills  | PENDING_ADDITIONS |
-| arbitrage_training_corpus               | ~10% — decision logging ad-hoc; schema not defined | PENDING_ADDITIONS |
-| AI control center                       | Name/scope not specified                           | memory            |
-| GitHackers                              | Name unclear; surfaced once                        | PENDING_ADDITIONS |
-| Square webhook ingestion                | Gates on local_sales T3 (migration 0062) landing   | PENDING_ADDITIONS |
+| Tesla API integration | Moved to T6 Parked Backlog (item D6)            |
+| Edge injury insurance | Moved to T6 Parked Backlog (item C9)            |
 
 ---
 
@@ -291,10 +283,9 @@ This is the answer to "biggest progress per paste."
 
 ## Open Questions for Colin
 
-| #   | Question                                                                                                                | Blocking what |
-| --- | ----------------------------------------------------------------------------------------------------------------------- | ------------- |
-| Q2  | Streamlit Port (T4): are any specific tiers or modules ready to be promoted to the next sprint?                         | T4 roadmap    |
-| Q3  | Life Tracks (T6): do USA move / Tesla API / injury insurance warrant a formal spec + weighting, or remain capture-only? | T6 structure  |
+| #   | Question                                                                                        | Blocking what |
+| --- | ----------------------------------------------------------------------------------------------- | ------------- |
+| Q2  | Streamlit Port (T4): are any specific tiers or modules ready to be promoted to the next sprint? | T4 roadmap    |
 
 ---
 
