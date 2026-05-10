@@ -217,3 +217,31 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-10T04:00:00Z sprint=leverage-targets chunk=T-005 doc=docs/sprint-5/t005-net-worth-study.md
+cited_principles: [Phase 1b twin Q&A required before acceptance doc; twin unreachable — all 7 questions → Colin]
+trigger_match_evidence: |
+  cache_match_enabled = true per sprint-state.md Sprint 5 state.
+  However, 7 design decisions arose during Phase 1a that cannot be cache-matched:
+  1. manual_assets vs balance_sheet_entries (data model decision)
+  2. inventory auto-pull from inventory_snapshots.value_at_cost (integration scope)
+  3. vehicle auto-pull from vehicles.current_value_estimate (integration scope)
+  4. "transactions and business_review" — concrete field list unknown (intent clarification)
+  5. F20 fix scope — include in T-005 or separate task (scope decision)
+  6. daily auto-snapshot cron vs manual-only + staleness warning (behavior decision)
+  7. chart type — keep SVG multi-line, shadcn AreaChart stacked, or true Sankey
+  None of these have prior decisions to cache-match against. Per Phase 1b Step 3 fallback:
+  "If the twin endpoint is unreachable for all questions, surface all questions to Colin in one batch."
+  Twin returned "Host not in allowlist" for every query.
+reversibility_check: |
+  Study doc: new file at docs/sprint-5/t005-net-worth-study.md — fully reversible.
+  auto-proceed-log.md append: this entry — append-only, reversible via git.
+  sprint-state.md update: document only, no code/schema effect.
+  No code written, no schema changed. All 7 items require Colin decision before builder starts.
+confidence: high (escalation correct; 7 design decisions require Colin input, not cache-match)
+outcome: escalated
+escalation_reasons:
+- twin_unreachable_all_queries (endpoint blocked from coordinator sandbox — host_not_in_allowlist)
+- 7_design_decisions_required (data model, integration scope, F20 fix scope, chart type, cron vs manual)

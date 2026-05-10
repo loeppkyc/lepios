@@ -284,3 +284,31 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+
+# Leverage Target T-005 — Net Worth (2026-05-10)
+
+# ============================================================
+
+t005_net_worth:
+leverage_target_id: "T-005"
+task_id: "ca9f3e22-1ca9-4b4e-9555-1e948b1beedc"
+run_id: "66eb5186-62f3-4901-ad3a-77b59817b200"
+status: "awaiting-colin-questions"
+current_pct: 20
+study_doc: "docs/sprint-5/t005-net-worth-study.md"
+acceptance_doc: null
+phase: "1b — escalating 7 design questions to Colin (twin unreachable)"
+branch: "harness/task-ca9f3e22-1ca9-4b4e-9555-1e948b1beedc"
+opened_at: "2026-05-10T03:40:00Z"
+last_updated_at: "2026-05-10T04:00:00Z"
+pending_colin_questions:
+- "Q1: manual_assets table vs extending balance_sheet_entries for crypto/real-estate?"
+- "Q2: inventory value — auto-pull from inventory_snapshots.value_at_cost or keep manual?"
+- "Q3: vehicle value — auto-pull from vehicles.current_value_estimate or keep manual balance_sheet_entries row?"
+- "Q4: what specifically from transactions + business_review should appear as net worth line items?"
+- "Q5: F20 style={} fix — part of T-005 or separate cleanup task?"
+- "Q6: daily auto-snapshot cron in addition to manual button, or manual-only + staleness warning?"
+- "Q7: chart type — keep SVG multi-line, shadcn AreaChart stacked, or true Sankey?"
+resume_instructions: "Colin answers Q1-Q7 via new task_queue row with metadata.prior_task_id=ca9f3e22-1ca9-4b4e-9555-1e948b1beedc. Coordinator reads answers and writes acceptance doc (Phase 1d)."
