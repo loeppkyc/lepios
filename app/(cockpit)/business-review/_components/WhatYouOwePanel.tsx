@@ -128,6 +128,20 @@ function shortDate(isoTimestamp: string): string {
 // polling at 15 min cadence is harmless (cache hit until ttl expires).
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000
 
+// Hard timeout on each fetch. Without it, a hung route leaves the panel stuck
+// at "Loading…" indefinitely. 60s covers cold-start + SP-API retry budget.
+const FETCH_TIMEOUT_MS = 60 * 1000
+
+function friendlyError(message: string): string {
+  if (/SP-API|HTTP 5\d\d|InternalFailure|ServiceUnavailable/i.test(message)) {
+    return 'Amazon temporarily unavailable'
+  }
+  if (/aborted|timeout|timed out/i.test(message)) {
+    return 'Request timed out — will retry'
+  }
+  return 'Could not load — will retry'
+}
+
 export function WhatYouOwePanel() {
   const [settlement, setSettlement] = useState<SettlementResponse | null>(null)
   const [settlementError, setSettlementError] = useState<string | null>(null)
@@ -143,9 +157,14 @@ export function WhatYouOwePanel() {
   // without waiting for the 30-min-cached FBA route
   useEffect(() => {
     let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const load = () => {
-      fetch('/api/business-review/settlement', { cache: 'no-store' })
+      const controller = new AbortController()
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+      fetch('/api/business-review/settlement', { cache: 'no-store', signal: controller.signal })
         .then(async (res) => {
           if (!res.ok) {
             const body = (await res.json().catch(() => ({}))) as { error?: string }
@@ -164,21 +183,33 @@ export function WhatYouOwePanel() {
           setSettlementError(err instanceof Error ? err.message : String(err))
           setSettlementLoading(false)
         })
+        .finally(() => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
+        })
     }
 
     load()
     const interval = setInterval(load, REFRESH_INTERVAL_MS)
     return () => {
       cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
       clearInterval(interval)
     }
   }, [])
 
   useEffect(() => {
     let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const load = () => {
-      fetch('/api/business-review/fba-inventory', { cache: 'no-store' })
+      const controller = new AbortController()
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+      fetch('/api/business-review/fba-inventory', { cache: 'no-store', signal: controller.signal })
         .then(async (res) => {
           if (!res.ok) {
             const body = (await res.json().catch(() => ({}))) as { error?: string }
@@ -197,12 +228,19 @@ export function WhatYouOwePanel() {
           setFbaError(err instanceof Error ? err.message : String(err))
           setFbaLoading(false)
         })
+        .finally(() => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
+        })
     }
 
     load()
     const interval = setInterval(load, REFRESH_INTERVAL_MS)
     return () => {
       cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
       clearInterval(interval)
     }
   }, [])
@@ -266,14 +304,16 @@ export function WhatYouOwePanel() {
         ? fbaInventory.fulfillableUnits.toString()
         : '—'
 
-  // Constraint B-8: sub-label shows cache age from fetchedAt
+  // Constraint B-8: sub-label shows cache age from fetchedAt.
+  // Errors are translated to friendly text — raw SP-API JSON dumps shouldn't
+  // reach the UI. Technical detail is preserved in the dev-mode debug section.
   const fbaSubLabel = fbaInventory
     ? `Last updated: ${minutesAgo(fbaInventory.fetchedAt)}`
     : fbaError
-      ? fbaError
+      ? friendlyError(fbaError)
       : undefined
 
-  const settlementSubLabel = settlementError ? settlementError : undefined
+  const settlementSubLabel = settlementError ? friendlyError(settlementError) : undefined
 
   return (
     <div
@@ -321,7 +361,7 @@ export function WhatYouOwePanel() {
               wordBreak: 'break-all',
             }}
           >
-            {JSON.stringify({ settlement, fbaInventory }, null, 2)}
+            {JSON.stringify({ settlement, settlementError, fbaInventory, fbaError }, null, 2)}
           </pre>
         </DebugSection>
       )}
