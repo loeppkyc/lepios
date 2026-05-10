@@ -63,6 +63,7 @@ ${trackLine('t2')}
 ${trackLine('t3')}
 ${trackLine('t4')}
 ${trackLine('t5')}
+${trackLine('t6')}
 
 **Strategic rollup: ${strategic_pct.toFixed(1)}%**${deltaStr}
 

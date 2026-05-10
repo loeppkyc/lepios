@@ -20,7 +20,7 @@ export async function computeT1b(): Promise<TrackResult> {
     return {
       track: 't1b',
       label: 'Product Components',
-      strategic_weight_pct: 5,
+      strategic_weight_pct: 4.5,
       source: 'db',
       rollup_pct: denom > 0 ? Math.round((pts / denom) * 1000) / 10 : 0,
       raw_pts: Math.round(pts * 100) / 100,
@@ -35,7 +35,7 @@ export async function computeT1b(): Promise<TrackResult> {
     return {
       track: 't1b',
       label: 'Product Components',
-      strategic_weight_pct: 5,
+      strategic_weight_pct: 4.5,
       source: 'db',
       rollup_pct: 0,
       raw_pts: 0,

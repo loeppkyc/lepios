@@ -44,7 +44,7 @@ export async function computeT2(): Promise<TrackResult> {
     return {
       track: 't2',
       label: 'Amazon Pipeline',
-      strategic_weight_pct: 40,
+      strategic_weight_pct: 36,
       source: 'doc_parse',
       rollup_pct: Math.round(rollup * 10) / 10,
       raw_pts: Math.round(totalPts * 100) / 100,
@@ -59,7 +59,7 @@ export async function computeT2(): Promise<TrackResult> {
     return {
       track: 't2',
       label: 'Amazon Pipeline',
-      strategic_weight_pct: 40,
+      strategic_weight_pct: 36,
       source: 'doc_parse',
       rollup_pct: 0,
       raw_pts: 0,

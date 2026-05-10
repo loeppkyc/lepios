@@ -20,7 +20,7 @@ export async function computeT1(): Promise<TrackResult> {
     return {
       track: 't1',
       label: 'Autonomous Harness',
-      strategic_weight_pct: 20,
+      strategic_weight_pct: 18,
       source: 'db',
       rollup_pct: denom > 0 ? Math.round((pts / denom) * 1000) / 10 : 0,
       raw_pts: Math.round(pts * 100) / 100,
@@ -35,7 +35,7 @@ export async function computeT1(): Promise<TrackResult> {
     return {
       track: 't1',
       label: 'Autonomous Harness',
-      strategic_weight_pct: 20,
+      strategic_weight_pct: 18,
       source: 'db',
       rollup_pct: 0,
       raw_pts: 0,

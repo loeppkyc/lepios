@@ -33,7 +33,7 @@ export async function computeT3(): Promise<TrackResult> {
     return {
       track: 't3',
       label: 'Local Sales',
-      strategic_weight_pct: 5,
+      strategic_weight_pct: 4.5,
       source: 'hardcoded',
       rollup_pct,
       raw_pts: rollup_pct,
@@ -48,7 +48,7 @@ export async function computeT3(): Promise<TrackResult> {
     return {
       track: 't3',
       label: 'Local Sales',
-      strategic_weight_pct: 5,
+      strategic_weight_pct: 4.5,
       source: 'hardcoded',
       rollup_pct: 0,
       raw_pts: 0,
