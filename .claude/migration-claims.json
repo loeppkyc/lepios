@@ -191,7 +191,13 @@
       "filename": "0174_streamlit_modules_lock.sql",
       "claimed_at": "2026-05-10",
       "note": "manual_owner + in_progress_branch + locked_at columns on streamlit_modules. Partial index idx_streamlit_modules_unlocked for coordinator eligibility query. Required before continuous mode restart (~02:40 UTC 2026-05-11)."
+    },
+    "0175": {
+      "branch": "feat/routines-quota-forecaster",
+      "filename": "0175_routines_quota_cursor.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Routines quota cursor — seeds ROUTINES_BACKOFF_UNTIL, ROUTINES_INVOCATIONS_TODAY, ROUTINES_INVOCATIONS_WINDOW_START in harness_config. Gives quota-guard and quota-forecast O(1) reads instead of per-tick agent_events scan. Fix for 429 cliffs at 14:35 + 20:40 UTC 2026-05-09."
     }
   },
-  "next_available": 175
+  "next_available": 176
 }

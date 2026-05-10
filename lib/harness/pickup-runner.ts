@@ -7,6 +7,7 @@ import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 import { recordAttribution } from '@/lib/attribution/writer'
+import { forecastQuotaBeforeStart } from '@/lib/harness/quota-forecast'
 import {
   getActiveSession,
   canClaimNextTask,
@@ -269,6 +270,36 @@ export async function runPickup(runId: string): Promise<PickupResult> {
         duration_ms,
         ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
       }
+    }
+  }
+
+  // Proactive quota forecast — halt before cliff when ≤ TASK_COST_MAX invocations remain.
+  // Runs before the reactive guard; fails open so forecast errors never block pickup.
+  const forecast = await forecastQuotaBeforeStart()
+  if (!forecast.safe_to_start) {
+    const duration_ms = Date.now() - start
+    void logEvent(
+      runId,
+      'warning',
+      null,
+      `coordinator_startup_skipped_quota_forecast: ${forecast.reason}`,
+      duration_ms,
+      'coordinator_startup_skipped_quota_forecast',
+      {
+        reason: forecast.reason,
+        invocations_24h: forecast.invocations_24h,
+        cliff_threshold: forecast.cliff_threshold,
+        estimated_remaining: forecast.estimated_remaining,
+        recommended_wait_minutes: forecast.recommended_wait_minutes ?? null,
+      }
+    )
+    return {
+      ok: true,
+      claimed: null,
+      reason: 'quota-forecast',
+      run_id: runId,
+      duration_ms,
+      ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
     }
   }
 

@@ -113,6 +113,24 @@ export async function fireCoordinator(params: {
       },
     })
 
+    // Write backoff cursor so quota-guard gets O(1) reads instead of a 24h lookback.
+    if (upstreamStatus === 429) {
+      try {
+        const retryAfterSec = retryAfter !== null ? Number(retryAfter) : NaN
+        const cutoffMs =
+          !isNaN(retryAfterSec) && retryAfterSec >= 0
+            ? Date.now() + retryAfterSec * 1_000
+            : Date.now() + 60 * 60 * 1_000 // 1h fallback
+        const db2 = createServiceClient()
+        await db2
+          .from('harness_config')
+          .update({ value: new Date(cutoffMs).toISOString() })
+          .eq('key', 'ROUTINES_BACKOFF_UNTIL')
+      } catch {
+        // Non-fatal — guard falls back to agent_events lookback
+      }
+    }
+
     return {
       ok: false,
       error: errMsg,
@@ -137,6 +155,35 @@ export async function fireCoordinator(params: {
       routine_id: routineId,
     },
   })
+
+  // Update rolling 24h invocation counter and clear any active backoff cursor.
+  try {
+    const db2 = createServiceClient()
+    const { data: configRows } = await db2
+      .from('harness_config')
+      .select('key, value')
+      .in('key', ['ROUTINES_INVOCATIONS_TODAY', 'ROUTINES_INVOCATIONS_WINDOW_START'])
+    const get = (k: string) =>
+      (configRows as { key: string; value: string }[] | null)?.find((r) => r.key === k)?.value ?? ''
+    const windowStart = get('ROUTINES_INVOCATIONS_WINDOW_START')
+    const windowStartMs = windowStart ? new Date(windowStart).getTime() : 0
+    const WINDOW_MS = 24 * 60 * 60 * 1_000
+    const isNewWindow = !windowStartMs || Date.now() - windowStartMs > WINDOW_MS
+    const currentCount = isNewWindow ? 0 : parseInt(get('ROUTINES_INVOCATIONS_TODAY'), 10) || 0
+    await db2
+      .from('harness_config')
+      .update({ value: String(currentCount + 1) })
+      .eq('key', 'ROUTINES_INVOCATIONS_TODAY')
+    await db2.from('harness_config').update({ value: '' }).eq('key', 'ROUTINES_BACKOFF_UNTIL')
+    if (isNewWindow) {
+      await db2
+        .from('harness_config')
+        .update({ value: new Date().toISOString() })
+        .eq('key', 'ROUTINES_INVOCATIONS_WINDOW_START')
+    }
+  } catch {
+    // Non-fatal — forecast falls back to agent_events count
+  }
 
   // Attribution: coordinator fired for this task
   void recordAttribution(

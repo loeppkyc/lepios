@@ -13,7 +13,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 
-const GUARD_WINDOW_MS = 6 * 60 * 60 * 1000 // look back 6h for 429 events
+const GUARD_WINDOW_MS = 24 * 60 * 60 * 1000 // look back 24h — must exceed max retry_after (observed 12h)
 const DEFAULT_BACKOFF_MINUTES = 60 // fallback when retry_after absent
 
 export interface QuotaGuardResult {
@@ -49,6 +49,27 @@ function parseRetryAfterCutoff(retryAfter: string | undefined, occurredAt: strin
 }
 
 export async function preClaimQuotaCheck(): Promise<QuotaGuardResult> {
+  // Primary: O(1) cursor read from harness_config — written by invoke-coordinator on 429.
+  // Falls through to agent_events lookback when the key is absent or unreadable.
+  try {
+    const db0 = createServiceClient()
+    const { data: cursorRow } = await db0
+      .from('harness_config')
+      .select('value')
+      .eq('key', 'ROUTINES_BACKOFF_UNTIL')
+      .maybeSingle()
+    const backoffUntil = (cursorRow as { value: string } | null)?.value
+    if (backoffUntil) {
+      const cutoffMs = new Date(backoffUntil).getTime()
+      if (!isNaN(cutoffMs) && cutoffMs > Date.now()) {
+        const retry_after_minutes = Math.ceil((cutoffMs - Date.now()) / 60_000)
+        return { safe_to_claim: false, reason: 'quota_429_backoff_active', retry_after_minutes }
+      }
+    }
+  } catch {
+    // Fall through to agent_events lookback
+  }
+
   try {
     const db = createServiceClient()
     const since = new Date(Date.now() - GUARD_WINDOW_MS).toISOString()
