@@ -284,3 +284,27 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+
+# Net Worth (T-005) — awaiting grounding checkpoint
+
+# ============================================================
+
+net_worth_t005:
+task_id: "3cfe78a6-1715-4ad5-b144-d4376c69e733"
+leverage_target: "T-005"
+triggered_by: "telegram_command"
+status: "awaiting-grounding"
+code_shipped: true
+prs_merged: ["94", "95"]
+migration_applied: "0133_net_worth_snapshots.sql"
+acceptance_doc: "docs/acceptance/net-worth.md"
+coordinator_handoff: "docs/handoffs/2026-05-10-net-worth-grounding.md"
+current_live_assets: "88630.14"
+current_live_liabilities: "39958.77"
+current_live_net_worth: "48671.37"
+snapshots_saved: 0
+grounding_checkpoint: "Colin navigates to /net-worth, verifies numbers, clicks Save Snapshot, confirms row in net_worth_snapshots"
+opened_at: "2026-05-10T03:45:00Z"
+last_updated_at: "2026-05-10T03:52:00Z"
