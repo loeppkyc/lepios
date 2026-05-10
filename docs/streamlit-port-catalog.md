@@ -1,7 +1,15 @@
 # Streamlit Port Catalog
 
-Generated: 2026-04-25T11:24:22.096Z
-Total modules: 234 | Pending: 234 | Complete: 0 | Deferred: 0
+Generated: 2026-04-25T11:24:22.096Z  
+Last sweep: 2026-05-10 — mass classification (DEAD/ALREADY_PORTED/NEEDS_PORT)
+Total modules: 234 | Pending: 91 | Complete: 143 | Deferred: 0
+
+Sweep breakdown (2026-05-10):
+
+- 79 DEAD: one-time scripts, Streamlit test fixtures, framework glue (app.py, utils/config.py, tests/test_*.py, etc.)
+- 25 ALREADY_PORTED pages: confirmed cockpit routes (life-pnl, monthly-expenses, payouts, receipts, health, etc.)
+- 29 ALREADY_PORTED utils: confirmed lib/ replacements (lib/amazon/, lib/telegram/, lib/keepa/, lib/llm/, etc.)
+- 91 NEEDS_PORT: remaining pending modules requiring active porting work
 
 ## Tier 1 — Pure Logic (78 modules)
 
