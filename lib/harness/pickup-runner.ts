@@ -7,6 +7,7 @@ import { sendMessageWithButtons } from '@/lib/harness/telegram-buttons'
 import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 import { recordAttribution } from '@/lib/attribution/writer'
+import { scoutCheck, sendScoutBlockAlert } from '@/lib/oss/scout'
 import { forecastQuotaBeforeStart } from '@/lib/harness/quota-forecast'
 import { guardedWrite } from '@/lib/supabase/service-write'
 import {
@@ -394,6 +395,56 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     ).catch(() => {})
     await logEvent(runId, 'error', task.id, 'validation-failed: task field empty', duration_ms)
     return { ok: true, claimed: null, reason: 'validation-failed', run_id: runId, duration_ms }
+  }
+
+  // OSS Scout gate — runs after claim so we hold the task during inspection.
+  // Block: unclaim (return to queued), fire Telegram, bail out.
+  // Warn: proceed, scout result appended to metadata post-claim.
+  const scoutResult = await scoutCheck(task)
+  // Only log block/warn — pass is implicit (every claimed task not blocked/warned was a pass).
+  // Morning digest derives scouts_run from task_pickup + scout_block + scout_warn counts.
+  if (scoutResult.decision !== 'pass') {
+    void logEvent(
+      runId,
+      scoutResult.decision === 'block' ? 'warning' : 'success',
+      task.id,
+      `scout_${scoutResult.decision}: ${scoutResult.verdicts.map((v) => `${v.dep}=${v.verdict}`).join(', ')}`,
+      scoutResult.latency_ms,
+      `scout_${scoutResult.decision}`,
+      { scorer: scoutResult.scorer, verdicts: scoutResult.verdicts, latency_ms: scoutResult.latency_ms }
+    )
+  }
+  if (scoutResult.decision === 'block') {
+    try {
+      const db = createServiceClient()
+      await db
+        .from('task_queue')
+        .update({ status: 'queued', claimed_at: null, claimed_by: null, last_heartbeat_at: null })
+        .eq('id', task.id)
+    } catch {
+      // Unclaim failure is non-fatal — task stale-reclaims in 15 min
+    }
+    void sendScoutBlockAlert(task, scoutResult)
+    return {
+      ok: true,
+      claimed: null,
+      reason: 'scout-blocked',
+      run_id: runId,
+      duration_ms: Date.now() - start,
+      ...(cancelledIds.length ? { cancelled_tasks: cancelledIds } : {}),
+    }
+  }
+  if (scoutResult.decision === 'warn') {
+    try {
+      const db = createServiceClient()
+      const existing = typeof task.metadata === 'object' && task.metadata !== null ? task.metadata : {}
+      await db
+        .from('task_queue')
+        .update({ metadata: { ...existing, oss_scout: scoutResult } })
+        .eq('id', task.id)
+    } catch {
+      // Non-fatal — warn verdict still allows pickup to proceed
+    }
   }
 
   // Attribution: one row per successful task claim
