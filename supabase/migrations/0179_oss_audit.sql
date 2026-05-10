@@ -1,4 +1,4 @@
--- Migration 0178: OSS audit — Step 1 schema
+-- Migration 0179: OSS audit — Step 1 schema
 --
 -- Adds oss_audit_status/at/evidence to streamlit_modules (rule-based v1),
 -- creates oss_packages cache table for future oss_scout API scoring (Step 4),
@@ -35,7 +35,7 @@ CREATE TABLE oss_packages (
 -- ON CONFLICT DO NOTHING: 0170 may have inserted npm/pypi already; github is new.
 INSERT INTO capability_registry (capability, domain, description, default_enforcement, destructive)
 VALUES
-  ('net.outbound.github', 'oss_radar', 'GitHub REST API — repo search + metadata',       'enforce', false),
-  ('net.outbound.npm',    'oss_radar', 'npm registry — package metadata + downloads',     'enforce', false),
-  ('net.outbound.pypi',   'oss_radar', 'PyPI JSON API — package metadata lookup',         'enforce', false)
+  ('net.outbound.github', 'net', 'GitHub REST API — repo search + metadata',       'enforce', false),
+  ('net.outbound.npm',    'net', 'npm registry — package metadata + downloads',     'enforce', false),
+  ('net.outbound.pypi',   'net', 'PyPI JSON API — package metadata lookup',         'enforce', false)
 ON CONFLICT (capability) DO NOTHING;
