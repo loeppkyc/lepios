@@ -8,6 +8,7 @@ import { fireCoordinator } from '@/lib/harness/invoke-coordinator'
 import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 import { recordAttribution } from '@/lib/attribution/writer'
 import { forecastQuotaBeforeStart } from '@/lib/harness/quota-forecast'
+import { guardedWrite } from '@/lib/supabase/service-write'
 import {
   getActiveSession,
   canClaimNextTask,
@@ -580,7 +581,7 @@ export async function onTaskComplete(params: {
     if (estimationErrorPct !== null) updatePayload.estimation_error_pct = estimationErrorPct
 
     if (Object.keys(updatePayload).length > 0) {
-      await db.from('task_queue').update(updatePayload).eq('id', taskId)
+      await guardedWrite(db.from('task_queue').update(updatePayload).eq('id', taskId), 'task_queue', 'update')
     }
   } catch {
     // Non-fatal

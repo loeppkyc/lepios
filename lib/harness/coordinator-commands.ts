@@ -17,6 +17,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { guardedWrite } from '@/lib/supabase/service-write'
 import { postMessage } from '@/lib/orchestrator/telegram'
 import { autoPickModule, logPickDecision } from '@/lib/harness/auto-pick'
 import { hasDoneState, draftDoneState } from '@/lib/harness/done-state-drafter'
@@ -95,7 +96,7 @@ async function startContinuousRun(initialTarget: string): Promise<string | null>
     const runId = data.id as string
 
     // Save to harness_config so complete/route.ts can look it up
-    await db.from('harness_config').update({ value: runId }).eq('key', 'HARNESS_CONTINUOUS_RUN_ID')
+    await guardedWrite(db.from('harness_config').update({ value: runId }).eq('key', 'HARNESS_CONTINUOUS_RUN_ID'), 'harness_config', 'update')
 
     return runId
   } catch {
