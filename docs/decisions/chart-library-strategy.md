@@ -94,7 +94,7 @@ The shadcn chart component is a thin CSS-var wrapper over Recharts. It adds zero
 
 ### F19 justification
 
-Current Tailwind bar charts have no Y-axis labels, no gridlines, no interactive tooltips, and no support for multi-series line charts. shadcn/Recharts delivers all four at no coordinator overhead cost. Every new chart module becomes a ~30-line spec instead of a ~100-line SVG implementation. The 20% improvement is structural, not incremental.
+Current Tailwind bar charts have no Y-axis labels, no gridlines, no interactive tooltips, and no support for multi-series line charts. shadcn/Recharts delivers all four at no coordinator overhead cost. Every new chart module becomes a ~30-line spec instead of a ~100-line SVG implementation. F19 % delta: ~70% reduction in coordinator lines-of-spec (unit: lines per chart component).
 
 ---
 

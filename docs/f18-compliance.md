@@ -84,7 +84,7 @@ Per the strategic destination audit:
 | ---------------------------------------- | ----------------------------------- | ---------------------------------------- | ---------------------- |
 | F17 — behavioral-ingestion-justification | `lib/rules/registry.ts`             | None                                     | ⚠️ Declared, not gated |
 | **F18 — measurement-benchmark-required** | `lib/rules/registry.ts`             | **None**                                 | ❌ **Largest gap**     |
-| F19 — continuous-improvement (process)   | `lib/harness/process-efficiency.ts` | Signals logged, no enforcement loop      | ⚠️ Partial             |
+| F19 — continuous-improvement (process)   | `lib/harness/process-efficiency.ts` | % delta logged per signal, no auto-gate  | ⚠️ Partial             |
 | F20 — design-system-enforcement          | `eslint.config.mjs`                 | Active (`style=` grep + reviewer agent)  | ✅ Enforced            |
 | F21 — acceptance-tests-first             | Coordinator workflow                | Active (acceptance docs gate PRs)        | ✅ Enforced            |
 | F22 — cron-secret-auth-via-helper        | `eslint.config.mjs`                 | Active (no-restricted-syntax + reviewer) | ✅ Enforced            |

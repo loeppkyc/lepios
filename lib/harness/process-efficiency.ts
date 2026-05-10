@@ -52,9 +52,10 @@ export async function buildProcessEfficiencyLines(): Promise<string> {
     const frictionCount = (frictionResult.data ?? []).length
 
     const lines: string[] = ['Process efficiency (24h):']
+    // F19 unit for all signals below: % delta logged per session; declining % = ceiling signal.
 
     // Signal 1: Queue throughput — proxy for coordinator quota utilization
-    // Benchmark: ≥70% of created tasks complete within 24h
+    // F19 unit: % tasks completed / tasks created (24h). Benchmark: ≥70% healthy.
     if (queued24h === 0) {
       lines.push('• Queue throughput: no tasks created')
     } else {
@@ -67,7 +68,7 @@ export async function buildProcessEfficiencyLines(): Promise<string> {
     }
 
     // Signal 2: Task pickup latency — median time from queued → claimed
-    // Benchmark: p50 < 5 min
+    // F19 unit: p50 latency in minutes. Benchmark: <5 min healthy.
     if (latencyMinutes === null) {
       lines.push('• Pickup latency: no pickups in 24h | 💡 Check pickup cron is firing')
     } else {
@@ -79,7 +80,7 @@ export async function buildProcessEfficiencyLines(): Promise<string> {
     }
 
     // Signal 3: Queue depth — parallel opportunity detector
-    // Tasks in 'queued' with priority ≤ 3 are actionable right now; >1 = serialization waste
+    // F19 unit: count of actionable tasks waiting (priority ≤ 3). Target: 0 = fully drained.
     if (queueDepth === 0) {
       lines.push('• Queue depth: 0 tasks waiting ✅')
     } else {
@@ -93,7 +94,7 @@ export async function buildProcessEfficiencyLines(): Promise<string> {
     }
 
     // Signal 4: Friction index — grounding blocks + retries signal spec-quality problems
-    // Benchmark: 0 per day; >2 = elevated, review coordinator spec quality
+    // F19 unit: count of grounding blocks/retries per day. Target: 0.
     if (frictionCount === 0) {
       lines.push('• Friction: 0 grounding blocks / retries ✅')
     } else {

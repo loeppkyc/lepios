@@ -71,7 +71,7 @@ export const RULES: readonly Rule[] = [
     name: 'continuous-improvement-process',
     scope: 'global',
     summary:
-      'Every system, process, and workflow is continuously evaluated for "how can this be 20% faster, cheaper, or better?" Extends the module-level 20% Better loop to the build process, communication patterns, resource utilization, and Colin-time vs autonomous-time ratio.',
+      'Every system, process, and workflow is continuously evaluated against its own prior baseline. Log the % delta achieved (aim for ~100%; no ceiling). Define unit per system (latency/cost/accuracy/throughput) so %s compare. Declining % across sessions = approaching efficiency ceiling — signal to pivot. Measurement, not gate — no auto-queue threshold based on improvement size.',
     defined_at: '~/.claude/CLAUDE.md:73',
     references: [
       'CLAUDE.md:72',
