@@ -257,7 +257,19 @@
       "filename": "0185_phone_relay_scans.sql",
       "claimed_at": "2026-05-10",
       "note": "MID batch 2 — phone_relay_scans table for Scanner Phone → PageProfit desktop relay. See docs/acceptance/mid-batch-2-scanner-phone.md."
+    },
+    "0189": {
+      "branch": "feat/mid-batch-deals",
+      "filename": "0189_deal_tracker.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch 3 — deal_tracker_items + deal_price_history tables. Replaces Google Sheets deal tracking."
+    },
+    "0190": {
+      "branch": "feat/mid-batch-deals",
+      "filename": "0190_polymarket_predictions.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch 3 — polymarket_predictions table. Replaces Google Sheets Polymarket log."
     }
   },
-  "next_available": 186
+  "next_available": 191
 }
