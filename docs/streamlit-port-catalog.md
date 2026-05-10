@@ -1,15 +1,19 @@
 # Streamlit Port Catalog
 
 Generated: 2026-04-25T11:24:22.096Z  
-Last sweep: 2026-05-10 — mass classification (DEAD/ALREADY_PORTED/NEEDS_PORT)
+Last sweep: 2026-05-10 — classifier sweep (TRIVIAL/MID/COMPLEX on 91 NEEDS_PORT)
 Total modules: 234 | Pending: 91 | Complete: 143 | Deferred: 0
+T4 port progress: 61.1% (143/234)
 
 Sweep breakdown (2026-05-10):
 
 - 79 DEAD: one-time scripts, Streamlit test fixtures, framework glue (app.py, utils/config.py, tests/test_*.py, etc.)
 - 25 ALREADY_PORTED pages: confirmed cockpit routes (life-pnl, monthly-expenses, payouts, receipts, health, etc.)
 - 29 ALREADY_PORTED utils: confirmed lib/ replacements (lib/amazon/, lib/telegram/, lib/keepa/, lib/llm/, etc.)
-- 91 NEEDS_PORT: remaining pending modules requiring active porting work
+- 91 NEEDS_PORT classified (2026-05-10 classifier sweep):
+  - 0 TRIVIAL (<100 LOC): none qualify — prior sweeps cleared all sub-100-LOC modules
+  - 50 MID (100-499 LOC): tagged `notes = 'mid-port'`; candidates for next batch sprint
+  - 41 COMPLEX (≥500 LOC): tagged `notes = 'complex-port'`; scope notes in oss_audit_evidence
 
 ## Tier 1 — Pure Logic (78 modules)
 
