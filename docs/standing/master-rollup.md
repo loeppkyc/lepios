@@ -1,8 +1,8 @@
 # Master Rollup — LepiOS
 
-**Last updated:** 2026-05-01 — B4 50% partial (PR #53) + row 11 acceptance doc (PR #52) + row 17 acceptance doc (PR #55) + sandbox acceptance doc (PR #57) + self_repair acceptance doc (PR #59)
-**Updated by:** combined recompute: B4 0%→50% (T5 67%→71%); row 11 0%→25% (T2 52.3%→54.4%); Strategic 47.0%→48.5%; row 17 0%→25% (T2 54.4%→56.1%); Strategic 48.5%→49.2%; sandbox 0%→25% (T1 58.38%→60.13%); Strategic 49.2%→49.5%; self_repair 0%→25% (T1 60.13%→61.63%); Strategic 49.5%→49.8%
-**Recompute protocol:** update this file after every PR merge or meaningful state change
+**Last updated:** 2026-05-09 — auto-rollup pipeline wired (feat/auto-rollup); prior manual entry 2026-05-01
+**Auto-compute:** `POST /api/admin/rollup/refresh` (CRON_SECRET required) — rewrites the Portfolio Rollup section between AUTO-ROLLUP fences on each run
+**Recompute protocol:** automated via /api/admin/rollup/refresh; wire into night-tick to run nightly. Manual edits outside the AUTO-ROLLUP fences are preserved.
 
 ---
 
@@ -12,16 +12,19 @@ Two portfolio-wide numbers live at the top. **Strategic rollup** answers "what s
 
 ---
 
+<!-- AUTO-ROLLUP:START -->
+<!-- Regenerated automatically by /api/admin/rollup/refresh — do not edit between fences -->
+<!-- Pending first run — POST /api/admin/rollup/refresh to populate -->
+
 ## Portfolio Rollup
 
-| Rollup          | Value     | Basis                                                                                                     |
-| --------------- | --------- | --------------------------------------------------------------------------------------------------------- |
-| **Strategic**   | **49.8%** | Weighted by track importance (T1=20, T1b=5, T2=40, T3=5, T4=15, T5=15). T4's 0% has 15% portfolio weight. |
-| **Total scope** | **15.4%** | 4,974 completion-points across 324 discrete items. T4's 234 zeros dominate. Without T4: 55.3%.            |
+| Track                 | Rollup | Weight | Source |
+| --------------------- | ------ | ------ | ------ |
+| _(pending first run)_ | —      | —      | —      |
 
-Strategic rollup math: T1 20%×61.63=12.33 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 · T3 5%×0=0 · T4 15%×0=0 · T5 15%×71.0=10.65 · **sum=49.82**
+**Strategic rollup: pending first run**
 
-Total scope math: 324 items total (T1:21 · T1b:7 · T2:21 · T3:3 · T4:234 · T5:27 · T6:3 · T7:8) · sum of completion-pcts=4,974 · 4974÷324=**15.4%** · without T4: 4974÷90=**55.3%**
+<!-- AUTO-ROLLUP:END -->
 
 ---
 
