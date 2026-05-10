@@ -229,7 +229,7 @@ export default async function CoordinatorPage() {
 
   const stateChangedSub = (() => {
     if (!stats.stateChangedAt) return `${stats.running} running · ${stats.queued} queued`
-    const ms = Date.now() - new Date(stats.stateChangedAt).getTime()
+    const ms = Date.now() - new Date(stats.stateChangedAt).getTime() // eslint-disable-line react-hooks/purity
     const m = Math.floor(ms / 60_000)
     const since = m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`
     return `since ${since} · ${stats.running} running · ${stats.queued} queued`
@@ -259,6 +259,19 @@ export default async function CoordinatorPage() {
           marginBottom: 24,
         }}
       />
+
+      <div style={{ marginBottom: 16, textAlign: 'right' }}>
+        <a
+          href="/autonomous"
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-disabled)',
+          }}
+        >
+          View trend dashboard →
+        </a>
+      </div>
 
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
