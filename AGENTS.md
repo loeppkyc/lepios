@@ -24,3 +24,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## ARCHITECTURE.md is the north star
 
 If anything in this codebase contradicts ARCHITECTURE.md, flag it — do not silently fix it.
+
+### Migration GRANT template (F24)
+
+Every `CREATE TABLE` migration must include grants for `service_role`. Standard block:
+
+```sql
+GRANT INSERT, UPDATE, DELETE ON <table_name> TO service_role;
+```
+
+Append-only or read-only tables that intentionally exclude write grants must include `-- AD7-exempt` anywhere in the file. Without this marker, `scripts/lint-migration-grants.mjs` fails CI.

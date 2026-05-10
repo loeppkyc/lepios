@@ -129,6 +129,24 @@ export const RULES: readonly Rule[] = [
     defined_at: 'CLAUDE.md:74',
     references: ['lib/auth/cron-secret.ts', 'tests/auth/cron-secret.test.ts', 'eslint.config.mjs'],
   },
+  {
+    number: 23,
+    name: 'gpu-day-readiness-tracker',
+    scope: 'project',
+    summary:
+      'docs/gpu-day-readiness.md is a living doc. Any window that ships or confirms a line item must recompute the total and bump "Last updated" before closing.',
+    defined_at: 'CLAUDE.md:77',
+    references: ['docs/gpu-day-readiness.md'],
+  },
+  {
+    number: 24,
+    name: 'migration-grants-required',
+    scope: 'project',
+    summary:
+      'Every CREATE TABLE migration must include GRANT INSERT, UPDATE, DELETE ON <table> TO service_role. Exceptions (append-only or read-only tables) must be explicitly marked with -- AD7-exempt in the migration file. Enforced by scripts/lint-migration-grants.mjs in CI.',
+    defined_at: 'CLAUDE.md:78',
+    references: ['scripts/lint-migration-grants.mjs'],
+  },
 ] as const
 
 /**
