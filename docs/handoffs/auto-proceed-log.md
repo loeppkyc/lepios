@@ -25,6 +25,23 @@ outcome: escalated-mandatory (cache_match_enabled=false)
 
 ---
 
+2026-05-10T03:10:00Z sprint=hardening chunk=H4 doc=docs/sprint-5/h4-session-summary-acceptance.md
+cited_principles: [F18, META-C]
+trigger_match_evidence: |
+  F18 trigger: "every new module must ship with metrics capture." Applied as: every coordinator
+  session should produce an auditable event. The coordinator is an autonomous agent without
+  session-close instrumentation (confirmed by postmortem 915d1fee). H4 spec from postmortem
+  is explicit about required fields and acceptance criterion.
+reversibility_check: |
+  Sole change: adding a Phase 7 section to .claude/agents/coordinator.md (doc edit only).
+  Reversible by removing the section. No schema changes (agent_events has all required columns).
+  No code changes. No migrations. Pattern already exists in 3 prior session summary rows.
+confidence: medium
+outcome: escalated (META-C condition a: trigger match is F18-adjacent not F18-exact; medium
+confidence → escalate per rule)
+
+---
+
 2026-04-22T15:30:00-06:00 sprint=harness-e2e chunk=v0-test doc=docs/harness-e2e/chunk-v0-test-acceptance.md
 phase: 6 (sprint close)
 cited_principles: [cache_match_enabled: false — Phase 0 result honored throughout]
