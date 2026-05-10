@@ -79,7 +79,7 @@ SELECT key, value FROM harness_config WHERE key IN ('CRON_SECRET', 'TELEGRAM_CHA
 
 Store the results in your working context:
 
-- `CRON_SECRET` — used as the Bearer token in every heartbeat and drain-trigger curl
+- `CRON_SECRET` — used as the Bearer token in every heartbeat curl
 - `TELEGRAM_CHAT_ID` — used as `chat_id` in every `outbound_notifications` insert
 
 If the query fails (table missing or row absent):
@@ -107,9 +107,9 @@ _S=$(curl -s \
 unset _S
 ```
 
-If the curl fails (Supabase creds not in bash env), the temp file is absent — heartbeat and drain
-fall back gracefully per their own rules. Do NOT fall back to `.env.local` — it is absent in
-the cloud coordinator sandbox and is the root cause of prior drain 403 failures.
+If the curl fails (Supabase creds not in bash env), the temp file is absent — heartbeat falls
+back gracefully per its own rules. Do NOT fall back to `.env.local` — it is absent in
+the cloud coordinator sandbox.
 
 # Quota Forecast Check — Run After Runtime Config
 
@@ -221,6 +221,45 @@ traceable to its task_queue row without opening GitHub.
 **F18 surface:** `branch_guard_triggered` events accumulate in `agent_events` — one per
 fire is expected (the runtime always starts on a default branch). Morning digest surfaces
 the count. Alarm condition: zero events on a day with fires means the guard did not run.
+
+# Resume from pending notification — Check Before Loading Reference Files
+
+Before loading reference files, check whether a prior invocation left a notification
+waiting for a response. This covers the F-N28 scenario where the coordinator timed out
+while polling, saved the row ID, and exited — the notification may have since been
+responded to.
+
+Use `mcp__Supabase__execute_sql`:
+
+```sql
+SELECT metadata->'pending_notification_id' AS pending_id
+FROM task_queue
+WHERE id = '<TASK_ID>';
+```
+
+If `pending_id` is non-null:
+
+```sql
+SELECT status, response
+FROM outbound_notifications
+WHERE id = '<pending_id>';
+```
+
+**If `status = 'response_received'`:**
+1. Parse `response.callback_data` → `action` (`approve` or `reject`)
+2. Clear the pending flag:
+   ```sql
+   UPDATE task_queue
+   SET metadata = metadata - 'pending_notification_id'
+   WHERE id = '<TASK_ID>';
+   ```
+3. Resume from Phase 4 Step 5 (parse response) — skip all earlier phases, they were completed in the prior invocation.
+
+**If `status` is still `pending` or `sent`:**
+- Log `agent_events`: `action='coordinator_resume_notification_still_pending', meta.row_id='<pending_id>'`
+- Wait for the pg_cron drain (≤5 min). Poll Supabase every 30s for up to 10 minutes before declaring timeout again.
+
+**If `pending_id` is null:** no pending notification — proceed normally to load reference files.
 
 # Reference files you read
 
@@ -571,31 +610,35 @@ ROW_ID=$(echo "$ROW" | python3 -c \
 
 If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notification_insert_failed) and **stop** — do not silently skip notifications.
 
-## Step 3 — Signal drain (insert to pending_drain_triggers)
 
-The coordinator sandbox cannot call Vercel endpoints directly. Instead, insert a row into
-`pending_drain_triggers` — the pg_cron job fires the drain within 5 minutes via pg_net
-with no sandbox restrictions.
+## Step 3 — Save notification row ID to task metadata (no bash drain calls)
 
-```bash
-# Signal drain by inserting a row to pending_drain_triggers.
-# pg_cron fires /api/cron/notifications-drain-tick every 5 minutes (migration 0168).
-# No bash curl to Vercel needed — coordinator sandbox cannot reach it anyway.
-DRAIN_SIGNAL=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pending_drain_triggers" \
-  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-  -H "Content-Type: application/json" \
-  -H "Prefer: return=representation" \
-  -d "{\"triggered_by\": \"coordinator\", \"task_id\": \"${TASK_ID}\"}" 2>/dev/null || echo "")
-DRAIN_SIGNAL_ID=$(echo "$DRAIN_SIGNAL" | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d,list) and d else 'SIGNAL_FAILED')" \
-  2>/dev/null)
-if [ "$DRAIN_SIGNAL_ID" = "SIGNAL_FAILED" ] || [ -z "$DRAIN_SIGNAL_ID" ]; then
-  echo "[coordinator] pending_drain_triggers insert failed — notification will deliver on next cron cycle (within 5 min)"
-fi
+Do NOT attempt any bash curl to trigger the drain. The pg_cron job fires
+`/api/cron/notifications-drain-tick` every 5 minutes automatically — no signal needed.
+Direct drain calls to Vercel return 403 because CRON_SECRET is not available in the
+coordinator sandbox bash environment (F-N28 root cause).
+
+Instead, persist `ROW_ID` so the next coordinator invocation can resume after the
+notification is responded to.
+
+Use the Supabase MCP tool (`mcp__Supabase__execute_sql`) to write the row ID into
+`task_queue.metadata`:
+
+```sql
+UPDATE task_queue
+SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('pending_notification_id', '<ROW_ID>')
+WHERE id = '<TASK_ID>';
 ```
 
-Non-fatal if the insert fails. pg_cron fires the drain every 5 minutes regardless.
+Also update `docs/sprint-state.md`:
+```
+status: awaiting-async-response
+pending_notification_id: <ROW_ID>
+```
+
+The drain will fire within the next cron cycle (≤5 min). The next coordinator invocation
+checks the notification status before doing anything else (see “Resume from pending
+notification” below).
 
 ## Step 4 — Fire-and-forget vs. polling
 
