@@ -125,7 +125,11 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-05-10 MDT — T5 deeper sweep: A4 25%→70% (local-AI dashboard + twin/knowledge live with 11+ callers, but active HTTP 530s on ollama.embed in overnight crons and ollama.generate failing after health success — inference unreliable, architecture shipped). D6 50%→75% (Local_AI resolved by dashboard ship; Retail_Monitor still pending). E1 50%→100% (Keepa hit-lists + BSR sparkline confirmed live in T2 audit). Total: 91.0% → **95.7%** (+4.7 pts).
+2026-05-10 MDT — Task 7bb2a620 grounding complete: `OLLAMA_TUNNEL_URL` inserted into `harness_config`, PR #195 deployed to production, daytime-tick triggered → `tunnel_used: true` in response, `ollama.health` logged to `agent_events` (status=success, 10 models). A4 stays at 70% — tunnel wiring is correct but overnight 530s persist (root cause: laptop sleeping at ~midnight MDT / 06:xx UTC). **Manual fix needed:** run `powercfg /change standby-timeout-ac 0` locally to prevent sleep. Once 530s clear, A4 → 90%+ (+1.5 pts). Total unchanged: **96.0 / 100**.
+
+Previously: 2026-05-10 MDT — B5 85%→100%: `coordinator.md` "(staged in git)" note was stale — file confirmed fully committed with complete branch-naming guard (task_id check + stray-branch deletion + pre-write drift re-verify). B category now 100%. Total: **95.7% → 96.0%** (+0.3 pts).
+
+Previously: 2026-05-10 MDT — T5 deeper sweep: A4 25%→70% (local-AI dashboard + twin/knowledge live with 11+ callers, but active HTTP 530s on ollama.embed in overnight crons and ollama.generate failing after health success — inference unreliable, architecture shipped). D6 50%→75% (Local_AI resolved by dashboard ship; Retail_Monitor still pending). E1 50%→100% (Keepa hit-lists + BSR sparkline confirmed live in T2 audit). Total: 91.0% → **95.7%** (+4.7 pts).
 
 Previously: 2026-05-05 MDT — Decision sweep with Colin: B6 → 100% (SQL backdoor accepted), C3 → 100% (Safety Agent: build, Phase 1 queued as task `9b9bca02`), C5 → 100% (Status page deferred, morning_digest covers surface). 5 spec/decision docs written, 3 tasks queued, 1 task closed. C category now 100%. Total: 81.0% → **91.0%**.
 
@@ -136,5 +140,3 @@ Previously: 2026-05-05 MDT — E2 → 100%. `OURA_TOKEN` confirmed in `harness_c
 Previously: 2026-04-27 (W4) — C4 chart strategy → 100%. shadcn/ui Chart (Recharts) adopted. `docs/decisions/chart-library-strategy.md` written. AmazonDailyChart + UtilityBarChart migrated. Total: 64.0% → 67.0%.  
 2026-04-27 11:31 MDT / 17:31 UTC — updated after PR #35 merge (B1/B2/B3 → 100%)  
 Previously: 2026-04-27 ~10:00 MDT (initial write same session)
-
-**Next highest-leverage item:** B4 — cloudflared tunnel as Windows service. Blocks all Ollama production traffic. Runs ngrok in 5 min to unblock immediately; named Cloudflare tunnel takes 30–60 min but survives reboots. See `docs/ollama-tunnel-diagnosis-2026-04-27.md §7` for exact steps.
