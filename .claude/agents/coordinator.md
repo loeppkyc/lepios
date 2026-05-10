@@ -532,25 +532,31 @@ ROW_ID=$(echo "$ROW" | python3 -c \
 
 If `ROW_ID` is `INSERT_FAILED` or empty: log to agent_events (action=notification_insert_failed) and **stop** — do not silently skip notifications.
 
-## Step 3 — Trigger drain (best-effort)
+## Step 3 — Signal drain (insert to pending_drain_triggers)
+
+The coordinator sandbox cannot call Vercel endpoints directly. Instead, insert a row into
+`pending_drain_triggers` — the pg_cron job fires the drain within 5 minutes via pg_net
+with no sandbox restrictions.
 
 ```bash
-# CRON_SECRET is in /tmp/coordinator-secret — written at session start from harness_config.
-# Do NOT use ${CRON_SECRET} bare or grep .env.local — both absent in cloud coordinator sandbox.
-_CS=$(cat /tmp/coordinator-secret 2>/dev/null || echo "")
-DRAIN_HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST https://lepios-one.vercel.app/api/harness/notifications-drain \
-  -H "Authorization: Bearer ${_CS}" 2>/dev/null || echo "000")
-unset _CS
+# Signal drain by inserting a row to pending_drain_triggers.
+# pg_cron fires /api/cron/notifications-drain-tick every 5 minutes (migration 0168).
+# No bash curl to Vercel needed — coordinator sandbox cannot reach it anyway.
+DRAIN_SIGNAL=$(curl -s -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/pending_drain_triggers" \
+  -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: return=representation" \
+  -d "{\"triggered_by\": \"coordinator\", \"task_id\": \"${TASK_ID}\"}" 2>/dev/null || echo "")
+DRAIN_SIGNAL_ID=$(echo "$DRAIN_SIGNAL" | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d,list) and d else 'SIGNAL_FAILED')" \
+  2>/dev/null)
+if [ "$DRAIN_SIGNAL_ID" = "SIGNAL_FAILED" ] || [ -z "$DRAIN_SIGNAL_ID" ]; then
+  echo "[coordinator] pending_drain_triggers insert failed — notification will deliver on next cron cycle (within 5 min)"
+fi
 ```
 
-On failure:
-
-- `200` → delivered; proceed.
-- `401` → CRON_SECRET in `/tmp/coordinator-secret` does not match `process.env.CRON_SECRET` on Vercel. Log `drain_trigger_failed` with `reason: cron_secret_mismatch`. Re-read `harness_config` and rewrite the temp file.
-- Any other code → log `drain_trigger_failed` with `http_status: <code>`. Non-fatal — notification delivers on next cron cycle (daily 1 AM UTC via `/api/cron/notifications-drain-tick`).
-
-Do not abort on drain failure. For interactive approval sessions, ask Colin to call the drain manually if the message doesn't appear within 2 minutes.
+Non-fatal if the insert fails. pg_cron fires the drain every 5 minutes regardless.
 
 ## Step 4 — Fire-and-forget vs. polling
 
