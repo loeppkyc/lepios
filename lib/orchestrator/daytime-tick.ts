@@ -7,6 +7,7 @@ import { fetchHistoricalContext, scoreDaytimeTick } from './scoring'
 import { CURRENT_CAPACITY_TIER } from './config'
 import type { CheckResult, DaytimeTickResult, TickStatus, QualityScore } from './types'
 import { upsertHeartbeat } from './heartbeat'
+import { hydrateOllamaConfig, getBaseUrl } from '@/lib/ollama/client'
 
 const SIGNAL_REVIEW_TIMEOUT_MS = 100_000
 const DEFAULT_CHECK_TIMEOUT_MS = 15_000
@@ -52,8 +53,7 @@ function toColumnStatus(tickStatus: TickStatus): 'success' | 'warning' | 'error'
 }
 
 function getTunnelUsed(): boolean {
-  const url = process.env.OLLAMA_TUNNEL_URL ?? ''
-  return url.length > 0 && !url.includes('localhost')
+  return !getBaseUrl().includes('localhost')
 }
 
 export async function runDaytimeTick(): Promise<DaytimeTickResult> {
@@ -61,6 +61,9 @@ export async function runDaytimeTick(): Promise<DaytimeTickResult> {
   const run_id = crypto.randomUUID()
   const started_at = new Date().toISOString()
   const tickStart = Date.now()
+
+  // Hydrate harness_config cache so healthCheck() uses tunnel URL, not localhost
+  await hydrateOllamaConfig()
   const tunnel_used = getTunnelUsed()
 
   const checks: CheckResult[] = []

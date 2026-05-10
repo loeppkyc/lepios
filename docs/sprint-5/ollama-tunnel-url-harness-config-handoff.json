@@ -1,0 +1,26 @@
+{
+  "chunk_id": "ollama-tunnel-url-harness-config",
+  "task_id": "7bb2a620-e4cb-47b1-a836-b7c6c148c99f",
+  "status": "complete",
+  "files_changed": [
+    "lib/ollama/client.ts",
+    "lib/harness/smoke-tests/ollama-health.ts",
+    "lib/orchestrator/daytime-tick.ts",
+    "tests/ollama-client.test.ts",
+    "docs/sprint-5/ollama-tunnel-url-harness-config-acceptance.md",
+    "docs/sprint-5/ollama-tunnel-url-harness-config-handoff.json",
+    "docs/sprint-state.md",
+    "docs/handoffs/auto-proceed-log.md",
+    "docs/handoffs/cost-log.md"
+  ],
+  "tests": { "passing": 40, "failing": 0, "new": 1 },
+  "changes_summary": {
+    "lib/ollama/client.ts": "healthCheck() tunnel_used now derived from getBaseUrl() (harness_config-aware) instead of process.env",
+    "lib/orchestrator/daytime-tick.ts": "runDaytimeTick() calls hydrateOllamaConfig() before checks run; getTunnelUsed() uses getBaseUrl()",
+    "lib/harness/smoke-tests/ollama-health.ts": "runOllamaHealthSmoke() calls hydrateOllamaConfig() + getBaseUrl() instead of reading process.env directly",
+    "tests/ollama-client.test.ts": "Added regression test: tunnel_used=true when harness_config has tunnel URL and process.env is absent"
+  },
+  "grounding_checkpoint_required": "1. INSERT INTO harness_config (key, value) VALUES ('OLLAMA_TUNNEL_URL', '<cloudflare-tunnel-url>'). 2. Trigger daytime-tick: curl -s -X GET https://lepios-one.vercel.app/api/cron/daytime-tick -H 'Authorization: Bearer <CRON_SECRET>' — confirm tunnel_used:true in response. 3. SELECT meta FROM agent_events WHERE action='ollama.health' ORDER BY occurred_at DESC LIMIT 1 — expect tunnel_used=true, base_url matches harness_config value.",
+  "unknowns": [],
+  "next_chunk_blockers": []
+}

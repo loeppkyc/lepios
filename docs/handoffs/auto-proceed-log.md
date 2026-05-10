@@ -259,3 +259,25 @@ reversibility_check: |
   No shared seams touched. No migration. No API changes.
 confidence: high
 outcome: auto-proceeded (Colin explicit approval; reversible; sprint-5 cache_match_enabled=true)
+
+---
+
+2026-05-10T03:30:00Z sprint=5 chunk=ollama-tunnel-url-harness-config doc=docs/sprint-5/ollama-tunnel-url-harness-config-acceptance.md
+cited_principles: [META-C, cache_match_enabled: true (per sprint-state.md sprint_5 2026-05-01 override)]
+trigger_match_evidence: |
+Principle match: "beef-up of existing code with no schema changes, no new external deps,
+no destructive operations" → auto-proceed eligible under META-C.
+Chunk scope: fix 3 call sites that read process.env.OLLAMA_TUNNEL_URL instead of the
+harness_config cached value. All changes are 1-3 line substitutions in existing functions.
+Prior coordinator session (2026-05-10T03:22:00Z) completed the cache-match analysis and
+recorded approval in task_queue row 7bb2a620-e4cb-47b1-a836-b7c6c148c99f.
+This session completes Phase 2 by writing the acceptance doc that session planned.
+reversibility_check: |
+lib/ollama/client.ts (healthCheck tunnel_used): 2-line change, fully reversible via git.
+lib/orchestrator/daytime-tick.ts (hydrate call + getTunnelUsed): 4-line change, fully reversible.
+lib/harness/smoke-tests/ollama-health.ts (hydrate + getBaseUrl): 2-line change, fully reversible.
+tests/ollama-client.test.ts (1 new test): reversible — delete or revert.
+No schema changes. No migrations. No new env vars. No Vercel config changes.
+All decisions: LOW cost to reverse.
+confidence: high
+outcome: auto-proceeded (cache_match_enabled=true, prior session approval recorded in task_queue)

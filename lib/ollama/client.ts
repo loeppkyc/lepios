@@ -261,8 +261,7 @@ export interface OllamaHealthResult {
 export async function healthCheck(): Promise<OllamaHealthResult> {
   const start = Date.now()
   const baseUrl = getBaseUrl()
-  const tunnelUsed =
-    !!process.env.OLLAMA_TUNNEL_URL && process.env.OLLAMA_TUNNEL_URL !== 'http://localhost:11434'
+  const tunnelUsed = !baseUrl.includes('localhost')
 
   try {
     const res = await fetch(`${baseUrl}/api/tags`, {

@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { hydrateOllamaConfig, getBaseUrl } from '@/lib/ollama/client'
 
 export interface OllamaHealthResult {
   passed: boolean
@@ -13,7 +14,8 @@ const BENCHMARK_LATENCY_MS = 5_000
 const REQUIRED_MODEL = 'nomic-embed-text'
 
 export async function runOllamaHealthSmoke(): Promise<OllamaHealthResult> {
-  const tunnelUrl = (process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434').replace(/\/$/, '')
+  await hydrateOllamaConfig()
+  const tunnelUrl = getBaseUrl() // already strips trailing slash
   const tagsUrl = `${tunnelUrl}/api/tags`
   const start = Date.now()
 

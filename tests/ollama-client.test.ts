@@ -327,6 +327,21 @@ describe('healthCheck', () => {
     expect(result.reachable).toBe(true)
     expect(result.models).toEqual([])
   })
+
+  it('sets tunnel_used=true when harness_config has tunnel URL and process.env is absent', async () => {
+    // harness_config returns a non-localhost URL
+    mockMaybeSingle.mockResolvedValue({
+      data: { value: 'https://from-harness-config.example.com' },
+      error: null,
+    })
+    await hydrateOllamaConfig() // populate the cache
+
+    vi.stubGlobal('fetch', mockFetch({ models: [] }))
+
+    const result = await healthCheck()
+
+    expect(result.tunnel_used).toBe(true) // harness_config URL used, no process.env
+  })
 })
 
 // ── generate ──────────────────────────────────────────────────────────────────
