@@ -165,9 +165,10 @@ export async function forecastQuotaBeforeStart(): Promise<QuotaForecastResult> {
       estimated_remaining,
     }
   } catch {
-    // Fail open — forecast failure must never block coordinator startup
+    // Fail closed — better to stall than absorb a 429 cliff when both
+    // harness_config and agent_events fall through.
     return {
-      safe_to_start: true,
+      safe_to_start: false,
       reason: 'forecast_error',
       invocations_24h: 0,
       cliff_threshold: CLIFF_THRESHOLD,
