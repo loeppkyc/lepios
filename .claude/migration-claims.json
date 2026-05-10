@@ -239,7 +239,25 @@
       "filename": "0182_cora_future.sql",
       "claimed_at": "2026-05-10",
       "note": "MID batch family cluster — cora_future_items table with status/timeline/deadline tracking. See docs/acceptance/mid-batch-coras-future.md."
+    },
+    "0183": {
+      "branch": "feat/mid-batch-profile",
+      "filename": "0183_profile_columns.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch 2 — add display_name + module_preferences columns to user_profiles. See docs/acceptance/mid-batch-2-profile.md."
+    },
+    "0184": {
+      "branch": "feat/mid-batch-profile",
+      "filename": "0184_dropbox_audit_runs.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch 2 — dropbox_audit_runs table for persisted Dropbox storage audits. See docs/acceptance/mid-batch-2-dropbox.md."
+    },
+    "0185": {
+      "branch": "feat/mid-batch-profile",
+      "filename": "0185_phone_relay_scans.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch 2 — phone_relay_scans table for Scanner Phone → PageProfit desktop relay. See docs/acceptance/mid-batch-2-scanner-phone.md."
     }
   },
-  "next_available": 183
+  "next_available": 186
 }
