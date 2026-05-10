@@ -14,6 +14,7 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 
 import { hasOtherWorktrees } from '../../scripts/lib/window-claim.mjs'
 
@@ -65,5 +66,42 @@ describe('hasOtherWorktrees', () => {
     expect(hasOtherWorktrees()).toBe(true)
     process.chdir(mainCheckout)
     git(mainCheckout, `worktree remove "${join(tmpRoot, 'wt-y')}" --force`)
+  })
+
+  it('returns false when only agent worktrees (locked "claude agent ...") exist', () => {
+    // Simulate a Claude Code Agent tool worktree: path under .claude/worktrees/,
+    // lock file starting with "claude agent".
+    process.chdir(mainCheckout)
+    const agentWtPath = join(mainCheckout, '.claude', 'worktrees', 'agent-abc123')
+    git(mainCheckout, 'branch worktree-agent-abc123')
+    git(mainCheckout, `worktree add "${agentWtPath}" worktree-agent-abc123`)
+    // Write the lock file (git worktree add doesn't auto-lock; simulate Agent tool behavior)
+    const lockFile = join(mainCheckout, '.git', 'worktrees', 'agent-abc123', 'locked')
+    writeFileSync(lockFile, 'claude agent agent-abc123 (pid 99999)')
+    try {
+      expect(hasOtherWorktrees()).toBe(false)
+    } finally {
+      // Locked worktrees require double-force (-f -f) to remove.
+      git(mainCheckout, `worktree remove "${agentWtPath}" -f -f`)
+    }
+  })
+
+  it('returns true when a real (non-agent) worktree and an agent worktree both exist', () => {
+    process.chdir(mainCheckout)
+    const agentWtPath = join(mainCheckout, '.claude', 'worktrees', 'agent-def456')
+    git(mainCheckout, 'branch worktree-agent-def456')
+    git(mainCheckout, `worktree add "${agentWtPath}" worktree-agent-def456`)
+    writeFileSync(
+      join(mainCheckout, '.git', 'worktrees', 'agent-def456', 'locked'),
+      'claude agent agent-def456 (pid 99999)'
+    )
+    git(mainCheckout, 'branch feat/real')
+    git(mainCheckout, `worktree add "${join(tmpRoot, 'wt-real')}" feat/real`)
+    try {
+      expect(hasOtherWorktrees()).toBe(true)
+    } finally {
+      git(mainCheckout, `worktree remove "${join(tmpRoot, 'wt-real')}" --force`)
+      git(mainCheckout, `worktree remove "${agentWtPath}" -f -f`)
+    }
   })
 })
