@@ -217,3 +217,32 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-10T02:47:00Z sprint=5 chunk=f18-ceiling doc=docs/sprint-5/f18-ceiling-acceptance.md
+cited_principles: [F18, F17, META-C, coordinator.md Phase 1b twin-unreachable rule]
+trigger_match_evidence: |
+  cache_match_enabled = true per sprint-state.md (Twin endpoint verified live 2026-05-01).
+  However META-C condition (b) fails: confidence cannot be HIGH with 3 unresolved design questions.
+  All 3 Phase 1b Twin Q&A queries returned "Host not in allowlist" (coordinator sandbox blocked).
+  Per coordinator.md Phase 1b: "If the twin endpoint is unreachable for all questions... surface
+  all questions to Colin in one batch." Twin Q1 (table architecture), Q2 (dashboard location),
+  Q3 (which modules to seed) all require Colin input before builder can proceed.
+  Additionally, Q2 (dashboard location) is a personal design decision — "probably Colin would want..."
+  is the escalation signal per coordinator.md non-negotiables.
+reversibility_check: |
+  Study doc: new file at docs/sprint-5/f18-ceiling-study.md — fully reversible (delete or rewrite).
+  Acceptance doc: new file at docs/sprint-5/f18-ceiling-acceptance.md — fully reversible.
+  Migration 0171_module_ceiling_metrics.sql: not yet written; will be CREATE TABLE = reversible (DROP TABLE).
+  3 seed rows: additive, reversible (DELETE FROM).
+  New page app/(cockpit)/harness/ceiling/: not yet written; fully reversible (delete files).
+  New API route app/api/metrics/ceiling/: not yet written; fully reversible (delete file).
+  sprint-state.md update: document only, no code/schema effect.
+  All decisions: LOW cost to reverse.
+confidence: medium (Twin blocked; dashboard location uncertain — cannot reach HIGH)
+outcome: escalated
+escalation_reasons:
+  - twin_unreachable_all_three_questions (coordinator sandbox "Host not in allowlist")
+  - Q2_personal_design_decision (dashboard location requires Colin input)
+  - meta_c_condition_b_fails (confidence medium, not high)

@@ -268,6 +268,21 @@ commit: "b617167"
 opened_at: "2026-04-27T00:26:00Z"
 last_updated_at: "2026-04-27T00:40:00Z"
 
+f18_ceiling_chunk:
+status: "awaiting-colin-approval"
+task_id: "a3de7bed-2bce-4832-a1a1-28b87f104d62"
+description: "F18 ceiling metric layer — new module_ceiling_metrics table + dashboard"
+study_doc: "docs/sprint-5/f18-ceiling-study.md"
+acceptance_doc: "docs/sprint-5/f18-ceiling-acceptance.md"
+branch: "harness/task-a3de7bed-2bce-4832-a1a1-28b87f104d62"
+opened_at: "2026-05-10T02:45:00Z"
+last_updated_at: "2026-05-10T02:47:00Z"
+pending_colin_questions:
+  - "Q1: harness_resource_budgets new table vs extend? Coordinator recommends new table."
+  - "Q2: Dashboard at /harness/ceiling (new route) vs section on existing metrics page?"
+  - "Q3: twin current_value NULL (v1) vs live-wired from agent_events?"
+escalation_reason: "Twin endpoint blocked (host not in allowlist) + Q2 is personal design decision"
+
 hardening_h3:
 hardening_id: "H3"
 task_id: "9b95359e-828d-46d9-8514-1a1ff16f4c31"
