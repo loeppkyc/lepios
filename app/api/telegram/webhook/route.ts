@@ -923,6 +923,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       })
       .eq('id', matchedId)
 
+    // Resume any coordinator task waiting on this notification (F-N28-fix-A).
+    // Fire-and-forget — coordinator-resume is idempotent and non-fatal.
+    void (async () => {
+      // eslint-disable-next-line no-restricted-syntax -- forwarding CRON_SECRET to internal route (same pattern as triggerPickup)
+      const secret = process.env.CRON_SECRET
+      if (!secret) return
+      const base = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lepios-one.vercel.app'
+      await fetch(`${base}/api/harness/coordinator-resume`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notification_id: matchedId }),
+      }).catch(() => {})
+    })()
+
     // If this is a coordinator task-approval button, transition the task_queue status inline.
     // The coordinator exits after sending the Telegram message, so there is no polling process
     // waiting for outbound_notifications — the webhook must act on it directly.

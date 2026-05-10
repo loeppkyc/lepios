@@ -221,8 +221,13 @@
       "filename": "0179_oss_audit.sql",
       "claimed_at": "2026-05-10",
       "note": "OSS audit Step 1 — oss_audit_status/at/evidence on streamlit_modules + oss_packages cache table + capability_registry seeds (github/npm/pypi). Companion: lib/oss-radar/audit.ts (rule_based_v1 scorer) + app/api/cron/oss-audit/route.ts (40/tick backfill) + lib/oss-radar/digest.ts (F18 line)."
+    },
+    "0180": {
+      "branch": "feat/f-n28-fix-a",
+      "filename": "0180_awaiting_approval_status.sql",
+      "claimed_at": "2026-05-10",
+      "note": "F-N28-fix-A — adds awaiting_approval status to task_queue CHECK constraint. Used by coordinator exit-on-notify pattern: coordinator exits and sets task to awaiting_approval; coordinator-resume route transitions back to queued when Colin responds."
     }
   },
-  "next_available": 180
-}
+  "next_available": 181
 }
