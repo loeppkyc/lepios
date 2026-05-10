@@ -52,7 +52,7 @@ This sprint fixes all outstanding gaps identified in the Check-Before-Build audi
 - Vendor memory system (learned vendor → category) — useful but requires a separate `vendor_rules` table. Defer to v1.1.
 - Batch upload — single-receipt upload is the MVP path. Defer.
 - PDF support — only JPEG/PNG/WebP OCR for v1. PDF deferred.
-- **BookkeeperView YTD (v1 scope note):** The v1 bookkeeper accordion is single-month — it receives the receipts already filtered by the page's month selector, so it always renders one accordion panel. The Streamlit Bookkeeper View shows all months YTD in a single view (full-year accordion + YTD summary row). The YTD version requires a separate all-year fetch outside the month filter loop. Task queued: `receipts-bookkeeper-ytd` (priority 6). See task_queue for details.
+- **BookkeeperView YTD:** ~~v1 deferred~~ **SHIPPED v1.1** (`feat/bookkeeper-ytd-accordion`, 2026-05-10). Page header "This Month | YTD" toggle — YTD uses `GET /api/receipts?year=YYYY`, accordion groups all months newest-first, per-month pagination (100 rows + "show 50 more"), F18 metrics strip (receipt count + fetch ms vs 1s benchmark). Task d5d8c3c0 closed on merge.
 
 ---
 
