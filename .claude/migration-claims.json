@@ -197,7 +197,13 @@
       "filename": "0175_routines_quota_cursor.sql",
       "claimed_at": "2026-05-10",
       "note": "Routines quota cursor — seeds ROUTINES_BACKOFF_UNTIL, ROUTINES_INVOCATIONS_TODAY, ROUTINES_INVOCATIONS_WINDOW_START in harness_config. Gives quota-guard and quota-forecast O(1) reads instead of per-tick agent_events scan. Fix for 429 cliffs at 14:35 + 20:40 UTC 2026-05-09."
+    },
+    "0176": {
+      "branch": "fix/coordinator-respect-module-lock",
+      "filename": "0176_coordinator_module_lock.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Add harness_module_id bridge column to streamlit_modules + rewrite claim_next_task() with LEFT JOIN to skip tasks whose matched module is locked (in_progress_branch or manual_owner set). Seed: pages/21_PageProfit.py → pageprofit-scanner. Companion: pickup-runner.ts module-locked diagnostic shim."
     }
   },
-  "next_available": 176
+  "next_available": 177
 }
