@@ -27,3 +27,4 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 2026-04-26T00:50:00Z coordinator sprint=5 chunk=stall-alert phase=3+4 tokens_in=~35000 tokens_out=~5000 escalated=false auto_proceeded=false colin_direct_ratification=true awaiting_grounding=true
 2026-04-26T01:16:00Z coordinator sprint=5 chunk=notification-drain-dedup phase=1a-1d+3 tokens_in=~25000 tokens_out=~5000 escalated=false auto_proceeded=false colin_direct_ratification=true builder_delegated=true
 2026-04-27T00:40:00Z coordinator sprint=5 chunk=h1-drain-fix phase=1a+2 tokens_in=~38000 tokens_out=~9000 escalated=true auto_proceeded=false task_id=8a9dcb62
+2026-05-10T00:00:00Z coordinator sprint=unknown chunk=unknown phase=startup tokens_in=~4000 tokens_out=~1000 escalated=true auto_proceeded=false task_id=dbbb1a53 error=task_status_not_claimed
