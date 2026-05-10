@@ -9,6 +9,22 @@ last_reviewed_by_colin_at: 2026-05-01
 
 ---
 
+2026-05-10T03:10:00Z sprint=5 chunk=H5 doc=docs/sprint-5/h5-branch-preconfig-acceptance.md
+cited_principles: [META-C, hardening-scope, reversibility]
+trigger_match_evidence: |
+  H5 is a hardening task (no Streamlit predecessor). All changes are additive: new event name
+  branch_guard_passed, new BRANCH: payload line, Routine system prompt step. No data deleted,
+  no schema changed. Scope tightly bound to 2 code files + 1 Colin console action.
+reversibility_check: |
+  coordinator.md change: reversible — git revert.
+  invoke-coordinator.ts change: reversible — git revert.
+  Routine system prompt: reversible — Colin edits back via console.
+  No schema migrations. No destructive ops.
+confidence: medium
+outcome: escalated (confidence=medium; Part A requires Colin console action — cannot cache-match past a Colin decision point)
+
+---
+
 2026-04-27T00:00:00Z sprint=5 chunk=H3 doc=docs/sprint-5/h3-pickup-ordering-acceptance.md
 cited_principles: [cache_match_enabled: false — mandatory escalation per sprint-state.md]
 trigger_match_evidence: |
