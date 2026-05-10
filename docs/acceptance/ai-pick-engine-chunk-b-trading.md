@@ -193,7 +193,7 @@ Runs Sunday night (`0 4 * * 1` UTC = 9pm Sunday MT):
 5. Insert into `prediction_weights`, set new row `is_active=true`, flip old to `false` (atomic transaction).
 6. Telegram summary to Colin: "Weights tuned. Trend 1.0→1.15, RSI 1.0→0.95, ..."
 
-Per F19: changes logged to `agent_events`, surfaced in morning_digest.
+Per F19: % delta in scoring accuracy (unit: hit-rate %) logged to `agent_events`, surfaced in morning_digest.
 
 ---
 

@@ -1,4 +1,4 @@
-# F19_PRIME_SPEC — "20% is the floor"
+# F19_PRIME_SPEC — "log % delta, aim for ~100%"
 
 **Status:** DRAFT 1 (2026-04-28) — for review. Not yet approved. No migration written.
 **Source of truth (when approved):** This doc.
@@ -28,13 +28,13 @@
 
 ## The problem
 
-F19 today says: every system, process, and workflow is continuously evaluated for "20% faster, cheaper, or better." Implementation guidance in CLAUDE.md §3 rule 9 covers the *signal* layer (every module ships F18 metrics; nightly loop surfaces top 3 actionable suggestions; >20% inefficiency auto-queues a task).
+F19 today says: every system, process, and workflow is continuously evaluated against its own prior baseline — log the % delta achieved, aim for ~100%, no ceiling. Define unit per system (latency/cost/accuracy/throughput) so %s compare across sessions. Declining % = approaching efficiency ceiling, signal to pivot. Measurement, not gate. Implementation guidance in CLAUDE.md §3 rule 9 covers the *signal* layer (every module ships F18 metrics; nightly loop surfaces top 3 suggestions in morning_digest).
 
 **Three real gaps surface in practice:**
 
-### Gap 1 — The 20% number is read as a target, not a floor
+### Gap 1 — % delta must be logged, not gated
 
-When a 60% improvement is on the table, F19 phrasing nudges agents toward "find a 20% win and stop." The framing rewards *meeting* the bar, not *exceeding* it. Today's session: Colin explicitly redlined "20% is the FLOOR, not the target. Take the fastest path with quality double-check. No ceiling."
+There is no minimum acceptable improvement. Log the actual % delta achieved (unit: defined per system). Aim for ~100%; take every gain available. Declining % across sessions signals an approaching efficiency ceiling — the right response is to pivot focus, not try harder on the same axis.
 
 ### Gap 2 — F19 is silent on the verification step that gates the ship
 
@@ -47,23 +47,23 @@ F18 (measurement + benchmark + surfacing) is the *evidence base* that a verifier
 
 ### Gap 3 — Optimizer's reasoning is not captured
 
-When F19 surfaces a "20% better" suggestion in morning_digest, the *why* (signal that triggered it, alternatives considered, expected gain) lives in chat context and is lost. `decisions_log` (memory layer chunk #1, shipped today via migration 0044) is the right home for these — but F19 doesn't currently write to it.
+When F19 surfaces a "% delta" suggestion in morning_digest, the *why* (signal that triggered it, unit, alternatives considered, expected gain) lives in chat context and is lost. `decisions_log` (memory layer chunk #1, shipped today via migration 0044) is the right home for these — but F19 doesn't currently write to it.
 
 ---
 
 ## Architecture decisions (five)
 
-### AD1. **20% is the floor, no ceiling — phrasing change with teeth**
+### AD1. **Log % delta, aim for ~100% — measurement, not gate**
 
-F19 currently reads as if 20% is the bar. F19' reframes:
+F19' reframes improvement tracking:
 
-- **Trigger threshold (unchanged):** any signal showing >20% inefficiency vs. benchmark auto-queues a task. This stays — it's the surfacing rule.
-- **Optimizer target (new framing):** when a path is proposed, the optimizer reports the *largest verifiable* improvement, not the smallest acceptable one. "I found a 22% improvement" is suspect; "I found 64% but only 22% is safely verifiable" is honest.
-- **Quality double-check (new requirement):** any proposed path with >0% gain *must* go through the verifier before substitution. There is no "small enough to skip review" branch.
+- **No auto-queue threshold:** there is no minimum % that triggers a task. Log every gain, however small or large. Surfacing is always-on; the nightly loop surfaces top 3 regardless of size.
+- **Optimizer target:** report the *largest verifiable* improvement, not a minimum acceptable one. "I found 64% but only 22% is safely verifiable this cycle" is the honest format.
+- **Defined unit per system:** every signal must declare its unit (e.g., throughput = tasks/24h, latency = p50 min, accuracy = hit-rate %). Without a unit, % deltas from different systems aren't comparable.
+- **Ceiling signal:** if the logged % delta is declining across 3+ consecutive sessions for the same signal, that's an efficiency ceiling — pivot focus rather than continuing to optimize the same axis.
+- **Quality double-check (unchanged):** any proposed path with >0% gain *must* go through the verifier before substitution.
 
-**Why this matters:** the 20% floor framing is what stops agents from over-engineering tiny wins (<20% paths shouldn't auto-queue tasks — too noisy). The "no ceiling" framing is what stops agents from leaving 60% gains on the table because "20% was met."
-
-**Pinning rule:** F19's existing 20% trigger is preserved. F19' adds the ceiling-removal language to the rule body. No new threshold.
+**Why this matters:** gating on a fixed % threshold causes agents to stop at the bar rather than report what's actually achievable. Logging whatever % is achieved — with the unit attached — gives Colin the data to decide when a signal is played out.
 
 ### AD2. **Optimizer + Verifier pair — distinct roles, separate code paths, separate sessions**
 

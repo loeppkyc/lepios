@@ -161,7 +161,7 @@ This keeps §8.5 Accuracy Zone:
 - **F20 (design system):** No inline `style={}`. All new components use shadcn/ui + Tailwind utility classes.
 - **F18 (measurement + benchmark):** Every prediction logs to `agent_events` with grade, confidence, outcome. Calibration page surfaces hit rate vs benchmark (random = 50%, breakeven = 60% on -150 odds).
 - **F17 (behavioral ingestion):** Each prediction + outcome is an event the engine learns from — direct contribution to the path probability engine.
-- **F19 (continuous improvement):** Weekly `analyze_and_learn` cron runs the 20%-better loop on scoring weights. Adjustments logged, surfaced in morning_digest.
+- **F19 (continuous improvement):** Weekly `analyze_and_learn` cron logs % delta in scoring accuracy (unit: hit-rate %). Adjustments logged, surfaced in morning_digest. Declining % across sessions signals ceiling; aim for ~100%, log whatever is achieved.
 
 ---
 
