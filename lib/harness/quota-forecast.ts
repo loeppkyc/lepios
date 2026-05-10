@@ -17,7 +17,7 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 
-const CLIFF_THRESHOLD = 10 // conservative; observed limit ~12/day
+const CLIFF_THRESHOLD = 12 // conservative; observed limit ~15-16/day (2026-05-09 data)
 const TASK_COST_MAX = 3 // worst case: initial invoke + 2 retries
 const BURN_LOOKBACK_MS = 24 * 60 * 60 * 1000 // 24h rolling window
 const GUARD_WINDOW_MS = 6 * 60 * 60 * 1000 // look back 6h for 429 events
@@ -101,24 +101,49 @@ export async function forecastQuotaBeforeStart(): Promise<QuotaForecastResult> {
     }
 
     // ── Step 2: check burn rate ───────────────────────────────────────────────
-    const { data: burnRows, error: burnError } = await db
-      .from('agent_events')
-      .select('id')
-      .eq('action', 'invoke_coordinator')
-      .eq('status', 'success')
-      .gte('occurred_at', new Date(now - BURN_LOOKBACK_MS).toISOString())
-
-    if (burnError) {
-      return {
-        safe_to_start: true,
-        reason: 'forecast_error',
-        invocations_24h: 0,
-        cliff_threshold: CLIFF_THRESHOLD,
-        estimated_remaining: CLIFF_THRESHOLD,
+    // Primary: O(1) read from harness_config cursor (written by invoke-coordinator on success).
+    // Falls back to agent_events count when cursor is absent or window is stale.
+    let invocations_24h = -1
+    try {
+      const { data: configRows } = await db
+        .from('harness_config')
+        .select('key, value')
+        .in('key', ['ROUTINES_INVOCATIONS_TODAY', 'ROUTINES_INVOCATIONS_WINDOW_START'])
+      const get = (k: string) =>
+        (configRows as { key: string; value: string }[] | null)?.find((r) => r.key === k)?.value ??
+        ''
+      const windowStart = get('ROUTINES_INVOCATIONS_WINDOW_START')
+      const windowStartMs = windowStart ? new Date(windowStart).getTime() : 0
+      if (windowStartMs && now - windowStartMs <= BURN_LOOKBACK_MS) {
+        invocations_24h = parseInt(get('ROUTINES_INVOCATIONS_TODAY'), 10) || 0
+      } else {
+        // Window stale or missing — treat as fresh (0 invocations)
+        invocations_24h = 0
       }
+    } catch {
+      // Fall through to agent_events count
     }
 
-    const invocations_24h = (burnRows ?? []).length
+    if (invocations_24h < 0) {
+      // Cursor unavailable — count from agent_events
+      const { data: burnRows, error: burnError } = await db
+        .from('agent_events')
+        .select('id')
+        .eq('action', 'invoke_coordinator')
+        .eq('status', 'success')
+        .gte('occurred_at', new Date(now - BURN_LOOKBACK_MS).toISOString())
+
+      if (burnError) {
+        return {
+          safe_to_start: true,
+          reason: 'forecast_error',
+          invocations_24h: 0,
+          cliff_threshold: CLIFF_THRESHOLD,
+          estimated_remaining: CLIFF_THRESHOLD,
+        }
+      }
+      invocations_24h = (burnRows ?? []).length
+    }
     const estimated_remaining = CLIFF_THRESHOLD - invocations_24h
 
     if (estimated_remaining < TASK_COST_MAX) {
@@ -140,9 +165,10 @@ export async function forecastQuotaBeforeStart(): Promise<QuotaForecastResult> {
       estimated_remaining,
     }
   } catch {
-    // Fail open — forecast failure must never block coordinator startup
+    // Fail closed — better to stall than absorb a 429 cliff when both
+    // harness_config and agent_events fall through.
     return {
-      safe_to_start: true,
+      safe_to_start: false,
       reason: 'forecast_error',
       invocations_24h: 0,
       cliff_threshold: CLIFF_THRESHOLD,

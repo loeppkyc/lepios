@@ -124,10 +124,47 @@ export async function checkQuota(runId: string): Promise<QuotaStatus> {
       }
     }
 
-    // Signal 2: token budget
+    // Signal 2: Routines invocation count (replaces dead HARNESS_QUOTA_TOKENS_USED signal).
+    // Reads ROUTINES_INVOCATIONS_TODAY from harness_config (written by invoke-coordinator).
+    // Falls back to agent_events count when cursor is unavailable.
     const db = createServiceClient()
-    const { used, limit, threshold } = await readTokenBudget(db)
-    const usage_pct = limit > 0 ? Math.round((used / limit) * 100) : 0
+    const { threshold } = await readTokenBudget(db) // still reads HARNESS_QUOTA_THRESHOLD for the %
+
+    let invocations_24h = 0
+    try {
+      const { data: configRows } = await db
+        .from('harness_config')
+        .select('key, value')
+        .in('key', ['ROUTINES_INVOCATIONS_TODAY', 'ROUTINES_INVOCATIONS_WINDOW_START'])
+      const get = (k: string) =>
+        (configRows as { key: string; value: string }[] | null)?.find((r) => r.key === k)?.value ??
+        ''
+      const windowStart = get('ROUTINES_INVOCATIONS_WINDOW_START')
+      const windowStartMs = windowStart ? new Date(windowStart).getTime() : 0
+      const WINDOW_MS = 24 * 60 * 60 * 1_000
+      if (!windowStartMs || Date.now() - windowStartMs > WINDOW_MS) {
+        invocations_24h = 0
+      } else {
+        invocations_24h = parseInt(get('ROUTINES_INVOCATIONS_TODAY'), 10) || 0
+      }
+    } catch {
+      // Fallback: count from agent_events
+      try {
+        const { data } = await db
+          .from('agent_events')
+          .select('id')
+          .eq('action', 'invoke_coordinator')
+          .eq('status', 'success')
+          .gte('occurred_at', new Date(Date.now() - 86_400_000).toISOString())
+        invocations_24h = (data ?? []).length
+      } catch {
+        // Non-fatal — fail open
+      }
+    }
+
+    // Express as % of CLIFF_THRESHOLD (12) for compatibility with existing threshold logic.
+    const CLIFF = 12
+    const usage_pct = Math.round((invocations_24h / CLIFF) * 100)
     const should_halt = usage_pct >= threshold
 
     return {
@@ -135,7 +172,7 @@ export async function checkQuota(runId: string): Promise<QuotaStatus> {
       threshold,
       should_halt,
       signal: should_halt ? 'token_budget' : 'ok',
-      detail: `tokens used=${used.toLocaleString()} / limit=${limit.toLocaleString()} (${usage_pct}%)`,
+      detail: `routines invocations today=${invocations_24h} / cliff=${CLIFF} (${usage_pct}%)`,
       skip_check: false,
     }
   } catch (err) {
