@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { spApiConfigured } from '@/lib/amazon/client'
+import { spApiConfigured, spFetch } from '@/lib/amazon/client'
 import { logEvent, logError } from '@/lib/knowledge/client'
 import { findAsin, getCatalogData } from '@/lib/amazon/catalog'
 import { getUsedBuyBox } from '@/lib/amazon/pricing'
@@ -11,11 +11,40 @@ import { calcProfit, calcRoi, getDecision } from '@/lib/profit/calculator'
 import { getKeepaProduct } from '@/lib/keepa/product'
 import { getEbayListings } from '@/lib/ebay/listings'
 import { estimateEbayProfit } from '@/lib/ebay/fees'
+import { classifyTier, getFloorPrice, parseFormat } from '@/lib/pallets/tier-classifier'
+
+const MARKETPLACE_CA = 'A2EUQ1WTGCTBG2'
+
+type CatalogAttributesResponse = {
+  attributes?: {
+    contributor?: Array<{ value: string; contributorRole?: { value: string } }>
+    binding?: Array<{ value: string }>
+  }
+}
+
+async function getBookAttributes(asin: string): Promise<{ author: string; binding: string }> {
+  try {
+    const data = await spFetch<CatalogAttributesResponse>(`/catalog/2022-04-01/items/${asin}`, {
+      params: { marketplaceIds: MARKETPLACE_CA, includedData: 'attributes' },
+    })
+    const contributors = data.attributes?.contributor ?? []
+    const authorEntry =
+      contributors.find((c) => c.contributorRole?.value?.toLowerCase() === 'author') ??
+      contributors[0]
+    return {
+      author: authorEntry?.value ?? '',
+      binding: data.attributes?.binding?.[0]?.value ?? '',
+    }
+  } catch {
+    return { author: '', binding: '' }
+  }
+}
 
 const ScanBody = z.object({
   isbn: z.string().min(1),
   cost_paid: z.number().positive().max(999.99),
   hit_list_item_id: z.string().uuid().optional(),
+  pallet_id: z.string().uuid().optional(),
 })
 
 export async function POST(request: Request) {
@@ -44,7 +73,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const { isbn: rawIsbn, cost_paid: costPaid, hit_list_item_id: hitListItemId } = parsed.data
+  const {
+    isbn: rawIsbn,
+    cost_paid: costPaid,
+    hit_list_item_id: hitListItemId,
+    pallet_id: palletId,
+  } = parsed.data
   const isbn = normalizeIsbn(rawIsbn)
 
   if (!isIsbn(isbn)) {
@@ -70,8 +104,12 @@ export async function POST(request: Request) {
     )
   }
 
-  // Step 2: catalog + buy box in parallel (independent of each other)
-  const [catalog, buyBoxPrice] = await Promise.all([getCatalogData(asin), getUsedBuyBox(asin)])
+  // Step 2: catalog + buy box + book attributes in parallel (independent of each other)
+  const [catalog, buyBoxPrice, bookAttrs] = await Promise.all([
+    getCatalogData(asin),
+    getUsedBuyBox(asin),
+    getBookAttributes(asin),
+  ])
 
   if (!buyBoxPrice) {
     await logError('pageprofit', 'scan', new Error(`No used buy box price for ASIN ${asin}`), {
@@ -101,6 +139,11 @@ export async function POST(request: Request) {
   // Not used as a buy/skip gate until we have real sell-through data to validate the signal.
   const decision = getDecision(profit, roi)
 
+  // Tier classification
+  const format = parseFormat(bookAttrs.binding)
+  const tier = classifyTier(bookAttrs.author, catalog.title ?? '')
+  const floorPriceCad = getFloorPrice(tier, format)
+
   // Resolve BSR + source: SP-API is preferred; Keepa fills the gap
   const bsr = catalog.bsr > 0 ? catalog.bsr : (keepaProduct?.bsr ?? null)
   const bsrSource: 'sp-api' | 'keepa' | null =
@@ -111,37 +154,48 @@ export async function POST(request: Request) {
   const ebayProfit = ebayListings ? estimateEbayProfit(ebayListings.medianCad, costPaid) : null
 
   // Write scan result
-  const { data: scanRow, error: dbError } = await supabase.from('scan_results').insert({
-    // SPRINT5-GATE: replace with profiles FK + RLS policy (ARCHITECTURE.md §7.3, MN-3)
-    person_handle: 'colin',
-    isbn,
-    asin,
-    title: catalog.title || null,
-    cost_paid_cad: costPaid,
-    buy_box_price_cad: buyBoxPrice,
-    fba_fees_cad: fbaFees,
-    profit_cad: profit,
-    roi_pct: roi,
-    decision,
-    marketplace: 'amazon_ca',
-    bsr,
-    bsr_source: bsrSource,
-    rank_drops_30: keepaProduct?.rankDrops30 ?? null,
-    monthly_sold: keepaProduct?.monthlySold ?? null,
-    avg_rank_90d: keepaProduct?.avgRank90d ?? null,
-    ebay_listing_median_cad: ebayListings?.medianCad ?? null,
-    ebay_listing_count: ebayListings?.count ?? null,
-    ebay_profit_cad: ebayProfit,
-  }).select('id').single()
+  const { data: scanRow, error: dbError } = await supabase
+    .from('scan_results')
+    .insert({
+      // SPRINT5-GATE: replace with profiles FK + RLS policy (ARCHITECTURE.md §7.3, MN-3)
+      person_handle: 'colin',
+      isbn,
+      asin,
+      title: catalog.title || null,
+      author: bookAttrs.author || null,
+      binding: bookAttrs.binding || null,
+      tier,
+      cost_paid_cad: costPaid,
+      buy_box_price_cad: buyBoxPrice,
+      fba_fees_cad: fbaFees,
+      profit_cad: profit,
+      roi_pct: roi,
+      decision,
+      marketplace: 'amazon_ca',
+      bsr,
+      bsr_source: bsrSource,
+      rank_drops_30: keepaProduct?.rankDrops30 ?? null,
+      monthly_sold: keepaProduct?.monthlySold ?? null,
+      avg_rank_90d: keepaProduct?.avgRank90d ?? null,
+      ebay_listing_median_cad: ebayListings?.medianCad ?? null,
+      ebay_listing_count: ebayListings?.count ?? null,
+      ebay_profit_cad: ebayProfit,
+      pallet_id: palletId ?? null,
+    })
+    .select('id')
+    .single()
 
   // Link scan result back to hit list item if this was a batch scan
   if (!dbError && hitListItemId && scanRow?.id) {
-    await supabase.from('hit_list_items').update({
-      status: 'scanned',
-      scan_result_id: scanRow.id,
-      scanned_at: new Date().toISOString(),
-      cost_paid_cad: costPaid,
-    }).eq('id', hitListItemId)
+    await supabase
+      .from('hit_list_items')
+      .update({
+        status: 'scanned',
+        scan_result_id: scanRow.id,
+        scanned_at: new Date().toISOString(),
+        cost_paid_cad: costPaid,
+      })
+      .eq('id', hitListItemId)
   }
 
   // Write agent event — non-critical, don't fail the scan if this errors
@@ -175,6 +229,7 @@ export async function POST(request: Request) {
       isbn,
       asin,
       title: catalog.title,
+      author: bookAttrs.author || null,
       imageUrl: catalog.imageUrl,
       bsr,
       bsrCategory: catalog.bsrCategory,
@@ -185,6 +240,8 @@ export async function POST(request: Request) {
       profit,
       roi,
       decision,
+      tier,
+      floorPriceCad,
       marketplace: 'amazon_ca',
       keepa: keepaProduct
         ? {
