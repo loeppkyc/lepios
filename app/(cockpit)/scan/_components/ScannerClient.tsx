@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CockpitInput } from '@/components/cockpit/CockpitInput'
 import { BsrSparkline } from '@/components/cockpit/BsrSparkline'
 import type { VelocityBadge } from '@/lib/keepa/product'
 import type { BsrPoint } from '@/lib/keepa/history'
+import type { BookTier } from '@/lib/pallets/tier-classifier'
 import { useDevMode } from '@/lib/hooks/useDevMode'
 import { DebugSection } from '@/components/cockpit/DebugSection'
 
@@ -30,6 +32,7 @@ interface ScanResult {
   isbn: string
   asin: string
   title: string
+  author: string | null
   imageUrl: string
   bsr: number | null
   bsrCategory: string
@@ -40,8 +43,16 @@ interface ScanResult {
   profit: number
   roi: number
   decision: 'buy' | 'skip'
+  tier: BookTier
+  floorPriceCad: number | null
   keepa: KeepaData | null
   ebay: EbayData | null
+}
+
+const TIER_STYLES: Record<BookTier, { label: string; bg: string; color: string }> = {
+  COLLECTIBLE: { label: 'COLLECTIBLE', bg: 'var(--color-accent-gold)', color: 'var(--color-base)' },
+  HIGH_DEMAND: { label: 'HIGH DEMAND', bg: 'var(--color-positive)', color: 'var(--color-base)' },
+  STANDARD: { label: 'STANDARD', bg: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
 }
 
 interface HitListOption {
@@ -100,6 +111,9 @@ function VelocityPill({ badge }: { badge: VelocityBadge }) {
 }
 
 export function ScannerClient() {
+  const searchParams = useSearchParams()
+  const palletId = searchParams.get('pallet_id')
+
   const [isbn, setIsbn] = useState('')
   const [costPaid, setCostPaid] = useState('0.25')
   const [result, setResult] = useState<ScanResult | null>(null)
@@ -111,8 +125,15 @@ export function ScannerClient() {
   const [sparkLoading, setSparkLoading] = useState(false)
   const [sparkPoints, setSparkPoints] = useState<BsrPoint[] | null>(null)
 
+  // Routing state
+  const [routeState, setRouteState] = useState<'idle' | 'routing' | 'done'>('idle')
+  const [routeDecision, setRouteDecision] = useState<'go' | 'bbv' | 'donate' | null>(null)
+  const [routeError, setRouteError] = useState<string | null>(null)
+
   // Save-to-list state
-  const [saveState, setSaveState] = useState<'idle' | 'open' | 'saving' | 'saved' | 'new-list'>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'open' | 'saving' | 'saved' | 'new-list'>(
+    'idle'
+  )
   const [lists, setLists] = useState<HitListOption[]>([])
   const [listsLoaded, setListsLoaded] = useState(false)
   const [savedToName, setSavedToName] = useState<string | null>(null)
@@ -129,13 +150,17 @@ export function ScannerClient() {
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isbn: isbn.trim(), cost_paid: parseFloat(costPaid) }),
+        body: JSON.stringify({
+          isbn: isbn.trim(),
+          cost_paid: parseFloat(costPaid),
+          ...(palletId ? { pallet_id: palletId } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? 'Scan failed')
       else {
         setResult(data as ScanResult)
-        // Reset sparkline + save state on each new scan
+        // Reset sparkline + save + routing state on each new scan
         setSparkOpen(false)
         setSparkLoading(false)
         setSparkPoints(null)
@@ -143,6 +168,9 @@ export function ScannerClient() {
         setSavedToName(null)
         setSaveError(null)
         setNewListName('')
+        setRouteState('idle')
+        setRouteDecision(null)
+        setRouteError(null)
       }
     } catch {
       setError('Network error — check connection')
@@ -172,6 +200,30 @@ export function ScannerClient() {
       // Error state: BSR text stays, no sparkline shown
     } finally {
       setSparkLoading(false)
+    }
+  }
+
+  async function handleRoute(decision: 'go' | 'bbv' | 'donate') {
+    if (!result?.scanResultId || routeState !== 'idle') return
+    setRouteState('routing')
+    setRouteError(null)
+    try {
+      const res = await fetch(`/api/scan/${result.scanResultId}/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routing_decision: decision }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setRouteError(d.error ?? 'Routing failed')
+        setRouteState('idle')
+      } else {
+        setRouteDecision(decision)
+        setRouteState('done')
+      }
+    } catch {
+      setRouteError('Network error')
+      setRouteState('idle')
     }
   }
 
@@ -287,9 +339,31 @@ export function ScannerClient() {
             margin: '4px 0 0',
           }}
         >
-          Amazon CA · Chunk B
+          Amazon CA · 3-way routing
         </p>
       </div>
+
+      {palletId && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-accent-gold)',
+            background: 'var(--color-overlay)',
+            border: '1px solid var(--color-accent-gold)',
+            borderRadius: 'var(--radius-md)',
+            padding: '8px 12px',
+          }}
+        >
+          Scanning against pallet — scans will be linked automatically.{' '}
+          <a
+            href="/pallets"
+            style={{ color: 'inherit', textDecoration: 'underline', fontWeight: 600 }}
+          >
+            ← Back to pallets
+          </a>
+        </div>
+      )}
 
       <form onSubmit={handleScan} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <CockpitInput
@@ -395,6 +469,9 @@ export function ScannerClient() {
                   flexWrap: 'wrap',
                 }}
               >
+                {result.author && (
+                  <span style={{ color: 'var(--color-text-primary)' }}>{result.author}</span>
+                )}
                 <span>{result.asin}</span>
                 {result.bsr && result.bsr > 0 && (
                   <span
@@ -411,21 +488,41 @@ export function ScannerClient() {
                 <VelocityPill badge={velocityBadge} />
               </div>
             </div>
-            <span
+            <div
               style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-small)',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-sm)',
-                background: isBuy ? 'var(--color-positive)' : 'var(--color-overlay)',
-                color: isBuy ? 'var(--color-base)' : 'var(--color-text-muted)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: 4,
                 flexShrink: 0,
               }}
             >
-              {isBuy ? 'BUY' : 'SKIP'}
-            </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: TIER_STYLES[result.tier].bg,
+                  color: TIER_STYLES[result.tier].color,
+                }}
+              >
+                {TIER_STYLES[result.tier].label}
+              </span>
+              {result.floorPriceCad !== null && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-nano)',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  floor ${result.floorPriceCad.toFixed(2)}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* BSR sparkline — on-demand, tap-to-load */}
@@ -547,6 +644,119 @@ export function ScannerClient() {
               </span>
             )}
           </div>
+
+          {/* 3-way routing panel */}
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+            {routeState === 'done' && routeDecision ? (
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-positive)',
+                }}
+              >
+                {routeDecision === 'go' && '✓ Routed to Amazon'}
+                {routeDecision === 'bbv' && '✓ Staged for BBV'}
+                {routeDecision === 'donate' && '✓ Marked for donation'}
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-disabled)',
+                    marginBottom: 10,
+                  }}
+                >
+                  Route this book
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleRoute('go')}
+                    disabled={routeState === 'routing'}
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      fontWeight: 700,
+                      padding: '8px 16px',
+                      background:
+                        routeState === 'routing'
+                          ? 'var(--color-surface-2)'
+                          : 'var(--color-positive)',
+                      color:
+                        routeState === 'routing'
+                          ? 'var(--color-text-disabled)'
+                          : 'var(--color-base)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: routeState === 'routing' ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    GO — Amazon
+                  </button>
+                  <button
+                    onClick={() => handleRoute('bbv')}
+                    disabled={routeState === 'routing'}
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      fontWeight: 700,
+                      padding: '8px 16px',
+                      background:
+                        routeState === 'routing'
+                          ? 'var(--color-surface-2)'
+                          : 'var(--color-accent-gold)',
+                      color:
+                        routeState === 'routing'
+                          ? 'var(--color-text-disabled)'
+                          : 'var(--color-base)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: routeState === 'routing' ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    BBV
+                  </button>
+                  <button
+                    onClick={() => handleRoute('donate')}
+                    disabled={routeState === 'routing'}
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      fontWeight: 600,
+                      padding: '8px 16px',
+                      background: 'none',
+                      color:
+                        routeState === 'routing'
+                          ? 'var(--color-text-disabled)'
+                          : 'var(--color-text-muted)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: routeState === 'routing' ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Donate
+                  </button>
+                </div>
+                {routeError && (
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      color: 'var(--color-critical)',
+                      marginTop: 6,
+                    }}
+                  >
+                    {routeError}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -655,7 +865,9 @@ export function ScannerClient() {
                   fontSize: 'var(--text-small)',
                   fontWeight: 600,
                   padding: '7px 14px',
-                  background: newListName.trim() ? 'var(--color-accent-gold)' : 'var(--color-surface-2)',
+                  background: newListName.trim()
+                    ? 'var(--color-accent-gold)'
+                    : 'var(--color-surface-2)',
                   color: newListName.trim() ? 'var(--color-base)' : 'var(--color-text-disabled)',
                   border: 'none',
                   borderRadius: 'var(--radius-md)',
@@ -710,7 +922,14 @@ export function ScannerClient() {
 
       {devMode && result !== null && (
         <DebugSection heading="Debug — Scanner Result">
-          <pre style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-nano)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <pre
+            style={{
+              color: 'var(--color-text-primary)',
+              fontSize: 'var(--text-nano)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
             {JSON.stringify(result, null, 2)}
           </pre>
         </DebugSection>

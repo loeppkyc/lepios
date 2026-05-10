@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDevMode } from '@/lib/hooks/useDevMode'
 import { HeartbeatTile } from './HeartbeatTile'
+import { PageProfitTile } from './PageProfitTile'
 
 interface NavItem {
   label: string
@@ -37,7 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Amazon & Inventory',
     items: [
       { label: 'Amazon', href: '/amazon' },
-      { label: 'PageProfit', href: null },
+      { label: 'PageProfit', href: '/scan' },
       { label: 'Shipment Manager', href: null },
       { label: 'Inventory', href: '/inventory' },
       { label: 'Repricer', href: null },
@@ -321,6 +322,9 @@ export function CockpitSidebar() {
 
           {/* ── Heartbeat tile ── */}
           <HeartbeatTile />
+
+          {/* ── PageProfit tile ── */}
+          <PageProfitTile />
 
           {/* ── Nav sections ── */}
           <nav

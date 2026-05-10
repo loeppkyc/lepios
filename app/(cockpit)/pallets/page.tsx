@@ -1,8 +1,19 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { listPalletInvoices, sumPalletSpendLast12Months } from '@/lib/pallets/queries'
+import {
+  listPalletInvoices,
+  sumPalletSpendLast12Months,
+  listActivePalletsWithScanCount,
+  listClosedPalletsAwaitingAp,
+  listSettledPalletsWithAp,
+  listDonatedBooks,
+} from '@/lib/pallets/queries'
 import { PalletInvoiceForm } from './_components/PalletInvoiceForm'
 import { PalletInvoiceTable } from './_components/PalletInvoiceTable'
+import { PalletIntakeForm } from './_components/PalletIntakeForm'
+import { ActivePalletsList } from './_components/ActivePalletsList'
+import { PalletApSection } from './_components/PalletApSection'
+import { DonateLog } from './_components/DonateLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,10 +24,15 @@ export default async function PalletsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [invoices, last12Total] = await Promise.all([
-    listPalletInvoices(24),
-    sumPalletSpendLast12Months(),
-  ])
+  const [invoices, last12Total, activePallets, closedPallets, settledPallets, donatedBooks] =
+    await Promise.all([
+      listPalletInvoices(24),
+      sumPalletSpendLast12Months(),
+      listActivePalletsWithScanCount(),
+      listClosedPalletsAwaitingAp(),
+      listSettledPalletsWithAp(10),
+      listDonatedBooks(30),
+    ])
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-base)', padding: '24px' }}>
@@ -52,11 +68,33 @@ export default async function PalletsPage() {
             letterSpacing: '0.04em',
           }}
         >
-          Monthly pallet invoices · gross spend tracking
+          Pallet intake · active pallets · monthly invoices
         </p>
       </div>
 
-      {/* Invoice form */}
+      {/* Sub-module 1: pallet intake form */}
+      <PalletIntakeForm />
+
+      {/* Active pallets list */}
+      <div className="mt-4">
+        <ActivePalletsList pallets={activePallets} />
+      </div>
+
+      {/* Sub-module 2: AP settlement (closed pallets + settled history) */}
+      <div className="mt-4">
+        <PalletApSection closedPallets={closedPallets} settledPallets={settledPallets} />
+      </div>
+
+      {/* Sub-module 8: donate log */}
+      {donatedBooks.length > 0 && (
+        <div className="mt-4">
+          <DonateLog books={donatedBooks} />
+        </div>
+      )}
+
+      <hr className="border-border my-6" />
+
+      {/* Invoice form (legacy gross-spend tracker) */}
       <PalletInvoiceForm />
 
       {/* Invoices table + total tile */}

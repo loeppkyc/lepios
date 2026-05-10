@@ -28,6 +28,7 @@ import { buildOpenEscalationsLine } from '@/lib/harness/twin-escalations/digest'
 import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest'
 import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
+import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -329,6 +330,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: Port catalog lock status — locked / unlocked-pending / done ───────
   const moduleLockLine = await buildModuleLockDigestLine()
   messageToSend = `${messageToSend}\n${moduleLockLine}`
+
+  // ── F18: PageProfit — scan count + tier + routing breakdown (24h) ─────────
+  const pageProfitLine = await buildPageProfitScanLine()
+  messageToSend = `${messageToSend}\n${pageProfitLine}`
 
   characterCount = messageToSend.length
 

@@ -17,3 +17,83 @@ export interface PalletInvoiceInsert {
   gst_amount: number
   notes?: string | null
 }
+
+export type PalletStatus = 'active' | 'closed' | 'settled'
+
+export interface Pallet {
+  id: string
+  source: string
+  intake_date: string // YYYY-MM-DD
+  est_cost_cad: number | null
+  status: PalletStatus
+  notes: string | null
+  created_at: string
+}
+
+export interface PalletInsert {
+  source: string
+  intake_date: string
+  est_cost_cad?: number | null
+  notes?: string | null
+}
+
+export interface TierBreakdown {
+  COLLECTIBLE: number
+  HIGH_DEMAND: number
+  STANDARD: number
+}
+
+export interface RoutingBreakdown {
+  go: number
+  bbv: number
+  donate: number
+  pending: number
+}
+
+export interface PalletWithScanCount extends Pallet {
+  scan_count: number
+  tier_breakdown: TierBreakdown
+  routing_breakdown: RoutingBreakdown
+}
+
+// ── Donate log (sub-module 8) ─────────────────────────────────────────────
+
+export interface DonatedBook {
+  id: string
+  isbn: string
+  asin: string | null
+  title: string | null
+  author: string | null
+  tier: string | null
+  cost_paid_cad: number
+  created_at: string
+}
+
+// ── AP Records (sub-module 2) ─────────────────────────────────────────────
+
+export interface PalletApRecord {
+  id: string
+  pallet_id: string
+  invoice_month: string // YYYY-MM-DD (first of month)
+  confirmed_cost_cad: number
+  gst_amount_cad: number
+  paid_on: string | null // YYYY-MM-DD
+  notes: string | null
+  created_at: string
+}
+
+export interface PalletApRecordInsert {
+  pallet_id: string
+  invoice_month: string
+  confirmed_cost_cad: number
+  gst_amount_cad: number
+  paid_on?: string | null
+  notes?: string | null
+}
+
+export interface SettledPalletWithAp extends Pallet {
+  confirmed_cost_cad: number
+  gst_amount_cad: number
+  invoice_month: string
+  paid_on: string | null
+}
