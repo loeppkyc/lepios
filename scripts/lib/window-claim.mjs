@@ -44,7 +44,8 @@ export function isMainCheckout() {
 }
 
 /**
- * True iff the repo has any linked worktrees beyond the main checkout.
+ * True iff the repo has any linked worktrees beyond the main checkout,
+ * excluding ephemeral agent worktrees created by the Claude Code Agent tool.
  *
  * F-N10 prevention companion: F-N8 fired only when other windows had LIVE claims.
  * F-N10 (recurrence) showed the gap — between sessions, claims age out / get
@@ -52,12 +53,31 @@ export function isMainCheckout() {
  * checkout can satisfy "no other claims live" yet still be using a repo whose
  * persistent shape is multi-worktree. Forcing every window into a worktree once
  * worktrees exist closes the F-N10 path.
+ *
+ * Agent worktrees are excluded: they live at `.claude/worktrees/agent-*` inside
+ * the main checkout and are locked with reason "claude agent". Counting them
+ * caused F-N10 to fire permanently (since they always exist while Claude Code is
+ * running), forcing every session to use --allow-main-checkout and defeating
+ * the guard entirely. Real worktrees (e.g. lepios-family) still trigger the guard.
  */
 export function hasOtherWorktrees() {
   const out = execSync('git worktree list --porcelain').toString()
-  // Each `worktree <path>` line marks one entry. >1 means at least one linked.
-  const count = (out.match(/^worktree /gm) ?? []).length
-  return count > 1
+  // Parse stanzas — each entry is a block of lines ending with a blank line.
+  const stanzas = out.trim().split(/\n\n+/)
+  // Skip the first entry (main checkout itself). Count remaining non-agent worktrees.
+  const linked = stanzas.slice(1).filter((stanza) => {
+    const pathMatch = stanza.match(/^worktree (.+)/m)
+    const lockMatch = stanza.match(/^locked (.+)/m)
+    if (!pathMatch) return false
+    const wtPath = pathMatch[1].trim()
+    const lockReason = lockMatch ? lockMatch[1].trim() : ''
+    // Exclude agent worktrees: path under .claude/worktrees/ OR lock reason starts with "claude agent"
+    const isAgentWorktree =
+      wtPath.replace(/\\/g, '/').includes('/.claude/worktrees/') ||
+      lockReason.startsWith('claude agent')
+    return !isAgentWorktree
+  })
+  return linked.length > 0
 }
 
 /** Replace path separators so a branch like `feat/foo/bar` lands as one flat filename. */
