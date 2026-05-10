@@ -48,7 +48,7 @@ Strategic math: T1 20%×100.0=20.00 · T1b 5%×88.0=4.40 · T2 40%×56.1=22.44 �
 | 3   | Local Sales            | 3 items       | **0%**       | 4.5%             | `docs/acceptance/local-sales-webhook.md` (acceptance doc written, not built)      |
 | 4   | Streamlit Port Backlog | 234 modules   | **0%**       | 13.5%            | `docs/streamlit-port-catalog.md` (all pending; promotion via acceptance-doc flow) |
 | 5   | GPU Day Readiness      | 27 line items | **96.0%**    | 13.5%            | `docs/gpu-day-readiness.md`                                                       |
-| 6   | Parked Backlog         | 28 items      | **0.0%**     | 10%              | `docs/standing/parked-backlog.md`                                                 |
+| 6   | Parked Backlog         | 41 items      | **0.0%**     | 10%              | `docs/standing/parked-backlog.md`                                                 |
 | L1  | Life Tracks            | 3 items       | visible only | unweighted       | memory; no capture infrastructure                                                 |
 
 ---
