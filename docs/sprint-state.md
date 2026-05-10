@@ -230,6 +230,24 @@ grounding_checkpoints:
 - "Confirm /api/harness/notifications-drain cron appears in Vercel Cron Jobs tab after deploy to main"
 - "SELECT meta FROM agent_events WHERE action='notification_delivered' ORDER BY occurred_at DESC LIMIT 3 — expect delivery_latency_ms > 0"
 
+ollama_tunnel_url_harness_config_chunk:
+status: "in-build"
+acceptance_doc: "docs/sprint-5/ollama-tunnel-url-harness-config-acceptance.md"
+coordinator_task_id: "7bb2a620-e4cb-47b1-a836-b7c6c148c99f"
+colin_approved_at: "2026-05-10T03:22:00Z (cache-match auto-proceed META-C)"
+delegated_to_builder_at: "2026-05-10T03:30:00Z"
+files_to_change:
+
+- "lib/ollama/client.ts"
+- "lib/harness/smoke-tests/ollama-health.ts"
+- "lib/orchestrator/daytime-tick.ts"
+- "tests/ollama-client.test.ts"
+  no_schema_change: true
+  grounding_checkpoints:
+- "INSERT INTO harness_config (key, value) VALUES ('OLLAMA_TUNNEL_URL', '<tunnel-url>')"
+- "Trigger daytime-tick — confirm tunnel_used=true in response"
+- "SELECT meta FROM agent_events WHERE action='ollama.health' ORDER BY occurred_at DESC LIMIT 1 — expect tunnel_used=true"
+
 # Grounding checkpoints still pending for completed-build chunks
 
 # (all require Colin to apply migrations and verify live behaviour):
@@ -268,7 +286,7 @@ commit: "b617167"
 opened_at: "2026-04-27T00:26:00Z"
 last_updated_at: "2026-04-27T00:40:00Z"
 
-hardening_h3:
+hardening*h3:
 hardening_id: "H3"
 task_id: "9b95359e-828d-46d9-8514-1a1ff16f4c31"
 source_label: "postmortem_915d1fee"
@@ -277,9 +295,9 @@ description: "Pickup ordering — FIFO guarantee + coordinator-busy unclaim"
 study_doc: "docs/sprint-5/h3-pickup-ordering-study.md"
 acceptance_doc: "docs/sprint-5/h3-pickup-ordering-acceptance.md"
 audit_finding: "FIFO ordering is correct — root cause is 429 serialization + daily cron. Part A=immediate unclaim on 429. Part B=hourly cron (Colin approved)."
-root_causes: - "429_limbo: fireCoordinator 429 leaves task in claimed state for 15-min stale window, burning retry_count" - "daily_cron: task-pickup runs once per day (0 0 \* \* _), max 24h claim latency"
-part_a_status: "shipped — pickup-runner.ts immediately unclears task on 429, no retry_count burn, Telegram alert fires"
-part_b_status: "shipped — vercel.json cron changed to 0 _ \* \* \* (hourly, Colin approved Hobby slot usage)"
+root_causes: - "429_limbo: fireCoordinator 429 leaves task in claimed state for 15-min stale window, burning retry_count" - "daily_cron: task-pickup runs once per day (0 0 \* \* *), max 24h claim latency"
+part*a_status: "shipped — pickup-runner.ts immediately unclears task on 429, no retry_count burn, Telegram alert fires"
+part_b_status: "shipped — vercel.json cron changed to 0 * \* \* \* (hourly, Colin approved Hobby slot usage)"
 branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
