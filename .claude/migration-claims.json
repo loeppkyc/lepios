@@ -167,7 +167,31 @@
       "filename": "0170_dropbox_capability.sql",
       "claimed_at": "2026-05-09",
       "note": "Register net.outbound.dropbox + net.outbound.dropbox.content + net.outbound.npm + net.outbound.pypi in capability_registry. Seed DROPBOX_REFRESH_TOKEN / DROPBOX_APP_KEY / DROPBOX_APP_SECRET placeholders in harness_config."
+    },
+    "0171": {
+      "branch": "feat/pageprofit-port",
+      "filename": "0171_pallets_scanner.sql",
+      "claimed_at": "2026-05-09",
+      "note": "PageProfit sub-module 1 — pallets + pallet_invoices tables. Applied to prod. PR #181 open (not merged)."
+    },
+    "0172": {
+      "branch": "feat/pageprofit-port",
+      "filename": "0172_pallet_ap_records.sql",
+      "claimed_at": "2026-05-09",
+      "note": "PageProfit sub-module 2 — pallet_ap_records table + settle trigger. Applied to prod. PR #181 open (not merged)."
+    },
+    "0173": {
+      "branch": "feat/pageprofit-port",
+      "filename": "0173_scan_tier_routing.sql",
+      "claimed_at": "2026-05-10",
+      "note": "PageProfit sub-module 3 — author/binding/tier/routing_decision on scan_results + bbv_outbox table. Applied to prod. PR #181 open (not merged)."
+    },
+    "0174": {
+      "branch": "feat/streamlit-modules-lock",
+      "filename": "0174_streamlit_modules_lock.sql",
+      "claimed_at": "2026-05-10",
+      "note": "manual_owner + in_progress_branch + locked_at columns on streamlit_modules. Partial index idx_streamlit_modules_unlocked for coordinator eligibility query. Required before continuous mode restart (~02:40 UTC 2026-05-11)."
     }
   },
-  "next_available": 171
+  "next_available": 175
 }
