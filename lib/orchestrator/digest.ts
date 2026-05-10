@@ -29,6 +29,7 @@ import { buildReconciliationMatchLine } from '@/lib/amazon/reconciliation-digest
 import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
 import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
+import { buildOssAuditDigestLine } from '@/lib/oss-radar/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -334,6 +335,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: PageProfit — scan count + tier + routing breakdown (24h) ─────────
   const pageProfitLine = await buildPageProfitScanLine()
   messageToSend = `${messageToSend}\n${pageProfitLine}`
+
+  // ── F18: OSS audit — step 3 verdict distribution across streamlit_modules ──
+  const ossAuditLine = await buildOssAuditDigestLine()
+  messageToSend = `${messageToSend}\n${ossAuditLine}`
 
   characterCount = messageToSend.length
 

@@ -215,7 +215,14 @@
       "filename": "0178_restore_backoff_clear.sql",
       "claimed_at": "2026-05-10",
       "note": "Task a1f630c9 — restore ROUTINES_BACKOFF_UNTIL clear in increment_routines_counter(). Was present in PR #201, dropped in #202 sync. Single CREATE OR REPLACE adding one UPDATE line."
+    },
+    "0179": {
+      "branch": "feat/oss-audit-step1-step3",
+      "filename": "0179_oss_audit.sql",
+      "claimed_at": "2026-05-10",
+      "note": "OSS audit Step 1 — oss_audit_status/at/evidence on streamlit_modules + oss_packages cache table + capability_registry seeds (github/npm/pypi). Companion: lib/oss-radar/audit.ts (rule_based_v1 scorer) + app/api/cron/oss-audit/route.ts (40/tick backfill) + lib/oss-radar/digest.ts (F18 line)."
     }
   },
-  "next_available": 179
+  "next_available": 180
+}
 }
