@@ -48,10 +48,31 @@ function PalletRow({ pallet }: { pallet: PalletWithScanCount }) {
         </span>
       </div>
 
-      {/* Scan count badge */}
-      <span className="bg-cockpit-surface text-muted-foreground shrink-0 rounded-full px-2 py-0.5 font-mono text-[11px]">
-        {pallet.scan_count} scan{pallet.scan_count !== 1 ? 's' : ''}
-      </span>
+      {/* Scan count + breakdown */}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="bg-cockpit-surface text-muted-foreground rounded-full px-2 py-0.5 font-mono text-[11px]">
+          {pallet.scan_count} scan{pallet.scan_count !== 1 ? 's' : ''}
+        </span>
+        {pallet.scan_count > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {pallet.tier_breakdown.COLLECTIBLE > 0 && (
+              <span className="rounded-sm bg-[var(--color-overlay)] px-1 font-mono text-[9px] text-[var(--color-accent-gold)]">
+                {pallet.tier_breakdown.COLLECTIBLE}C
+              </span>
+            )}
+            {pallet.tier_breakdown.HIGH_DEMAND > 0 && (
+              <span className="rounded-sm bg-[var(--color-overlay)] px-1 font-mono text-[9px] text-[var(--color-positive)]">
+                {pallet.tier_breakdown.HIGH_DEMAND}HD
+              </span>
+            )}
+            {pallet.tier_breakdown.STANDARD > 0 && (
+              <span className="rounded-sm bg-[var(--color-overlay)] px-1 font-mono text-[9px] text-[var(--color-text-disabled)]">
+                {pallet.tier_breakdown.STANDARD}S
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Scan link */}
       <a

@@ -6,12 +6,14 @@ import {
   listActivePalletsWithScanCount,
   listClosedPalletsAwaitingAp,
   listSettledPalletsWithAp,
+  listDonatedBooks,
 } from '@/lib/pallets/queries'
 import { PalletInvoiceForm } from './_components/PalletInvoiceForm'
 import { PalletInvoiceTable } from './_components/PalletInvoiceTable'
 import { PalletIntakeForm } from './_components/PalletIntakeForm'
 import { ActivePalletsList } from './_components/ActivePalletsList'
 import { PalletApSection } from './_components/PalletApSection'
+import { DonateLog } from './_components/DonateLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,13 +24,15 @@ export default async function PalletsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [invoices, last12Total, activePallets, closedPallets, settledPallets] = await Promise.all([
-    listPalletInvoices(24),
-    sumPalletSpendLast12Months(),
-    listActivePalletsWithScanCount(),
-    listClosedPalletsAwaitingAp(),
-    listSettledPalletsWithAp(10),
-  ])
+  const [invoices, last12Total, activePallets, closedPallets, settledPallets, donatedBooks] =
+    await Promise.all([
+      listPalletInvoices(24),
+      sumPalletSpendLast12Months(),
+      listActivePalletsWithScanCount(),
+      listClosedPalletsAwaitingAp(),
+      listSettledPalletsWithAp(10),
+      listDonatedBooks(30),
+    ])
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-base)', padding: '24px' }}>
@@ -80,6 +84,13 @@ export default async function PalletsPage() {
       <div className="mt-4">
         <PalletApSection closedPallets={closedPallets} settledPallets={settledPallets} />
       </div>
+
+      {/* Sub-module 8: donate log */}
+      {donatedBooks.length > 0 && (
+        <div className="mt-4">
+          <DonateLog books={donatedBooks} />
+        </div>
+      )}
 
       <hr className="border-border my-6" />
 

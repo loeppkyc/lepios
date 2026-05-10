@@ -37,8 +37,36 @@ export interface PalletInsert {
   notes?: string | null
 }
 
+export interface TierBreakdown {
+  COLLECTIBLE: number
+  HIGH_DEMAND: number
+  STANDARD: number
+}
+
+export interface RoutingBreakdown {
+  go: number
+  bbv: number
+  donate: number
+  pending: number
+}
+
 export interface PalletWithScanCount extends Pallet {
   scan_count: number
+  tier_breakdown: TierBreakdown
+  routing_breakdown: RoutingBreakdown
+}
+
+// ── Donate log (sub-module 8) ─────────────────────────────────────────────
+
+export interface DonatedBook {
+  id: string
+  isbn: string
+  asin: string | null
+  title: string | null
+  author: string | null
+  tier: string | null
+  cost_paid_cad: number
+  created_at: string
 }
 
 // ── AP Records (sub-module 2) ─────────────────────────────────────────────

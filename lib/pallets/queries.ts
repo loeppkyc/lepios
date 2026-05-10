@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import type {
+  DonatedBook,
   Pallet,
   PalletApRecord,
   PalletApRecordInsert,
@@ -7,7 +8,9 @@ import type {
   PalletInvoice,
   PalletInvoiceInsert,
   PalletWithScanCount,
+  RoutingBreakdown,
   SettledPalletWithAp,
+  TierBreakdown,
 } from './types'
 
 /** Returns pallet invoices ordered newest-first, capped at the given month window. */
@@ -56,7 +59,10 @@ export async function insertPalletInvoice(insert: PalletInvoiceInsert): Promise<
 
 // ── Pallets (physical units, sub-module 1) ────────────────────────────────
 
-/** Active pallets with scan counts — used by /pallets Active Pallets section and scanner context. */
+const EMPTY_TIER: TierBreakdown = { COLLECTIBLE: 0, HIGH_DEMAND: 0, STANDARD: 0 }
+const EMPTY_ROUTING: RoutingBreakdown = { go: 0, bbv: 0, donate: 0, pending: 0 }
+
+/** Active pallets with scan counts and tier/routing breakdown — used by /pallets Active Pallets section. */
 export async function listActivePalletsWithScanCount(): Promise<PalletWithScanCount[]> {
   const service = createServiceClient()
 
@@ -70,19 +76,50 @@ export async function listActivePalletsWithScanCount(): Promise<PalletWithScanCo
   if (!pallets?.length) return []
 
   const ids = pallets.map((p) => p.id as string)
-  const { data: counts, error: countsError } = await service
+  const { data: scans, error: scansError } = await service
     .from('scan_results')
-    .select('pallet_id')
+    .select('pallet_id, tier, routing_decision')
     .in('pallet_id', ids)
 
-  if (countsError) throw new Error(countsError.message)
+  if (scansError) throw new Error(scansError.message)
 
-  const countMap = new Map<string, number>()
-  for (const row of counts ?? []) {
-    if (row.pallet_id) countMap.set(row.pallet_id, (countMap.get(row.pallet_id) ?? 0) + 1)
+  type BdMap = {
+    scan_count: number
+    tier_breakdown: TierBreakdown
+    routing_breakdown: RoutingBreakdown
+  }
+  const bdMap = new Map<string, BdMap>()
+
+  for (const row of scans ?? []) {
+    const pid = row.pallet_id as string
+    if (!bdMap.has(pid)) {
+      bdMap.set(pid, {
+        scan_count: 0,
+        tier_breakdown: { ...EMPTY_TIER },
+        routing_breakdown: { ...EMPTY_ROUTING },
+      })
+    }
+    const bd = bdMap.get(pid)!
+    bd.scan_count++
+    const tier = row.tier as string | null
+    if (tier === 'COLLECTIBLE') bd.tier_breakdown.COLLECTIBLE++
+    else if (tier === 'HIGH_DEMAND') bd.tier_breakdown.HIGH_DEMAND++
+    else if (tier === 'STANDARD') bd.tier_breakdown.STANDARD++
+    const rd = row.routing_decision as string | null
+    if (rd === 'go') bd.routing_breakdown.go++
+    else if (rd === 'bbv') bd.routing_breakdown.bbv++
+    else if (rd === 'donate') bd.routing_breakdown.donate++
+    else bd.routing_breakdown.pending++
   }
 
-  return pallets.map((p) => ({ ...(p as Pallet), scan_count: countMap.get(p.id) ?? 0 }))
+  return pallets.map((p) => {
+    const bd = bdMap.get(p.id) ?? {
+      scan_count: 0,
+      tier_breakdown: { ...EMPTY_TIER },
+      routing_breakdown: { ...EMPTY_ROUTING },
+    }
+    return { ...(p as Pallet), ...bd }
+  })
 }
 
 /** Insert a new pallet. Returns the created row. */
@@ -167,4 +204,20 @@ export async function insertApRecord(insert: PalletApRecordInsert): Promise<Pall
   const { data, error } = await service.from('pallet_ap_records').insert(insert).select().single()
   if (error) throw new Error(error.message)
   return data as PalletApRecord
+}
+
+// ── Donate log (sub-module 8) ─────────────────────────────────────────────
+
+/** Books routed to donate, newest-first. */
+export async function listDonatedBooks(limit: number = 30): Promise<DonatedBook[]> {
+  const service = createServiceClient()
+  const { data, error } = await service
+    .from('scan_results')
+    .select('id, isbn, asin, title, author, tier, cost_paid_cad, created_at')
+    .eq('routing_decision', 'donate')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DonatedBook[]
 }
