@@ -48,3 +48,13 @@ export function hasValidCronSecret(request: Request): boolean {
   if (!secret) return false
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
+
+/**
+ * Returns the raw CRON_SECRET value for routes that need to make outgoing
+ * authenticated calls to other internal endpoints (e.g. coordinator-resume
+ * triggering task-pickup). Route files must use this instead of reading
+ * process.env.CRON_SECRET directly (F22).
+ */
+export function getCronSecret(): string | undefined {
+  return process.env.CRON_SECRET
+}

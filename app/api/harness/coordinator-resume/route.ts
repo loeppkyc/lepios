@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireCronSecret } from '@/lib/auth/cron-secret'
+import { requireCronSecret, getCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
@@ -70,9 +70,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // Log resume event
-  await db
-    .from('agent_events')
-    .insert({
+  try {
+    await db.from('agent_events').insert({
       domain: 'orchestrator',
       action: 'coordinator_resumed',
       actor: 'coordinator_resume',
@@ -86,10 +85,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       tags: ['coordinator', 'harness', 'notification'],
     })
-    .catch(() => {})
+  } catch {}
 
   // Trigger pickup to re-invoke coordinator immediately
-  const secret = process.env.CRON_SECRET
+  const secret = getCronSecret()
   if (secret) {
     const base = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lepios-one.vercel.app'
     await fetch(`${base}/api/cron/task-pickup`, {
