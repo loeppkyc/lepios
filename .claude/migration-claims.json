@@ -227,7 +227,19 @@
       "filename": "0180_awaiting_approval_status.sql",
       "claimed_at": "2026-05-10",
       "note": "F-N28-fix-A — adds awaiting_approval status to task_queue CHECK constraint. Used by coordinator exit-on-notify pattern: coordinator exits and sets task to awaiting_approval; coordinator-resume route transitions back to queued when Colin responds."
+    },
+    "0181": {
+      "branch": "feat/mid-batch-family",
+      "filename": "0181_family.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch family cluster — cleaning_clients, cora_activities, family_important_dates tables. See docs/acceptance/mid-batch-family.md."
+    },
+    "0182": {
+      "branch": "feat/mid-batch-family",
+      "filename": "0182_cora_future.sql",
+      "claimed_at": "2026-05-10",
+      "note": "MID batch family cluster — cora_future_items table with status/timeline/deadline tracking. See docs/acceptance/mid-batch-coras-future.md."
     }
   },
-  "next_available": 181
+  "next_available": 183
 }
