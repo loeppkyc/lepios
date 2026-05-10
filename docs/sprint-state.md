@@ -284,3 +284,25 @@ branch: "harness/task-9b95359e-828d-46d9-8514-1a1ff16f4c31"
 pr: "33"
 opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
+
+# ============================================================
+# Harness fix — OLLAMA_TUNNEL_URL → harness_config (2026-05-10)
+# ============================================================
+
+harness_ollama_tunnel_url:
+  coordinator_task_id: "c00e54e0-e531-4cdc-a6f5-e29a92e325ff"
+  builder_task_id: "7bb2a620-e4cb-47b1-a836-b7c6c148c99f"
+  source_label: "morning_diagnostics_2026_04_28"
+  status: "in-build"
+  description: "Move OLLAMA_TUNNEL_URL from process.env to harness_config. Fix 3 direct process.env reads in client.ts:265, ollama-health.ts:16, daytime-tick.ts:55."
+  acceptance_doc: "docs/sprint-5/ollama-tunnel-url-harness-config-acceptance.md"
+  approval_method: "cache-match-meta-c"
+  files_to_change:
+    - "lib/ollama/client.ts"
+    - "lib/harness/smoke-tests/ollama-health.ts"
+    - "lib/orchestrator/daytime-tick.ts"
+    - "tests/ollama-client.test.ts"
+  no_schema_change: true
+  grounding_checkpoint: "Colin inserts OLLAMA_TUNNEL_URL into harness_config, triggers daytime-tick, confirms tunnel_used=true and base_url matches harness_config value"
+  opened_at: "2026-05-10T03:22:00Z"
+  last_updated_at: "2026-05-10T03:22:00Z"

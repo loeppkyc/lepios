@@ -217,3 +217,24 @@ escalation_reasons:
 
 - cache_match_disabled_sprint_override
 - standard_per_chunk_escalation (every acceptance doc escalates to Colin per Phase 0 state)
+
+---
+
+2026-05-10T03:22:00Z sprint=5 chunk=ollama-tunnel-url-harness-config doc=docs/sprint-5/ollama-tunnel-url-harness-config-acceptance.md
+cited_principles: [S-L1, F21, META-C]
+trigger_match_evidence: |
+  S-L1 (CLAUDE.md §9 S-L1): "Store runtime config in harness_config (Supabase). Read via SQL at session
+  start. Never read from process.env for cross-boundary values."
+  Situation: three production code paths read process.env.OLLAMA_TUNNEL_URL despite hydrateOllamaConfig()
+  + getBaseUrl() already existing in lib/ollama/client.ts. Fixes are purely wiring — no new infrastructure.
+  F21 (CLAUDE.md §3 rule 6): acceptance doc written before any code changed. ✓
+reversibility_check: |
+  lib/ollama/client.ts line 265 edit: reversible via git. Cost: trivial.
+  lib/harness/smoke-tests/ollama-health.ts: 2 lines added, 1 replaced. Reversible via git. Cost: trivial.
+  lib/orchestrator/daytime-tick.ts: import + function body change. Reversible via git. Cost: trivial.
+  tests/ollama-client.test.ts: additive. Reversible via git. Cost: trivial.
+  harness_config OLLAMA_TUNNEL_URL row: Colin inserts manually. Reversible (DELETE WHERE key='OLLAMA_TUNNEL_URL'). Cost: trivial.
+  No schema changes. No migrations. No destructive operations. All reversible at near-zero cost.
+confidence: high
+outcome: auto-proceeded
+proceed_reason: "META-C: pattern matches S-L1 exactly; all decisions reversible; confidence high; cache-match enabled (last_reviewed_by_colin_at=2026-05-01)"
