@@ -28,6 +28,14 @@ interface EbayData {
   fallbackUsed: boolean
 }
 
+interface EbaySoldData {
+  avgSoldCad: number
+  lowSoldCad: number
+  highSoldCad: number
+  soldCount: number
+  fallbackUsed: boolean
+}
+
 interface ScanResult {
   scanResultId: string | null
   isbn: string
@@ -48,6 +56,7 @@ interface ScanResult {
   floorPriceCad: number | null
   keepa: KeepaData | null
   ebay: EbayData | null
+  ebaySold: EbaySoldData | null
 }
 
 const TIER_STYLES: Record<BookTier, { label: string; bg: string; color: string }> = {
@@ -658,7 +667,7 @@ export function ScannerClient() {
 
           {/* eBay active listing comps row */}
           <div style={cell}>
-            <div style={cellLabel}>eBay CA (active listings)</div>
+            <div style={cellLabel}>eBay CA (active)</div>
             {result.ebay ? (
               <div
                 style={{
@@ -695,6 +704,44 @@ export function ScannerClient() {
                 }}
               >
                 No eBay data
+              </span>
+            )}
+          </div>
+
+          {/* eBay sold comps row */}
+          <div style={cell}>
+            <div style={cellLabel}>eBay CA (sold 30d)</div>
+            {result.ebaySold && result.ebaySold.soldCount > 0 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <span style={{ ...cellValue, color: 'var(--color-text-primary)' }}>
+                  {result.ebaySold.soldCount} sold · avg ${result.ebaySold.avgSoldCad.toFixed(2)}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-small)',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  ${result.ebaySold.lowSoldCad.toFixed(2)} – $
+                  {result.ebaySold.highSoldCad.toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                No sold data
               </span>
             )}
           </div>

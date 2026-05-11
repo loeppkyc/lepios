@@ -10,6 +10,7 @@ import { normalizeIsbn, isIsbn } from '@/lib/amazon/isbn'
 import { calcProfit, calcRoi, getDecision } from '@/lib/profit/calculator'
 import { getKeepaProduct } from '@/lib/keepa/product'
 import { getEbayListings } from '@/lib/ebay/listings'
+import { getSoldComps } from '@/lib/ebay/finding'
 import { estimateEbayProfit } from '@/lib/ebay/fees'
 import { classifyTier, getFloorPrice, parseFormat } from '@/lib/pallets/tier-classifier'
 
@@ -125,11 +126,12 @@ export async function POST(request: Request) {
     )
   }
 
-  // Step 3: FBA fees + Keepa + eBay in parallel (none depend on each other)
-  const [fbaFees, keepaProduct, ebayResult] = await Promise.all([
+  // Step 3: FBA fees + Keepa + eBay active + eBay sold in parallel (none depend on each other)
+  const [fbaFees, keepaProduct, ebayResult, soldResult] = await Promise.all([
     getFbaFees(asin, buyBoxPrice),
     getKeepaProduct(asin),
     getEbayListings(isbn, catalog.title || undefined),
+    getSoldComps(isbn, catalog.title || undefined),
   ])
 
   const profit = calcProfit(buyBoxPrice, fbaFees, costPaid)
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
   // eBay comp fields
   const ebayListings = ebayResult.listings
   const ebayProfit = ebayListings ? estimateEbayProfit(ebayListings.medianCad, costPaid) : null
+  const soldComps = soldResult.comps
 
   // Write scan result
   const { data: scanRow, error: dbError } = await supabase
@@ -260,6 +263,15 @@ export async function POST(request: Request) {
             count: ebayListings.count,
             profit: ebayProfit,
             fallbackUsed: ebayListings.fallbackUsed,
+          }
+        : null,
+      ebaySold: soldComps
+        ? {
+            avgSoldCad: soldComps.avgSoldCad,
+            lowSoldCad: soldComps.lowSoldCad,
+            highSoldCad: soldComps.highSoldCad,
+            soldCount: soldComps.soldCount,
+            fallbackUsed: soldComps.fallbackUsed,
           }
         : null,
     },
