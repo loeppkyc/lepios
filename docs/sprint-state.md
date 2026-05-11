@@ -319,3 +319,20 @@ colin_approved_at: "2026-05-09"
 delegated_to_builder_at: "2026-05-09T03:40:00Z"
 builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
 last_updated_at: "2026-05-09T03:40:00Z"
+
+# ============================================================
+# Telegram handler gaps (harness improvement, 2026-05-11)
+# ============================================================
+
+telegram_handler_gaps:
+task_id: "4011807f-62b5-4048-95b1-f10408148c8e"
+status: "awaiting-colin-approval"
+description: "Audit all Telegram handler gaps + write handlers for every task state that can receive user input"
+acceptance_doc: "docs/sprint-5/telegram-handler-gaps-acceptance.md"
+source: "colin-telegram"
+gaps_found:
+  - "review_timeout: no recovery handler — alert instructs /review {id} approve|skip but webhook has no such handler"
+  - "acceptance_doc_ready: referenced in webhook lines 958+1118 but not in schema CHECK constraint (dead code)"
+open_question: "Part B: Option A (add acceptance_doc_ready to schema) or Option B (remove dead code references)?"
+opened_at: "2026-05-11T00:00:00Z"
+last_updated_at: "2026-05-11T00:00:00Z"

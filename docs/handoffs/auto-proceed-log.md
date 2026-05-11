@@ -1,3 +1,21 @@
+2026-05-11T00:00:00Z sprint=5 chunk=telegram-handler-gaps task=4011807f doc=docs/sprint-5/telegram-handler-gaps-acceptance.md
+cited_principles: [META-C, escalation-mandatory]
+trigger_match_evidence: |
+Situation: new webhook handler for review_timeout recovery + schema migration for
+acceptance_doc_ready status. No exact cached principle match. Schema migration is
+involved (Part B Option A), new command handler is new code path.
+META-C conditions not met: no trigger text in any principle matches "add webhook handler
+for task status X". Part B requires Colin's explicit choice between two options.
+reversibility_check: |
+Part A handler: code-only, fully reversible (revert PR).
+Part B Option A (schema): migration ADD VALUE to CHECK constraint — reversible via
+compensating migration (DROP CONSTRAINT + ADD CONSTRAINT without the value). Medium cost.
+Part B Option B (code removal): fully reversible (revert lines).
+confidence: n/a (escalating)
+outcome: escalated-mandatory — Part B requires Colin decision; Part A has no cached match
+
+---
+
 2026-05-10T03:22:00Z sprint=chore task=782a885e doc=docs/sprint-5/known-event-domains-acceptance.md
 cited_principles: [META-C, reversibility]
 trigger_match_evidence: |

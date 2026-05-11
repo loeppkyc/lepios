@@ -4,6 +4,11 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 
 ---
 
+2026-05-11T00:00:00Z coordinator sprint=5 chunk=telegram-handler-gaps phase=2 tokens_in=~28000 tokens_out=~5000 escalated=true auto_proceeded=false
+notes: harness improvement task (Colin-fired). Audit complete. 2 gaps: review_timeout no recovery handler (critical), acceptance_doc_ready schema gap (dead code). Acceptance doc written at docs/sprint-5/telegram-handler-gaps-acceptance.md. Awaiting Colin approval + Part B decision (Option A add to schema vs Option B remove dead code).
+
+---
+
 2026-05-10T04:20:00Z coordinator sprint=T003 chunk=T003-study phase=1a tokens_in=~18000 tokens_out=~6000 escalated=true auto_proceeded=false
   reason: 4 open design questions (receipt_lines table shape, reconciliation target, camera OCR completeness, extraction method)
   twin_blocked: true (sandbox cannot reach lepios-one.vercel.app)
