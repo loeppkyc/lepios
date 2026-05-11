@@ -1,8 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import type { TrackResult } from '../types'
 
-// Tier-weighted completion: done_tier_sum / total_tier_sum.
-// known_undercount=true always until feat/streamlit-modules-lock lands a port_status sync.
+// Tier-weighted completion: done_tier_sum / total_tier_sum (port_status = 'complete').
+// feat/streamlit-modules-lock (0174) landed — port_status sync is live.
 // count-based pct is included in raw_pts for reference.
 export async function computeT4(): Promise<TrackResult> {
   const t0 = Date.now()
@@ -16,10 +16,10 @@ export async function computeT4(): Promise<TrackResult> {
     const rows = data as { port_status: string; suggested_tier: number }[]
     const totalTier = rows.reduce((s, r) => s + Number(r.suggested_tier), 0)
     const doneTier = rows
-      .filter((r) => r.port_status === 'done')
+      .filter((r) => r.port_status === 'complete')
       .reduce((s, r) => s + Number(r.suggested_tier), 0)
     const totalCount = rows.length
-    const doneCount = rows.filter((r) => r.port_status === 'done').length
+    const doneCount = rows.filter((r) => r.port_status === 'complete').length
 
     const rollup_pct = totalTier > 0 ? Math.round((doneTier / totalTier) * 1000) / 10 : 0
 
@@ -31,8 +31,7 @@ export async function computeT4(): Promise<TrackResult> {
       rollup_pct,
       raw_pts: doneCount,
       denominator: totalCount,
-      // Always flagged until port_status sync (feat/streamlit-modules-lock) lands
-      known_undercount: true,
+      known_undercount: false,
       source_stale: false,
       source_last_updated: null,
       compute_ms: Date.now() - t0,
