@@ -1,0 +1,44 @@
+{
+  "chunk_id": "sprint-6-D",
+  "acceptance_doc_path": "docs/sprint-6/chunk-D-acceptance.md",
+  "branch": "feat/sprint6-chunk-D-fba-batches",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/245",
+  "commit_sha": "d2c42a6d18f59ff87d8add663bf27d8ffd241875",
+  "files_changed": [
+    "supabase/migrations/0198_fba_batches.sql",
+    "app/api/batches/route.ts",
+    "app/api/batches/[id]/route.ts",
+    "app/api/batches/[id]/items/route.ts",
+    "app/(cockpit)/batches/page.tsx",
+    "app/(cockpit)/batches/_components/BatchesClient.tsx",
+    "app/(cockpit)/batches/[id]/page.tsx",
+    "app/(cockpit)/batches/[id]/_components/BatchDetailClient.tsx",
+    "app/(cockpit)/scan/_components/ScannerClient.tsx",
+    "tests/fba-batches-api.test.ts"
+  ],
+  "tests": { "passing": 19, "failing": 0, "new": 19 },
+  "migrations_applied": [],
+  "migration_pending": {
+    "file": "supabase/migrations/0198_fba_batches.sql",
+    "number": "0198",
+    "applied_by_coordinator": true,
+    "applied_at": "2026-05-11T11:57:00Z"
+  },
+  "deploy_url": "https://lepios-one.vercel.app/batches",
+  "grounding_checkpoint_required": [
+    "Navigate to https://lepios-one.vercel.app/batches — page loads, shows 'No open batches'.",
+    "Create a new batch named 'Test Batch'.",
+    "Go to /scan, scan a book, list it via 'List on Amazon', click 'Add to Batch' → select 'Test Batch' → confirm 'Added to Test Batch'.",
+    "Navigate to /batches → click 'Test Batch' → item shows with status 'listed' and SKU.",
+    "SELECT * FROM fba_batch_items WHERE batch_id = '<test batch id>' — expect 1 row.",
+    "BLOCKER: AMAZON_SELLER_ID must be in Vercel env (value: A2MBPL1EOSSBIE from .env.local) before 'List on Amazon' works."
+  ],
+  "unknowns": [
+    "Migration 0198 applied by coordinator via MCP on 2026-05-11 — tables fba_batches and fba_batch_items exist in production.",
+    "Pre-existing TS errors in unrelated test files not caused by Chunk D.",
+    "Pre-existing lint error in HitListClient.tsx not caused by Chunk D."
+  ],
+  "next_chunk_blockers": [],
+  "tokens_used": 145104,
+  "timestamp": "2026-05-11T11:57:00Z"
+}
