@@ -1,3 +1,22 @@
+2026-05-11T14:30:00Z sprint=5 chunk=grounding-reply-fix doc=docs/sprint-5/grounding-reply-fix-acceptance.md
+cited_principles: [H2-harness-fix-pattern, META-C, reversibility]
+trigger_match_evidence: |
+  H2 pattern: "harness route uses wrong status enum value in condition, coordinator
+  silently not re-invoked." H2 fixed heartbeat .eq('claimed') → .in(['claimed','running']).
+  Current: webhook approve-branch uses status='approved' for awaiting_grounding tasks,
+  but pickup cron only picks queued tasks — coordinator never re-invoked.
+  coordinator-resume uses .eq('awaiting_approval') — misses awaiting_grounding tasks.
+  Evidence: 3 live stuck tasks confirmed with response_received notifications but no
+  coordinator re-invocation (last_heartbeat_at predates response_received_at).
+reversibility_check: |
+  webhook status string change 'approved'→'queued': reversible-free (revert commit).
+  coordinator-resume .eq→.in: reversible-free (revert commit).
+  select adds 'status' field: reversible-free. No migration, no data loss.
+confidence: high
+outcome: auto-proceeded
+
+---
+
 2026-05-10T03:22:00Z sprint=chore task=782a885e doc=docs/sprint-5/known-event-domains-acceptance.md
 cited_principles: [META-C, reversibility]
 trigger_match_evidence: |

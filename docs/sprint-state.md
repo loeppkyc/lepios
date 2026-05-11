@@ -304,6 +304,28 @@ opened_at: "2026-04-27T00:00:00Z"
 last_updated_at: "2026-04-27T00:14:00Z"
 
 # ============================================================
+# Grounding reply fix (harness bug fix, 2026-05-11)
+# ============================================================
+
+grounding_reply_fix:
+  task_id: "27f70e12-d3e8-4de0-80db-1f30d587be5e"
+  status: "in-build"
+  description: "Fix awaiting_grounding→approved transition bug; coordinator never re-invoked after grounding approval"
+  acceptance_doc: "docs/sprint-5/grounding-reply-fix-acceptance.md"
+  cache_match: "auto-proceeded (H2 pattern, high confidence)"
+  affected_files:
+    - "app/api/telegram/webhook/route.ts"
+    - "app/api/harness/coordinator-resume/route.ts"
+    - "tests/api/telegram-webhook.test.ts"
+  grounding_checkpoints:
+    - "Recovery SQL for 3 stuck tasks (91adca3c, a3de7bed, 4aa53419)"
+    - "Smoke test: set task to awaiting_grounding, tap Approve, verify task→queued not approved"
+    - "agent_events: coordinator_resumed action appears after recovery pickup"
+  coordinator_task_id: "27f70e12-d3e8-4de0-80db-1f30d587be5e"
+  opened_at: "2026-05-11T14:30:00Z"
+  last_updated_at: "2026-05-11T14:30:00Z"
+
+# ============================================================
 # Scanner subdir fix (standalone bug fix, 2026-05-09)
 # ============================================================
 
