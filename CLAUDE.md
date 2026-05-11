@@ -14,37 +14,34 @@ LepiOS is Colin's life command center. Cockpit-style instrument panel.
 Next.js App Router, Supabase, Tailwind, shadcn/ui (heavily customized),
 Vercel.
 
-**Current state (2026-04-21):**
+**Current state (2026-05-11):**
 
 Live in production at `lepios-one.vercel.app`, auto-deploying from
-GitHub main. 370+ tests. Autonomous night_tick + morning_digest crons
-running against production Supabase. Rule-based quality scoring v1
-live, accumulating Tier 1 (`tier_1_laptop_ollama`) baseline data.
+GitHub main. Autonomous harness running (task pickup cron at 6:30 AM MDT,
+remote coordinator invocation enabled). QBO OAuth live. April close cockpit
+shipped (PR #248).
 
 **Sprints shipped:**
 
 - Sprint 1: Design Council primitives + cockpit shell
-- Sprint 2: Betting tile (Kelly Sizer) — deployed, not active priority
-- Sprint 3: PageProfit scan flow (Chunks A–E complete)
-- Sprint 4 (current): Business Review Trust Layer (BR Tier 1–3 progression)
+- Sprint 2: Betting tile (Kelly Sizer)
+- Sprint 3: PageProfit scan flow (Chunks A–E)
+- Sprint 4: Business Review Trust Layer
+- Sprint 5: Amazon Orders + Payouts, subdir detection, harness Steps 1–6
+- Sprint 6: PageProfit v2 — List on Amazon (Chunk A), eBay sold comps (Chunk B),
+  Scan History (Chunk C), FBA Batch Manager (Chunk D)
 
-**Autonomous harness (parallel track):**
+**Autonomous harness (current):**
 
-- Step 1–5 complete: knowledge store, handoffs, safety agent, scoring
-  dashboard, Ollama + pgvector
-- Step 6 complete: orchestration loop (night_tick + morning_digest)
-  live in production as of 2026-04-20
-- Step 6.5 pending: daytime Ollama tick + OLLAMA_TUNNEL_URL wiring
-- Step 7–8 pending (see 8-component plan in docs/)
+- All Steps 1–6 complete and running in production
+- task-pickup cron: `30 12 * * *` (6:30 AM MDT) — fires coordinator automatically
+- HARNESS_REMOTE_INVOCATION_ENABLED = true
+- Migration 0199 (2026-05-11): fixed `claim_next_task` FOR UPDATE + LEFT JOIN bug
+  that had stalled the harness since migration 0176 was applied
 
-**Feedback loop scoring v1:** shipped 2026-04-21. See
-docs/feedback-loop-scoring.md — §11 lists deferred work with
-revisit triggers.
-
-**Up next (as of this edit):** app-layer work on Sprint 4 Business
-Review or Sprint 5 Amazon Orders + Payouts, per ARCHITECTURE.md §7
-sprint queue. Autonomous harness expansion (Step 6.5 Ollama daytime)
-gated on a clean week of overnight runs.
+**Up next:** task queue has ~10 tasks queued (harness improvements, acceptance
+doc auto-approval, grounding fixes). Coordinator is running. Sprint 7 not yet
+scoped — next scope session when harness clears the queue.
 
 ---
 
