@@ -30,7 +30,7 @@ export type ReclaimRow = {
 export async function claimTask(runId: string): Promise<TaskRow | null> {
   const db = createServiceClient()
   const { data, error } = await db.rpc('claim_next_task', { p_run_id: runId }).maybeSingle()
-  if (error) throw error
+  if (error) throw new Error(`claimTask: ${error.message} (code: ${error.code})`)
   return (data as TaskRow | null) ?? null
 }
 
@@ -45,7 +45,7 @@ export async function peekTask(): Promise<TaskRow | null> {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
-  if (error) throw error
+  if (error) throw new Error(`peekTask: ${error.message} (code: ${error.code})`)
   return (data as TaskRow | null) ?? null
 }
 
@@ -56,7 +56,7 @@ export async function heartbeat(taskId: string): Promise<void> {
     .from('task_queue')
     .update({ last_heartbeat_at: new Date().toISOString() })
     .eq('id', taskId)
-  if (error) throw error
+  if (error) throw new Error(`heartbeat: ${error.message} (code: ${error.code})`)
 }
 
 // Reset stale claimed/running tasks via FOR UPDATE SKIP LOCKED in Postgres.
@@ -64,7 +64,7 @@ export async function heartbeat(taskId: string): Promise<void> {
 export async function reclaimStale(): Promise<ReclaimRow[]> {
   const db = createServiceClient()
   const { data, error } = await db.rpc('reclaim_stale_tasks')
-  if (error) throw error
+  if (error) throw new Error(`reclaimStale: ${error.message} (code: ${error.code})`)
   return (data as ReclaimRow[]) ?? []
 }
 
@@ -82,7 +82,7 @@ export async function completeTask(
       ...(result !== undefined ? { result } : {}),
     })
     .eq('id', taskId)
-  if (error) throw error
+  if (error) throw new Error(`completeTask: ${error.message} (code: ${error.code})`)
 }
 
 // Mark a task failed with an error message.
@@ -96,5 +96,5 @@ export async function failTask(taskId: string, errorMessage: string): Promise<vo
       completed_at: new Date().toISOString(),
     })
     .eq('id', taskId)
-  if (error) throw error
+  if (error) throw new Error(`failTask: ${error.message} (code: ${error.code})`)
 }
