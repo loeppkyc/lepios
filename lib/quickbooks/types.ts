@@ -34,3 +34,31 @@ export interface AccountBalance {
   balance: number
   currency: string
 }
+
+export interface QBOTransactionRow {
+  date: string
+  txnType: string
+  docNum: string
+  name: string
+  memo: string
+  account: string
+  split: string
+  amount: number
+}
+
+export interface QBOTransactionListResponse {
+  Header: {
+    ReportName: string
+    DateMacro: string
+    StartPeriod: string
+    EndPeriod: string
+    Currency: string
+  }
+  Columns: { Column: Array<{ ColTitle: string; ColType: string }> }
+  Rows: {
+    Row?: Array<{
+      ColData?: Array<{ value: string }>
+      type?: string
+    }>
+  }
+}

@@ -1,5 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/service'
-import type { AccountBalance, QBOAccountsResponse, QBOTokenResponse } from './types'
+import type {
+  AccountBalance,
+  QBOAccountsResponse,
+  QBOTokenResponse,
+  QBOTransactionListResponse,
+  QBOTransactionRow,
+} from './types'
 
 const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
 const QBO_API_BASE = 'https://quickbooks.api.intuit.com/v3/company'
@@ -124,6 +130,46 @@ export async function fetchAccounts(): Promise<AccountBalance[]> {
     balance: a.CurrentBalance,
     currency: a.CurrencyRef?.value ?? 'CAD',
   }))
+}
+
+export async function fetchTransactions(
+  startDate: string,
+  endDate: string
+): Promise<QBOTransactionRow[]> {
+  const { token, realmId } = await getValidAccessToken()
+
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    minorversion: MINOR_VERSION,
+  })
+  const url = `${QBO_API_BASE}/${realmId}/reports/TransactionList?${params}`
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  })
+
+  if (!res.ok) throw new Error(`QBO TransactionList failed: ${res.status} ${await res.text()}`)
+
+  const data = (await res.json()) as QBOTransactionListResponse
+  const rows = data.Rows?.Row ?? []
+
+  return rows
+    .filter((r) => r.ColData && r.ColData.length >= 8)
+    .map((r) => {
+      const cols = r.ColData!
+      return {
+        date: cols[0]?.value ?? '',
+        txnType: cols[1]?.value ?? '',
+        docNum: cols[2]?.value ?? '',
+        name: cols[3]?.value ?? '',
+        memo: cols[4]?.value ?? '',
+        account: cols[5]?.value ?? '',
+        split: cols[6]?.value ?? '',
+        amount: parseFloat(cols[7]?.value ?? '0') || 0,
+      }
+    })
+    .filter((r) => r.date !== '')
 }
 
 export async function isConnected(): Promise<boolean> {
