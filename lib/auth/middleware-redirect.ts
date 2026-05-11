@@ -32,12 +32,15 @@ export type GateOutcome =
   | { kind: 'redirect-login' }
   | { kind: 'redirect-pending' }
   | { kind: 'redirect-home' } // signed-in user hitting /login
-  | { kind: 'redirect-session-expired' } // signed-in but absolute lifetime exceeded
+  | { kind: 'redirect-session-expired' } // signed-in but absolute 8h lifetime exceeded
+  | { kind: 'redirect-idle-timeout' } // signed-in but idle for more than 1h
 
 /**
  * Single source of truth for the middleware decision.
  * - Unauthenticated on a public path → allow.
  * - Unauthenticated on a protected path → redirect to /login.
+ * - Authenticated + idle timeout → redirect to /login?error=idle_timeout
+ *   (checked before hard expiry — idle is the more actionable reason when both fire).
  * - Authenticated + session expired → redirect to /login?error=session_expired
  *   (regardless of role; expiry overrides). Public paths still allowed since
  *   middleware will sign the user out before redirecting.
@@ -45,12 +48,18 @@ export type GateOutcome =
  * - Authenticated + pending → redirect to /pending-approval (except already on it).
  * - Authenticated + non-admin on /admin → redirect to /pending-approval.
  * - Authenticated + approved on /login → redirect to /.
+ *
+ * Precedence for timeout checks (both applied only to non-public paths):
+ *   idleExpired → redirect-idle-timeout  (checked first)
+ *   sessionExpired → redirect-session-expired
+ * When both are true, idle wins — it's the user-facing reason that matters.
  */
 export function gateRequest(
   pathname: string,
   hasUser: boolean,
   role: UserRole | null,
-  sessionExpired: boolean = false
+  sessionExpired: boolean = false,
+  idleExpired: boolean = false
 ): GateOutcome {
   const onLogin = pathname === '/login' || pathname.startsWith('/login/')
   const onPending = pathname === '/pending-approval' || pathname.startsWith('/pending-approval/')
@@ -61,10 +70,16 @@ export function gateRequest(
     return { kind: 'redirect-login' }
   }
 
-  // Session-lifetime guard runs before any role-based logic. A user with a
-  // valid Supabase session but an exceeded absolute lifetime gets bounced
-  // through sign-out → /login. Public paths (login, auth callbacks) still
-  // skip this so the user can complete the re-auth flow.
+  // Idle timeout guard — checked before hard expiry. A user inactive for >1h
+  // is bounced through sign-out → /login?error=idle_timeout. When both idle
+  // and hard expiry are true, idle surfaces as the reason.
+  if (idleExpired && !isPublicPath(pathname)) {
+    return { kind: 'redirect-idle-timeout' }
+  }
+
+  // Hard session-lifetime guard. A user with a valid Supabase session but an
+  // exceeded absolute 8h lifetime gets bounced through sign-out → /login.
+  // Public paths (login, auth callbacks) still skip this.
   if (sessionExpired && !isPublicPath(pathname)) {
     return { kind: 'redirect-session-expired' }
   }

@@ -138,8 +138,8 @@ describe('gateRequest', () => {
 })
 
 describe('gateRequest — session lifetime guard', () => {
-  // Default behavior unchanged: omitting sessionExpired arg = false.
-  it('legacy 3-arg call shape still works (sessionExpired defaults to false)', () => {
+  // Default behavior unchanged: omitting sessionExpired/idleExpired args = false.
+  it('legacy 3-arg call shape still works (both timeout flags default to false)', () => {
     expect(gateRequest('/net-worth', true, 'admin')).toEqual({ kind: 'allow' })
   })
 
@@ -185,6 +185,54 @@ describe('gateRequest — session lifetime guard', () => {
     // With expired: should be redirect-session-expired (run signOut path first).
     expect(gateRequest('/admin', true, 'business', true)).toEqual({
       kind: 'redirect-session-expired',
+    })
+  })
+})
+
+describe('gateRequest — idle timeout guard', () => {
+  it('idle only → redirect-idle-timeout on protected path', () => {
+    expect(gateRequest('/net-worth', true, 'admin', false, true)).toEqual({
+      kind: 'redirect-idle-timeout',
+    })
+  })
+
+  it('idle + hard expired → idle wins (checked first, more actionable reason)', () => {
+    expect(gateRequest('/net-worth', true, 'admin', true, true)).toEqual({
+      kind: 'redirect-idle-timeout',
+    })
+  })
+
+  it('neither idle nor expired → allow', () => {
+    expect(gateRequest('/net-worth', true, 'admin', false, false)).toEqual({ kind: 'allow' })
+  })
+
+  it('hard expired only (not idle) → redirect-session-expired', () => {
+    expect(gateRequest('/net-worth', true, 'admin', true, false)).toEqual({
+      kind: 'redirect-session-expired',
+    })
+  })
+
+  it('idle flag does NOT trigger on /login', () => {
+    expect(gateRequest('/login', true, 'admin', false, true)).toEqual({ kind: 'redirect-home' })
+  })
+
+  it('idle flag does NOT trigger on /auth/callback', () => {
+    expect(gateRequest('/auth/callback', true, 'admin', false, true)).toEqual({ kind: 'allow' })
+  })
+
+  it('idle flag does NOT trigger on /pending-approval', () => {
+    expect(gateRequest('/pending-approval', true, 'pending', false, true)).toEqual({
+      kind: 'allow',
+    })
+  })
+
+  it('unauthenticated user with idle flag → redirect-login (no session, no idle clock)', () => {
+    expect(gateRequest('/net-worth', false, null, false, true)).toEqual({ kind: 'redirect-login' })
+  })
+
+  it('idle flag overrides role-based redirects (pending + idle → idle wins)', () => {
+    expect(gateRequest('/net-worth', true, 'pending', false, true)).toEqual({
+      kind: 'redirect-idle-timeout',
     })
   })
 })

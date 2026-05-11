@@ -51,7 +51,12 @@ function LoginPageContent() {
     } else if (errorParam === 'session_expired') {
       setMessage({
         type: 'error',
-        text: 'Your session expired after 4 hours. Please sign in again.',
+        text: 'Your session expired after 8 hours. Please sign in again.',
+      })
+    } else if (errorParam === 'idle_timeout') {
+      setMessage({
+        type: 'error',
+        text: 'You were signed out due to inactivity (1 hour). Please sign in again.',
       })
     }
   }, [errorParam])
