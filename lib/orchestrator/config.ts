@@ -13,6 +13,13 @@ export const KNOWN_EVENT_DOMAINS = [
   'pageprofit',
   'system',
   'ollama',
+  'gmail',
+  'amazon',
+  'harness',
+  'coordinator',
+  'twin',
+  'telegram',
+  'purpose_review',
 ] as const
 
 export const STUCK_PROCESSING_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes

@@ -1,3 +1,19 @@
+2026-05-10T03:22:00Z sprint=chore task=782a885e doc=docs/sprint-5/known-event-domains-acceptance.md
+cited_principles: [META-C, reversibility]
+trigger_match_evidence: |
+Situation: expand 7 strings in monitoring config array (KNOWN_EVENT_DOMAINS in
+lib/orchestrator/config.ts). No schema, no RLS, no UI, no external API call.
+META-C trigger: additive config housekeeping, no domain semantics, fully reversible.
+Pattern matches "correcting a missing entry in a string list" — same class as adding a
+module slug to a known-good enumeration. cache_match_enabled: true (Colin confirmed 2026-05-01).
+reversibility_check: |
+Adding 7 strings to an as-const array: reversible by deleting the 7 lines. Cost: trivial grep/edit.
+No migration, no data loss, no external effect. Reversible-free.
+confidence: high
+outcome: auto-proceeded
+
+---
+
 2026-04-19T12:30:00-06:00 sprint=4 chunk=null doc=docs/sprint-4/plan.md
 cited_principles: [CHUNK-ORDERING, plan-ratification]
 trigger_match_evidence: Plan ratification escalated per coordinator.md Phase 1 step 5. Colin reviewed plan end-to-end and returned two edits: D parallel-eligible after A (not strictly fourth), Chunk B cost-basis decision must land in Phase 2 not plan phase. Plan approved as edited.
