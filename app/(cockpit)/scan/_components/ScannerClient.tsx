@@ -157,7 +157,16 @@ export function ScannerClient() {
   const [listPrice, setListPrice] = useState('')
   const [listNote, setListNote] = useState('Like New Condition. 100% Satisfaction Guaranteed.')
   const [listedSku, setListedSku] = useState<string | null>(null)
+  const [listedListingId, setListedListingId] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
+
+  // Add to Batch state
+  type BatchAddState = 'idle' | 'open' | 'saving' | 'saved'
+  const [batchAddState, setBatchAddState] = useState<BatchAddState>('idle')
+  const [batches, setBatches] = useState<{ id: string; name: string }[]>([])
+  const [batchesLoaded, setBatchesLoaded] = useState(false)
+  const [savedToBatch, setSavedToBatch] = useState<string | null>(null)
+  const [batchAddError, setBatchAddError] = useState<string | null>(null)
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault()
@@ -195,7 +204,11 @@ export function ScannerClient() {
         setListPrice((data as ScanResult).buyBoxPrice?.toFixed(2) ?? '')
         setListNote('Like New Condition. 100% Satisfaction Guaranteed.')
         setListedSku(null)
+        setListedListingId(null)
         setListError(null)
+        setBatchAddState('idle')
+        setSavedToBatch(null)
+        setBatchAddError(null)
       }
     } catch {
       setError('Network error — check connection')
@@ -341,6 +354,7 @@ export function ScannerClient() {
       const data = await res.json()
       if (res.status === 201 || res.status === 200) {
         setListedSku(data.sku ?? null)
+        setListedListingId(data.listingId ?? null)
         setListState('done')
       } else {
         const msg =
@@ -354,6 +368,56 @@ export function ScannerClient() {
     } catch {
       setListError('Network error')
       setListState('error')
+    }
+  }
+
+  async function handleOpenBatch() {
+    setBatchAddState('open')
+    setBatchAddError(null)
+    if (!batchesLoaded) {
+      try {
+        const res = await fetch('/api/batches')
+        if (res.ok) {
+          const data = await res.json()
+          setBatches(data as { id: string; name: string }[])
+          setBatchesLoaded(true)
+        }
+      } catch {
+        setBatchAddError('Failed to load batches')
+      }
+    }
+  }
+
+  async function handleAddToBatch(batchId: string, batchName: string) {
+    if (!result) return
+    setBatchAddState('saving')
+    setBatchAddError(null)
+    try {
+      const res = await fetch(`/api/batches/${batchId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scan_result_id: result.scanResultId ?? undefined,
+          amazon_listing_id: listedListingId ?? undefined,
+          sku: listedSku ?? undefined,
+          asin: result.asin,
+          isbn: result.isbn,
+          title: result.title || undefined,
+          condition_code: listCondition,
+          list_price_cad: parseFloat(listPrice) || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setBatchAddError(d.error ?? 'Failed to add to batch')
+        setBatchAddState('open')
+      } else {
+        setSavedToBatch(batchName)
+        setBatchAddState('saved')
+      }
+    } catch {
+      setBatchAddError('Network error')
+      setBatchAddState('open')
     }
   }
 
@@ -1233,6 +1297,110 @@ export function ScannerClient() {
               }}
             >
               Listed as {listedSku} on Amazon CA
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add to Batch panel — shown only after listing is done */}
+      {result && listState === 'done' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {batchAddState === 'idle' && (
+            <button
+              onClick={handleOpenBatch}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                fontWeight: 600,
+                padding: '8px 16px',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text-muted)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                alignSelf: 'flex-start',
+              }}
+            >
+              Add to Batch
+            </button>
+          )}
+
+          {(batchAddState === 'open' || batchAddState === 'saving') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <select
+                disabled={batchAddState === 'saving'}
+                defaultValue=""
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val) {
+                    const batch = batches.find((b) => b.id === val)
+                    if (batch) handleAddToBatch(batch.id, batch.name)
+                  }
+                }}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 10px',
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="" disabled>
+                  {batchAddState === 'saving'
+                    ? 'Adding…'
+                    : batches.length === 0
+                      ? '— no open batches —'
+                      : '— pick a batch —'}
+                </option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setBatchAddState('idle')}
+                disabled={batchAddState === 'saving'}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  padding: '7px 12px',
+                  background: 'none',
+                  color: 'var(--color-text-disabled)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {batchAddState === 'saved' && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-positive)',
+              }}
+            >
+              Added to &ldquo;{savedToBatch}&rdquo;
+            </div>
+          )}
+
+          {batchAddError && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-critical)',
+              }}
+            >
+              {batchAddError}
             </div>
           )}
         </div>
