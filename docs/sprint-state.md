@@ -319,3 +319,24 @@ colin_approved_at: "2026-05-09"
 delegated_to_builder_at: "2026-05-09T03:40:00Z"
 builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
 last_updated_at: "2026-05-09T03:40:00Z"
+
+# ============================================================
+# Auto-grounding check run — 2026-05-11
+# ============================================================
+
+auto_grounding_2026_05_11:
+task_id: "533f032f-b424-4523-9912-f7d94da63c19"
+run_at: "2026-05-11T14:10:00Z"
+report: "docs/sprint-5/auto-grounding-report-2026-05-11.md"
+telegram_notification_id: "d93af23f-c2a6-4942-8bc4-aa8a6bbf5d5a"
+results:
+  attribution: "sql_pass — 148 rows, 137 task_queue attributed"
+  notification_drain_dedup: "sql_pass — UNIQUE INDEX confirmed, notification_delivered firing"
+  coordinator_env: "partial — config populated, heartbeat structurally blocked by Vercel sandbox allowlist (not a chunk bug)"
+  streamlit_inventory: "sql_pass — 234 modules loaded (smoke query still needed by Colin)"
+  "20-percent-better-engine": "partial — 6 proposals queued, 0 trigger events in agent_events"
+  ollama_100: "partial — tunnel URL configured, live daytime-tick test needed"
+  stall_alert: "needs_colin — no stall_alert_sent events, manual T1 simulation required"
+  gmail_scanner: "needs_colin — GOOGLE_* env vars not set"
+  purpose_review: "needs_colin — migration 0026 + Telegram callback test required"
+  awaiting_grounding_constraint: "already_present — task e9be65bf can be cancelled"
