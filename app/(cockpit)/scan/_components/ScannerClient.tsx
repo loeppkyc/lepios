@@ -9,6 +9,7 @@ import type { BsrPoint } from '@/lib/keepa/history'
 import type { BookTier } from '@/lib/pallets/tier-classifier'
 import { useDevMode } from '@/lib/hooks/useDevMode'
 import { DebugSection } from '@/components/cockpit/DebugSection'
+import type { ConditionCode } from '@/lib/amazon/listings'
 
 interface KeepaData {
   bsr: number | null
@@ -140,6 +141,15 @@ export function ScannerClient() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [newListName, setNewListName] = useState('')
 
+  // List on Amazon state
+  type ListState = 'idle' | 'open' | 'submitting' | 'done' | 'error'
+  const [listState, setListState] = useState<ListState>('idle')
+  const [listCondition, setListCondition] = useState<ConditionCode>('like_new')
+  const [listPrice, setListPrice] = useState('')
+  const [listNote, setListNote] = useState('Like New Condition. 100% Satisfaction Guaranteed.')
+  const [listedSku, setListedSku] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
+
   async function handleScan(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -160,7 +170,7 @@ export function ScannerClient() {
       if (!res.ok) setError(data.error ?? 'Scan failed')
       else {
         setResult(data as ScanResult)
-        // Reset sparkline + save + routing state on each new scan
+        // Reset sparkline + save + routing + listing state on each new scan
         setSparkOpen(false)
         setSparkLoading(false)
         setSparkPoints(null)
@@ -171,6 +181,12 @@ export function ScannerClient() {
         setRouteState('idle')
         setRouteDecision(null)
         setRouteError(null)
+        setListState('idle')
+        setListCondition('like_new')
+        setListPrice((data as ScanResult).buyBoxPrice?.toFixed(2) ?? '')
+        setListNote('Like New Condition. 100% Satisfaction Guaranteed.')
+        setListedSku(null)
+        setListError(null)
       }
     } catch {
       setError('Network error — check connection')
@@ -291,6 +307,44 @@ export function ScannerClient() {
     } catch {
       setSaveError('Network error')
       setSaveState('new-list')
+    }
+  }
+
+  async function handleListNow() {
+    if (!result?.scanResultId || listState !== 'open') return
+    const priceVal = parseFloat(listPrice)
+    if (isNaN(priceVal) || priceVal <= 0) {
+      setListError('Enter a valid price')
+      return
+    }
+    setListState('submitting')
+    setListError(null)
+    try {
+      const res = await fetch(`/api/scan/${result.scanResultId}/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          condition_code: listCondition,
+          list_price_cad: priceVal,
+          condition_note: listNote,
+        }),
+      })
+      const data = await res.json()
+      if (res.status === 201 || res.status === 200) {
+        setListedSku(data.sku ?? null)
+        setListState('done')
+      } else {
+        const msg =
+          data.error ??
+          (data.sp_api_issues && data.sp_api_issues.length > 0
+            ? JSON.stringify(data.sp_api_issues[0])
+            : 'Listing failed')
+        setListError(msg)
+        setListState('error')
+      }
+    } catch {
+      setListError('Network error')
+      setListState('error')
     }
   }
 
@@ -915,6 +969,223 @@ export function ScannerClient() {
               }}
             >
               {saveError}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List on Amazon panel — shown after save-to-list, before debug */}
+      {result && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {listState === 'idle' && (
+            <button
+              onClick={() => setListState('open')}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                fontWeight: 600,
+                padding: '8px 16px',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text-muted)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                alignSelf: 'flex-start',
+                width: '100%',
+              }}
+            >
+              List on Amazon
+            </button>
+          )}
+
+          {(listState === 'open' || listState === 'submitting' || listState === 'error') && (
+            <div
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase' as const,
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                List on Amazon CA (FBA)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-text-disabled)',
+                    textTransform: 'uppercase' as const,
+                  }}
+                >
+                  Condition
+                </label>
+                <select
+                  value={listCondition}
+                  disabled={listState === 'submitting'}
+                  onChange={(e) => setListCondition(e.target.value as ConditionCode)}
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-small)',
+                    padding: '7px 10px',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="like_new">Like New</option>
+                  <option value="very_good">Very Good</option>
+                  <option value="used_good">Good</option>
+                  <option value="acceptable">Acceptable</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-text-disabled)',
+                    textTransform: 'uppercase' as const,
+                  }}
+                >
+                  List Price (CAD)
+                </label>
+                <input
+                  type="number"
+                  value={listPrice}
+                  disabled={listState === 'submitting'}
+                  onChange={(e) => setListPrice(e.target.value)}
+                  step="0.01"
+                  min="0.01"
+                  max="9999.99"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-small)',
+                    padding: '7px 10px',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-nano)',
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-text-disabled)',
+                    textTransform: 'uppercase' as const,
+                  }}
+                >
+                  Condition Note
+                </label>
+                <textarea
+                  value={listNote}
+                  disabled={listState === 'submitting'}
+                  onChange={(e) => setListNote(e.target.value)}
+                  maxLength={1000}
+                  rows={2}
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-small)',
+                    padding: '7px 10px',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    resize: 'vertical' as const,
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleListNow}
+                  disabled={listState === 'submitting'}
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-small)',
+                    fontWeight: 700,
+                    padding: '8px 18px',
+                    background:
+                      listState === 'submitting'
+                        ? 'var(--color-surface-2)'
+                        : 'var(--color-accent-gold)',
+                    color:
+                      listState === 'submitting'
+                        ? 'var(--color-text-disabled)'
+                        : 'var(--color-base)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: listState === 'submitting' ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {listState === 'submitting' ? 'Listing…' : 'List Now'}
+                </button>
+                <button
+                  onClick={() => {
+                    setListState('idle')
+                    setListError(null)
+                  }}
+                  disabled={listState === 'submitting'}
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-small)',
+                    padding: '8px 14px',
+                    background: 'none',
+                    color: 'var(--color-text-disabled)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: listState === 'submitting' ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              {listState === 'error' && listError && (
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-small)',
+                    color: 'var(--color-critical)',
+                  }}
+                >
+                  {listError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {listState === 'done' && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-positive)',
+              }}
+            >
+              Listed as {listedSku} on Amazon CA
             </div>
           )}
         </div>
