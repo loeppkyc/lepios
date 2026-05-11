@@ -1,0 +1,24 @@
+{
+  "chunk_id": "sprint-6-B",
+  "acceptance_doc_path": "docs/sprint-6/chunk-B-acceptance.md",
+  "files_changed": [
+    "lib/ebay/finding.ts",
+    "app/api/scan/route.ts",
+    "app/(cockpit)/scan/_components/ScannerClient.tsx",
+    "tests/ebay-finding.test.ts"
+  ],
+  "tests": {
+    "passing": 5,
+    "failing": 0,
+    "new": 5
+  },
+  "migrations_applied": [],
+  "deploy_url": "https://github.com/loeppkyc/lepios/pull/242",
+  "grounding_checkpoint_required": [
+    "Scan a real ISBN (e.g. 9780307887436). Confirm the scan result card shows two eBay rows: 'eBay CA (active)' and 'eBay CA (sold 30d)'. Open devtools > Network > filter /api/scan > confirm response body contains 'ebaySold' field (may be null for books with no recent sold comps — that is acceptable). If soldCount > 0, confirm the low-high range sub-line renders below the avg line."
+  ],
+  "unknowns": [],
+  "next_chunk_blockers": [],
+  "tokens_used": 18000,
+  "timestamp": "2026-05-11T05:27:00Z"
+}

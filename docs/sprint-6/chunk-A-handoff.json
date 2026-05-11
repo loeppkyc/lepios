@@ -1,0 +1,46 @@
+{
+  "chunk_id": "sprint-6-A",
+  "acceptance_doc_path": "docs/sprint-6/chunk-A-acceptance.md",
+  "files_changed": [
+    "supabase/migrations/0197_amazon_listings.sql",
+    "lib/amazon/listings.ts",
+    "app/api/scan/[id]/list/route.ts",
+    "app/(cockpit)/scan/_components/ScannerClient.tsx",
+    ".env.example",
+    "tests/amazon-listings.test.ts"
+  ],
+  "tests": {
+    "passing": 3452,
+    "failing": 154,
+    "new": 7
+  },
+  "test_notes": "All 7 new tests pass. 154 failing tests are pre-existing and not from this chunk (deploy-gate-timeout, architecture/rls-coverage for other teams' tables, auth coverage for pre-existing unguarded routes). My route scan/[id]/list/route.ts is NOT in the auth failures — it properly calls auth.getUser().",
+  "migrations_applied": [],
+  "migration_pending": {
+    "file": "supabase/migrations/0197_amazon_listings.sql",
+    "number": "0197",
+    "reason": "MCP apply_migration tool not callable from builder sub-agent context. Must be applied by coordinator via mcp__claude_ai_Supabase__apply_migration before the route is usable in production.",
+    "sql_summary": "CREATE TABLE amazon_listings + 3 indexes + ENABLE ROW LEVEL SECURITY + GRANT INSERT,UPDATE,DELETE TO service_role"
+  },
+  "deploy_url": "PR #241 at https://github.com/loeppkyc/lepios/pull/241 — not yet deployed to production (migration must be applied first)",
+  "commit_sha": "42df1d36b8c8df22b07e2feaa93aaf329df6c15d",
+  "branch": "feat/sprint6-chunk-A-list-on-amazon",
+  "grounding_checkpoint_required": [
+    "STEP 0 (BLOCKER): Coordinator must apply migration 0197 to Supabase via mcp__claude_ai_Supabase__apply_migration with SQL from supabase/migrations/0197_amazon_listings.sql before any grounding is possible.",
+    "STEP 1: Confirm AMAZON_SELLER_ID is in Vercel production environment. The value A2MBPL1EOSSBIE is already in .env.local — verify it is also in Vercel dashboard for the production environment. Without this, 'List Now' returns 503.",
+    "STEP 2: After migration + env var confirmed, scan any book (e.g. ISBN 9780307887436), route GO, click 'List on Amazon', select condition, confirm price, click 'List Now'.",
+    "STEP 3: Verify Seller Central → Manage Inventory shows the book as Active (FBA) within 15 minutes.",
+    "STEP 4: Verify SELECT sku, sp_api_status FROM amazon_listings ORDER BY listed_at DESC LIMIT 1 returns sp_api_status = 'ACCEPTED'."
+  ],
+  "unknowns": [
+    "Migration 0197 not yet applied to Supabase — coordinator must apply via MCP before PR can be merged and deployed.",
+    "The acceptance doc specified filename '20260510_0197_amazon_listings.sql' but the pre-commit hook expects purely numeric prefixes (extracts leading digits, which gave '20260510' not '0197'). Renamed to '0197_amazon_listings.sql' to match existing convention. The migration-claims.json entry already uses '0197' as the key so the rename is consistent.",
+    "AMAZON_SELLER_ID is present in .env.local (value A2MBPL1EOSSBIE) but coordinator should verify it is also in Vercel production env vars before Colin attempts grounding.",
+    "Pre-existing RLS coverage test fails for 5 tables from other branches (cleaning_clients, cora_activities, cora_future_items, family_important_dates, oss_packages) — not from this chunk. Note for coordinator: these other branches need RLS added to pass the architecture invariant."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0197 must be applied before Chunk B or any chunk that depends on amazon_listings data."
+  ],
+  "tokens_used": 85000,
+  "timestamp": "2026-05-11T05:20:00Z"
+}

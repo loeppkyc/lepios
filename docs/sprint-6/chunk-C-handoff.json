@@ -1,0 +1,31 @@
+{
+  "chunk_id": "sprint-6-C",
+  "acceptance_doc_path": "docs/sprint-6/chunk-C-acceptance.md",
+  "branch": "feat/sprint6-chunk-C-scan-history",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/244",
+  "commit_sha": "7b0b03daaecc723a4c38c84dc154b511a4b8c348",
+  "files_changed": [
+    "app/api/scan/history/route.ts",
+    "app/(cockpit)/scan/history/page.tsx",
+    "app/(cockpit)/scan/history/_components/ScanHistoryClient.tsx",
+    "tests/scan-history-api.test.ts"
+  ],
+  "tests": { "passing": 10, "failing": 0, "new": 10 },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app/scan/history",
+  "grounding_checkpoint_required": [
+    "Navigate to https://lepios-one.vercel.app/scan/history — page loads without error (no 404, no JS crash).",
+    "If scan_results has rows: table shows scans with correct date, ISBN, title, profit colour coding, and decision badges.",
+    "If scan_results is empty: 'No scans yet — go scan some books!' message appears with link to /scan.",
+    "Click 'BUY' filter — table reloads showing only rows where decision='buy'.",
+    "Spot-check one row: profit and ROI values should match what /scan showed when that book was scanned."
+  ],
+  "unknowns": [
+    "Acceptance doc SQL used column name 'listed_at' but actual scan_results column is 'recorded_at' (confirmed from migration 0004_add_scan_results.sql). Route uses 'recorded_at'. Coordinator should update the acceptance doc to fix the column name reference.",
+    "Pre-existing TypeScript errors in tests/orb/, tests/sandbox/, tests/security/, tests/scripts/ were not touched — they are out of scope for this chunk.",
+    "F20: inline token-reference style={} permitted per ScannerClient.tsx precedent (matching existing pattern)."
+  ],
+  "next_chunk_blockers": [],
+  "tokens_used": 18500,
+  "timestamp": "2026-05-11T10:35:00Z"
+}

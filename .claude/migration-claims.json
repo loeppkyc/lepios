@@ -311,7 +311,13 @@
       "filename": "0196_keepa_deals.sql",
       "claimed_at": "2026-05-10",
       "note": "Keepa/Product Intel cluster — keepa_deals table. Renumbered 0192→0194→0196 (multi-collision)."
+    },
+    "0198": {
+      "branch": "feat/sprint6-chunk-D-fba-batches",
+      "filename": "0198_fba_batches.sql",
+      "claimed_at": "2026-05-11",
+      "note": "Sprint 6 Chunk D — FBA Batch Manager. fba_batches + fba_batch_items tables. FK to amazon_listings (nullable). Depends on 0197."
     }
   },
-  "next_available": 197
+  "next_available": 199
 }
