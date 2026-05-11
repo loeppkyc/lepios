@@ -281,7 +281,19 @@
       "filename": "0191_sports_picks.sql",
       "claimed_at": "2026-05-10",
       "note": "Sports Intel MID cluster — sports_picks table (replaces Google Sheets Sports_Picks_Log). Ports: utils/sports_odds.py, utils/sports_coach.py, tools/sports_predictions.py."
+    },
+    "0192": {
+      "branch": "feat/largest-mid-cluster",
+      "filename": "0192_marketplace_listings.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Reselling cluster — marketplace_listings table. Replaces Google Sheets Marketplace Hub tab."
+    },
+    "0193": {
+      "branch": "feat/largest-mid-cluster",
+      "filename": "0193_repricer_rules.sql",
+      "claimed_at": "2026-05-10",
+      "note": "Reselling cluster — repricer_rules + repricer_log tables. Replaces Google Sheets Repricer Rules + Repricer Log tabs. File renumbered from 0191 (collision with feat/insurance-sports-cluster); DB applied as 0191_repricer_rules via MCP — CREATE TABLE IF NOT EXISTS makes re-apply safe."
     }
   },
-  "next_available": 192
+  "next_available": 194
 }
