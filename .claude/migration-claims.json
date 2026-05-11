@@ -341,7 +341,13 @@
       "filename": "0202_twilio_capability.sql",
       "claimed_at": "2026-05-14",
       "note": "Register net.outbound.twilio capability + grant to coordinator/harness."
+    },
+    "0203": {
+      "branch": "feat/april-close-v2",
+      "filename": "0203_parse_financial_events.sql",
+      "claimed_at": "2026-05-11",
+      "note": "Backfill gross_contribution/fees_contribution/refunds_contribution on amazon_financial_events from raw_json. Unlocks April 2026 revenue breakdown. Applied to prod via Supabase MCP as 0200_parse_financial_events (renumbered due to collision)."
     }
   },
-  "next_available": 203
+  "next_available": 204
 }
