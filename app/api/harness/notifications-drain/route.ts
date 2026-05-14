@@ -193,6 +193,11 @@ async function drain(request: Request): Promise<NextResponse> {
     })
   }
 
+  for (const row of rows as any[]) {
+    const chatId = row.chat_id ?? process.env.TELEGRAM_CHAT_ID
+    const token = process.env.TELEGRAM_BOT_TOKEN
+
+    if (!chatId || !token) {
       failed++
       continue
     }

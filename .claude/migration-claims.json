@@ -317,7 +317,31 @@
       "filename": "0198_fba_batches.sql",
       "claimed_at": "2026-05-11",
       "note": "Sprint 6 Chunk D — FBA Batch Manager. fba_batches + fba_batch_items tables. FK to amazon_listings (nullable). Depends on 0197."
+    },
+    "0199": {
+      "branch": "fix/claim-next-task-race",
+      "filename": "0199_fix_claim_next_task_for_update.sql",
+      "claimed_at": "2026-05-12",
+      "note": "FOR UPDATE row lock in claim_next_task to prevent double-claim race."
+    },
+    "0200": {
+      "branch": "feat/security-hardening",
+      "filename": "0200_rls_hardening.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Phase 2 Security Hardening — RLS on 10 tables."
+    },
+    "0201": {
+      "branch": "feat/security-hardening",
+      "filename": "0201_agent_events_hardening.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Phase 2 Security Hardening — Lock down agent_events to service_role."
+    },
+    "0202": {
+      "branch": "feat/two-way-sms",
+      "filename": "0202_twilio_capability.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Register net.outbound.twilio capability + grant to coordinator/harness."
     }
   },
-  "next_available": 199
+  "next_available": 203
 }
