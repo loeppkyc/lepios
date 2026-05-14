@@ -4,6 +4,14 @@
 # unless errexit is on). The hook then returns the last command's exit code.
 set -e
 
+# ─── Source API keys for AI review and agent_events logging ──────────────
+if [ -f .env.local ]; then
+  _ANTHROPIC=$(grep -E '^ANTHROPIC_API_KEY=' .env.local | cut -d'=' -f2- | tr -d '"' | tr -d '\r')
+  _SUPABASE=$(grep -E '^SUPABASE_SERVICE_ROLE_KEY=' .env.local | cut -d'=' -f2- | tr -d '"' | tr -d '\r')
+  [ -n "$_ANTHROPIC" ] && export ANTHROPIC_API_KEY="$_ANTHROPIC"
+  [ -n "$_SUPABASE" ] && export SUPABASE_SERVICE_ROLE_KEY="$_SUPABASE"
+fi
+
 # ─── Multi-window protocol — rebase + migration claim ─────────────────────
 # Seam-approved check lives in .husky/commit-msg (needs commit message).
 # Rebase + migration claim work fine here without the message.
