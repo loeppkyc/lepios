@@ -28,6 +28,7 @@ import {
   handleResumeCommand,
 } from '@/lib/harness/coordinator-commands'
 import { postMessage } from '@/lib/orchestrator/telegram'
+import { handleApprovedTask } from '@/lib/harness/approval-listener'
 
 export const dynamic = 'force-dynamic'
 
@@ -977,6 +978,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 })
                 .eq('id', taskId)
               void triggerPickup()
+              void handleApprovedTask(taskId).catch(() => {})
             } else {
               await db
                 .from('task_queue')
@@ -1140,6 +1142,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 })
                 .eq('id', taskId)
               void triggerPickup()
+              void handleApprovedTask(taskId).catch(() => {})
               await postMessage(`Approved task ${taskId.slice(0, 8)} — pickup triggered.`).catch(
                 () => {}
               )
