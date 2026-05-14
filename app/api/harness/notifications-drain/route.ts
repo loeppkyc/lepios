@@ -4,7 +4,6 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 import { httpRequest } from '@/lib/harness/arms-legs/http'
 import { sms as sendSms } from '@/lib/harness/arms-legs/sms'
-import { telegram as sendTelegram } from '@/lib/harness/arms-legs/telegram'
 
 export const dynamic = 'force-dynamic'
 
