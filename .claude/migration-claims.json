@@ -347,7 +347,13 @@
       "filename": "0203_parse_financial_events.sql",
       "claimed_at": "2026-05-11",
       "note": "Backfill gross_contribution/fees_contribution/refunds_contribution on amazon_financial_events from raw_json. Unlocks April 2026 revenue breakdown. Applied to prod via Supabase MCP as 0200_parse_financial_events (renumbered due to collision)."
+    },
+    "0204": {
+      "branch": "harness/task-582c5d5f-ai-dispatcher",
+      "filename": "0204_ai_dispatch_source.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Task 582c5d5f — add 'ai_dispatch' to task_queue.source CHECK constraint. Required for POST /api/ai/dispatch to queue coordinator-tier tasks."
     }
   },
-  "next_available": 204
+  "next_available": 205
 }
