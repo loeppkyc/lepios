@@ -25,8 +25,8 @@ export async function GET() {
     void logEvent('quickbooks', 'accounts.fetch', {
       actor: 'user',
       status: 'success',
-      outputSummary: `${accounts.length} accounts — bank: $${bankTotal.toFixed(0)}, cc: $${ccTotal.toFixed(0)}`,
-      meta: { account_count: accounts.length, bank_total: bankTotal, cc_total: ccTotal },
+      outputSummary: `${accounts.length} accounts fetched`,
+      meta: { account_count: accounts.length },
     })
     return NextResponse.json({
       accounts,
