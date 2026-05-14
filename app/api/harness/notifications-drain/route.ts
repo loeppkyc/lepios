@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 import { httpRequest } from '@/lib/harness/arms-legs/http'
 import { sms as sendSms } from '@/lib/harness/arms-legs/sms'
+import { telegram as sendTelegram } from '@/lib/harness/arms-legs/telegram'
 
 export const dynamic = 'force-dynamic'
 
@@ -196,7 +197,7 @@ async function drain(request: Request): Promise<NextResponse> {
       continue
     }
 
-    let result: { ok: boolean; messageId?: number | string; error?: string }
+    let result: { ok: boolean; messageId?: number | string; error?: string } = { ok: false }
 
     if (row.channel === 'sms') {
       const smsResult = await sendSms(String(row.payload.text || ''), {
