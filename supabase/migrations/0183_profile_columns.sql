@@ -5,4 +5,5 @@ ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS display_name    text,
   ADD COLUMN IF NOT EXISTS module_prefs    jsonb NOT NULL DEFAULT '[]'::jsonb;
 
--- No new table — ALTER only. AD7-exempt (no CREATE TABLE).
+-- No new table — ALTER only. 
+-- AD7-exempt
