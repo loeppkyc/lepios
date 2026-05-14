@@ -6,7 +6,7 @@
 
 ---
 
-## Total Readiness: 94.7 / 100
+## Total Readiness: 97.2 / 100
 
 ---
 
@@ -60,15 +60,15 @@ _Without reliable drain + tunnel, autonomous ships are deaf-and-dumb post-GPU._
 
 _4 of 6 already won._
 
-| #   | Line item                                   | Weight | Pct  | Contribution | Notes                                                                                                                                                                                                     |
-| --- | ------------------------------------------- | ------ | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Keepa Intel grounding doc                   | 4      | 100% | 4.00         | `docs/sprint-5/grounding/keepa-intel.md` confirmed                                                                                                                                                        |
-| D2  | Goals grounding doc                         | 4      | 100% | 4.00         | `docs/sprint-5/grounding/goals.md` confirmed                                                                                                                                                              |
-| D3  | Oura Health grounding doc                   | 4      | 100% | 4.00         | `docs/sprint-5/grounding/oura-health.md` confirmed                                                                                                                                                        |
-| D4  | Scanner Phone grounding doc                 | 4      | 100% | 4.00         | `docs/sprint-5/grounding/scanner-phone.md` confirmed                                                                                                                                                      |
-| D5  | Inventory grounding doc                     | 2      | 0%   | 0.00         | Next batch — explicitly not started                                                                                                                                                                       |
-| D6  | Local_AI / Retail_Monitor decision resolved | 2      | 75%  | 1.50         | **Local_AI resolved:** local-AI ops dashboard shipped MID batch 2 (app/(cockpit)/local-ai/ + /api/local-ai/status live). Decision made = building it. **Retail_Monitor still pending** — no decision yet. |
-|     | **Category total**                          | **20** |      | **17.50**    |                                                                                                                                                                                                           |
+| #   | Line item                                   | Weight | Pct  | Contribution | Notes                                                                                                                                                                                                                                                        |
+| --- | ------------------------------------------- | ------ | ---- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | Keepa Intel grounding doc                   | 4      | 100% | 4.00         | `docs/sprint-5/grounding/keepa-intel.md` confirmed                                                                                                                                                                                                           |
+| D2  | Goals grounding doc                         | 4      | 100% | 4.00         | `docs/sprint-5/grounding/goals.md` confirmed                                                                                                                                                                                                                 |
+| D3  | Oura Health grounding doc                   | 4      | 100% | 4.00         | `docs/sprint-5/grounding/oura-health.md` confirmed                                                                                                                                                                                                           |
+| D4  | Scanner Phone grounding doc                 | 4      | 100% | 4.00         | `docs/sprint-5/grounding/scanner-phone.md` confirmed                                                                                                                                                                                                         |
+| D5  | Inventory grounding doc                     | 2      | 100% | 2.00         | **Written 2026-05-14.** `docs/sprint-5/grounding/inventory.md` — full study of Pages/7_Inventory.py + Pages/22_Inventory_Spend.py. Data sources, business rules (pallet avg, COGS hierarchy), ≥20% improvements, 6-table schema, AC skeleton, grounding SQL. |
+| D6  | Local_AI / Retail_Monitor decision resolved | 2      | 100% | 2.00         | **Fully resolved 2026-05-14.** Local_AI: shipped. Retail_Monitor: **Build it** — decision doc at `docs/decisions/retail-monitor-build.md`, task queued (645af95d) with `awaiting_grounding` status p5.                                                       |
+|     | **Category total**                          | **20** |      | **20.00**    |                                                                                                                                                                                                                                                              |
 
 ---
 
@@ -90,23 +90,21 @@ _4 of 6 already won._
 | A — Ollama Pipeline     | 25      | 22.50     | 90%       |
 | B — Harness Reliability | 30      | 29.70     | 99%       |
 | C — Doctrine + Docs     | 15      | 15.00     | 100%      |
-| D — Staged Batch        | 20      | 17.50     | 87.5%     |
+| D — Staged Batch        | 20      | 20.00     | 100%      |
 | E — Env + Secrets       | 10      | 10.00     | 100%      |
-| **Total**               | **100** | **94.70** | **94.7%** |
+| **Total**               | **100** | **97.20** | **97.2%** |
 
 ---
 
 ## Top Items Remaining (12.3 pts total)
 
-| Rank | Item                                                | Weight | Gap  | Pts remaining |
-| ---- | --------------------------------------------------- | ------ | ---- | ------------- |
-| 1    | D5 — Inventory grounding doc                        | 2      | 100% | 2.00          |
-| 2    | A4 — Fix Ollama 530s (embed + generate reliability) | 5      | 30%  | 1.50          |
-| 3    | A2 — Cline fully wired (first real task shipped)    | 5      | 20%  | 1.00          |
-| 4    | D6 — Retail_Monitor decision resolved               | 2      | 25%  | 0.50          |
+| Rank | Item                                                | Weight | Gap | Pts remaining |
+| ---- | --------------------------------------------------- | ------ | --- | ------------- |
+| 1    | A4 — Fix Ollama 530s (embed + generate reliability) | 5      | 30% | 1.50          |
+| 2    | A2 — Cline fully wired (first real task shipped)    | 5      | 20% | 1.00          |
 
-**5.3 pts remaining.** A5 + A6 written 2026-05-14 (+7 pts).
-A4 needs `powercfg /change standby-timeout-ac 0` run locally to stop overnight 530s.
+**2.8 pts remaining.** D5 + D6 closed 2026-05-14 (+2.5 pts).
+A4 closes once `powercfg /change standby-timeout-ac 0` is run and 3 clean overnight ticks confirm.
 A2 closes when first real Ollama coding task ships via Cline/Continue.
 
 ---
@@ -128,7 +126,9 @@ These items appear in readiness criteria but have no corresponding task in `task
 
 ## Last Updated
 
-2026-05-14 MDT — **A5 + A6 written (+7 pts → 94.7%).** `docs/ollama-triage.md` (triage rubric: decision tree, tier table, known good/bad tasks, escalation thresholds, F18 metrics, AI dispatcher integration) and `docs/gpu-day-checklist.md` (7-phase day-of upgrade checklist: hardware, model pull, baseline, config, smoke test, rollback) both written from scratch. These were phantom entries reset to 0% earlier today; now 100%. **5.3 pts remain:** D5 (2 pts), A4 (1.5 pts), A2 (1 pt), D6 (0.5 pts).
+2026-05-14 MDT — **D5 + D6 closed (+2.5 pts → 97.2%).** Inventory grounding doc written (`docs/sprint-5/grounding/inventory.md`) — full study of Streamlit Pages/7 + Pages/22, 6-table schema, pallet-avg business rules, ≥20% improvement list, AC skeleton. Retail_Monitor decision: **Build it** — decision doc + task queued (645af95d, `awaiting_grounding`, p5). D category now 100%.
+
+Previously: 2026-05-14 MDT — **A5 + A6 written (+7 pts → 94.7%).** `docs/ollama-triage.md` (triage rubric: decision tree, tier table, known good/bad tasks, escalation thresholds, F18 metrics, AI dispatcher integration) and `docs/gpu-day-checklist.md` (7-phase day-of upgrade checklist: hardware, model pull, baseline, config, smoke test, rollback) both written from scratch. These were phantom entries reset to 0% earlier today; now 100%. **5.3 pts remain:** D5 (2 pts), A4 (1.5 pts), A2 (1 pt), D6 (0.5 pts).
 
 Previously: 2026-05-14 MDT — **Step 6.5 tests fixed (commit 5e4e4ea).** Daytime tick code was already fully implemented. Builder fixed 20 failing test mocks + added 9 route-level tests (AC-2, AC-8). 30/30 tests passing. vercel.json cron entry already present. OLLAMA_TUNNEL_URL already set in Vercel. **To activate A4:** (1) Set `DAYTIME_TICK_ENABLED=1` in Vercel env — no redeploy needed. (2) Run `powercfg /change standby-timeout-ac 0` in admin PowerShell to stop laptop sleeping. Once 3 consecutive clean overnight ticks confirm, A4 → 90%+ (+1.5 pts).
 
