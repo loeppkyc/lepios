@@ -156,6 +156,73 @@ If `SAFE` is `True` (or the curl fails / returns non-JSON — fail open):
 
 **The forecast endpoint is read-only and requires no auth.** Do not pass `CRON_SECRET`.
 
+# Step 0 — Branch Pre-Configuration (injected by Routine system prompt)
+
+**This step runs before any coordinator.md content is processed.** It is injected by the
+Anthropic console Routine system prompt — not by this agent file. Colin must add the following
+block to the Routine system prompt so it fires on every invocation before the coordinator
+agent begins reading its own instructions.
+
+**Why Step 0 exists:** The Routines API `/fire` endpoint places every session on a
+runtime-generated default branch (`claude/vibrant-heisenberg-{random}`). Without Step 0, the
+coordinator's first write would land on this default branch instead of the task-scoped branch.
+Step 0 corrects this before any file reads or git operations occur.
+
+**Instruction for Colin (add to Anthropic console Routine system prompt):**
+
+```
+STEP 0 — BRANCH PRE-CONFIGURATION (runs before anything else):
+1. Identify task_id from your invocation context (the task brief payload).
+2. Run: git checkout -b harness/task-{task_id} 2>/dev/null || git checkout harness/task-{task_id}
+3. Verify branch: git branch --show-current
+4. If branch is still "main" after step 2: log agent_events row with
+   action='branch_guard_triggered', status='error', meta.reason='stuck_on_main'
+   — then STOP. Do not proceed.
+5. If branch matches harness/task-{task_id}: continue to read coordinator.md.
+```
+
+**Abort condition — if branch is main after Step 0:**
+
+If `git branch --show-current` still returns `main` after the checkout attempt, the
+coordinator MUST stop immediately. Log to `agent_events` before stopping:
+
+```sql
+INSERT INTO agent_events (domain, action, actor, status, task_type, output_summary, meta, tags)
+VALUES (
+  'coordinator',
+  'branch_guard_triggered',
+  'coordinator',
+  'error',
+  'startup',
+  'Step 0 branch pre-config failed — still on main after checkout attempt',
+  jsonb_build_object(
+    'task_id',          '<TASK_ID>',
+    'expected_branch',  'harness/task-<TASK_ID>',
+    'actual_branch',    'main',
+    'reason',           'stuck_on_main'
+  ),
+  ARRAY['coordinator', 'branch_guard', 'harness']
+);
+```
+
+Send a Telegram notification (fire-and-forget, `requires_response=false`):
+
+```
+[LepiOS Coordinator] startup aborted
+Status: error
+task_id: {TASK_ID}
+Step 0 failed — branch stuck on main. Manual intervention required.
+```
+
+Then exit. Do not write any file or run any git command while on main.
+
+**Note for coordinator agent:** The detailed branch guard logic (stray-branch cleanup,
+per-write drift checks, PR title format, F18 surface) lives in the "Branch Naming" section
+below. Step 0 is the startup trigger; Branch Naming is the enforcement layer throughout
+the session. Both are required.
+
+---
+
 # Branch Naming — Enforce Before Any Write
 
 Every task invocation MUST run on branch `harness/task-{task_id}` (full UUID, e.g.
@@ -238,6 +305,7 @@ WHERE id = '<TASK_ID>';
 ```
 
 **If `notif_response` is non-null** (coordinator-resume wrote it when Colin responded):
+
 1. Parse `notif_response` as JSON → read `callback_data` → parse as JSON → read `action` (`approve` or `reject`)
 2. Clear both pending keys from metadata:
    ```sql
@@ -248,6 +316,7 @@ WHERE id = '<TASK_ID>';
 3. Proceed directly to Phase 4 Step 5 — skip all earlier phases (they completed in the prior invocation).
 
 **If `notif_id` is non-null but `notif_response` is null** (awaiting Colin's reply):
+
 - The task transitioned back to `queued` before the response arrived — unexpected but recoverable.
 - Log `agent_events`: `action='coordinator_resume_response_missing', meta.notif_id='<notif_id>'`
 - Transition task back to `awaiting_approval` and exit. Do not re-run phases.
@@ -471,6 +540,78 @@ When every chunk passes AND the sprint's kill-criterion question can be answered
 3. Mark sprint-state `closed`. Surface any parked items for backlog.
 4. **Surface the auto-proceed-log audit requirement explicitly** in the sprint-close handoff: "Next sprint will run cache-match-disabled until you update `last_reviewed_by_colin_at` in `docs/handoffs/auto-proceed-log.md`." This is how the audit ritual becomes unskippable.
 
+## Phase 7 — Session summary (run at every clean session exit)
+
+At the end of every coordinator invocation — whether the session completes a chunk, hits a
+grounding checkpoint, escalates, or exits on error — write a structured summary to
+`agent_events`. This is non-optional. Colin uses these rows in the morning digest and for
+coordinator health audits.
+
+**When to run:** immediately before the final Telegram notification and process exit. If the
+session is interrupted (stale-reclaim, quota cliff, uncaught error), write the summary row
+anyway with whatever state is known. A partial summary is better than no summary.
+
+**Use `run_id` as the session identifier.** The harness does not provide a dedicated
+`session_id` field. Use the value of `run_id` (the Anthropic Routines invocation ID, available
+in your invocation context) as `session_id` in the summary meta. If `run_id` is unavailable,
+use `task_id` as a fallback.
+
+**Fields to track on best-effort basis during the session:**
+
+| Field                  | How to track                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| `tasks_attempted`      | Count of `task_queue` rows claimed or touched this session                                  |
+| `tasks_completed`      | Count of chunks where Phase 4 returned pass AND grounding checkpoint resolved (or was none) |
+| `grounding_checks_run` | Count of grounding checkpoints posted to Colin (including partial passes)                   |
+| `handoffs_issued`      | Count of builder handoffs (acceptance docs passed to builder sub-agent)                     |
+| `files_read`           | Best-effort list of file paths read via Read/Glob/Grep tools — not exhaustive               |
+| `escalations`          | Count of decisions escalated to Colin (non-FYI escalations only)                            |
+| `phases_completed`     | List of phase numbers completed in this invocation, e.g. `[0, 1, 2, 3]`                     |
+
+**Insert row at session end:**
+
+```sql
+INSERT INTO agent_events (
+  domain, action, actor, status, task_type, output_summary, meta, tags
+) VALUES (
+  'coordinator',
+  'session_summary',
+  'coordinator',
+  'success',   -- 'success' if no unrecoverable errors; 'error' if session aborted
+  'session',
+  '<one-line summary: what the session accomplished, e.g. "chunk sprint-5-H4 complete, Phase 7 added to coordinator.md">',
+  jsonb_build_object(
+    'session_id',         '<run_id or task_id fallback>',
+    'task_id',            '<TASK_ID>',
+    'tasks_attempted',    <N>,
+    'tasks_completed',    <N>,
+    'grounding_checks_run', <N>,
+    'handoffs_issued',    <N>,
+    'escalations',        <N>,
+    'phases_completed',   ARRAY[<phase numbers>],
+    'files_read',         ARRAY['<path1>', '<path2>'],
+    'exit_reason',        '<clean | quota_cliff | stale_reclaim | error | grounding_wait | awaiting_approval>'
+  ),
+  ARRAY['coordinator', 'session_summary', 'harness']
+);
+```
+
+**`exit_reason` values:**
+
+| Value               | Meaning                                                               |
+| ------------------- | --------------------------------------------------------------------- |
+| `clean`             | All planned work completed; session ended normally                    |
+| `quota_cliff`       | Quota forecast blocked startup or mid-session                         |
+| `stale_reclaim`     | Heartbeat lapsed; harness re-claimed task before session could resume |
+| `error`             | Unrecoverable error aborted the session                               |
+| `grounding_wait`    | Session paused for Colin to run grounding checkpoint                  |
+| `awaiting_approval` | Session paused waiting for Colin's Telegram approve/reject            |
+
+**F18 surface:** session summary rows in `agent_events` feed the morning digest. The digest
+queries for rows where `action='session_summary'` and `domain='coordinator'`, grouped by day.
+Metrics surfaced: sessions run, tasks completed, grounding checks, handoffs, escalation rate.
+Declining task completion per session = coordinator efficiency signal.
+
 # Escalation rules (when to stop and ask Colin)
 
 Escalate on any of these, regardless of what cached principles suggest:
@@ -626,6 +767,7 @@ WHERE id = '<TASK_ID>';
 ```
 
 Also update `docs/sprint-state.md`:
+
 ```
 status: awaiting-async-response
 pending_notification_id: <ROW_ID>

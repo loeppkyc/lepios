@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       .from('task_queue')
       .update({ last_heartbeat_at: new Date().toISOString() })
       .eq('id', task_id)
-      .eq('status', 'claimed')
+      .in('status', ['claimed', 'running'])
       .select('id')
 
     if (error) {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const updated = Array.isArray(data) ? data : []
 
     if (updated.length === 0) {
-      return NextResponse.json({ ok: false, error: 'task not found or not claimed' })
+      return NextResponse.json({ ok: false, error: 'task not found or not claimed/running' })
     }
 
     // Log success to agent_events (fire-and-forget, swallow errors)
