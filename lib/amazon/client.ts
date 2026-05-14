@@ -1,5 +1,7 @@
 import { createHmac, createHash } from 'crypto'
 import { logEvent } from '@/lib/knowledge/client'
+import { telegram } from '@/lib/harness/arms-legs/telegram'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const SP_API_BASE = 'https://sellingpartnerapi-na.amazon.com'
 
@@ -127,6 +129,36 @@ function buildAuthHeaders(
   }
 }
 
+// ── Persistent 5xx Telegram alert (dedup: one per path/hour) ─────────────────
+
+async function sendPersistent5xxAlert(path: string, status: number, body: string): Promise<void> {
+  let shouldAlert = true
+  try {
+    const db = createServiceClient()
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { data } = await db
+      .from('agent_events')
+      .select('id')
+      .filter('meta->>path', 'eq', path)
+      .eq('action', 'sp_api.5xx_alert_sent')
+      .gte('created_at', oneHourAgo)
+      .limit(1)
+    if (data && data.length > 0) shouldAlert = false
+  } catch {
+    // Dedup check failed — alert anyway (fail-open)
+  }
+  if (!shouldAlert) return
+  void telegram(
+    `[LepiOS] SP-API persistent 5xx\nPath: ${path}\nStatus: ${status}\nAttempts: ${MAX_RETRIES + 1}\n${body.slice(0, 200)}`,
+    { bot: 'alerts', agentId: 'sp_api' }
+  ).catch(() => {})
+  void logEvent('amazon', 'sp_api.5xx_alert_sent', {
+    actor: 'system',
+    status: 'warning',
+    meta: { path, status },
+  })
+}
+
 // ── Main SP-API fetch helper ──────────────────────────────────────────────────
 
 export async function spFetch<T>(
@@ -186,6 +218,7 @@ export async function spFetch<T>(
     if (res.status >= 500 && res.status < 600) {
       if (attempt === MAX_RETRIES) {
         const text = await res.text()
+        void sendPersistent5xxAlert(path, res.status, text)
         throw new Error(
           `SP-API ${method} ${path} (${res.status}): upstream error after ${MAX_RETRIES} retries. ${text.slice(0, 200)}`
         )
