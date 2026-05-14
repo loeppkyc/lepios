@@ -56,6 +56,7 @@ function getTunnelUsed(): boolean {
   return !getBaseUrl().includes('localhost')
 }
 
+/** Runs the daytime tick process: checks Ollama health, scans agent_events for anomalies, and writes a scored result row to agent_events. */
 export async function runDaytimeTick(): Promise<DaytimeTickResult> {
   const tick_id = crypto.randomUUID()
   const run_id = crypto.randomUUID()
