@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: Request) {
   const contentType = request.headers.get('Content-Type') || ''
-  
+
   let body: string
   let from: string
 
@@ -37,31 +37,33 @@ export async function POST(request: Request) {
   }
 
   const colinNumber = process.env.TWILIO_TO_NUMBER
-  
+
   // Security: Whitelist Colin's number
   if (from !== colinNumber && colinNumber) {
     console.warn(`Ignoring SMS from unknown sender: ${from}`)
     // Return empty TwiML to satisfy Twilio
-    return new Response('<Response></Response>', { 
-      headers: { 'Content-Type': 'text/xml' } 
+    return new Response('<Response></Response>', {
+      headers: { 'Content-Type': 'text/xml' },
     })
   }
 
   // Log the interaction to agent_events for traceability
   const db = createServiceClient()
-  await db.from('agent_events').insert({
-    domain: 'orchestrator',
-    action: 'sms_webhook',
-    actor: 'colin',
-    status: 'success',
-    task_type: 'sms_command',
-    output_summary: `received SMS command: ${body.slice(0, 50)}`,
-    meta: { from, body },
-    tags: ['sms', 'webhook'],
-  }).catch(() => {})
+  try {
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'sms_webhook',
+      actor: 'colin',
+      status: 'success',
+      task_type: 'sms_command',
+      output_summary: `received SMS command: ${body.slice(0, 50)}`,
+      meta: { from, body },
+      tags: ['sms', 'webhook'],
+    })
+  } catch {}
 
   const cmd = body.trim().toLowerCase()
-  
+
   try {
     // Route to appropriate coordinator command
     if (cmd.startsWith('run ') || cmd === 'run') {
@@ -82,11 +84,13 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error('SMS Command Execution Error:', err)
-    await postSms(`LepiOS Error: ${err instanceof Error ? err.message : 'Unknown error during execution.'}`)
+    await postSms(
+      `LepiOS Error: ${err instanceof Error ? err.message : 'Unknown error during execution.'}`
+    )
   }
 
   // Return empty TwiML (replies are handled asynchronously via postSms/Telegram)
-  return new Response('<Response></Response>', { 
-    headers: { 'Content-Type': 'text/xml' } 
+  return new Response('<Response></Response>', {
+    headers: { 'Content-Type': 'text/xml' },
   })
 }

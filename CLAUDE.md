@@ -60,7 +60,7 @@ scoped — next scope session when harness clears the queue.
 
 ## 3 — Architecture Rules (non-negotiable)
 
-1. **Check-Before-Build (§8.4):** Before any new code/schema/config — verify it doesn't exist in the Streamlit OS baseline (Phase 2) or in this repo (Phase 3+). Default action: Beef-Up. Replace requires Colin's explicit approval. Build-New is last resort.
+1. **Check-Before-Build (§8.4):** Before any new code/schema/config — (a) verify it doesn't already exist in this repo; (b) search GitHub for open-source libraries or repos solving the same problem and document the verdict: Wrap (import as dependency) / Fork (take their engine, put our shell on top) / Reference (read for patterns, write ours) / Build-new (last resort). Default action: Beef-Up what exists. Build-New requires explicit Colin approval. Every acceptance doc must include a "GitHub prior art" section before coordinator submits it.
 2. **Accuracy-Zone Pipeline (§8.5):** Tight-scope tasks (one sentence + acceptance criterion). Stop at 40-50% context window, write handoff note, fresh worker picks up. Reality-Check Agent reviews every report. Hallucination log: `docs/hallucination-log.md`.
 3. **Decisions Are Colin's:** Agents propose; Colin decides. Every destructive operation, schema change, and migration plan requires explicit Colin approval.
 4. **Tier 0 Safety:** Before any git operation, migration, deploy, or secret-adjacent action — confirm it is safe. If in doubt, stop and ask.
@@ -76,11 +76,11 @@ scoped — next scope session when harness clears the queue.
 
 ---
 
-## 4 — Baseline Reference
+## 4 — The Product
 
-The Streamlit OS (`../streamlit_app/`) is the 7-week baseline. It contains working logic for: Amazon scan/list/ship, expenses, betting (Kelly Sizer), Oura ingestion, Telegram bots, and more. Phase 2 audits document it in `audits/`. Phase 3 porting decisions (port vs. rebuild) require Colin's approval.
+LepiOS IS the product. 60+ cockpit pages live in production at `lepios-one.vercel.app`. The repo is the source of truth — not any prior Streamlit prototype.
 
-Do NOT modify the Streamlit OS during Phase 2. It remains running as reference until LepiOS v1 ships real value.
+**Before authoring net-new code:** check the repo first (does this already exist?), then GitHub (has someone open-sourced a solution?). The repo is living memory — read it before building anything.
 
 ---
 
@@ -96,13 +96,13 @@ Do NOT modify the Streamlit OS during Phase 2. It remains running as reference u
 
 ## 6 — Data Integrity Rules
 
-**Historical Streamlit bets data is NOT trusted for LepiOS signals pending an odds-integrity audit (BACKLOG-1).** Do not import bets from Streamlit SQLite/Sheets into the Supabase `bets` table without explicit approval from Colin and a verified audit. See `audits/migration-notes.md` BACKLOG-1 for scope and methodology requirements.
+**Historical bets data from the prior system is NOT trusted for LepiOS signals pending an odds-integrity audit (BACKLOG-1).** Do not import historical bets into the Supabase `bets` table without explicit approval from Colin and a verified audit. See `audits/migration-notes.md` BACKLOG-1 for scope and methodology requirements.
 
 ---
 
-## 7 — Kill Criterion (ARCHITECTURE.md §11)
+## 7 — Ongoing Standard (ARCHITECTURE.md §11)
 
-2 weeks from Phase 3 start: if LepiOS is not measurably helping Colin make or save money (Amazon Telegram alerts firing on real deals, Expenses tile tracking real spend, Betting/Trading tiles logging real activity), stop and simplify. Elegance is not a substitute for utility.
+Every sprint must ship something that measurably helps Colin make or save money. Amazon alerts, expense accuracy, payout reconciliation, and bookkeeping are the live anchors. Elegance is not a substitute for utility — if a feature doesn't connect to a real dollar or a real decision, reconsider it.
 
 ---
 
@@ -173,9 +173,9 @@ Local dev equivalents: replace `https://lepios-one.vercel.app` with `http://loca
 
 **Google Sheets** (`mcp__google-sheets__*`)
 
-| Tool         | When to use                                        | Never use for                          |
-| ------------ | -------------------------------------------------- | -------------------------------------- |
-| `read_sheet` | Read Streamlit baseline data for porting reference | Large reads (>500 rows) — download CSV |
+| Tool         | When to use                                    | Never use for                          |
+| ------------ | ---------------------------------------------- | -------------------------------------- |
+| `read_sheet` | Read/write sheets for data not yet in Supabase | Large reads (>500 rows) — download CSV |
 
 ### Global Skills Available
 
