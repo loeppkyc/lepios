@@ -8,6 +8,28 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({ from: mockFrom })),
 }))
 
+// ── Mock heartbeat ────────────────────────────────────────────────────────────
+// upsertHeartbeat throws loud on failure (dead-man's switch) — mock it so tests
+// aren't flaky on DB availability and can exercise the heartbeat-guarantee paths.
+
+vi.mock('@/lib/orchestrator/heartbeat', () => ({
+  upsertHeartbeat: vi.fn().mockResolvedValue(undefined),
+}))
+
+// ── Mock hydrateOllamaConfig ──────────────────────────────────────────────────
+// Prevents the harness_config SELECT from hitting the mocked Supabase client
+// with a chain it doesn't support (.select().eq().maybeSingle()).
+// getBaseUrl reads process.env.OLLAMA_TUNNEL_URL dynamically so AC-7 tests
+// can control the tunnel_used flag by setting/unsetting the env var.
+
+vi.mock('@/lib/ollama/client', () => ({
+  hydrateOllamaConfig: vi.fn().mockResolvedValue(undefined),
+  getBaseUrl: vi.fn().mockImplementation(() => {
+    const url = process.env.OLLAMA_TUNNEL_URL ?? 'http://localhost:11434'
+    return url.replace(/\/$/, '')
+  }),
+}))
+
 // ── Mock checks ───────────────────────────────────────────────────────────────
 
 const { mockOllamaHealth, mockSignalReview, mockSiteHealth } = vi.hoisted(() => ({
