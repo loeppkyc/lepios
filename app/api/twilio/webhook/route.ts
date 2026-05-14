@@ -12,7 +12,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 /**
- * Twilio SMS Webhook handler.
+ * Twilio SMS Webhook handler (deployed 2026-05-14).
  * Expects application/x-www-form-urlencoded POST from Twilio.
  */
 export async function POST(request: Request) {
