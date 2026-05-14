@@ -3,6 +3,7 @@ import { requireCronSecret } from '@/lib/auth/cron-secret'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runImprovementEngine } from '@/lib/harness/improvement-engine'
 import { httpRequest } from '@/lib/harness/arms-legs/http'
+import { sms as sendSms } from '@/lib/harness/arms-legs/sms'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,25 +192,29 @@ async function drain(request: Request): Promise<NextResponse> {
     })
   }
 
-  for (const row of rows as PendingRow[]) {
-    if (row.channel !== 'telegram') continue
-
-    const chatId = row.chat_id ?? defaultChatId
-    if (!chatId) {
-      const newAttempts = row.attempts + 1
-      await db
-        .from('outbound_notifications')
-        .update({
-          attempts: newAttempts,
-          last_error: 'no chat_id and TELEGRAM_CHAT_ID not configured',
-          ...(newAttempts >= MAX_ATTEMPTS ? { status: 'failed' } : {}),
-        })
-        .eq('id', row.id)
       failed++
       continue
     }
 
-    const result = await sendTelegram(token, chatId, row.payload)
+    let result: { ok: boolean; messageId?: number | string; error?: string }
+
+    if (row.channel === 'sms') {
+      const smsResult = await sendSms(String(row.payload.text || ''), {
+        to: chatId,
+        agentId: 'notifications_drain',
+      })
+      result = { ok: smsResult.ok, messageId: smsResult.sid, error: smsResult.error }
+    } else if (row.channel === 'telegram') {
+      result = await sendTelegram(token, chatId, row.payload)
+    } else {
+      // Unknown channel
+      await db
+        .from('outbound_notifications')
+        .update({ status: 'failed', last_error: `Unsupported channel: ${row.channel}` })
+        .eq('id', row.id)
+      failed++
+      continue
+    }
 
     if (result.ok) {
       await db
@@ -217,8 +222,8 @@ async function drain(request: Request): Promise<NextResponse> {
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
-          // Merge Telegram's returned message_id into payload so the inbound
-          // webhook can match reply_to_message.message_id (strategy B correlation).
+          // For Telegram, merge message_id for reply correlation. 
+          // For SMS, we store the Twilio SID if available.
           ...(result.messageId != null
             ? { payload: { ...row.payload, message_id: result.messageId } }
             : {}),

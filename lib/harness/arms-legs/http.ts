@@ -13,6 +13,7 @@ const HOST_ALLOW: Record<string, string> = {
   'net.outbound.github': 'api.github.com',
   'net.outbound.telegram': 'api.telegram.org',
   'net.outbound.openai': 'api.openai.com',
+  'net.outbound.twilio': 'api.twilio.com',
   // OSS Radar sources (capabilities seeded in migration 0170)
   'net.outbound.npm': 'registry.npmjs.org',
   'net.outbound.pypi': 'pypi.org',
