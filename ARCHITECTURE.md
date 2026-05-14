@@ -209,20 +209,27 @@ Multi-user HARD GATE from previous §7.3 still applies before any second user to
 
 ### 8.4 Check-Before-Build Doctrine
 
-**Before proposing new code, schema, config, or integration, every agent MUST check whether it already exists in the codebase.** LepiOS has accumulated 7+ weeks of work. Much of what we need is probably already there in some form.
+**Before proposing new code, schema, config, or integration, every agent MUST run through the three-step check below.** LepiOS has 60+ shipped pages and a curated prior-art inventory — much of what we need is already here or on GitHub.
 
-For every proposed unit of work, the agent asks and documents:
+**Step 1 — Check the repo.** Grep the repo, list the files, check Supabase schema, check existing components. Report what exists and its state: _Working / Partial / Broken / Stale._
 
-1. **Does this already exist?** Grep the repo, list the files, check Supabase schema, check existing components, check past Claude Code sessions. Report findings.
-2. **If it exists, what's the state?** _Working / Partial / Broken / Stale._
-3. **What's the right action?** Pick one:
-   - **Leave alone** (works, meets v1 bar) — document and move on.
-   - **Beef up** (exists but under-built) — extend in place, don't rewrite.
-   - **Replace** (exists but fundamentally wrong shape for v1) — deprecate with a migration plan, don't just delete.
-   - **Build new** (genuinely doesn't exist) — only after the first three are ruled out.
-4. **Confirm with Colin before replacing or deleting existing work.** Beefing up is default-safe; replacement is not.
+**Step 2 — Check GitHub.** Search [`docs/github-prior-art.md`](../docs/github-prior-art.md) for the relevant domain. If the category isn't listed, search GitHub before proceeding and add a new entry. Verdict codes:
 
-This rule applies to components, database tables, RLS policies, agents, scripts, config, MCPs, and documentation. **"Build new" is the last resort, not the first instinct.**
+- **Wrap** — import as a package dependency (fastest path; proven code)
+- **Fork** — take their engine, put our shell on top (when deep customization needed)
+- **Reference** — read for patterns, implement in our stack (when stack is incompatible)
+- **Build-new** — last resort; requires Colin approval; acceptance doc must state why nothing else fits
+
+**Step 3 — Pick the right action.**
+
+- **Leave alone** (works, meets bar) — document and move on
+- **Beef up** (exists but under-built) — extend in place, don't rewrite
+- **Replace** (wrong shape) — deprecate with migration plan, don't just delete
+- **Build new** — only after Steps 1–2 confirm nothing fits
+
+**Confirm with Colin before replacing or deleting existing work.** Beefing up is default-safe; replacement is not.
+
+Every acceptance doc must include a "GitHub prior art" section (1–3 rows from `docs/github-prior-art.md`) before coordinator submits it for approval.
 
 ### 8.5 Accuracy-Zone Pipeline — Hallucination Management
 
