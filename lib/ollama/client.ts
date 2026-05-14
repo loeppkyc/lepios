@@ -312,6 +312,7 @@ export interface GenerateOptions {
   model?: string
   timeoutMs?: number
   systemPrompt?: string
+  stream?: boolean
 }
 
 export interface GenerateResult {
@@ -459,6 +460,84 @@ export async function generate(
   })
 
   return { text, confidence, model, tokens_used }
+}
+
+/**
+ * Streaming variant of generate(). Yields tokens as they arrive from Ollama.
+ * Uses the same circuit-breaker check as generate() — throws OllamaUnreachableError
+ * if the circuit is OPEN or if the request fails.
+ *
+ * Usage:
+ *   for await (const token of generateStream('Summarise this deal', { task: 'analysis' })) {
+ *     process.stdout.write(token)
+ *   }
+ */
+export async function* generateStream(
+  prompt: string,
+  opts: GenerateOptions = {}
+): AsyncGenerator<string> {
+  const task = opts.task ?? 'general'
+  const model = opts.model ?? autoSelectModel(task)
+
+  let circuit: CircuitStatus
+  try {
+    circuit = await getCircuitState()
+  } catch {
+    circuit = {
+      state: 'CLOSED',
+      open_reason: null,
+      recent_failures: 0,
+      last_failure_at: null,
+      last_success_at: null,
+      transitioned: false,
+      prev_state: 'CLOSED',
+    }
+  }
+
+  handleCircuitTransition(circuit, model)
+
+  if (circuit.state === 'OPEN') {
+    throw new OllamaUnreachableError('circuit open — skipping Ollama')
+  }
+
+  const defaultTimeout = task === 'analysis' ? 60_000 : 15_000
+  let res: Response
+  try {
+    res = await ollamaFetch(
+      '/api/generate',
+      { model, prompt, system: opts.systemPrompt, stream: true },
+      opts.timeoutMs ?? defaultTimeout
+    )
+  } catch (err) {
+    throw new OllamaUnreachableError(err)
+  }
+
+  if (!res.ok || !res.body) {
+    throw new OllamaUnreachableError(`Ollama /api/generate stream returned HTTP ${res.status}`)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const chunk = decoder.decode(value, { stream: true })
+      for (const line of chunk.split('\n')) {
+        if (!line.trim()) continue
+        try {
+          const parsed = JSON.parse(line) as { response?: string; done?: boolean }
+          if (parsed.response) yield parsed.response
+          if (parsed.done) return
+        } catch {
+          // partial JSON line — skip
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
 }
 
 // ── embed ─────────────────────────────────────────────────────────────────────
