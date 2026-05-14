@@ -31,6 +31,8 @@ import { getRegisteredChecks } from './registry'
 import { findSafeListRepair } from './repairs/safe-list'
 import { isSandboxGatedEligible, attemptSandboxRepair } from './repairs/sandbox-gated'
 import { escalate } from './repairs/escalate'
+import { sendDailyBot } from '@/lib/telegram/daily-bot'
+import { renderAutoRepaired } from '@/lib/telegram/templates'
 import './checks' // side-effect: populate registry
 import type {
   CheckResult,
@@ -141,6 +143,18 @@ export async function runScan(options: RunOptions): Promise<ScanReport> {
       if (resolved) {
         totalRepairs += 1
         await emitRepairSuccessEvent(db, { checkKey: result.key, runId, tier })
+        // Alert Colin when stuck tasks are detected and auto-repaired.
+        // The escalation path (unresolved) already alerts via escalate().
+        if (result.key === 'health.task_queue_stuck' && !dryRun) {
+          const stuckCount = (result.evidence.stuck_count as number | undefined) ?? 1
+          const msg = renderAutoRepaired({
+            at: new Date(),
+            checkKey: result.key,
+            description: `${stuckCount} stuck task_queue row${stuckCount === 1 ? '' : 's'} detected`,
+            repairs: stuckCount,
+          })
+          await sendDailyBot(msg).catch(() => {})
+        }
       } else if (outcome === 'failure' || outcome === 'not_applicable') {
         // Escalate after a failed safe-list attempt.
         const esc = await escalate(result, ctx, `safe-list repair returned ${outcome}`)
