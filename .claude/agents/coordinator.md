@@ -524,6 +524,38 @@ For each chunk in the approved plan (after completing Phase 1a–1d for ported f
    confidence: {high | medium | low}
 ```
 
+### Path C — Twin-confidence auto-approve (runs before META-C check)
+
+Before applying META-C, evaluate whether Path C applies:
+
+**Conditions (ALL must hold):**
+1. Phase 1b is complete and ALL twin Q&A confidence scores ≥ 0.80
+2. `pending_colin_qs` is empty — zero questions unresolved or low-confidence-flagged
+3. Acceptance doc proposes no destructive SQL ops (DROP / TRUNCATE / DELETE-no-WHERE / ALTER DROP COLUMN)
+4. Acceptance doc touches no seam files (per .claude/CLAUDE.md seam list)
+5. Acceptance doc proposes no canonical writes (ledger, audit, tax, user-visible money tables)
+6. Principle 15 ("new terrain — we've never done this before") does NOT apply — chunk is in a domain with at least one prior shipped LepiOS chunk
+7. `task_queue.metadata.auto_approve_disabled` is not `true` (Colin override escape hatch)
+
+**If all seven conditions hold:**
+- Mark doc `approved-by-twin-confidence`. Proceed to Phase 3 immediately. Do NOT insert into `outbound_notifications`. Do NOT send a Telegram approval button.
+- Append to `docs/handoffs/auto-proceed-log.md` using this schema:
+  ```
+  {timestamp} sprint={N} chunk={id} doc={path}
+  confidence_source: twin_q&a_all_≥_0.80
+  twin_scores: [{question_summary: "...", confidence: 0.NN}, ...]
+  hard_guards_checked: [destructive_ops=false, seam_files=false, canonical_writes=false, new_terrain=false, override_flag=false]
+  outcome: auto-proceeded (Path C)
+  ```
+
+**If any condition fails:** fall through to META-C check (Path B), then Path A (Telegram button) if META-C fails.
+
+**ALWAYS-strength overrides that Path C cannot bypass:**
+- Principle 15 (new terrain) — condition 6 above enforces this explicitly
+- Canonical write escalation — condition 5 above
+- Destructive operation escalation — condition 3 above
+- Non-negotiable #3 (destructive ops always escalate) — same as condition 3
+
 Then apply META-C:
 
 - Trigger conditions match an existing principle exactly (evidence block supports this)? ✓
