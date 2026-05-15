@@ -8,6 +8,7 @@ import { CURRENT_CAPACITY_TIER } from './config'
 import type { CheckResult, DaytimeTickResult, TickStatus, QualityScore } from './types'
 import { upsertHeartbeat } from './heartbeat'
 import { hydrateOllamaConfig, getBaseUrl } from '@/lib/ollama/client'
+import { runPreResearch } from '@/lib/harness/pre-research'
 
 const SIGNAL_REVIEW_TIMEOUT_MS = 100_000
 const DEFAULT_CHECK_TIMEOUT_MS = 15_000
@@ -71,6 +72,36 @@ export async function runDaytimeTick(): Promise<DaytimeTickResult> {
   checks.push(await safeCheck('ollama_health', checkOllamaHealth))
   checks.push(await safeCheck('signal_review', checkSignalReview, SIGNAL_REVIEW_TIMEOUT_MS))
   checks.push(await safeCheck('site_health', checkSiteHealth))
+
+  // Pre-research: generate Ollama summaries for queued tasks after health checks.
+  // Wrapped in safeCheck so any error becomes a warn flag, never kills the tick.
+  checks.push(
+    await safeCheck(
+      'pre_research',
+      async (): Promise<CheckResult> => {
+        const preResearchStart = Date.now()
+        const pr = await runPreResearch()
+        const hasErrors = pr.errors.length > 0
+        return {
+          name: 'pre_research',
+          status: hasErrors ? 'warn' : 'pass',
+          flags: pr.errors.map((msg) => ({
+            severity: 'warn' as const,
+            message: msg,
+            entity_type: 'pre_research',
+          })),
+          counts: {
+            tasks_processed: pr.tasks_processed,
+            tasks_skipped: pr.tasks_skipped,
+            tasks_no_hints: pr.tasks_no_hints,
+            tasks_ollama_error: pr.tasks_ollama_error,
+          },
+          duration_ms: Date.now() - preResearchStart,
+        }
+      },
+      120_000
+    )
+  )
 
   const finished_at = new Date().toISOString()
   const duration_ms = Date.now() - tickStart

@@ -30,6 +30,18 @@ vi.mock('@/lib/ollama/client', () => ({
   }),
 }))
 
+// ── Mock pre-research ─────────────────────────────────────────────────────────
+// runPreResearch runs inside the pre_research safeCheck — mock to a no-op so
+// existing daytime-tick tests are unaffected by the new check.
+
+const { mockRunPreResearch } = vi.hoisted(() => ({
+  mockRunPreResearch: vi.fn(),
+}))
+
+vi.mock('@/lib/harness/pre-research', () => ({
+  runPreResearch: mockRunPreResearch,
+}))
+
 // ── Mock checks ───────────────────────────────────────────────────────────────
 
 const { mockOllamaHealth, mockSignalReview, mockSiteHealth } = vi.hoisted(() => ({
@@ -105,6 +117,13 @@ beforeEach(() => {
   mockOllamaHealth.mockResolvedValue(passCheck('ollama_health'))
   mockSignalReview.mockResolvedValue(passCheck('signal_review'))
   mockSiteHealth.mockResolvedValue(passCheck('site_health'))
+  mockRunPreResearch.mockResolvedValue({
+    tasks_processed: 0,
+    tasks_skipped: 0,
+    tasks_no_hints: 0,
+    tasks_ollama_error: 0,
+    errors: [],
+  })
   mockFetchHistory.mockResolvedValue({
     task_type: 'daytime_tick',
     capacity_tier: 'tier_1_laptop_ollama',
@@ -122,7 +141,7 @@ describe('runDaytimeTick — shape (AC-1)', () => {
     expect(result.tick_id).toBeTruthy()
     expect(result.run_id).toBeTruthy()
     expect(result.mode).toBe('daytime_ollama')
-    expect(result.checks).toHaveLength(3)
+    expect(result.checks).toHaveLength(4)
     expect(result.started_at).toBeTruthy()
     expect(result.finished_at).toBeTruthy()
     expect(typeof result.duration_ms).toBe('number')
@@ -137,7 +156,8 @@ describe('runDaytimeTick — shape (AC-1)', () => {
     expect(names).toContain('ollama_health')
     expect(names).toContain('signal_review')
     expect(names).toContain('site_health')
-    expect(names).toHaveLength(3)
+    expect(names).toContain('pre_research')
+    expect(names).toHaveLength(4)
   })
 })
 
@@ -296,6 +316,7 @@ describe('runDaytimeTick — heartbeat guarantee (AC-11)', () => {
     mockOllamaHealth.mockResolvedValue(failCheck('ollama_health'))
     mockSignalReview.mockResolvedValue(failCheck('signal_review'))
     mockSiteHealth.mockResolvedValue(failCheck('site_health'))
+    mockRunPreResearch.mockRejectedValue(new Error('pre-research crashed'))
     const b = makeInsertBuilder()
     mockFrom.mockReturnValue(b)
     await runDaytimeTick()
@@ -317,10 +338,11 @@ describe('runDaytimeTick — heartbeat guarantee (AC-11)', () => {
     await expect(runDaytimeTick()).resolves.toBeDefined()
   })
 
-  it('status = failed when all 3 checks fail', async () => {
+  it('status = failed when all 4 checks fail', async () => {
     mockOllamaHealth.mockResolvedValue(failCheck('ollama_health'))
     mockSignalReview.mockResolvedValue(failCheck('signal_review'))
     mockSiteHealth.mockResolvedValue(failCheck('site_health'))
+    mockRunPreResearch.mockRejectedValue(new Error('pre-research crashed'))
     mockFrom.mockReturnValue(makeInsertBuilder())
     const result = await runDaytimeTick()
     expect(result.status).toBe('failed')
