@@ -328,12 +328,17 @@ t005_chunk2:
   task_id: "ca9f3e22-1ca9-4b4e-9555-1e948b1beedc"
   chunk: "2"
   branch: "harness/task-ca9f3e22-net-worth"
-  status: "in-build"
+  status: "complete"
   description: "Net worth completion — vehicles/inventory auto-pull, shadcn AreaChart, daily cron, staleness banner, morning digest line"
   acceptance_doc: "docs/sprint-7/t005-net-worth-v2-acceptance.md"
   phase1a_study_doc: "docs/sprint-5/t005-net-worth-study.md"
   design_decisions_resolved: ["Q1-done", "Q2-inventory-autopull", "Q3-vehicles-autopull", "Q4-deferred", "Q5-f20-deferred", "Q6-daily-cron", "Q7-shadcn-areachart"]
   chunk1_commit: "7944715"
+  chunk2_commit: "eb37aef"
   acceptance_doc_written_at: "2026-05-14"
   delegated_to_builder_at: "2026-05-14"
+  builder_complete_at: "2026-05-14"
+  handoff_doc: "docs/sprint-7/chunk-t005-2-handoff.json"
+  tests: "18 passing, 0 failing"
+  flags: ["vercel_json_two_crons_at_0700", "tests_test_file_scope_bypass_used"]
   last_updated_at: "2026-05-14"
