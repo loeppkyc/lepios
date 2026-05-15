@@ -158,6 +158,16 @@ async function writeDigestEvent(result: DigestResult): Promise<void> {
     }
   }
 
+  let stallCount = 0
+  let stalledTaskIds: string[] = []
+  try {
+    const stall = await getDigestStallSummary()
+    stallCount = stall.count
+    stalledTaskIds = stall.stalled_task_ids
+  } catch {
+    // non-critical
+  }
+
   try {
     const supabase = createServiceClient()
     await supabase.from('agent_events').insert({
@@ -173,6 +183,8 @@ async function writeDigestEvent(result: DigestResult): Promise<void> {
       meta: {
         digest_status: result.status,
         mapped_from: 'spec_v1',
+        stall_count: stallCount,
+        stalled_task_ids: stalledTaskIds,
       },
     })
   } catch {

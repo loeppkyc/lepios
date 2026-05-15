@@ -279,6 +279,7 @@ async function detectT5(): Promise<StallEvent[]> {
 export async function getDigestStallSummary(): Promise<{
   count: number
   descriptions: string[]
+  stalled_task_ids: string[]
 }> {
   try {
     const db = createServiceClient()
@@ -309,9 +310,9 @@ export async function getDigestStallSummary(): Promise<{
 
     const descriptions = rows.map((r) => `${r.id.slice(0, 8)} — ${r.task.slice(0, 40)}`)
 
-    return { count: rows.length, descriptions }
+    return { count: rows.length, descriptions, stalled_task_ids: rows.map((r) => r.id) }
   } catch {
-    return { count: 0, descriptions: [] }
+    return { count: 0, descriptions: [], stalled_task_ids: [] }
   }
 }
 
