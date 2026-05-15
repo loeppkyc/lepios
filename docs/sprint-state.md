@@ -339,26 +339,22 @@ builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
 last_updated_at: "2026-05-09T03:40:00Z"
 
 # ============================================================
-# cockpit-hit-lists-ui (Sprint 7, 2026-05-14)
+# Retail Arb Engine (task 3a13fc07, 2026-05-15)
 # ============================================================
 
-cockpit_hit_lists_ui:
-  task_id: "5be30d29-48a2-4a8a-a7e3-92ff8bd3fa7b"
-  branch: "harness/task-5be30d29-cockpit-hit-lists-ui"
-  status: "awaiting_grounding"
-  description: "Hit Lists UI — F20-clean rewrite of HitListClient.tsx + enrich GET items API with scan_results join + BSR sparklines"
-  acceptance_doc: "docs/sprint-7/cockpit-hit-lists-acceptance.md"
-  acceptance_doc_committed_at: "aa4236c"
-  phase1a_complete: true
-  phase1b_twin_reached: false
-  phase1b_applied_principles: true
-  phase1c_improvements: ["shadcn Table", "BSR sparklines", "sort/filter", "F20 full rewrite", "scan_results surfaced to UI"]
-  acceptance_doc_written_at: "2026-05-14"
-  delegated_to_builder_at: "2026-05-14"
-  builder_complete_at: "2026-05-14"
-  builder_commit: "e58789b"
-  handoff_doc: "docs/sprint-7/chunk-hit-lists-handoff.json"
-  f20_style_matches: 0
-  flags: ["table.tsx_generated_not_preexisting", "preexisting_ts_errors_in_tests_not_introduced"]
-  grounding_checkpoint: "Load /hit-lists — verify sortable table, status filter tabs, BSR sparkline, all CRUD"
-  last_updated_at: "2026-05-14"
+retail_arb_engine:
+task_id: "3a13fc07-2db6-4d0e-a245-4397a5c0978c"
+status: "awaiting-colin-approval"
+description: "Add Arb Engine tab to RetailHQPage — batch retail deal scan via SP-API + Keepa"
+study_doc: "docs/sprint-7/retail-arb-engine-study.md"
+acceptance_doc: "docs/sprint-7/retail-arb-engine-acceptance.md"
+scope_approved_by_colin_at: "2026-05-15T14:39:47Z"
+scope_approved_action: "Proceed (Arb Engine scope) — callback_data action=approve"
+system_inventory_updated: "retail-scout-arbitrage bumped from 0% to 72% (2026-05-15)"
+open_questions:
+  - "ROI threshold for retail arb BUY decision (suggesting 15% vs 50% for books)"
+  - "Persist scan results to retail_arb_scans table (v2) or agent_events only (v1)?"
+  - "Import-from-Deals UX: auto-populate from Deals tab or separate input form?"
+branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
+opened_at: "2026-05-15T14:25:02Z"
+last_updated_at: "2026-05-15T14:42:00Z"
