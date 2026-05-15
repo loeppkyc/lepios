@@ -30,6 +30,11 @@ import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
 import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
 import { buildOssAuditDigestLine } from '@/lib/oss-radar/digest'
+import {
+  buildTradingCompositeDigestLine,
+  buildTradingPicksDigestLine,
+  buildSportsPicksDigestLine,
+} from '@/lib/trading/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -339,6 +344,14 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: OSS audit — step 3 verdict distribution across streamlit_modules ──
   const ossAuditLine = await buildOssAuditDigestLine()
   messageToSend = `${messageToSend}\n${ossAuditLine}`
+
+  // ── Sprint 7 Chunk C: Trading composite confidence + picks ───────────────
+  const tradingCompositeLine = await buildTradingCompositeDigestLine()
+  messageToSend = `${messageToSend}\n${tradingCompositeLine}`
+  const tradingPicksLine = await buildTradingPicksDigestLine()
+  if (tradingPicksLine) messageToSend = `${messageToSend}${tradingPicksLine}`
+  const sportsPicksLine = await buildSportsPicksDigestLine()
+  if (sportsPicksLine) messageToSend = `${messageToSend}${sportsPicksLine}`
 
   characterCount = messageToSend.length
 
