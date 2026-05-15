@@ -1,4 +1,4 @@
-{
+﻿{
   "claimed": {
     "0138": {
       "branch": "security/lockdown-phase-0-4",
@@ -366,6 +366,12 @@
       "claimed_at": "2026-05-15",
       "note": "F18 Ceiling Metric Layer — module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
     }
-  },
-  "next_available": 207
+,
+    "0209": {
+      "branch": "feat/focus-page",
+      "filename": "0209_focus.sql",
+      "claimed_at": "2026-05-15",
+      "note": "Focus system -- open_loops, time_blocks, focus_sessions tables. Pomodoro timer, Zeigarnik brain-dump, time blocking. Applied to prod via Supabase MCP."
+    }  },
+  "next_available": 210
 }

@@ -1,0 +1,28 @@
+{
+  "chunk_id": "annual-review-crosslinks",
+  "acceptance_doc_path": "docs/acceptance/annual-review-crosslinks.md",
+  "files_changed": [
+    "app/(cockpit)/net-worth/_components/NetWorthPage.tsx",
+    "app/(cockpit)/life-pnl/_components/LifePnlPage.tsx"
+  ],
+  "tests": {
+    "passing": 0,
+    "failing": 0,
+    "new": 0,
+    "note": "vitest not installed in build container — test execution not possible. Acceptance doc line 22 explicitly flagged this: 'test files exist; no node_modules in container'. Pre-existing condition, not introduced by this chunk."
+  },
+  "migrations_applied": [],
+  "deploy_url": "",
+  "grounding_checkpoint_required": [
+    "Colin visits /net-worth — confirm 'View Annual Review →' link appears in the header below the 'as of {date}' line, and navigates to /annual-review",
+    "Colin visits /life-pnl — confirm '→ Annual Review' link appears in the header alongside the existing '→ Net Worth' cross-link, and navigates to /annual-review"
+  ],
+  "unknowns": [
+    "window-start.mjs refused window claim because branch had pre-existing uncommitted coordinator changes to docs/handoffs/auto-proceed-log.md and docs/sprint-state.md. These files are outside my scope and were not staged or committed. Coordinator should ensure those changes are committed separately.",
+    "Test suite could not be executed: vitest not installed in container. AC7 (tests pass) is unverified in this environment. Tests must be run post-merge on a machine with node_modules installed.",
+    "F24 gap flagged in acceptance doc (migration 0135 missing service_role GRANT) — noted as out-of-scope for this chunk, separate fixup task recommended by coordinator."
+  ],
+  "next_chunk_blockers": [],
+  "tokens_used": 8200,
+  "timestamp": "2026-05-15T00:00:00Z"
+}
