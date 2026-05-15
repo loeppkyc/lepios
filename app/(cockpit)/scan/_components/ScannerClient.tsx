@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { CockpitInput } from '@/components/cockpit/CockpitInput'
-import { BsrSparkline } from '@/components/cockpit/BsrSparkline'
 import type { VelocityBadge } from '@/lib/keepa/product'
 import type { BsrPoint } from '@/lib/keepa/history'
 import type { BookTier } from '@/lib/pallets/tier-classifier'
@@ -167,6 +167,64 @@ export function ScannerClient() {
   const [batchesLoaded, setBatchesLoaded] = useState(false)
   const [savedToBatch, setSavedToBatch] = useState<string | null>(null)
   const [batchAddError, setBatchAddError] = useState<string | null>(null)
+
+  // Phone relay state
+  const [relayActive, setRelayActive] = useState(false)
+  const [relaySession, setRelaySession] = useState<string>('')
+  const [relayLastSince, setRelayLastSince] = useState<string>(new Date().toISOString())
+  const [relayStatus, setRelayStatus] = useState<'idle' | 'scanning' | 'got-isbn'>('idle')
+
+  function generateSessionCode(): string {
+    return Math.random().toString(36).slice(2, 8).toUpperCase()
+  }
+
+  useEffect(() => {
+    if (!relayActive || !relaySession) return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/phone-relay?session=${relaySession}&since=${relayLastSince}`)
+        if (!res.ok) return
+        const data = (await res.json()) as { scans: { isbn: string; scanned_at: string }[] }
+        const scans = data.scans ?? []
+        if (scans.length > 0) {
+          const latest = scans[scans.length - 1]
+          setRelayLastSince(latest.scanned_at)
+          const detectedIsbn = latest.isbn
+          setIsbn(detectedIsbn)
+          setRelayStatus('got-isbn')
+          setError(null)
+          setResult(null)
+          setLoading(true)
+          try {
+            const scanRes = await fetch('/api/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isbn: detectedIsbn.trim(), cost_paid: parseFloat(costPaid) }),
+            })
+            const scanData = await scanRes.json()
+            if (!scanRes.ok) setError(scanData.error ?? 'Scan failed')
+            else {
+              setResult(scanData as ScanResult)
+              setSparkOpen(false)
+              setSparkPoints(null)
+              setSaveState('idle')
+              setRouteState('idle')
+              setListState('idle')
+              setBatchAddState('idle')
+            }
+          } catch {
+            setError('Network error')
+          } finally {
+            setLoading(false)
+            setRelayStatus('scanning')
+          }
+        }
+      } catch {
+        /* silently ignore poll errors */
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [relayActive, relaySession, relayLastSince, costPaid])
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault()
@@ -492,6 +550,65 @@ export function ScannerClient() {
         </div>
       )}
 
+      {/* Phone relay panel */}
+      <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
+        {!relayActive ? (
+          <button
+            type="button"
+            onClick={() => {
+              const code = generateSessionCode()
+              setRelaySession(code)
+              setRelayLastSince(new Date().toISOString())
+              setRelayActive(true)
+              setRelayStatus('scanning')
+            }}
+            className="cursor-pointer rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          >
+            Phone scan
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold tracking-widest text-[var(--color-text-disabled)] uppercase">
+                Session
+              </span>
+              <span className="font-mono text-lg font-bold tracking-wider text-[var(--color-text-primary)]">
+                {relaySession}
+              </span>
+            </div>
+            <div className="text-xs break-all text-[var(--color-text-muted)]">
+              lepios-one.vercel.app/scan/phone?session={relaySession}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    `https://lepios-one.vercel.app/scan/phone?session=${relaySession}`
+                  )
+                }
+                className="cursor-pointer rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+              >
+                Copy URL
+              </button>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {relayStatus === 'got-isbn' ? 'Scanning…' : 'Waiting for scan…'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRelayActive(false)
+                  setRelayStatus('idle')
+                }}
+                className="ml-auto cursor-pointer rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-disabled)] hover:text-[var(--color-critical)]"
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <form onSubmit={handleScan} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <CockpitInput
           label="ISBN"
@@ -652,10 +769,49 @@ export function ScannerClient() {
             </div>
           </div>
 
-          {/* BSR sparkline — on-demand, tap-to-load */}
+          {/* BSR rank history chart — on-demand, tap-to-load */}
           {sparkOpen && sparkPoints && sparkPoints.length > 0 && (
             <div style={{ paddingLeft: 64 }}>
-              <BsrSparkline points={sparkPoints} />
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart
+                  data={sparkPoints.map((p) => ({
+                    date: new Date(p.t).toLocaleDateString('en-CA', {
+                      month: 'short',
+                      day: 'numeric',
+                    }),
+                    rank: p.rank,
+                  }))}
+                  margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
+                >
+                  <Line
+                    type="monotone"
+                    dataKey="rank"
+                    stroke="var(--color-accent-gold)"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: 'var(--color-text-disabled)' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis reversed={true} hide={true} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 4,
+                      fontSize: 12,
+                    }}
+                    formatter={(v) => [`#${Number(v).toLocaleString()}`, 'BSR']}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-0.5 text-xs text-[var(--color-text-disabled)]">
+                BSR history · {sparkPoints.length} data points
+              </div>
             </div>
           )}
 
