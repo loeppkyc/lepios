@@ -16,20 +16,78 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .from('hit_lists')
     .select('id')
     .eq('id', id)
-    .eq('person_handle', 'colin')
+    .eq('person_handle', 'colin') // SPRINT5-GATE
     .single()
 
   if (!list) return NextResponse.json({ error: 'List not found' }, { status: 404 })
 
-  const { data, error } = await supabase
+  // Step 1 — fetch items with all fields needed for enrichment
+  const { data: items, error } = await supabase
     .from('hit_list_items')
-    .select('id, isbn, status, added_at')
+    .select('id, isbn, cost_paid_cad, status, scan_result_id, added_at, scanned_at')
     .eq('hit_list_id', id)
     .order('added_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
 
-  return NextResponse.json(data ?? [])
+  // Step 2 — fetch latest scan_result for items that have one
+  const resultIds = (items ?? [])
+    .filter((i) => i.scan_result_id)
+    .map((i) => i.scan_result_id!)
+
+  const { data: scanResults } =
+    resultIds.length > 0
+      ? await supabase
+          .from('scan_results')
+          .select('id, title, bsr, profit_cad, roi_pct, decision, tier')
+          .in('id', resultIds)
+      : { data: [] }
+
+  // Step 3 — BSR history per scanned ISBN (last 7 readings each)
+  const scannedIsbns = [
+    ...new Set((items ?? []).filter((i) => i.scan_result_id).map((i) => i.isbn)),
+  ]
+
+  const { data: bsrHistory } =
+    scannedIsbns.length > 0
+      ? await supabase
+          .from('scan_results')
+          .select('isbn, bsr, recorded_at')
+          .in('isbn', scannedIsbns)
+          .not('bsr', 'is', null)
+          .order('recorded_at', { ascending: true })
+          .limit(7 * scannedIsbns.length)
+      : { data: [] }
+
+  // Assemble enriched rows
+  const resultMap = new Map((scanResults ?? []).map((r) => [r.id, r]))
+  const historyMap = new Map<string, { bsr: number; recorded_at: string }[]>()
+  for (const h of bsrHistory ?? []) {
+    const arr = historyMap.get(h.isbn) ?? []
+    arr.push({ bsr: h.bsr!, recorded_at: h.recorded_at })
+    historyMap.set(h.isbn, arr)
+  }
+
+  return NextResponse.json(
+    (items ?? []).map((item) => {
+      const sr = item.scan_result_id ? resultMap.get(item.scan_result_id) : null
+      return {
+        id: item.id,
+        isbn: item.isbn,
+        cost_paid_cad: item.cost_paid_cad ? Number(item.cost_paid_cad) : null,
+        status: item.status as 'pending' | 'scanned' | 'skipped',
+        added_at: item.added_at,
+        scanned_at: item.scanned_at ?? null,
+        title: sr?.title ?? null,
+        bsr: sr?.bsr ?? null,
+        profit_cad: sr?.profit_cad ? Number(sr.profit_cad) : null,
+        roi_pct: sr?.roi_pct ? Number(sr.roi_pct) : null,
+        decision: sr?.decision ?? null,
+        tier: sr?.tier ?? null,
+        bsr_history: historyMap.get(item.isbn) ?? [],
+      }
+    })
+  )
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
