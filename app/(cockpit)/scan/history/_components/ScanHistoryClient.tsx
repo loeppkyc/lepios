@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { BarChart, Bar, XAxis, ResponsiveContainer } from 'recharts'
 
 interface ScanRow {
   id: string
@@ -48,11 +49,79 @@ const FILTER_BUTTONS: { label: string; value: Filter }[] = [
   { label: 'SKIP', value: 'skip' },
 ]
 
+// ---------------------------------------------------------------------------
+// KPI helpers — pure functions, no side effects
+// ---------------------------------------------------------------------------
+
+function computeKpis(rows: ScanRow[]) {
+  const total = rows.length
+  const buys = rows.filter((r) => r.decision === 'buy')
+  const buyCount = buys.length
+  const buyRate = total > 0 ? ((buyCount / total) * 100).toFixed(1) + '%' : '—'
+  const avgProfit =
+    buyCount > 0
+      ? '$' + (buys.reduce((s, r) => s + (r.profit_cad ?? 0), 0) / buyCount).toFixed(2)
+      : '—'
+  const totalProfit =
+    buyCount > 0 ? '$' + buys.reduce((s, r) => s + (r.profit_cad ?? 0), 0).toFixed(2) : '—'
+  return { total, buyCount, buyRate, avgProfit, totalProfit, buys }
+}
+
+function buildTrendData(buys: ScanRow[]) {
+  const byDate: Record<string, number> = {}
+  for (const r of buys) {
+    const d = r.recorded_at.slice(0, 10)
+    byDate[d] = (byDate[d] ?? 0) + (r.profit_cad ?? 0)
+  }
+  const sorted = Object.keys(byDate).sort()
+  // Last 30 calendar days that appear in data
+  const last30 = sorted.slice(-30)
+  return last30.map((date) => {
+    const [, mm, dd] = date.split('-')
+    return { date, label: `${mm}/${dd}`, profit: parseFloat(byDate[date].toFixed(2)) }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components (Tailwind only, no style={})
+// ---------------------------------------------------------------------------
+
+interface KpiChipProps {
+  label: string
+  value: string
+  highlight?: boolean
+}
+
+function KpiChip({ label, value, highlight = false }: KpiChipProps) {
+  return (
+    <div className="flex min-w-[100px] flex-col gap-0.5 rounded-md bg-[var(--color-surface-2)] px-4 py-3">
+      <span className="leading-none font-[var(--font-ui)] tracking-widest text-[var(--color-text-disabled)] text-[var(--text-nano)] uppercase">
+        {label}
+      </span>
+      <span
+        className={[
+          'leading-snug font-[var(--font-mono)] font-semibold text-[var(--text-body)] tabular-nums',
+          highlight ? 'text-[var(--color-positive)]' : 'text-[var(--color-text-primary)]',
+        ].join(' ')}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function ScanHistoryClient() {
   const [rows, setRows] = useState<ScanRow[]>([])
   const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const kpis = useMemo(() => computeKpis(rows), [rows])
+  const trendData = useMemo(() => buildTrendData(kpis.buys), [kpis.buys])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -214,6 +283,38 @@ export function ScanHistoryClient() {
           >
             Go to scanner
           </a>
+        </div>
+      )}
+
+      {/* KPI row */}
+      {!loading && !error && rowCount > 0 && (
+        <div className="flex flex-wrap gap-3">
+          <KpiChip label="Total scans" value={String(kpis.total)} />
+          <KpiChip label="BUY" value={String(kpis.buyCount)} highlight />
+          <KpiChip label="Buy rate" value={kpis.buyRate} />
+          <KpiChip label="Avg profit (buys)" value={kpis.avgProfit} highlight />
+          <KpiChip label="Est. total profit" value={kpis.totalProfit} highlight />
+        </div>
+      )}
+
+      {/* Profit trend chart */}
+      {!loading && !error && trendData.length >= 2 && (
+        <div className="h-[120px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={trendData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+              <XAxis
+                dataKey="label"
+                tick={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  fill: 'var(--color-text-disabled)',
+                }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Bar dataKey="profit" fill="var(--color-positive)" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
