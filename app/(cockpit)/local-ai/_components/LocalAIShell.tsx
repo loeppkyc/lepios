@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import type { TokenStatsResponse } from '@/app/api/local-ai/token-stats/route'
 
 type OllamaModel = {
   name: string
@@ -24,6 +25,7 @@ export function LocalAIShell({
 }) {
   const [status, setStatus] = useState<OllamaStatus>(null)
   const [loading, setLoading] = useState(true)
+  const [tokenStats, setTokenStats] = useState<TokenStatsResponse | null>(null)
 
   function checkOllama() {
     setLoading(true)
@@ -47,6 +49,12 @@ export function LocalAIShell({
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    fetch('/api/local-ai/token-stats')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setTokenStats(data as TokenStatsResponse)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -245,6 +253,221 @@ export function LocalAIShell({
               ))}
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Token usage */}
+      <div
+        style={{
+          background: '#14141e',
+          border: '1px solid #2a2a3a',
+          borderRadius: 10,
+          padding: '20px 24px',
+          marginBottom: 20,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            marginBottom: 16,
+          }}
+        >
+          Token Usage
+        </div>
+        {!tokenStats ? (
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: '0.82rem',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            Loading…
+          </div>
+        ) : (
+          <>
+            {/* Period tabs */}
+            {[tokenStats.this_week, tokenStats.this_month, tokenStats.all_time].map((period) => {
+              const total = period.claude_tokens + period.ollama_tokens
+              const ollamaPct = total > 0 ? Math.round((period.ollama_tokens / total) * 100) : 0
+              return (
+                <div key={period.label} style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: '0.72rem',
+                      color: 'var(--color-text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      marginBottom: 8,
+                    }}
+                  >
+                    {period.label}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <div
+                      style={{
+                        background: '#1e1e2e',
+                        borderRadius: 8,
+                        padding: '10px 14px',
+                        minWidth: 130,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '0.7rem',
+                          color: '#6b8cff',
+                          marginBottom: 4,
+                        }}
+                      >
+                        Claude API
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '1rem',
+                          fontWeight: 700,
+                          color: 'var(--color-text-primary)',
+                        }}
+                      >
+                        {period.claude_tokens.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.75rem',
+                          color: 'var(--color-text-muted)',
+                        }}
+                      >
+                        ${period.claude_cost_usd.toFixed(4)}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: '#1e1e2e',
+                        borderRadius: 8,
+                        padding: '10px 14px',
+                        minWidth: 130,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '0.7rem',
+                          color: '#37c85a',
+                          marginBottom: 4,
+                        }}
+                      >
+                        Ollama (local)
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '1rem',
+                          fontWeight: 700,
+                          color: 'var(--color-text-primary)',
+                        }}
+                      >
+                        {period.ollama_tokens.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.75rem',
+                          color: '#37c85a',
+                        }}
+                      >
+                        saved ~${period.ollama_saved_usd.toFixed(4)}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        background: '#1e1e2e',
+                        borderRadius: 8,
+                        padding: '10px 14px',
+                        minWidth: 100,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '0.7rem',
+                          color: 'var(--color-text-muted)',
+                          marginBottom: 4,
+                        }}
+                      >
+                        Ollama %
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '1.2rem',
+                          fontWeight: 700,
+                          color: ollamaPct > 50 ? '#37c85a' : 'var(--color-text-primary)',
+                        }}
+                      >
+                        {ollamaPct}%
+                      </div>
+                      {/* Mini bar */}
+                      <div
+                        style={{ height: 4, borderRadius: 2, background: '#2a2a3a', marginTop: 6 }}
+                      >
+                        <div
+                          style={{
+                            height: 4,
+                            borderRadius: 2,
+                            background: '#37c85a',
+                            width: `${ollamaPct}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {/* By feature */}
+            {tokenStats.by_feature.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '0.72rem',
+                    color: 'var(--color-text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    marginBottom: 8,
+                  }}
+                >
+                  Claude usage by feature (all time)
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {tokenStats.by_feature.slice(0, 6).map((f) => (
+                    <div
+                      key={f.domain}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        background: '#1e1e2e',
+                        borderRadius: 6,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      <span style={{ color: 'var(--color-text-primary)' }}>{f.domain}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>
+                        {f.claude_tokens.toLocaleString()} tokens · ${f.claude_cost_usd.toFixed(4)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

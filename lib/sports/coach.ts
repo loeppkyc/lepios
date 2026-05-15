@@ -3,6 +3,7 @@
 // Keeps claude-sonnet-4-6 for post-game debrief (quality matters)
 
 import Anthropic from '@anthropic-ai/sdk'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -70,6 +71,7 @@ Be direct. No fluff.`
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     })
+    logClaudeTokens(resp, 'sports')
     const text = (resp.content[0] as { type: string; text: string }).text
       .trim()
       .replace(/^```(?:json)?\s*/m, '')
@@ -126,6 +128,7 @@ Format as clean markdown. Be direct. No fluff.`
       max_tokens: 400,
       messages: [{ role: 'user', content: prompt }],
     })
+    logClaudeTokens(resp, 'sports')
     return (resp.content[0] as { type: string; text: string }).text.trim()
   } catch (e) {
     return `Analysis unavailable: ${e}`
@@ -175,6 +178,7 @@ Format as clean markdown. Sharp and direct.`
       max_tokens: 450,
       messages: [{ role: 'user', content: prompt }],
     })
+    logClaudeTokens(resp, 'sports')
     return (resp.content[0] as { type: string; text: string }).text.trim()
   } catch (e) {
     return `Review unavailable: ${e}`

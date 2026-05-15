@@ -15,6 +15,7 @@ import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 import Anthropic from '@anthropic-ai/sdk'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,7 @@ Do NOT include headings, bullet points, or markdown. Write as continuous prose s
     max_tokens: 400,
     messages: [{ role: 'user', content: prompt }],
   })
+  logClaudeTokens(response, 'harness')
 
   return response.content[0].type === 'text' ? response.content[0].text.trim() : ''
 }

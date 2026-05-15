@@ -442,10 +442,13 @@ export async function generate(
 
   const text = data.response ?? ''
   const confidence = extractConfidence(text)
+  const promptTokens = data.prompt_eval_count ?? 0
+  const evalTokens = data.eval_count ?? 0
   const tokens_used =
-    data.prompt_eval_count != null && data.eval_count != null
-      ? data.prompt_eval_count + data.eval_count
-      : null
+    data.prompt_eval_count != null && data.eval_count != null ? promptTokens + evalTokens : null
+  // What this would have cost at Claude Sonnet rates ($3/M input, $15/M output)
+  const claude_equivalent_usd =
+    tokens_used != null ? (promptTokens * 3.0 + evalTokens * 15.0) / 1_000_000 : null
   const durationMs = Date.now() - start
 
   void logEvent('ollama', 'ollama.generate', {
@@ -456,7 +459,12 @@ export async function generate(
     durationMs,
     tokensUsed: tokens_used ?? undefined,
     confidence,
-    meta: { model, task, actor_type: 'ollama_client' },
+    meta: {
+      model,
+      task,
+      actor_type: 'ollama_client',
+      ...(claude_equivalent_usd != null ? { claude_equivalent_usd } : {}),
+    },
   })
 
   return { text, confidence, model, tokens_used }

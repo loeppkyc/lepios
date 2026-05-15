@@ -64,6 +64,7 @@ export async function logEvent(
         error_type: opts.errorType ?? null,
         duration_ms: opts.durationMs ?? null,
         tokens_used: opts.tokensUsed ?? null,
+        cost_usd: opts.costUsd ?? null,
         confidence: opts.confidence ?? null,
         parent_id: opts.parentId ?? null,
         session_id: opts.sessionId ?? null,

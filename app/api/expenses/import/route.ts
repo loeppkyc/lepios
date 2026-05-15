@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { CATEGORIES } from '@/lib/types/expenses'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 // Vercel body limit is 4.5 MB but CSV text is tiny; 50 KB covers ~500 transactions
 const MAX_CSV_CHARS = 50_000
@@ -83,8 +84,11 @@ export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY not configured — expense CSV parsing requires the frontier model. Set the env var or import manually.' },
-      { status: 503 },
+      {
+        error:
+          'ANTHROPIC_API_KEY not configured — expense CSV parsing requires the frontier model. Set the env var or import manually.',
+      },
+      { status: 503 }
     )
   }
   const client = new Anthropic({ apiKey })
@@ -96,6 +100,7 @@ export async function POST(request: Request) {
       max_tokens: 4096,
       messages: [{ role: 'user', content: buildPrompt(account.trim(), csvText) }],
     })
+    logClaudeTokens(msg, 'expenses')
     const block = msg.content[0]
     raw = block.type === 'text' ? block.text : ''
   } catch (e: unknown) {

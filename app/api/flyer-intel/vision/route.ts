@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
         },
       ],
     })
+    logClaudeTokens(response, 'flyer-intel')
     text = response.content[0]?.type === 'text' ? response.content[0].text : ''
   } catch (e) {
     console.error('[flyer-intel/vision] Claude error:', e)

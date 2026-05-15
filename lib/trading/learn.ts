@@ -14,6 +14,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { PredictionWeights } from './types'
 import { DEFAULT_WEIGHTS } from './types'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 const client = new Anthropic()
 
@@ -106,6 +107,7 @@ ${JSON.stringify(currentWeights, null, 2)}`
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
+    logClaudeTokens(response, 'trading')
 
     const content = response.content[0]
     if (content.type !== 'text') {

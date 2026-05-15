@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 export const revalidate = 0
 
@@ -65,6 +66,7 @@ Be specific with dollar amounts. Use CAD.`
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     })
+    logClaudeTokens(msg, 'vehicles')
     const text = msg.content
       .map((c) => (c.type === 'text' ? c.text : ''))
       .join('\n')

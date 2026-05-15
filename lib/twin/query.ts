@@ -10,6 +10,7 @@ import { embed, generate, OllamaUnreachableError } from '@/lib/ollama/client'
 import { createServiceClient } from '@/lib/supabase/service'
 import { isUncertain } from '@/lib/twin/uncertainty'
 import { logEvent } from '@/lib/knowledge/client'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export async function claudeFallback(
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: `Context:\n${contextStr}\n\nQuestion: ${question}` }],
   })
+  logClaudeTokens(msg, 'twin')
 
   const answer = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : ''
   const confidence = isUncertain(answer) ? 0.55 : 0.75

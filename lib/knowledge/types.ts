@@ -21,6 +21,7 @@ export interface LogEventOptions {
   errorType?: string
   durationMs?: number
   tokensUsed?: number
+  costUsd?: number
   confidence?: number
   parentId?: string
   sessionId?: string

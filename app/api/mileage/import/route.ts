@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 const MAX_BYTES = 1024 * 1024 // 1 MB — CSV files are tiny
 
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
         },
       ],
     })
+    logClaudeTokens(msg, 'mileage')
     raw = msg.content[0].type === 'text' ? msg.content[0].text : ''
   } catch (e) {
     return NextResponse.json(

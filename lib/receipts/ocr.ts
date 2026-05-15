@@ -16,13 +16,14 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { DocumentBlockParam } from '@anthropic-ai/sdk/resources/messages/messages'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 // ── TODO: tune with real data — threshold below which regex is deemed unreliable
 const REGEX_CONFIDENCE_THRESHOLD = 0.7 // placeholder constant
 
 export interface OcrResult {
   vendor: string
-  date: string          // YYYY-MM-DD
+  date: string // YYYY-MM-DD
   pre_tax?: number
   tax?: number
   total: number
@@ -75,13 +76,8 @@ const TOTAL_PATTERNS = [
   /amount\s+due[:\s]+\$?([\d,]+\.\d{2})/i,
   /balance\s+due[:\s]+\$?([\d,]+\.\d{2})/i,
 ]
-const GST_PATTERNS = [
-  /(?:gst|hst|tax)[:\s]+\$?([\d,]+\.\d{2})/i,
-]
-const DATE_PATTERNS = [
-  /(\d{4}[-\/]\d{2}[-\/]\d{2})/,
-  /(\d{2}[-\/]\d{2}[-\/]\d{4})/,
-]
+const GST_PATTERNS = [/(?:gst|hst|tax)[:\s]+\$?([\d,]+\.\d{2})/i]
+const DATE_PATTERNS = [/(\d{4}[-\/]\d{2}[-\/]\d{2})/, /(\d{2}[-\/]\d{2}[-\/]\d{4})/]
 
 function tryRegex(text: string): { result: Partial<OcrResult>; confidence: number } {
   const fields: Partial<OcrResult> = { line_items: [] }
@@ -90,11 +86,19 @@ function tryRegex(text: string): { result: Partial<OcrResult>; confidence: numbe
 
   for (const pat of TOTAL_PATTERNS) {
     const m = text.match(pat)
-    if (m) { fields.total = parseFloat(m[1].replace(',', '')); matched++; break }
+    if (m) {
+      fields.total = parseFloat(m[1].replace(',', ''))
+      matched++
+      break
+    }
   }
   for (const pat of GST_PATTERNS) {
     const m = text.match(pat)
-    if (m) { fields.tax = parseFloat(m[1].replace(',', '')); matched++; break }
+    if (m) {
+      fields.tax = parseFloat(m[1].replace(',', ''))
+      matched++
+      break
+    }
   }
   for (const pat of DATE_PATTERNS) {
     const m = text.match(pat)
@@ -113,7 +117,10 @@ function tryRegex(text: string): { result: Partial<OcrResult>; confidence: numbe
   }
   // Vendor: first non-empty line of receipt text
   const firstLine = text.split('\n').find((l) => l.trim().length > 2)
-  if (firstLine) { fields.vendor = firstLine.trim(); matched++ }
+  if (firstLine) {
+    fields.vendor = firstLine.trim()
+    matched++
+  }
 
   return { result: fields, confidence: matched / total }
 }
@@ -157,7 +164,7 @@ async function callClaude(
   client: Anthropic,
   imageBase64: string,
   mimeType: string,
-  model: 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6',
+  model: 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
 ): Promise<RawOcrJson | null> {
   const msg = await client.messages.create({
     model,
@@ -179,6 +186,7 @@ async function callClaude(
       },
     ],
   })
+  logClaudeTokens(msg, 'receipts')
   const block = msg.content[0]
   const raw = block.type === 'text' ? block.text : ''
   return parseOcrJson(raw)
@@ -187,7 +195,7 @@ async function callClaude(
 async function callClaudePdf(
   client: Anthropic,
   pdfBase64: string,
-  model: 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6',
+  model: 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
 ): Promise<RawOcrJson | null> {
   const docBlock: DocumentBlockParam = {
     type: 'document',
@@ -207,6 +215,7 @@ async function callClaudePdf(
       },
     ],
   })
+  logClaudeTokens(msg, 'receipts')
   const block = msg.content[0]
   const raw = block.type === 'text' ? block.text : ''
   return parseOcrJson(raw)
@@ -283,7 +292,12 @@ export async function ocrReceipt(buffer: Buffer, mimeType: string): Promise<OcrR
   }
 
   // Regex confidence < threshold — use Claude Vision haiku
-  const haikusResult = await callClaude(client, imageBase64, resizedMime, 'claude-haiku-4-5-20251001')
+  const haikusResult = await callClaude(
+    client,
+    imageBase64,
+    resizedMime,
+    'claude-haiku-4-5-20251001'
+  )
   if (haikusResult) {
     const normalized = normalizeRaw(haikusResult, 'haiku')
     if (normalized) return normalized

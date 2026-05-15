@@ -3,6 +3,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { SportsPick } from '@/lib/sports/picks'
+import { logClaudeTokens } from '@/lib/ai/log-tokens'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -42,6 +43,7 @@ Expected output format:
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     })
+    logClaudeTokens(resp, 'sports')
     const raw = (resp.content[0] as { type: string; text: string }).text
       .trim()
       .replace(/^```(?:json)?\s*/m, '')
