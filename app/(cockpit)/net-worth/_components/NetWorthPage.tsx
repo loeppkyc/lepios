@@ -2,6 +2,13 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import type {
   BalanceSheetEntryLite,
   CategoryTotal,
@@ -23,6 +30,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   prepaid: 'Prepaid Expenses',
   inventory: 'Inventory',
   equipment: 'Equipment & Vehicles',
+  vehicle: 'Vehicles (Auto)',
   receivable: 'Receivables',
   personal_bank: 'Personal Banking',
   personal_investment: 'Personal Investments',
@@ -128,6 +136,13 @@ function KpiBlock({ label, value, color }: { label: string; value: string; color
   )
 }
 
+// shadcn/ui ChartConfig for the 3-series AreaChart (F20: Tailwind + CSS vars only)
+const trendChartConfig = {
+  total_assets: { label: 'Assets', color: 'var(--color-pillar-money)' },
+  total_liabilities: { label: 'Liabilities', color: 'hsl(var(--destructive))' },
+  net_worth: { label: 'Net Worth', color: 'hsl(var(--primary))' },
+} satisfies ChartConfig
+
 export function NetWorthPage() {
   const [data, setData] = useState<NetWorthResponse | null>(null)
   const [history, setHistory] = useState<NetWorthSnapshot[]>([])
@@ -212,86 +227,13 @@ export function NetWorthPage() {
     return acc
   }, {})
 
-  // Trend chart bounds
-  const chartW = 720
-  const chartH = 220
-  const padL = 60
-  const padR = 16
-  const padT = 12
-  const padB = 28
-  const innerW = chartW - padL - padR
-  const innerH = chartH - padT - padB
-
-  let chartSvg: React.ReactNode = null
-  if (history.length >= 2) {
-    const allValues = history.flatMap((s) => [s.total_assets, s.total_liabilities, s.net_worth])
-    const minV = Math.min(...allValues, 0)
-    const maxV = Math.max(...allValues)
-    const yRange = maxV - minV || 1
-    const xStep = innerW / Math.max(history.length - 1, 1)
-    const xy = (i: number, v: number) => ({
-      x: padL + i * xStep,
-      y: padT + innerH - ((v - minV) / yRange) * innerH,
-    })
-    const lineFor = (key: 'total_assets' | 'total_liabilities' | 'net_worth') =>
-      history
-        .map((s, i) => {
-          const p = xy(i, s[key])
-          return `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
-        })
-        .join(' ')
-
-    chartSvg = (
-      <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
-        {/* y=0 reference */}
-        <line
-          x1={padL}
-          x2={chartW - padR}
-          y1={padT + innerH - ((0 - minV) / yRange) * innerH}
-          y2={padT + innerH - ((0 - minV) / yRange) * innerH}
-          stroke="var(--color-border)"
-          strokeDasharray="2 4"
-        />
-        <path
-          d={lineFor('total_assets')}
-          fill="none"
-          stroke="var(--color-accent-gold)"
-          strokeWidth={2}
-        />
-        <path d={lineFor('total_liabilities')} fill="none" stroke="#e5534b" strokeWidth={2} />
-        <path
-          d={lineFor('net_worth')}
-          fill="none"
-          stroke="var(--color-pillar-health)"
-          strokeWidth={2.5}
-        />
-        {history.map((s, i) => {
-          const p = xy(i, s.net_worth)
-          return <circle key={s.id} cx={p.x} cy={p.y} r={3} fill="var(--color-pillar-health)" />
-        })}
-        {/* x-axis labels (first/last) */}
-        <text
-          x={padL}
-          y={chartH - 8}
-          fill="var(--color-text-disabled)"
-          fontFamily="var(--font-ui)"
-          fontSize="10"
-        >
-          {history[0].snapshot_date}
-        </text>
-        <text
-          x={chartW - padR}
-          y={chartH - 8}
-          fill="var(--color-text-disabled)"
-          fontFamily="var(--font-ui)"
-          fontSize="10"
-          textAnchor="end"
-        >
-          {history[history.length - 1].snapshot_date}
-        </text>
-      </svg>
-    )
-  }
+  // Staleness banner: days since latest snapshot
+  const snapshotAgeDays =
+    data?.latestSnapshot
+      ? Math.floor(
+          (Date.now() - new Date(data.latestSnapshot.snapshot_date).getTime()) / 86_400_000
+        )
+      : null
 
   return (
     <div
@@ -335,7 +277,7 @@ export function NetWorthPage() {
               margin: '6px 0 0',
             }}
           >
-            How much money and value you have right now. Assets − Liabilities, point in time.
+            How much money and value you have right now. Assets - Liabilities, point in time.
           </p>
           {data?.asOfDate && (
             <p
@@ -383,7 +325,7 @@ export function NetWorthPage() {
               opacity: savingSnap ? 0.6 : 1,
             }}
           >
-            {savingSnap ? 'Saving…' : 'Save Snapshot'}
+            {savingSnap ? 'Saving...' : 'Save Snapshot'}
           </button>
         </div>
       </div>
@@ -409,7 +351,7 @@ export function NetWorthPage() {
             color: 'var(--color-text-disabled)',
           }}
         >
-          Loading…
+          Loading...
         </div>
       )}
       {error && (
@@ -422,6 +364,13 @@ export function NetWorthPage() {
 
       {data && !loading && (
         <>
+          {/* Staleness banner - visible when latest snapshot is >1 day old (F20: Tailwind only) */}
+          {snapshotAgeDays !== null && snapshotAgeDays > 1 && (
+            <div className="mb-4 rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+              Snapshot {snapshotAgeDays}d old - save a fresh one to update the trend.
+            </div>
+          )}
+
           {/* Big KPI banner */}
           <div
             style={{
@@ -539,14 +488,14 @@ export function NetWorthPage() {
               <tbody>
                 {filteredCats.map((cat) => {
                   const key = `${cat.account_type}:${cat.category}`
-                  const rows = grouped[key] ?? []
-                  if (rows.length === 0) return null
+                  const catRows = grouped[key] ?? []
+                  if (catRows.length === 0) return null
                   return (
                     <RowGroup
                       key={key}
                       label={CATEGORY_LABELS[cat.category] ?? cat.category}
                       isLiability={cat.account_type === 'liability'}
-                      rows={rows}
+                      rows={catRows}
                       total={cat.total}
                       onSave={saveRow}
                     />
@@ -556,7 +505,7 @@ export function NetWorthPage() {
             </table>
           </div>
 
-          {/* Trend chart */}
+          {/* Trend chart - shadcn/ui AreaChart (F20: no style={}, Tailwind only for new JSX) */}
           <div
             style={{
               background: 'var(--color-surface)',
@@ -589,37 +538,87 @@ export function NetWorthPage() {
                 }}
               >
                 Save snapshots monthly to see your trend over time.
-                {history.length === 1 && ' (1 snapshot saved — 1 more and the chart appears.)'}
+                {history.length === 1 && ' (1 snapshot saved - 1 more and the chart appears.)'}
               </div>
             ) : (
               <>
-                {chartSvg}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 18,
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: 'var(--text-nano)',
-                    color: 'var(--color-text-muted)',
-                    marginTop: 8,
-                    flexWrap: 'wrap',
-                  }}
-                >
+                <ChartContainer config={trendChartConfig} className="h-56 w-full">
+                  <AreaChart data={history} margin={{ top: 4, right: 0, left: -8, bottom: 0 }}>
+                    <CartesianGrid
+                      vertical={false}
+                      stroke="var(--color-border)"
+                      strokeOpacity={0.5}
+                    />
+                    <XAxis
+                      dataKey="snapshot_date"
+                      tickLine={false}
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                      tick={{
+                        fontSize: 10,
+                        fill: 'var(--color-text-disabled)',
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={56}
+                      tickFormatter={(v: number) =>
+                        v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`
+                      }
+                      tick={{
+                        fontSize: 10,
+                        fill: 'var(--color-text-disabled)',
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Area
+                      type="monotone"
+                      dataKey="total_assets"
+                      stroke="var(--color-total_assets)"
+                      fill="var(--color-total_assets)"
+                      fillOpacity={0.15}
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total_liabilities"
+                      stroke="var(--color-total_liabilities)"
+                      fill="var(--color-total_liabilities)"
+                      fillOpacity={0.15}
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="net_worth"
+                      stroke="var(--color-net_worth)"
+                      fill="var(--color-net_worth)"
+                      fillOpacity={0.15}
+                      strokeWidth={2.5}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+                <div className="mt-2 flex flex-wrap gap-4 font-[family-name:var(--font-ui)] text-[length:var(--text-nano)] text-[var(--color-text-muted)]">
                   <span>
-                    <LegendDot color="var(--color-accent-gold)" /> Assets
+                    <span className="mr-1 inline-block size-2 rounded-full bg-[var(--color-pillar-money)]" />
+                    Assets
                   </span>
                   <span>
-                    <LegendDot color="#e5534b" /> Liabilities
+                    <span className="mr-1 inline-block size-2 rounded-full bg-[hsl(var(--destructive))]" />
+                    Liabilities
                   </span>
                   <span>
-                    <LegendDot color="var(--color-pillar-health)" /> Net Worth
+                    <span className="mr-1 inline-block size-2 rounded-full bg-[hsl(var(--primary))]" />
+                    Net Worth
                   </span>
                 </div>
               </>
             )}
           </div>
 
-          {/* Manual Assets — non-API wealth items (vehicles, real estate, etc.) */}
+          {/* Manual Assets - non-API wealth items (vehicles, real estate, etc.) */}
           <ManualAssetsSection />
 
           {/* Footer note */}
@@ -631,7 +630,7 @@ export function NetWorthPage() {
               lineHeight: 1.6,
             }}
           >
-            Equity rows (Retained Earnings, Owner&apos;s Draw, Net Income YTD, etc.) are excluded —
+            Equity rows (Retained Earnings, Owner&apos;s Draw, Net Income YTD, etc.) are excluded -
             they&apos;re accounting balances, not wealth. Edit any line on the{' '}
             <Link
               href="/balance-sheet"
@@ -644,22 +643,6 @@ export function NetWorthPage() {
         </>
       )}
     </div>
-  )
-}
-
-function LegendDot({ color }: { color: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: color,
-        marginRight: 4,
-        verticalAlign: 'middle',
-      }}
-    />
   )
 }
 
@@ -873,7 +856,7 @@ function EditableRow({
                 cursor: saving ? 'wait' : 'pointer',
               }}
             >
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving...' : 'Save'}
             </button>
             {err && (
               <span
@@ -885,7 +868,7 @@ function EditableRow({
                 }}
                 title={err}
               >
-                ⚠
+                !
               </span>
             )}
           </span>

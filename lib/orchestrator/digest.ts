@@ -30,6 +30,7 @@ import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
 import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
 import { buildOssAuditDigestLine } from '@/lib/oss-radar/digest'
+import { buildNetWorthDigestLine } from '@/lib/net-worth/digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -339,6 +340,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F18: OSS audit — step 3 verdict distribution across streamlit_modules ──
   const ossAuditLine = await buildOssAuditDigestLine()
   messageToSend = `${messageToSend}\n${ossAuditLine}`
+
+  // ── F18: Net Worth — latest snapshot + delta vs prior ─────────────────────
+  const netWorthLine = await buildNetWorthDigestLine()
+  messageToSend = `${messageToSend}\n${netWorthLine}`
 
   characterCount = messageToSend.length
 

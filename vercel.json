@@ -71,6 +71,10 @@
     {
       "path": "/api/cron/cleanup-orphan-convs",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/net-worth/snapshot",
+      "schedule": "0 7 * * *"
     }
   ]
 }

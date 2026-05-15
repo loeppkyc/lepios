@@ -139,6 +139,26 @@ function setupTables(state: SuiteState) {
         },
       }
     }
+    // vehicles: return empty array by default (no auto-pull injection in tests)
+    if (table === 'vehicles') {
+      const emptyResult = Promise.resolve({ data: [], error: null })
+      return {
+        select: () => ({
+          not: () => emptyResult,
+        }),
+      }
+    }
+    // inventory_snapshots: return empty array by default
+    if (table === 'inventory_snapshots') {
+      const emptyResult = Promise.resolve({ data: [], error: null })
+      return {
+        select: () => ({
+          order: () => ({
+            limit: () => emptyResult,
+          }),
+        }),
+      }
+    }
     throw new Error(`unmocked table: ${table}`)
   })
   return state
