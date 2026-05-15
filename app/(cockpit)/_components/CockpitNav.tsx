@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 
 const NAV_LINKS = [
   { href: '/scan', label: 'Scan' },
+  { href: '/scan/history', label: 'History' },
+  { href: '/batches', label: 'Batches' },
+  { href: '/scan/settings', label: 'Settings' },
   { href: '/hit-lists', label: 'Lists' },
   { href: '/inventory', label: 'Inventory' },
   { href: '/autonomous', label: 'Autonomous' },
