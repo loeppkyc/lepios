@@ -1,0 +1,16 @@
+{
+  "chunk_id": "auto-approve-twin-confidence",
+  "acceptance_doc_path": "docs/sprint-5/auto-approve-twin-confidence-acceptance.md",
+  "files_changed": [".claude/agents/coordinator.md"],
+  "tests": { "passing": 0, "failing": 0, "new": 0 },
+  "migrations_applied": [],
+  "deploy_url": "none — no code change",
+  "grounding_checkpoint_required": [
+    "After Colin confirms this session closes normally, run a coordinator session on a qualifying acceptance doc (all twin Q&A confidence >= 0.80, pending_colin_qs empty). Then verify: SELECT meta->>'confidence_source', meta->>'outcome', occurred_at FROM agent_events WHERE action = 'auto_proceed_path_c' ORDER BY occurred_at DESC LIMIT 1; — expect confidence_source='twin_q&a_all_>=_0.80', outcome='auto-proceeded'.",
+    "Also check docs/handoffs/auto-proceed-log.md for an entry with confidence_source: twin_q&a_all_≥_0.80."
+  ],
+  "unknowns": [],
+  "next_chunk_blockers": [],
+  "tokens_used": 1500,
+  "timestamp": "2026-05-15T15:00:00Z"
+}
