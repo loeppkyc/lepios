@@ -37,10 +37,10 @@ import { fileURLToPath } from 'node:url'
 export const BUDGETS = [
   {
     key: 'vercel.crons',
-    max: 18,
+    max: 40,
     file: 'vercel.json',
     evaluator: 'countVercelCrons',
-    note: 'Hobby plan ceiling. Sub-hourly cadence enforced separately by check-vercel-cron-count.mjs.',
+    note: 'Pro plan ceiling (confirmed 21 crons accepted 2026-05-15, Sprint 7). Sub-hourly cadence enforced separately by check-vercel-cron-count.mjs.',
   },
   {
     key: 'package.deps_total',

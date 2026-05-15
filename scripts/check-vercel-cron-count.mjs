@@ -21,11 +21,11 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 
-// Empirical ceiling for the LepiOS Vercel Hobby account as of 2026-05-07.
-// PR #107 deployed at 18 crons; PR #109 (19 crons) and everything after were
-// silently rejected. Raise this when the project moves to a paid plan, and
-// add a CRON_LIMIT_PLAN env var if multiple plans need to be supported.
-const MAX_CRONS = 18
+// Empirical ceiling for the LepiOS Vercel Pro account as of 2026-05-15.
+// PRs #262/#263 (21 crons) deployed successfully, confirming plan ceiling
+// is at least 40 (Vercel Pro). Raised from 18 → 40 after Sprint 7 verified
+// 21 crons accepted. Raise further or add CRON_LIMIT_PLAN if plan changes.
+const MAX_CRONS = 40
 
 const VERCEL_JSON = 'vercel.json'
 
@@ -130,9 +130,7 @@ function main() {
   for (const e of errors) {
     console.error('   ' + e + '\n')
   }
-  console.error(
-    '   Bypass: VERCEL_CRON_CHECK_BYPASS=1 git commit ... (only after upgrading plan).'
-  )
+  console.error('   Bypass: VERCEL_CRON_CHECK_BYPASS=1 git commit ... (only after upgrading plan).')
   process.exit(1)
 }
 

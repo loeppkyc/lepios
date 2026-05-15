@@ -18,7 +18,7 @@ A central registry (`harness_resource_budgets` table, seeded by migration 0159) 
 
 | Key                  | Max | Source         | Category | How counted                                   | Status                                       |
 | -------------------- | --- | -------------- | -------- | --------------------------------------------- | -------------------------------------------- |
-| `vercel.crons`       | 18  | `vercel.json`  | platform | length of `crons` array                       | Pre-commit gate ✅                           |
+| `vercel.crons`       | 40  | `vercel.json`  | platform | length of `crons` array                       | Pre-commit gate ✅                           |
 | `package.deps_total` | 300 | `package.json` | code     | `dependencies` + `devDependencies` key counts | Pre-commit gate ✅                           |
 | `vercel.env_vars`    | 100 | Vercel API     | platform | (sync job — not yet shipped)                  | Registered in DB, refreshed by future job ⏳ |
 

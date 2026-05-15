@@ -15,9 +15,7 @@ import { scoreInstrument } from '@/lib/trading/score'
 import { ALL_INSTRUMENTS, DEFAULT_WEIGHTS } from '@/lib/trading/types'
 import type { PredictionWeights, ScoreResult } from '@/lib/trading/types'
 import type { OHLCVBar } from '@/lib/trading/score'
-import YahooFinance from 'yahoo-finance2'
-
-const yahooFinance = new YahooFinance()
+import yahooFinance from 'yahoo-finance2'
 
 export async function POST(request: Request) {
   // auth: see lib/auth/cron-secret.ts
@@ -52,11 +50,20 @@ export async function POST(request: Request) {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - 70) // 70 days to ensure 60 trading days
 
-      const history = await yahooFinance.historical(instrument.ticker, {
+      type YFBar = {
+        date: Date
+        open: number
+        high: number
+        low: number
+        close: number
+        adjClose?: number
+        volume?: number
+      }
+      const history = (await yahooFinance.historical(instrument.ticker, {
         period1: startDate.toISOString().slice(0, 10),
         period2: endDate.toISOString().slice(0, 10),
-        interval: '1d',
-      })
+        interval: '1d' as const,
+      })) as unknown as YFBar[]
 
       if (!history || history.length < 10) {
         errors.push(`${instrument.ticker}: insufficient history (${history?.length ?? 0} bars)`)
