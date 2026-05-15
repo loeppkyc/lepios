@@ -348,6 +348,21 @@ export function NetWorthPage() {
               as of {data.asOfDate}
             </p>
           )}
+          <p
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-disabled)',
+              margin: '4px 0 0',
+            }}
+          >
+            <Link
+              href="/annual-review"
+              style={{ color: 'var(--color-accent-gold)', textDecoration: 'underline' }}
+            >
+              View Annual Review →
+            </Link>
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Link
