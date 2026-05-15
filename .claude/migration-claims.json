@@ -359,13 +359,13 @@
       "filename": "0205_scanner_settings.sql",
       "claimed_at": "2026-05-15",
       "note": "Scanner settings — per-user BUY/SKIP thresholds (min_profit_cad, min_roi_pct, max_bsr). Moves hardcoded constants from lib/profit/calculator.ts to DB. Single row keyed by person_handle='colin'; SPRINT5-GATE to profiles FK."
+    },
+    "0206": {
+      "branch": "harness/task-e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c",
+      "filename": "0206_module_ceiling_metrics.sql",
+      "claimed_at": "2026-05-15",
+      "note": "F18 Ceiling Metric Layer — module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
     }
-  },
-  "0206": {
-    "branch": "harness/task-e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c",
-    "filename": "0206_module_ceiling_metrics.sql",
-    "claimed_at": "2026-05-15",
-    "note": "F18 Ceiling Metric Layer — module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
   },
   "next_available": 207
 }
