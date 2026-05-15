@@ -1,7 +1,28 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
+/**
+ * StatsTab — trading statistics panel.
+ *
+ * Originally built in Chunk A (equity curve, mood/ticker/grade charts, streaks).
+ * Chunk C additions: Calibration chart (§9) + Bankroll Health section (§9).
+ *
+ * F20: No style={} — Tailwind only. All charts use shadcn/ui ChartContainer.
+ */
+
+import { useMemo, useEffect, useState } from 'react'
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Scatter,
+  ScatterChart,
+  XAxis,
+  YAxis,
+  ReferenceLine,
+} from 'recharts'
 import {
   ChartContainer,
   ChartTooltip,
@@ -9,10 +30,15 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import type { TradeRow } from '@/lib/trading/types'
+import type { CalibrationBucket } from '@/lib/trading/calibration'
+import { CALIBRATION_MIN_TOTAL_BETS } from '@/lib/trading/calibration'
+import type { BankrollSummary } from '@/lib/trading/bankroll'
 
 interface StatsTabProps {
   trades: TradeRow[]
 }
+
+// ── Chart configs ─────────────────────────────────────────────────────────────
 
 const equityChartConfig = {
   paper: { label: 'Paper P&L', color: 'var(--color-pillar-money)' },
@@ -26,6 +52,249 @@ const moodChartConfig = {
 const tickerChartConfig = {
   win_rate: { label: 'Win %', color: 'var(--color-pillar-money)' },
 } satisfies ChartConfig
+
+const calibrationChartConfig = {
+  actual: { label: 'Actual Win %', color: 'var(--color-pillar-money)' },
+} satisfies ChartConfig
+
+const bankrollChartConfig = {
+  bankroll: { label: 'Bankroll', color: 'var(--color-pillar-money)' },
+  high_water_mark: { label: 'High-Water Mark', color: 'var(--color-pillar-wealth)' },
+} satisfies ChartConfig
+
+// ── Calibration chart (Chunk C) ───────────────────────────────────────────────
+
+function CalibrationSection() {
+  const [buckets, setBuckets] = useState<CalibrationBucket[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [totalBets, setTotalBets] = useState(0)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/trading/calibration').then((r) => r.json()) as Promise<CalibrationBucket[]>,
+      // Get total bet count with win_prob_pct for unlock threshold
+      fetch('/api/trading/calibration?from=2000-01-01').then((r) => r.json()),
+    ])
+      .then(([data]) => {
+        // data is CalibrationBucket[] — count all bets via summing counts
+        const total = (data as CalibrationBucket[]).reduce((s, b) => s + b.count, 0)
+        setTotalBets(total)
+        setBuckets(data as CalibrationBucket[])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+      <span className="label-caps text-[var(--color-text-secondary)]">
+        Win Probability Calibration
+      </span>
+      <p className="mt-1 text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+        Are your estimates accurate? Dots above the line = you&apos;re underconfident.
+      </p>
+
+      {loading && (
+        <p className="mt-4 text-[length:var(--text-small)] text-[var(--color-text-disabled)]">
+          Loading…
+        </p>
+      )}
+
+      {!loading && (!buckets || totalBets < CALIBRATION_MIN_TOTAL_BETS) && (
+        <p className="mt-4 text-[length:var(--text-small)] text-[var(--color-text-disabled)]">
+          Log {CALIBRATION_MIN_TOTAL_BETS}+ bets with win probability estimates to unlock
+        </p>
+      )}
+
+      {!loading && buckets && totalBets >= CALIBRATION_MIN_TOTAL_BETS && (
+        <ChartContainer config={calibrationChartConfig} className="mt-4 h-48 w-full">
+          <ScatterChart margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+            <CartesianGrid stroke="var(--color-border)" strokeOpacity={0.4} />
+            <XAxis
+              type="number"
+              dataKey="predicted"
+              domain={[40, 100]}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 9, fill: 'var(--color-text-disabled)' }}
+              label={{
+                value: 'Estimated %',
+                position: 'insideBottom',
+                offset: -2,
+                fontSize: 9,
+                fill: 'var(--color-text-disabled)',
+              }}
+            />
+            <YAxis
+              type="number"
+              dataKey="actual"
+              domain={[0, 100]}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 9, fill: 'var(--color-text-disabled)' }}
+              tickFormatter={(v: number) => `${v}%`}
+            />
+            {/* Perfect calibration reference line (y = x) */}
+            <ReferenceLine
+              segment={[
+                { x: 40, y: 40 },
+                { x: 100, y: 100 },
+              ]}
+              stroke="var(--color-text-disabled)"
+              strokeDasharray="4 4"
+              strokeOpacity={0.5}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) =>
+                    name === 'actual' ? [`${value}%`, 'Actual'] : [`${value}%`, 'Predicted']
+                  }
+                />
+              }
+            />
+            <Scatter data={buckets} fill="var(--color-pillar-money)" fillOpacity={0.8} />
+          </ScatterChart>
+        </ChartContainer>
+      )}
+    </div>
+  )
+}
+
+// ── Bankroll health section (Chunk C) ─────────────────────────────────────────
+
+function BankrollSection() {
+  const [summary, setSummary] = useState<BankrollSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/trading/bankroll')
+      .then((r) => r.json() as Promise<BankrollSummary>)
+      .then((d) => {
+        setSummary(d)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+        <span className="label-caps text-[var(--color-text-secondary)]">Bankroll Health</span>
+        <p className="mt-2 text-[length:var(--text-small)] text-[var(--color-text-disabled)]">
+          Loading…
+        </p>
+      </div>
+    )
+  }
+
+  if (!summary || summary.history.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+        <span className="label-caps text-[var(--color-text-secondary)]">Bankroll Health</span>
+        <p className="mt-2 text-[length:var(--text-small)] text-[var(--color-text-disabled)]">
+          Log bets with bankroll readings to unlock health tracking.
+        </p>
+      </div>
+    )
+  }
+
+  const drawdownColor =
+    summary.current_drawdown_pct < -10
+      ? 'text-red-400'
+      : summary.current_drawdown_pct < 0
+        ? 'text-yellow-400'
+        : 'text-green-400'
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+      <span className="label-caps text-[var(--color-text-secondary)]">Bankroll Health</span>
+
+      {/* Stat tiles */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <div>
+          <p className="text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+            Current
+          </p>
+          <p className="font-mono text-base font-semibold text-[var(--color-text-primary)]">
+            ${summary.current.toFixed(2)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+            High-Water Mark
+          </p>
+          <p className="font-mono text-base font-semibold text-[var(--color-pillar-wealth)]">
+            ${summary.high_water_mark.toFixed(2)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+            Drawdown
+          </p>
+          <p className={`font-mono text-base font-semibold ${drawdownColor}`}>
+            {summary.current_drawdown_pct > 0 ? '+' : ''}
+            {summary.current_drawdown_pct}%
+          </p>
+        </div>
+      </div>
+
+      {/* Bankroll area chart */}
+      <ChartContainer config={bankrollChartConfig} className="mt-4 h-40 w-full">
+        <AreaChart data={summary.history} margin={{ top: 4, right: 0, left: -10, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.4} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 9, fill: 'var(--color-text-disabled)' }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 9, fill: 'var(--color-text-disabled)' }}
+            tickFormatter={(v: number) => `$${v}`}
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Area
+            type="monotone"
+            dataKey="bankroll"
+            stroke="var(--color-pillar-money)"
+            fill="var(--color-pillar-money)"
+            fillOpacity={0.1}
+            strokeWidth={1.5}
+          />
+          <Area
+            type="monotone"
+            dataKey="high_water_mark"
+            stroke="var(--color-pillar-wealth)"
+            fill="none"
+            strokeDasharray="4 4"
+            strokeWidth={1}
+            strokeOpacity={0.6}
+          />
+        </AreaChart>
+      </ChartContainer>
+
+      {/* Kelly recommendation */}
+      {summary.kelly_stake > 0 && (
+        <p className="mt-3 text-[length:var(--text-small)] text-[var(--color-text-secondary)]">
+          At ${summary.current.toFixed(2)} bankroll, quarter Kelly suggests{' '}
+          <span className="font-mono font-semibold text-[var(--color-pillar-money)]">
+            ${summary.kelly_stake.toFixed(2)}
+          </span>{' '}
+          max stake
+          <span className="ml-1 text-[length:var(--text-nano)] text-[var(--color-text-disabled)]">
+            (estimates use placeholder odds — TODO: tune with real data)
+          </span>
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export function StatsTab({ trades }: StatsTabProps) {
   const settledTrades = trades.filter((t) => t.dollar_pnl != null)
@@ -325,6 +594,14 @@ export function StatsTab({ trades }: StatsTabProps) {
           </table>
         </div>
       )}
+
+      {/* ── Chunk C additions ──────────────────────────────────────────────────── */}
+
+      {/* Calibration chart */}
+      <CalibrationSection />
+
+      {/* Bankroll health */}
+      <BankrollSection />
     </div>
   )
 }
