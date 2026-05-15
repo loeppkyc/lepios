@@ -1,3 +1,22 @@
+2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
+cited_principles: [META-C, escalation]
+trigger_match_evidence: |
+  Situation: Wire existing Money pillar P&L gauge and PillBars to live amazon_settlements
+  and business_expenses data. No schema, no destructive ops, 1 file change.
+  Would normally cache-match (additive code, reversible, no domain semantics).
+  BUT: twin unreachable (host not in allowlist), AND 3 open design questions require
+  Colin's judgment: (1) gauge % definition — domain semantic; (2) PillBar max value —
+  UX tunable; (3) trend sparkline scope — scope decision.
+  Cannot cache-match with open design semantic question + unreachable twin.
+reversibility_check: |
+  All decisions reversible: code change in 1 file, no migration, no DB writes.
+  Gauge formula change: reversible via edit. PillBar max: reversible via edit.
+  Sparkline add: reversible via remove. Cost: trivial grep/edit.
+confidence: medium — open design questions lower confidence below cache-match threshold
+outcome: escalated (twin unreachable + domain semantic question)
+
+---
+
 2026-05-10T03:22:00Z sprint=chore task=782a885e doc=docs/sprint-5/known-event-domains-acceptance.md
 cited_principles: [META-C, reversibility]
 trigger_match_evidence: |
