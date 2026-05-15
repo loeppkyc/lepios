@@ -4,6 +4,7 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 
 ---
 
+2026-05-15T12:12:00Z coordinator sprint=sprint-5 chunk=ingest-health-notes phase=0-2 tokens_in=~18000 tokens_out=~4000 escalated=true auto_proceeded=false
 2026-05-10T04:20:00Z coordinator sprint=T003 chunk=T003-study phase=1a tokens_in=~18000 tokens_out=~6000 escalated=true auto_proceeded=false
   reason: 4 open design questions (receipt_lines table shape, reconciliation target, camera OCR completeness, extraction method)
   twin_blocked: true (sandbox cannot reach lepios-one.vercel.app)
