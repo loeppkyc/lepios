@@ -1,0 +1,66 @@
+{
+  "chunk_id": "sprint-7-chunk-A",
+  "task_id": "f5dd1517-c0d7-42fb-be69-27b4d42e0d7e",
+  "acceptance_doc_path": "docs/sprint-7/chunk-A-trading-journal-ai-engine-acceptance.md",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/263",
+  "pr_number": 263,
+  "branch": "harness/task-f5dd1517-trading-journal-ai-engine",
+  "commits": [
+    "ae64023 — lib/trading: types, scoring engine, Claude learn module",
+    "3ab4eea — trades + predictions CRUD routes",
+    "25e6374 — AI score/learn routes + cron wrapper",
+    "79aebf9 — /trading cockpit: 4-tab Journal + AI Engine + Stats + Backtest stub",
+    "94563b9 — deps: yahoo-finance2 + technicalindicators [seam-approved]"
+  ],
+  "files_changed": [
+    "lib/trading/types.ts",
+    "lib/trading/score.ts",
+    "lib/trading/learn.ts",
+    "app/api/trades/route.ts",
+    "app/api/trades/[id]/route.ts",
+    "app/api/predictions/route.ts",
+    "app/api/predictions/[id]/route.ts",
+    "app/api/trading/score/route.ts",
+    "app/api/trading/learn/route.ts",
+    "app/api/cron/trading-score/route.ts",
+    "app/(cockpit)/trading/page.tsx",
+    "app/(cockpit)/trading/_components/TradingPage.tsx",
+    "app/(cockpit)/trading/_components/TradeForm.tsx",
+    "app/(cockpit)/trading/_components/AIEngineTab.tsx",
+    "app/(cockpit)/trading/_components/StatsTab.tsx",
+    "tests/trading/score.test.ts",
+    "tests/trading/trades-api.test.ts",
+    "supabase/migrations/0142_trading_journal.sql",
+    "package.json",
+    "package-lock.json"
+  ],
+  "files_NOT_changed_from_acceptance_doc": [
+    "vercel.json — BLOCKED: Vercel Hobby plan at 18/18 cron limit (resource budget enforcement). See unknowns."
+  ],
+  "tests": {
+    "passing": 45,
+    "failing": 0,
+    "new": 45,
+    "suite": "tests/trading/ (score.test.ts + trades-api.test.ts)",
+    "pre_existing_failing": 141,
+    "pre_existing_note": "141 failures in 17 test files existed before this chunk — none introduced by this work"
+  },
+  "migrations_applied": ["supabase/migrations/0142_trading_journal.sql"],
+  "deploy_url": "https://github.com/loeppkyc/lepios/pull/263",
+  "grounding_checkpoint_required": [
+    "Navigate to /trading on staging deploy — confirm page loads, 4 tabs render, Journal tab shows empty state 'No trades yet'",
+    "Log a paper ES=F trade: entry 4800, stop 4780, target 4860 (long). Settle it at 4820. Verify: dollar_pnl = $100, r_multiple = 1.0, stopped_out = false",
+    "POST /api/trading/score with cron secret — confirm predictions appear in AI Engine tab for at least 1 instrument, grade A/B+/B/C badge visible",
+    "Stats tab: log 3+ trades with different moods, settle them. Confirm equity curve and win-rate charts render without JS errors"
+  ],
+  "unknowns": [
+    "vercel.json cron blocked: Hobby plan at 18/18 cron ceiling (resource budget enforcement by check-vercel-cron-count.mjs). The /api/cron/trading-score route exists and is manually callable. Options: (a) remove one existing cron to make room, (b) accept manual-only invocation, (c) upgrade Vercel plan. Colin must decide before the scoring cron can be automated.",
+    "yahoo-finance2 v3 API live test not performed — all acceptance doc external deps were listed as 'live-test pending coordinator'. If Yahoo Finance rate-limits or changes their API, the score route will return 0 instruments scored. The route handles this gracefully (logs to agent_events, returns partial results)."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0142 must be confirmed applied in production Supabase before any live trading data is written. Migration includes trades, predictions, trust_state, prediction_weights tables.",
+    "If the next chunk depends on scored predictions existing, the cron (or a manual POST /api/trading/score) must run first."
+  ],
+  "tokens_used": 95000,
+  "timestamp": "2026-05-15T14:25:00Z"
+}
