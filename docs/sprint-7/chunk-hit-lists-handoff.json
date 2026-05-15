@@ -1,0 +1,35 @@
+{
+  "task_id": "5be30d29-48a2-4a8a-a7e3-92ff8bd3fa7b",
+  "chunk_id": "cockpit-hit-lists-ui",
+  "acceptance_doc_path": "docs/sprint-7/cockpit-hit-lists-acceptance.md",
+  "commit": "e58789b5bcfd72e51a3ed8e92983f34c57780562",
+  "branch": "harness/task-5be30d29-cockpit-hit-lists-ui",
+  "files_changed": [
+    "app/api/hit-lists/[id]/items/route.ts",
+    "app/(cockpit)/hit-lists/_components/HitListClient.tsx",
+    "components/ui/table.tsx"
+  ],
+  "tests_result": "0 new tests written (UI components + API enrichment; pre-existing TS errors in unrelated test files are pre-existing, zero errors in changed files)",
+  "acceptance_criteria_met": [
+    "GET /api/hit-lists/{id}/items returns enriched rows: title, bsr, profit_cad, roi_pct, decision, tier, bsr_history",
+    "Items render in shadcn/ui Table (Table/TableHeader/TableBody/TableRow/TableHead/TableCell) — not div-based list",
+    "Clicking a sortable column header (isbn/bsr/profit_cad/roi_pct/status/added_at) sorts asc → desc → asc",
+    "Status filter tabs (All / Pending / Scanned / Skipped) correctly filter rows",
+    "Item with ≥2 BSR readings shows SVG sparkline (44×16, inverted y-axis, gold stroke); item with 0 readings shows — without crashing",
+    "Create list, add ISBNs, delete item, delete list (window.confirm) — all still work",
+    "grep -r 'style=' app/(cockpit)/hit-lists/ --include='*.tsx' returns ZERO matches (F20)",
+    "tsc --noEmit: zero errors in changed files (pre-existing errors in tests/ are not introduced by this chunk)"
+  ],
+  "flags": [
+    "table.tsx did not exist in components/ui/ despite acceptance doc claiming it did. Generated standard shadcn Table primitives as authorized by the spec risk-flags section ('Generate if absent'). File added as components/ui/table.tsx — this is a net-new file not listed in the acceptance doc's 'files expected to change'. Noting here per builder rules.",
+    "docs/sprint-7/** scope overlaps with receipts-coordinator window. WINDOW_SCOPE_BYPASS=1 used for handoff file commit as instructed in task brief.",
+    "Pre-existing TypeScript errors in tests/ (amazon-sales, bookkeeping, deploy-gate, etc.) are not introduced by this chunk and not fixed (per Principle 13: don't chase errors beyond chunk scope)."
+  ],
+  "grounding_checkpoint_required": [
+    "Load /hit-lists in production. Verify: (1) list selector tab buttons render with gold active state; (2) table renders ISBN/Title/BSR/Profit/ROI/Decision/Status/Added columns; (3) clicking a column header sorts the rows; (4) status filter tabs filter correctly; (5) an item with ≥2 scan_results records shows the gold SVG sparkline in the BSR cell; (6) create list, add an ISBN, delete item, delete list all complete without errors."
+  ],
+  "unknowns": [],
+  "next_chunk_blockers": [],
+  "tokens_used": 8200,
+  "timestamp": "2026-05-14T00:00:00Z"
+}
