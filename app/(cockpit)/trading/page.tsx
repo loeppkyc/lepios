@@ -2,9 +2,7 @@
 // module_metric: trades WHERE person_handle='colin' AND created_at > now()-7d
 import dynamic from 'next/dynamic'
 
-const TradingPage = dynamic(() => import('./_components/TradingPage').then((m) => m.TradingPage), {
-  ssr: false,
-})
+const TradingPage = dynamic(() => import('./_components/TradingPage').then((m) => m.TradingPage))
 
 export const metadata = { title: 'Trading Journal — LepiOS' }
 
