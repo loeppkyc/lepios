@@ -327,7 +327,7 @@ last_updated_at: "2026-05-09T03:40:00Z"
 cockpit_hit_lists_ui:
   task_id: "5be30d29-48a2-4a8a-a7e3-92ff8bd3fa7b"
   branch: "harness/task-5be30d29-cockpit-hit-lists-ui"
-  status: "in-build"
+  status: "awaiting_grounding"
   description: "Hit Lists UI — F20-clean rewrite of HitListClient.tsx + enrich GET items API with scan_results join + BSR sparklines"
   acceptance_doc: "docs/sprint-7/cockpit-hit-lists-acceptance.md"
   acceptance_doc_committed_at: "aa4236c"
@@ -337,4 +337,10 @@ cockpit_hit_lists_ui:
   phase1c_improvements: ["shadcn Table", "BSR sparklines", "sort/filter", "F20 full rewrite", "scan_results surfaced to UI"]
   acceptance_doc_written_at: "2026-05-14"
   delegated_to_builder_at: "2026-05-14"
+  builder_complete_at: "2026-05-14"
+  builder_commit: "e58789b"
+  handoff_doc: "docs/sprint-7/chunk-hit-lists-handoff.json"
+  f20_style_matches: 0
+  flags: ["table.tsx_generated_not_preexisting", "preexisting_ts_errors_in_tests_not_introduced"]
+  grounding_checkpoint: "Load /hit-lists — verify sortable table, status filter tabs, BSR sparkline, all CRUD"
   last_updated_at: "2026-05-14"
