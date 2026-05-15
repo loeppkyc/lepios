@@ -8,6 +8,7 @@ import type {
   NetWorthResponse,
   NetWorthSnapshot,
 } from '@/app/api/net-worth/route'
+import { ManualAssetsSection } from './ManualAssetsSection'
 
 interface SaveRowInput {
   id: string
@@ -617,6 +618,9 @@ export function NetWorthPage() {
               </>
             )}
           </div>
+
+          {/* Manual Assets — non-API wealth items (vehicles, real estate, etc.) */}
+          <ManualAssetsSection />
 
           {/* Footer note */}
           <div

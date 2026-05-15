@@ -36,13 +36,14 @@ interface SnapshotRow {
   created_at: string
 }
 
-const { mockFrom, mockGetUser, insertCapture } = vi.hoisted(() => ({
+const { mockFrom, mockGetUser, insertCapture, mockServiceFrom } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
   mockGetUser: vi.fn(
     (): Promise<{ data: { user: { id: string } | null } }> =>
       Promise.resolve({ data: { user: { id: 'user-1' } } })
   ),
   insertCapture: { row: null as Record<string, unknown> | null },
+  mockServiceFrom: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -54,8 +55,12 @@ vi.mock('@/lib/supabase/server', () => ({
   ),
 }))
 
+vi.mock('@/lib/supabase/service', () => ({
+  createServiceClient: vi.fn(() => ({ from: mockServiceFrom })),
+}))
+
 import { GET as getNetWorth } from '@/app/api/net-worth/route'
-import { POST as postSnapshot } from '@/app/api/net-worth/snapshot/route'
+import { GET as getCronSnapshot, POST as postSnapshot } from '@/app/api/net-worth/snapshot/route'
 import { GET as getHistory } from '@/app/api/net-worth/history/route'
 
 beforeEach(() => {
@@ -309,6 +314,150 @@ describe('POST /api/net-worth/snapshot', () => {
     )
     expect(res.status).toBe(200)
     expect((insertCapture.row as Record<string, unknown>).notes).toBeNull()
+  })
+})
+
+// ── GET /api/net-worth/snapshot (cron-secret, idempotent) ───────────────────
+
+const CRON_SECRET = 'test-cron-secret-net-worth'
+
+function makeCronRequest() {
+  return new Request('http://localhost/api/net-worth/snapshot', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${CRON_SECRET}` },
+  })
+}
+
+interface CronSuiteState {
+  todaySnap?: SnapshotRow | null
+  entries?: Array<{ account_type: string; category: string; balance: number }>
+  insertResult?: SnapshotRow
+}
+
+function setupCronTables(state: CronSuiteState) {
+  mockServiceFrom.mockImplementation((table: string) => {
+    if (table === 'net_worth_snapshots') {
+      const maybeSingleResult = Promise.resolve({
+        data: state.todaySnap ?? null,
+        error: null,
+      })
+      const insertResult = Promise.resolve({
+        data: state.insertResult ?? null,
+        error: null,
+      })
+      return {
+        select: () => ({
+          eq: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: () => maybeSingleResult,
+              }),
+            }),
+          }),
+        }),
+        insert: (row: Record<string, unknown>) => {
+          insertCapture.row = row
+          return {
+            select: () => ({
+              single: () => insertResult,
+            }),
+          }
+        },
+      }
+    }
+    if (table === 'balance_sheet_entries') {
+      const entries = state.entries ?? []
+      return {
+        select: () => ({
+          in: () => Promise.resolve({ data: entries, error: null }),
+        }),
+      }
+    }
+    throw new Error(`unmocked service table: ${table}`)
+  })
+}
+
+describe('GET /api/net-worth/snapshot — auth', () => {
+  beforeEach(() => {
+    process.env.CRON_SECRET = CRON_SECRET
+    mockServiceFrom.mockReset()
+    insertCapture.row = null
+  })
+
+  it('returns 401 when Bearer secret is wrong', async () => {
+    const req = new Request('http://localhost/api/net-worth/snapshot', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer wrong-secret' },
+    })
+    const res = await getCronSnapshot(req)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 500 when CRON_SECRET env var is missing', async () => {
+    delete process.env.CRON_SECRET
+    const res = await getCronSnapshot(makeCronRequest())
+    expect(res.status).toBe(500)
+  })
+})
+
+describe('GET /api/net-worth/snapshot — idempotency', () => {
+  beforeEach(() => {
+    process.env.CRON_SECRET = CRON_SECRET
+    mockServiceFrom.mockReset()
+    insertCapture.row = null
+  })
+
+  it('returns existing snapshot without inserting when one exists today', async () => {
+    const existingSnap: SnapshotRow = {
+      id: 'existing-snap-today',
+      snapshot_date: new Date().toISOString().slice(0, 10),
+      total_assets: 50000,
+      total_liabilities: 10000,
+      net_worth: 40000,
+      breakdown: null,
+      notes: null,
+      created_at: new Date().toISOString(),
+    }
+    setupCronTables({ todaySnap: existingSnap })
+
+    const res = await getCronSnapshot(makeCronRequest())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.created).toBe(false)
+    expect(body.snapshot.id).toBe('existing-snap-today')
+    expect(insertCapture.row).toBeNull()
+  })
+
+  it('inserts a new snapshot when none exists for today', async () => {
+    const newSnap: SnapshotRow = {
+      id: 'new-snap-today',
+      snapshot_date: new Date().toISOString().slice(0, 10),
+      total_assets: 60000,
+      total_liabilities: 5000,
+      net_worth: 55000,
+      breakdown: null,
+      notes: null,
+      created_at: new Date().toISOString(),
+    }
+    setupCronTables({
+      todaySnap: null,
+      entries: [
+        { account_type: 'asset', category: 'bank', balance: 60000 },
+        { account_type: 'liability', category: 'loan', balance: 5000 },
+      ],
+      insertResult: newSnap,
+    })
+
+    const res = await getCronSnapshot(makeCronRequest())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.created).toBe(true)
+    expect(body.snapshot.id).toBe('new-snap-today')
+    expect(insertCapture.row).toBeTruthy()
+    const row = insertCapture.row as Record<string, unknown>
+    expect(row.total_assets).toBe(60000)
+    expect(row.total_liabilities).toBe(5000)
+    expect(row.net_worth).toBe(55000)
   })
 })
 

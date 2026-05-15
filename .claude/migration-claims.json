@@ -347,7 +347,19 @@
       "filename": "0203_parse_financial_events.sql",
       "claimed_at": "2026-05-11",
       "note": "Backfill gross_contribution/fees_contribution/refunds_contribution on amazon_financial_events from raw_json. Unlocks April 2026 revenue breakdown. Applied to prod via Supabase MCP as 0200_parse_financial_events (renumbered due to collision)."
+    },
+    "0204": {
+      "branch": "harness/task-da9bba88-h4-h5-coordinator-docs",
+      "filename": "0204_coordinator_traceability_trigger.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Task dbbb1a53 — DB trigger: stamp commit_sha on task completion + budget increment + work_budget_sessions status constraint add 'expired'."
+    },
+    "0205": {
+      "branch": "harness/task-ca9f3e22-net-worth",
+      "filename": "0205_manual_assets.sql",
+      "claimed_at": "2026-05-14",
+      "note": "Task ca9f3e22 T-005 — manual_assets table (vehicles, real estate equity, non-API wealth items). Companion to GET /api/net-worth/manual-assets and ManualAssetsSection UI."
     }
   },
-  "next_available": 204
+  "next_available": 206
 }
