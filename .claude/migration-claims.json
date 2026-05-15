@@ -365,13 +365,19 @@
       "filename": "0206_module_ceiling_metrics.sql",
       "claimed_at": "2026-05-15",
       "note": "F18 Ceiling Metric Layer — module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
-    }
-,
+    },
+    "0208": {
+      "branch": "harness/coordinator-trading-sprint7",
+      "filename": "0208_trading_sessions.sql",
+      "claimed_at": "2026-05-15",
+      "note": "Trading sessions daily journal — trading_sessions table with session_date/ticker/outcome/net_pnl/trades_json. Applied to prod via Supabase MCP in trading-sprint7 session. File restored to repo for tracking (was untracked when session closed)."
+    },
     "0209": {
       "branch": "feat/focus-page",
       "filename": "0209_focus.sql",
       "claimed_at": "2026-05-15",
       "note": "Focus system -- open_loops, time_blocks, focus_sessions tables. Pomodoro timer, Zeigarnik brain-dump, time blocking. Applied to prod via Supabase MCP."
-    }  },
+    }
+  },
   "next_available": 210
 }
