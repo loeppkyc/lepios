@@ -1,0 +1,54 @@
+{
+  "chunk_id": "chunk-B-1fb9151e",
+  "acceptance_doc_path": "docs/sprint-7/chunk-B-sports-intel-elo-acceptance.md",
+  "files_changed": [
+    "app/(cockpit)/sports-intel/_components/SportsIntelPage.tsx",
+    "app/(cockpit)/sports-intel/page.tsx",
+    "app/api/cron/elo-rebuild/route.ts",
+    "app/api/cron/sports-results/route.ts",
+    "app/api/sports/debrief/route.ts",
+    "app/api/sports/elo/route.ts",
+    "app/api/sports/gate/route.ts",
+    "lib/sports/debrief.ts",
+    "lib/sports/elo.ts",
+    "supabase/migrations/0206_elo_ratings.sql",
+    "tests/sports/debrief.test.ts",
+    "tests/sports/elo.test.ts"
+  ],
+  "tests": {
+    "passing": 3660,
+    "failing": 141,
+    "new": 35,
+    "notes": "35 new tests all passing (23 elo + 12 debrief). 141 pre-existing failures unrelated to this chunk (api-auth-coverage on non-sports routes, search-path-coverage, harness/orchestrator tests). No regressions introduced by this chunk."
+  },
+  "migrations_applied": [],
+  "migration_status": "PENDING — supabase/migrations/0206_elo_ratings.sql written but not applied. Supabase MCP not available in this execution context. Colin must apply manually via Supabase dashboard SQL editor for project xpanlbcjueimeofgsara.",
+  "commit_status": "STAGED, NOT COMMITTED — pre-commit hook calls git fetch -q origin which times out (intermittent GitHub network in this agent environment). set -e causes hook abort. All 12 files are git-staged and ready. Colin must run: cd lepios-task-1fb9151e && git commit. All checks will pass: TypeScript clean on new files, 35/35 new tests, no style={} in TSX, requireCronSecret on both cron routes, migration 0206 claimed in migration-claims.json.",
+  "deploy_url": null,
+  "grounding_checkpoint_required": [
+    "AC-1: SELECT column_name FROM information_schema.columns WHERE table_name='elo_ratings' — verify elo_ratings table exists with correct columns after migration 0206 is applied",
+    "AC-2: POST /api/cron/elo-rebuild with Bearer CRON_SECRET — verify response has games_processed > 0 and SELECT count(*) FROM elo_ratings WHERE sport='nhl' > 0",
+    "AC-3: GET /api/sports/elo — verify first team in response has highest elo value",
+    "AC-4: Navigate /sports-intel — verify Today's Games tab shows NHL game cards with ELO: chips inline",
+    "AC-5: Settlement smoke test — insert a mock sports_pick with game_id matching a completed Odds API score, run cron, verify pnl updated correctly",
+    "AC-6: After settlement runs: SELECT ai_debrief FROM sports_picks WHERE winner IS NOT NULL LIMIT 1 — verify non-null JSON",
+    "AC-7: Navigate /sports-intel → Gate Status tab — verify 2 gate cards visible (sports + trading)",
+    "AC-8: grep requireCronSecret app/api/cron/sports-results/route.ts — passes (verified locally)",
+    "AC-9: grep requireCronSecret app/api/cron/elo-rebuild/route.ts — passes (verified locally)",
+    "AC-10: After running both crons: SELECT action FROM agent_events WHERE domain='sports' ORDER BY created_at DESC LIMIT 2 — should show nightly_settlement and elo_rebuild",
+    "AC-11: grep -r 'style={' app/(cockpit)/sports-intel/ — passes, 0 results (verified locally)",
+    "AC-12: vercel.json 2 new cron entries — BLOCKED, see unknowns"
+  ],
+  "unknowns": [
+    "vercel.json cron additions (AC-12) BLOCKED: vercel.json scope is owned by harness/task-f5dd1517-trading-journal-ai-engine window. The two entries {path:/api/cron/sports-results, schedule:0 6 * * *} and {path:/api/cron/elo-rebuild, schedule:0 7 * * *} cannot be added while that window is active. Coordinator must coordinate: (a) have the trading-journal window add them with [seam-approved], or (b) add them after trading-journal window closes. Current vercel.json has 18 crons; adding 2 = 20, well within Hobby limit of 40.",
+    "Migration 0206 not applied: Supabase MCP (mcp__claude_ai_Supabase__apply_migration) was unavailable. CLI requires SUPABASE_ACCESS_TOKEN. Migration file is correct and lint-checked. Needs manual apply via Supabase SQL editor.",
+    "Commit not made: pre-commit hook calls git fetch -q origin with set -e, timing out (intermittent GitHub network in this agent env). All 12 files are staged. Colin commits from local terminal in lepios-task-1fb9151e/.",
+    "Migration number: acceptance doc header says 0205, task briefing says 0206. scripts/next-migration-number.mjs returned 0205 (claimed by another window). I claimed 0206 correctly per task briefing. No conflict since 0205 and 0206 create different tables."
+  ],
+  "next_chunk_blockers": [
+    "vercel.json cron entries must be added (coordinator to coordinate with trading-journal window) before sports-results and elo-rebuild crons run in production",
+    "Migration 0206 must be applied to Supabase before any sports Elo or AI debrief functionality works in production"
+  ],
+  "tokens_used": 95000,
+  "timestamp": "2026-05-15T07:00:00Z"
+}
