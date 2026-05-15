@@ -3,8 +3,9 @@
 **task_id:** a3de7bed-2bce-4832-a1a1-28b87f104d62  
 **chunk:** f18-ceiling  
 **sprint:** 5  
-**status:** awaiting-colin-approval  
+**status:** APPROVED — Colin approved 2026-05-10T03:04:49Z via Telegram (action=approve). All coordinator recommendations accepted.  
 **prepared:** 2026-05-10  
+**approved:** 2026-05-15  
 **study doc:** docs/sprint-5/f18-ceiling-study.md
 
 ---
@@ -222,23 +223,13 @@ META-C condition (b) fails: confidence cannot be `high` with 3 unresolved design
 
 ---
 
-## Open questions (require Colin response before builder can proceed)
+## Design decisions — resolved (Colin approved 2026-05-10)
 
-**Q1 — Dashboard location:**  
-Coordinator proposes `/harness/ceiling` (new route under `app/(cockpit)/harness/ceiling/`).  
-Alternatives: section on existing `/metrics` page (if it exists) or appended to harness scoring dashboard.  
-→ **Colin: confirm route location**
+Colin approved via Telegram (correlation_id=a3de7bed, action=approve). All coordinator recommendations accepted:
 
-**Q2 — harness_resource_budgets link:**  
-New `module_ceiling_metrics` table is a separate concept (performance ceilings vs. count limits). Should the two be cross-linked in the dashboard (e.g., "resource limits" and "performance ceilings" as two sections on one page)?  
-→ **Colin: separate pages or combined?**
-
-**Q3 — twin current_value:**  
-Twin answer rate `current_value` is NULL in seed data because the coordinator sandbox can't reach the twin endpoint. Should builder:  
-(a) Leave NULL until measurement is wired (v1 behavior), or  
-(b) Wire a live query from `agent_events` WHERE action IN ('twin.answer', 'twin.escalate') and auto-compute current_value on page load?  
-Coordinator recommends (a) for tight scope — add live measurement in a follow-up chunk.  
-→ **Colin: option (a) or (b)?**
+- **Q1 — Dashboard location:** `/harness/ceiling` new route ✅
+- **Q2 — harness_resource_budgets:** separate pages ✅ (new table, no cross-link in v1)
+- **Q3 — twin current_value:** NULL in v1 (option a) ✅ — live measurement deferred to follow-up chunk
 
 ---
 

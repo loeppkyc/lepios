@@ -1,4 +1,24 @@
 # ============================================================
+# F18 Ceiling Metric Layer (task a3de7bed) — coordinator run 2026-05-15
+# ============================================================
+
+f18_ceiling_metric_layer:
+  task_id: "a3de7bed-2bce-4832-a1a1-28b87f104d62"
+  run_id: "e755942b-91bf-47e8-a217-4c0f5c4d0545"
+  status: "in-build"
+  study_doc: "docs/sprint-5/f18-ceiling-study.md"
+  acceptance_doc: "docs/sprint-5/f18-ceiling-acceptance.md"
+  phase: "phase-3-builder-delegated"
+  colin_approved_at: "2026-05-10T03:04:49Z"
+  builder_delegated_at: "2026-05-15T14:15:00Z"
+  migration_planned: "0171_module_ceiling_metrics"
+  grounding_checkpoints:
+    - "SELECT module, current_value, ceiling_value, ceiling_cause_category FROM module_ceiling_metrics ORDER BY created_at — expect 3 rows (vercel-cron, ollama-embed, twin)"
+    - "Navigate to /harness/ceiling — 3 rows with traffic-light color coding"
+    - "Confirm twin row shows NULL current_value gracefully"
+  last_updated_at: "2026-05-15T14:15:00Z"
+
+# ============================================================
 
 # harness-e2e — throwaway plumbing test (parallel track)
 
