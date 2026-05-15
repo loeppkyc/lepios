@@ -343,3 +343,29 @@ blocking_questions: ["Q1: Phase 1a skip vs supplementary context", "Q2: Explicit
 coordinator_task_id: "574ed32c-29bf-4058-abc5-1b3375f2bb58"
 acceptance_doc_ready_at: "2026-05-15T14:00:00Z"
 last_updated_at: "2026-05-15T14:00:00Z"
+
+f18_ceiling_chunk:
+  chunk_id: "f18-ceiling"
+  coordinator_task_id: "a3de7bed-2bce-4832-a1a1-28b87f104d62"
+  builder_task_id: "e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c"
+  status: "complete"
+  grounding_result: "pass"
+  merged_at: "2026-05-15T20:25:00Z"
+  acceptance_doc: "docs/sprint-5/f18-ceiling-acceptance.md"
+  study_doc: "docs/sprint-5/f18-ceiling-study.md"
+  colin_approved_at: "2026-05-10T03:04:49Z"
+  delegated_to_builder_at: "2026-05-15T14:35:00Z"
+  build_complete_at: "2026-05-15T14:50:00Z"
+  migration: "0206_module_ceiling_metrics"
+  migration_applied_to_prod: true
+  pr: "269"
+  pr_url: "https://github.com/loeppkyc/lepios/pull/269"
+  files_created:
+    - "supabase/migrations/0206_module_ceiling_metrics.sql"
+    - "app/api/metrics/ceiling/route.ts"
+    - "app/(cockpit)/harness/ceiling/page.tsx"
+    - "app/(cockpit)/harness/ceiling/_components/CeilingTable.tsx"
+  grounding_checkpoints:
+    - "SELECT module, metric_name, current_value, benchmark_value, ceiling_value, ceiling_cause_category FROM module_ceiling_metrics ORDER BY created_at — expect 3 rows: vercel-cron/money/24/24/24, ollama-embed/hardware/10/50/15, twin/time/NULL/50/75"
+    - "Navigate to /harness/ceiling after deploy — confirm 3 rows render, traffic-light badge colors correct (red=hardware, yellow=money, green=time), twin NULL shows as — without crash"
+  last_updated_at: "2026-05-15T20:25:00Z"
