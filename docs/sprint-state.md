@@ -1,4 +1,22 @@
 # ============================================================
+# retail-scout-arbitrage — task 3a13fc07
+# ============================================================
+
+retail_scout_arbitrage:
+  task_id: "3a13fc07-2db6-4d0e-a245-4397a5c0978c"
+  status: "awaiting-grounding"
+  phase: "1a-complete"
+  study_doc: "docs/sprint-retail-scout/phase1a-streamlit-study.md"
+  finding: "system-inventory claims 0% but ~72% already ported — escalation required"
+  escalation_reason: "Pivot signal: task premise incorrect. Arb Engine is the key missing piece. Colin must decide scope."
+  pending_questions:
+    - "Q1: Update system-inventory retail-scout-arbitrage to ~72%?"
+    - "Q2: Re-scope task to Arb Engine only (XL effort)?"
+    - "Q3: Sequence with T-004 (PageProfit) since both need SP-API?"
+  opened_at: "2026-05-15T00:00:00Z"
+  last_updated_at: "2026-05-15T00:00:00Z"
+
+# ============================================================
 
 # harness-e2e — throwaway plumbing test (parallel track)
 
