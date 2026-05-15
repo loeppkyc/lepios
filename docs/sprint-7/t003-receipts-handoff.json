@@ -1,0 +1,81 @@
+{
+  "chunk_id": "T-003",
+  "task_queue_id": "91adca3c-06a5-4b69-8d9e-dd4e51b2a224",
+  "acceptance_doc_path": "docs/sprint-7/t003-receipts-acceptance.md",
+  "branch": "harness/task-91adca3c-receipts-coordinator",
+  "files_changed": [
+    "lib/receipts/types.ts",
+    "lib/receipts/ocr.ts",
+    "lib/receipts/match.ts",
+    "app/api/receipts/gmail-scan/route.ts",
+    "app/api/receipts/upload/route.ts",
+    "app/api/receipts/match/route.ts",
+    "app/api/receipts/confirm/route.ts",
+    "app/api/receipts/lines/route.ts",
+    "app/(cockpit)/receipts/page.tsx",
+    "app/(cockpit)/receipts/_components/ReceiptsPageV2.tsx",
+    "app/(cockpit)/receipts/_components/UploadZone.tsx",
+    "app/(cockpit)/receipts/_components/ReceiptRow.tsx",
+    "app/(cockpit)/receipts/_components/ReviewQueue.tsx",
+    "app/(cockpit)/receipts/_components/ReconcilePanel.tsx",
+    "tests/receipts/match.test.ts",
+    "tests/receipts/ocr.test.ts",
+    "tests/receipts/routes.test.ts",
+    "supabase/migrations/0204_receipt_lines.sql",
+    ".claude/migration-claims.json"
+  ],
+  "commits": [
+    "8dd65a3 feat(receipts): OCR pipeline + match engine (T-003, 91adca3c)",
+    "4451ee7 feat(receipts): gmail-scan, upload, match, confirm, lines API routes (T-003, 91adca3c)",
+    "54279f3 feat(receipts): /receipts cockpit page — 4-tab UI with upload, review, reconcile (T-003, 91adca3c)",
+    "35b14fb test(receipts): migration + OCR + route + match tests (T-003, 91adca3c)",
+    "248eccf feat(receipts): add receipt_lines + receipt_matches migration (T-003, 91adca3c) [seam-approved]"
+  ],
+  "tests": {
+    "passing": 38,
+    "failing": 0,
+    "new": 38,
+    "files": [
+      "tests/receipts/match.test.ts (14 tests — tiered tolerance, date window, auto-confirm, sort order)",
+      "tests/receipts/ocr.test.ts (7 tests — haiku default, sonnet fallback, OcrResult shape, API key guard)",
+      "tests/receipts/routes.test.ts (17 tests — F22 gmail-scan auth, F20 no style={}, F24 GRANT block, requireUser on 4 routes)"
+    ]
+  },
+  "migrations_applied": [
+    "supabase/migrations/0204_receipt_lines.sql — receipt_lines + receipt_matches tables"
+  ],
+  "migration_apply_status": "FILE COMMITTED TO BRANCH — NOT YET APPLIED TO SUPABASE PRODUCTION. Supabase MCP tool was not available in this environment. Migration must be applied by coordinator via: Supabase Dashboard → SQL Editor, or MCP apply_migration tool in a session that has it. SQL is in supabase/migrations/0204_receipt_lines.sql.",
+  "deploy_url": "pending — branch pushed to origin, PR and deploy not triggered by builder. Coordinator to open PR.",
+  "ac_coverage": {
+    "AC-1": "PASS — receipt_lines table created with all required columns (receipt_date, vendor, pre_tax, tax, total, category, line_items, source, source_email_id UNIQUE, ocr_model, reconciled)",
+    "AC-2": "PASS — receipt_matches table created with receipt_id FK, transaction_id TEXT, match_confidence numeric(5,4), auto_confirmed, confirmed_at, confirmed_by",
+    "AC-3": "PASS — /api/receipts/gmail-scan/route.ts uses requireCronSecret as FIRST auth call (F22). Gmail creds read from harness_config (S-L1 pattern). Cannot add to vercel.json (at 18-cron limit) — documented in EmailImportTab UI.",
+    "AC-4": "PASS — tests/receipts/routes.test.ts AC-4 block: requireCronSecret imported from lib/auth/cron-secret.ts, verified as first call in POST handler",
+    "AC-5": "PASS — grep check test passes",
+    "AC-6": "PASS — claude-haiku-4-5-20251001 used as primary OCR model, sonnet as fallback",
+    "AC-7": "PASS — match engine: tiered tolerance (≤$50 flat ±$3, $50-$500 ±10%, >$500 ±5%), date window ±10 days, vendor word-overlap. Auto-confirm ≥0.92. Hard gates on both amount+date.",
+    "AC-8": "PASS — /api/receipts/match (GET candidates), /api/receipts/confirm (POST confirm), /api/receipts/lines (GET 90-day window) — all use requireUser",
+    "AC-9": "PASS — ReceiptsPageV2.tsx: 4-tab layout (All Receipts, Review Queue, Reconcile, Email Import), SummaryStrip with total/GST/matched counts",
+    "AC-10": "PASS — ReceiptsPageV2 imports UploadZone, ReviewQueue, ReconcilePanel components",
+    "AC-11": "PASS — zero style={} in all 6 checked TSX files (F20 compliant)",
+    "AC-12": "PASS — migration includes GRANT INSERT, UPDATE, DELETE on receipt_lines TO service_role and on receipt_matches TO service_role",
+    "AC-13": "PASS — pre_tax/tax labelled as 'Pre-Tax' and 'GST/Tax', total as 'Total', reconciled as icon with status label"
+  },
+  "grounding_checkpoint_required": [
+    "Upload a real receipt image via /receipts → Upload tab. Verify OCR extraction returns correct vendor, date, and total within $0.01 of the printed amount.",
+    "Trigger gmail-scan manually via POST /api/receipts/gmail-scan with the CRON_SECRET header. Verify it reads Gmail creds from harness_config and does not error on missing bank_transactions table.",
+    "Navigate to /receipts cockpit page in production. Verify all 4 tabs render without JavaScript errors. Verify SummaryStrip shows correct counts after uploading a test receipt.",
+    "Verify migration 0204 has been applied to Supabase production (coordinator must apply it before grounding). Check: SELECT table_name FROM information_schema.tables WHERE table_name IN ('receipt_lines','receipt_matches');"
+  ],
+  "unknowns": [
+    "Migration 0204 not applied to Supabase production — Supabase MCP tool unavailable in this builder session. Coordinator must apply before grounding checkpoint 4 above.",
+    "Gmail cron cannot be added to vercel.json (already at 18-cron Vercel Hobby limit). Coordinator must decide: (a) remove an existing cron to make room, (b) promote to paid plan, or (c) leave Gmail scan as manual-trigger only. EmailImportTab UI has a 'Scan Now' button that calls the route manually.",
+    "bank_transactions table does not exist. receipt_matches.transaction_id stored as TEXT. When bank_transactions migration lands, coordinator should add the FK constraint documented in the migration comments.",
+    "tests/architecture/api-auth-coverage.test.ts was already failing before this task (pre-existing: many routes use createServiceClient + requireUser but the test's heuristic only looks for auth.getUser() or requireCronSecret). My 5 new routes add to the detected violations but did not introduce the failure. Coordinator should track this as a separate debt item."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0204 must be applied to Supabase production before any route that writes to receipt_lines or receipt_matches will work."
+  ],
+  "tokens_used": 48000,
+  "timestamp": "2026-05-15T03:20:00.000Z"
+}
