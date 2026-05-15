@@ -347,7 +347,13 @@
       "filename": "0203_parse_financial_events.sql",
       "claimed_at": "2026-05-11",
       "note": "Backfill gross_contribution/fees_contribution/refunds_contribution on amazon_financial_events from raw_json. Unlocks April 2026 revenue breakdown. Applied to prod via Supabase MCP as 0200_parse_financial_events (renumbered due to collision)."
+    },
+    "0204": {
+      "branch": "harness/task-91adca3c-receipts-coordinator",
+      "filename": "0204_receipt_lines.sql",
+      "claimed_at": "2026-05-14",
+      "note": "T-003 — receipt_lines (structured receipt storage, replaces Google Sheets) + receipt_matches (transaction reconciliation). transaction_id stored as TEXT pending bank_transactions migration."
     }
   },
-  "next_available": 204
+  "next_available": 205
 }
