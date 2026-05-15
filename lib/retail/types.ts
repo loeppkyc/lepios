@@ -1,4 +1,12 @@
-export type RetailWatchlistStatus = 'watching' | 'active' | 'passed' | 'sold'
+export type RetailWatchlistStatus =
+  | 'watching'
+  | 'active'
+  | 'bought'
+  | 'shipped_to_fba'
+  | 'live_on_amazon'
+  | 'sold'
+  | 'passed'
+  | 'returned'
 
 export interface RetailWatchlistItem {
   id: string
@@ -101,13 +109,69 @@ export const RETAIL_CATEGORIES = [
 export const STATUS_LABELS: Record<RetailWatchlistStatus, string> = {
   watching: 'Watching',
   active: 'Active Deal',
-  passed: 'Passed',
+  bought: 'Bought',
+  shipped_to_fba: 'Shipped to FBA',
+  live_on_amazon: 'Live on Amazon',
   sold: 'Sold',
+  passed: 'Passed',
+  returned: 'Returned',
 }
 
 export const STATUS_COLORS: Record<RetailWatchlistStatus, string> = {
   watching: 'bg-blue-900/40 text-blue-300',
   active: 'bg-green-900/40 text-green-300',
+  bought: 'bg-purple-900/40 text-purple-300',
+  shipped_to_fba: 'bg-indigo-900/40 text-indigo-300',
+  live_on_amazon: 'bg-amber-900/40 text-amber-300',
+  sold: 'bg-teal-900/40 text-teal-300',
   passed: 'bg-zinc-800 text-zinc-400',
-  sold: 'bg-amber-900/40 text-amber-300',
+  returned: 'bg-red-900/30 text-red-400',
+}
+
+// ── StockTrack types ──────────────────────────────────────────────────────────
+
+export interface StockTrackProduct {
+  name: string
+  sku: string
+  price: number | null
+  imageUrl?: string
+}
+
+export interface StoreAvailability {
+  store_name: string
+  address?: string
+  city?: string
+  quantity: number
+  price: number | null
+  on_sale: boolean
+}
+
+export interface PriceDrop {
+  product_name: string
+  sku: string
+  current_price: number | null
+  regular_price: number | null
+  discount_pct: number | null
+  category?: string
+  store_code: string
+}
+
+export interface TrendingProduct {
+  product_name: string
+  sku: string
+  price: number | null
+  regular_price: number | null
+  stores_in_stock: number
+  stores_total: number
+}
+
+export interface ScannerConfig {
+  id: string
+  store_code: string
+  min_discount_pct: number
+  keywords: string | null
+  enabled: boolean
+  last_scanned_at: string | null
+  created_at: string
+  updated_at: string
 }
