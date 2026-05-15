@@ -367,6 +367,36 @@ When Colin hands you a sprint brief:
 
 For any chunk that ports, replaces, or is informed by a Streamlit predecessor, complete all four sub-phases before writing the acceptance doc. Skip only if the chunk has zero Streamlit predecessor (greenfield work with no analog in Streamlit OS).
 
+### Phase 1a — Pre-research check (run FIRST)
+
+Before reading any Streamlit source files, check `task.metadata.research_notes`:
+
+```sql
+SELECT metadata->>'research_notes' AS notes,
+       metadata->>'research_notes_source_files' AS source_files,
+       metadata->>'research_notes_model' AS model
+FROM task_queue WHERE id = '{task_id}';
+```
+
+**If `research_notes` is non-empty (Option B — full skip):**
+
+1. Create `docs/sprint-{N}/chunk-{id}-streamlit-study.md` with this header:
+   ```
+   ## Pre-Research (Ollama-generated)
+   Model: {research_notes_model}
+   Source files: {research_notes_source_files}
+   ```
+   Then paste `research_notes` verbatim beneath it.
+2. Skip steps 1–5 of Phase 1a below. Do NOT read Streamlit source files.
+3. Proceed directly to Phase 1b Twin Q&A using the pre-research notes as context.
+4. Log to `agent_events`: `action: 'pre_research_skip'`, `meta: { task_id, notes_length, source_files }`.
+
+**Backfill escape:** If during Phase 1b or 1c you find a domain rule contradiction or a critical rule missing from the pre-research notes, you MAY read the specific Streamlit source file and append findings under `## Phase 1a Backfill` in the study doc. Do not re-read the entire file — targeted lookup only.
+
+**If `research_notes` is null or empty:** proceed with full Phase 1a below.
+
+---
+
 ### Phase 1a — Streamlit Study
 
 1. Read the Streamlit implementation of the feature end to end: UI layer, data layer, logic, config, and any helper utilities it calls.

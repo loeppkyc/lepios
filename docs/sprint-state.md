@@ -319,3 +319,17 @@ colin_approved_at: "2026-05-09"
 delegated_to_builder_at: "2026-05-09T03:40:00Z"
 builder_task_id: "e6e1d374-cde5-403e-a74d-4580d909beaf"
 last_updated_at: "2026-05-09T03:40:00Z"
+
+# ============================================================
+# Ollama Pre-Research (daytime tick extension, 2026-05-15)
+# ============================================================
+
+ollama_preresearch_chunk:
+task_id: "574ed32c-29bf-4058-abc5-1b3375f2bb58"
+status: "awaiting-colin-approval"
+description: "Extend daytime tick to do Ollama pre-research before coordinator Phase 1a. Stores summaries in task_queue.metadata.research_notes. Target: 25-35% coordinator token reduction."
+acceptance_doc: "docs/sprint-5/ollama-preresearch-daytime-tick-acceptance.md"
+blocking_questions: ["Q1: Phase 1a skip vs supplementary context", "Q2: Explicit coordinator.md edit approval"]
+coordinator_task_id: "574ed32c-29bf-4058-abc5-1b3375f2bb58"
+acceptance_doc_ready_at: "2026-05-15T14:00:00Z"
+last_updated_at: "2026-05-15T14:00:00Z"

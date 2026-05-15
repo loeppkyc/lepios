@@ -297,3 +297,31 @@ No schema changes. No migrations. No new env vars. No Vercel config changes.
 All decisions: LOW cost to reverse.
 confidence: high
 outcome: auto-proceeded (cache_match_enabled=true, prior session approval recorded in task_queue)
+
+---
+
+2026-05-15T14:00:00Z sprint=5 chunk=ollama-preresearch doc=docs/sprint-5/ollama-preresearch-daytime-tick-acceptance.md
+cited_principles: [META-C, ARCHITECTURE.md §3 rule 4 (Colin decides), F17, F18, F19]
+trigger_match_evidence: |
+cache_match_enabled: true per sprint-state.md (last_reviewed_by_colin_at: 2026-05-01).
+However, META-C requires confidence=high. Two conditions in this doc require Colin's judgment:
+Q1: whether Phase 1a is skipped entirely or notes are supplementary only — this is a
+values trade-off (token savings vs. acceptance-doc quality risk), not a pattern-match.
+Q2: coordinator.md edit requires explicit Colin approval per ARCHITECTURE.md §3 rule 4
+("Decisions Are Colin's") and coordinator.md Non-negotiable #4 ("You never edit
+ARCHITECTURE.md or CLAUDE.md" — coordinator.md is effectively an agent doctrine file
+of the same class). Both conditions fail confidence=high. Cache-match not applied.
+reversibility_check: |
+Acceptance doc: new file docs/sprint-5/ollama-preresearch-daytime-tick-acceptance.md — fully reversible (delete).
+lib/harness/pre-research.ts: new file — reversible (delete + revert daytime-tick.ts).
+lib/orchestrator/daytime-tick.ts: additive call — reversible (revert the added call block).
+.claude/agents/coordinator.md: additive Phase 1a block — reversible (revert the added section).
+tests/harness/pre-research.test.ts: new file — reversible (delete).
+No schema migrations. No destructive operations. All decisions LOW cost to reverse.
+sprint-state.md update: document only, no code/schema effect.
+auto-proceed-log.md append: this entry — append-only, reversible via git.
+confidence: medium (escalation correct — Q1 + Q2 require Colin judgment; confidence below high)
+outcome: escalated
+escalation_reasons:
+  - Q1_colin_decision_required (Phase 1a skip vs supplementary — values trade-off, not pattern-match)
+  - Q2_coordinator_md_explicit_approval (doctrine-level edit per ARCHITECTURE.md §3 rule 4)
