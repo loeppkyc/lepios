@@ -12,6 +12,23 @@ No migration, no data loss, no external effect. Reversible-free.
 confidence: high
 outcome: auto-proceeded
 
+2026-05-15T12:08:00Z sprint=sprint-5 task=4aa53419 doc=docs/sprint-5/ingest-health-notes-acceptance.md
+cited_principles: [canonical-write-escalation]
+trigger_match_evidence: |
+Situation: write 5 rows to `knowledge` table (Twin source-of-truth) containing health
+knowledge entries sourced from PubMed/AAD guidelines about seborrheic dermatitis.
+Coordinator escalation rule: "Canonical write about to happen — any write to a
+source-of-truth table… Until the Reality-Check Agent exists, Colin IS the
+Reality-Check Agent. Escalate the write for his eyes before builder applies it."
+The `knowledge` table is the Twin's primary corpus — canonical source for all Twin
+answers. Writing health content without Colin's review creates hallucination-into-DB risk.
+reversibility_check: |
+knowledge rows: reversible — DELETE WHERE entity ILIKE 'health:seborrheic-dermatitis:%'.
+Content hash deduplication prevents accidental re-insertion. Fully reversible, zero cost.
+New script file: reversible — delete file. No schema changes. No migrations.
+confidence: n/a — escalated, not cached. Canonical write rule overrides META-C.
+outcome: escalated (canonical-write-rule)
+
 ---
 
 2026-04-19T12:30:00-06:00 sprint=4 chunk=null doc=docs/sprint-4/plan.md

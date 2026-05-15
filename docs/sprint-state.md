@@ -109,7 +109,17 @@ status: "in-build"
 cache_match_enabled: true
 cache_match_reason: "Twin endpoint verified live 2026-05-01 (POST 200, retrieval gap separate from routing — F-L14 tracked). Autonomous flow restored."
 opened_at: "2026-04-24T00:00:00Z"
-last_updated_at: "2026-04-27T00:40:00Z"
+last_updated_at: "2026-05-15T12:10:00Z"
+
+ingest_health_notes_chunk:
+  task_id: "4aa53419-8b04-45a8-8117-af08fc45052d"
+  status: "awaiting-colin-approval"
+  acceptance_doc: "docs/sprint-5/ingest-health-notes-acceptance.md"
+  acceptance_doc_ready_at: "2026-05-15T12:08:00Z"
+  description: "Ingest seborrheic dermatitis health knowledge into Twin corpus (5 PubMed-sourced entries)"
+  escalation_reason: "canonical-write-escalation — knowledge table is Twin source-of-truth"
+  open_questions: 3
+  twin_endpoint: "unreachable from cloud sandbox (host-not-in-allowlist)"
 
 chunks_planned:
 
