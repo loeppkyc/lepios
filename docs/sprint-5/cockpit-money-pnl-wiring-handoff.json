@@ -1,0 +1,28 @@
+{
+  "task_id": "9c6cbd80-7b8f-4307-8e6c-c045eefa4f96",
+  "chunk_id": "cockpit-money-pnl-wiring",
+  "acceptance_doc_path": "docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md",
+  "status": "complete",
+  "files_changed": [
+    "app/(cockpit)/money/page.tsx",
+    "docs/sprint-5/cockpit-money-pnl-wiring-handoff.json"
+  ],
+  "tests": {
+    "passing": 0,
+    "failing": 0,
+    "new": 0,
+    "note": "node_modules absent in sandbox — tests could not run locally; Vercel CI will verify"
+  },
+  "migrations_applied": [],
+  "deploy_url": "pending — push triggers Vercel auto-deploy from branch",
+  "grounding_checkpoint_required": [
+    "Colin visits https://lepios-one.vercel.app/money after deploy and verifies: (1) Arc gauge shows ~82 (May P&L margin, non-zero); (2) Amazon PillBar shows ~$8,013 CAD; (3) Expenses PillBar shows ~$1,461 CAD; (4) Summary readout shows net profit ~+$6,552 CAD; (5) Sparkline renders 6 months of bars without console errors."
+  ],
+  "unknowns": [
+    "node_modules not present in sandbox — build and test suite could not run locally. TS errors in money/page.tsx are identical in kind (JSX implicit any, react/jsx-runtime missing) to 13,848 pre-existing repo-wide errors; no new error categories introduced. Vercel build is the authoritative build check.",
+    "The acceptance doc states this chunk was authored while coordinator-twin was unreachable. All three open questions (gauge formula, PillBar max, sparkline scope) were subsequently resolved by Colin via Telegram approval (2026-05-15T14:40:07Z) per the task prompt. The implementation matches those approved defaults exactly."
+  ],
+  "next_chunk_blockers": [],
+  "tokens_used": 8200,
+  "timestamp": "2026-05-15T15:30:00Z"
+}
