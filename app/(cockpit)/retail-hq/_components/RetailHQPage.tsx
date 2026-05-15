@@ -6,66 +6,52 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { lookupBrandRisk, riskBadgeClass, BRAND_DB } from '@/lib/reselling/brand-risk'
-import type { RetailDeal, BrandRiskEntry } from '@/lib/reselling/types'
+import type { BrandRiskEntry } from '@/lib/reselling/types'
 
-function RoiBadge({ roi }: { roi: number | null }) {
-  if (roi == null) return <span className="text-[var(--color-text-secondary)]">—</span>
-  const cls =
-    roi >= 30
-      ? 'bg-green-900/40 text-green-300'
-      : roi >= 15
-        ? 'bg-yellow-900/40 text-yellow-300'
-        : 'bg-[var(--color-cockpit-surface)] text-[var(--color-text-secondary)]'
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>
-      {roi.toFixed(1)}% ROI
-    </span>
-  )
+interface FlippDealItem {
+  name: string
+  description: string
+  price: number | string
+  prePrice: string
+  store: string
+  brand: string
+  validFrom: string
+  validTo: string
+  imageUrl: string
+  category: string
+  savings: string
 }
 
-function DealRow({ deal }: { deal: RetailDeal }) {
+function FlippDealRow({ item }: { item: FlippDealItem }) {
+  const priceStr = typeof item.price === 'number' ? `$${item.price.toFixed(2)}` : String(item.price)
   return (
     <div className="border-border rounded-lg border bg-[var(--color-cockpit-surface)] p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-[var(--color-text-primary)]">{deal.title}</p>
+          <p className="font-medium text-[var(--color-text-primary)]">{item.name}</p>
           <div className="mt-0.5 flex flex-wrap gap-3 text-xs text-[var(--color-text-secondary)]">
-            {deal.asin && <span className="font-mono">{deal.asin}</span>}
-            {deal.source && <span>{deal.source}</span>}
-            {deal.marketplace && <span>{deal.marketplace}</span>}
-            {deal.product_type && <span>{deal.product_type}</span>}
+            {item.store && <span>{item.store}</span>}
+            {item.brand && <span>{item.brand}</span>}
+            {item.category && <span>{item.category}</span>}
           </div>
           <div className="mt-1 flex items-center gap-3">
-            {deal.buy_price_cad != null && (
-              <span className="text-sm text-[var(--color-text-secondary)]">
-                Buy ${deal.buy_price_cad.toFixed(2)}
-              </span>
+            <span className="font-medium text-[var(--color-text-primary)]">{priceStr}</span>
+            {item.prePrice && (
+              <span className="text-sm text-[var(--color-text-secondary)] line-through">{item.prePrice}</span>
             )}
-            {deal.sell_price_cad != null && (
-              <span className="text-sm text-[var(--color-text-secondary)]">
-                → Sell ${deal.sell_price_cad.toFixed(2)}
-              </span>
-            )}
-            <RoiBadge roi={deal.roi_pct} />
-            {deal.sales_rank != null && (
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                Rank #{deal.sales_rank.toLocaleString()}
+            {item.savings && (
+              <span className="rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
+                {item.savings}
               </span>
             )}
           </div>
-          {deal.notes && (
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{deal.notes}</p>
+          {item.description && item.description !== item.name && (
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{item.description}</p>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {deal.status && (
-            <span className="rounded bg-[var(--color-cockpit-bg)] px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] capitalize">
-              {deal.status}
-            </span>
-          )}
-          {deal.found_date && (
-            <span className="text-xs text-[var(--color-text-secondary)]">{deal.found_date}</span>
-          )}
+        <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-[var(--color-text-secondary)]">
+          {item.validFrom && <span>From {item.validFrom}</span>}
+          {item.validTo && <span>To {item.validTo}</span>}
         </div>
       </div>
     </div>
@@ -233,27 +219,33 @@ function CalculatorTab() {
 }
 
 export function RetailHQPage() {
-  const [deals, setDeals] = useState<RetailDeal[]>([])
+  const [items, setItems] = useState<FlippDealItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [dealQuery, setDealQuery] = useState('sale')
 
   useEffect(() => {
     async function fetchDeals() {
       setLoading(true)
-      const res = await fetch('/api/retail/deals?limit=100')
-      const j = await res.json()
-      setDeals(j.deals ?? [])
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/retail/deals?q=${encodeURIComponent(dealQuery)}&limit=50`)
+        const j = (await res.json()) as { items?: FlippDealItem[] }
+        setItems(j.items ?? [])
+      } finally {
+        setLoading(false)
+      }
     }
     fetchDeals()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const filtered = statusFilter === 'all' ? deals : deals.filter((d) => d.status === statusFilter)
-  const avgRoi =
-    deals.length > 0
-      ? deals.reduce((s, d) => s + (d.roi_pct ?? 0), 0) /
-        deals.filter((d) => d.roi_pct != null).length
-      : null
+  function handleDealSearch(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    fetch(`/api/retail/deals?q=${encodeURIComponent(dealQuery)}&limit=50`)
+      .then((r) => r.json())
+      .then((j: { items?: FlippDealItem[] }) => { setItems(j.items ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -266,9 +258,9 @@ export function RetailHQPage() {
 
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total deals', value: deals.length },
-          { label: 'Avg ROI', value: avgRoi != null ? `${avgRoi.toFixed(1)}%` : '—' },
-          { label: 'Viable (≥15% ROI)', value: deals.filter((d) => (d.roi_pct ?? 0) >= 15).length },
+          { label: 'Flipp deals', value: items.length },
+          { label: 'Stores', value: new Set(items.map((i) => i.store).filter(Boolean)).size },
+          { label: 'With savings', value: items.filter((i) => i.savings).length },
         ].map((kpi) => (
           <div
             key={kpi.label}
@@ -284,33 +276,29 @@ export function RetailHQPage() {
 
       <Tabs defaultValue="deals">
         <TabsList>
-          <TabsTrigger value="deals">Deals ({deals.length})</TabsTrigger>
+          <TabsTrigger value="deals">Deals ({items.length})</TabsTrigger>
           <TabsTrigger value="brand-risk">Brand Risk</TabsTrigger>
           <TabsTrigger value="calculator">ROI Calculator</TabsTrigger>
         </TabsList>
 
         <TabsContent value="deals" className="space-y-3 pt-4">
-          <div className="flex gap-2">
-            {['all', 'active', 'bought', 'passed', 'expired'].map((s) => (
-              <Button
-                key={s}
-                size="sm"
-                variant={statusFilter === s ? 'default' : 'outline'}
-                onClick={() => setStatusFilter(s)}
-                className="capitalize"
-              >
-                {s}
-              </Button>
-            ))}
-          </div>
+          <form onSubmit={handleDealSearch} className="flex gap-2">
+            <Input
+              placeholder="Search Flipp (sale, LEGO, tool…)"
+              value={dealQuery}
+              onChange={(e) => setDealQuery(e.target.value)}
+              className="h-8 max-w-xs text-sm"
+            />
+            <Button type="submit" size="sm" disabled={loading}>Search</Button>
+          </form>
           {loading && <p className="text-sm text-[var(--color-text-secondary)]">Loading…</p>}
-          {!loading && filtered.length === 0 && (
+          {!loading && items.length === 0 && (
             <p className="text-sm text-[var(--color-text-secondary)]">
-              No deals found. The automated deal scanner writes here when it runs.
+              No Flipp deals found for this query.
             </p>
           )}
-          {filtered.map((d) => (
-            <DealRow key={d.id} deal={d} />
+          {items.map((item, i) => (
+            <FlippDealRow key={i} item={item} />
           ))}
         </TabsContent>
 

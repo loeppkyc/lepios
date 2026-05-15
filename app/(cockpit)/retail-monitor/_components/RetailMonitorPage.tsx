@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { RetailWatchlistItem, RetailWatchlistCreate } from '@/lib/retail/types'
+import type { RetailWatchlistItem, RetailWatchlistCreate, ScannerConfig } from '@/lib/retail/types'
 import {
   RETAIL_STORES,
   RETAIL_CATEGORIES,
@@ -14,6 +14,8 @@ import {
   STATUS_COLORS,
   type RetailWatchlistStatus,
 } from '@/lib/retail/types'
+import { STOCKTRACK_STORES } from '@/lib/retail/stocktrack-client'
+import { StockTrackPanel } from './StockTrackPanel'
 
 // ── Flip profit calculator ────────────────────────────────────────────────────
 
@@ -360,6 +362,226 @@ function FlipCalculator() {
   )
 }
 
+// ── Auto Scan panel ───────────────────────────────────────────────────────────
+
+const STORE_CODES = Object.keys(STOCKTRACK_STORES)
+
+function AutoScanPanel() {
+  const [selectedStores, setSelectedStores] = useState<string[]>(['bb', 'ct', 'hd'])
+  const [minPct, setMinPct] = useState('30')
+  const [period, setPeriod] = useState<'today' | 'yesterday' | 'weekly'>('today')
+  const [keywords, setKeywords] = useState('')
+  const [sendTelegram, setSendTelegram] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [result, setResult] = useState<{ deals_found: number; stores_scanned: number; duration_ms: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const [configs, setConfigs] = useState<ScannerConfig[]>([])
+  const [configsLoading, setConfigsLoading] = useState(true)
+  const [newStoreCode, setNewStoreCode] = useState(STORE_CODES[0])
+  const [newMinPct, setNewMinPct] = useState('30')
+  const [savingConfig, setSavingConfig] = useState(false)
+
+  const loadConfigs = useCallback(async () => {
+    setConfigsLoading(true)
+    try {
+      const res = await fetch('/api/scanner-configs')
+      const j = (await res.json()) as { configs?: ScannerConfig[] }
+      setConfigs(j.configs ?? [])
+    } finally {
+      setConfigsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void loadConfigs() }, [loadConfigs])
+
+  const toggleStore = (code: string) => {
+    setSelectedStores((prev) =>
+      prev.includes(code) ? prev.filter((s) => s !== code) : [...prev, code]
+    )
+  }
+
+  async function handleScan(e: React.FormEvent) {
+    e.preventDefault()
+    if (selectedStores.length === 0) return
+    setScanning(true)
+    setError(null)
+    setResult(null)
+    try {
+      const res = await fetch('/api/stocktrack/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_codes: selectedStores,
+          min_discount_pct: Number(minPct),
+          period,
+          keywords: keywords || undefined,
+          send_telegram: sendTelegram,
+        }),
+      })
+      const j = (await res.json()) as { deals_found?: number; stores_scanned?: number; duration_ms?: number; error?: string }
+      if (!res.ok) throw new Error(j.error ?? 'Scan failed')
+      setResult({ deals_found: j.deals_found ?? 0, stores_scanned: j.stores_scanned ?? 0, duration_ms: j.duration_ms ?? 0 })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  async function handleSaveConfig(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingConfig(true)
+    try {
+      await fetch('/api/scanner-configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_code: newStoreCode, min_discount_pct: Number(newMinPct) }),
+      })
+      await loadConfigs()
+    } finally {
+      setSavingConfig(false)
+    }
+  }
+
+  async function handleDeleteConfig(id: string) {
+    await fetch(`/api/scanner-configs/${id}`, { method: 'DELETE' })
+    setConfigs((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleScan} className="space-y-4">
+        <div>
+          <p className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">Stores</p>
+          <div className="flex flex-wrap gap-2">
+            {STORE_CODES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => toggleStore(code)}
+                className={`rounded px-2 py-1 text-xs transition-colors ${
+                  selectedStores.includes(code)
+                    ? 'bg-[var(--color-pillar-money)] text-white'
+                    : 'bg-[var(--color-cockpit-bg)] text-[var(--color-text-secondary)] hover:bg-[var(--color-cockpit-surface)]'
+                }`}
+              >
+                {STOCKTRACK_STORES[code]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <div className="w-24 space-y-1">
+            <Label className="text-xs text-[var(--color-text-secondary)]">Min Discount %</Label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={minPct}
+              onChange={(e) => setMinPct(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="w-28 space-y-1">
+            <Label className="text-xs text-[var(--color-text-secondary)]">Period</Label>
+            <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-32 space-y-1">
+            <Label className="text-xs text-[var(--color-text-secondary)]">Keywords (optional)</Label>
+            <Input
+              placeholder="LEGO, tool…"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={sendTelegram}
+              onChange={(e) => setSendTelegram(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Send Telegram alert
+          </label>
+          <Button type="submit" size="sm" disabled={scanning || selectedStores.length === 0}>
+            {scanning ? 'Scanning…' : 'Run Scan'}
+          </Button>
+        </div>
+      </form>
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {result && (
+        <div className="rounded-lg border border-border bg-[var(--color-cockpit-bg)] p-3 text-sm">
+          <span className="text-green-400 font-medium">{result.deals_found} deals</span>
+          <span className="text-[var(--color-text-secondary)]"> found across </span>
+          <span className="text-[var(--color-text-primary)]">{result.stores_scanned} stores</span>
+          <span className="text-[var(--color-text-secondary)]"> in {result.duration_ms}ms</span>
+        </div>
+      )}
+
+      <div className="border-t border-border pt-4">
+        <p className="mb-3 text-xs font-medium text-[var(--color-text-secondary)]">Saved Scanner Configs</p>
+        <form onSubmit={handleSaveConfig} className="mb-3 flex gap-2">
+          <div className="w-36">
+            <Select value={newStoreCode} onValueChange={setNewStoreCode}>
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STORE_CODES.map((c) => (
+                  <SelectItem key={c} value={c}>{STOCKTRACK_STORES[c]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-20">
+            <Input
+              type="number"
+              placeholder="30"
+              value={newMinPct}
+              onChange={(e) => setNewMinPct(e.target.value)}
+              className="h-7 text-xs"
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={savingConfig} className="h-7 text-xs">
+            {savingConfig ? 'Saving…' : 'Add'}
+          </Button>
+        </form>
+        {configsLoading && <p className="text-xs text-[var(--color-text-secondary)]">Loading…</p>}
+        {configs.length > 0 && (
+          <div className="space-y-1">
+            {configs.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded bg-[var(--color-cockpit-bg)] px-3 py-1.5 text-xs">
+                <span className="text-[var(--color-text-primary)]">
+                  {STOCKTRACK_STORES[c.store_code] ?? c.store_code} · ≥{c.min_discount_pct}%
+                  {c.keywords ? ` · "${c.keywords}"` : ''}
+                </span>
+                <button
+                  onClick={() => handleDeleteConfig(c.id)}
+                  className="text-[var(--color-text-secondary)] hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function RetailMonitorPage() {
@@ -433,6 +655,8 @@ export function RetailMonitorPage() {
           <TabsTrigger value="watchlist">Watchlist ({items.length})</TabsTrigger>
           <TabsTrigger value="add">Add Item</TabsTrigger>
           <TabsTrigger value="calc">Calculator</TabsTrigger>
+          <TabsTrigger value="stocktrack">StockTrack</TabsTrigger>
+          <TabsTrigger value="autoscan">Auto Scan</TabsTrigger>
         </TabsList>
 
         <TabsContent value="watchlist" className="mt-4">
@@ -461,6 +685,14 @@ export function RetailMonitorPage() {
 
         <TabsContent value="calc" className="mt-4">
           <FlipCalculator />
+        </TabsContent>
+
+        <TabsContent value="stocktrack" className="mt-4">
+          <StockTrackPanel />
+        </TabsContent>
+
+        <TabsContent value="autoscan" className="mt-4">
+          <AutoScanPanel />
         </TabsContent>
       </Tabs>
     </div>
