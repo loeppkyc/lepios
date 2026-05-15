@@ -230,6 +230,21 @@ export function LifePnlPage() {
             Net Worth
           </Link>
         </p>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            margin: '4px 0 0',
+          }}
+        >
+          <Link
+            href="/annual-review"
+            style={{ color: 'var(--color-accent-gold)', textDecoration: 'underline' }}
+          >
+            → Annual Review
+          </Link>
+        </p>
       </div>
 
       {/* Year selector */}
