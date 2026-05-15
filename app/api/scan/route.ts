@@ -86,6 +86,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'ISBN must be 10 or 13 digits' }, { status: 400 })
   }
 
+  // Fetch scanner settings (non-blocking — fall back to defaults on error)
+  let scanSettings: import('@/lib/profit/calculator').ScanSettings | undefined
+  try {
+    const { data: settingsRow } = await supabase
+      .from('scanner_settings')
+      .select('min_profit_cad, min_roi_pct, max_bsr')
+      .eq('person_handle', 'colin') // SPRINT5-GATE: replace with user profile lookup
+      .single()
+    if (settingsRow) {
+      scanSettings = {
+        min_profit_cad: Number(settingsRow.min_profit_cad),
+        min_roi_pct: Number(settingsRow.min_roi_pct),
+        max_bsr: Number(settingsRow.max_bsr),
+      }
+    }
+  } catch {
+    /* use defaults */
+  }
+
   const startMs = Date.now()
 
   // Step 1: ISBN → ASIN (sequential — required for all subsequent calls)
@@ -137,19 +156,19 @@ export async function POST(request: Request) {
   const profit = calcProfit(buyBoxPrice, fbaFees, costPaid)
   const roi = calcRoi(profit, costPaid)
 
+  // Resolve BSR + source: SP-API is preferred; Keepa fills the gap
+  const bsr = catalog.bsr > 0 ? catalog.bsr : (keepaProduct?.bsr ?? null)
+  const bsrSource: 'sp-api' | 'keepa' | null =
+    catalog.bsr > 0 ? 'sp-api' : keepaProduct?.bsr ? 'keepa' : null
+
   // eBay median is active listing prices (asking prices), not sold comps.
   // Not used as a buy/skip gate until we have real sell-through data to validate the signal.
-  const decision = getDecision(profit, roi)
+  const decision = getDecision(profit, roi, bsr, scanSettings)
 
   // Tier classification
   const format = parseFormat(bookAttrs.binding)
   const tier = classifyTier(bookAttrs.author, catalog.title ?? '')
   const floorPriceCad = getFloorPrice(tier, format)
-
-  // Resolve BSR + source: SP-API is preferred; Keepa fills the gap
-  const bsr = catalog.bsr > 0 ? catalog.bsr : (keepaProduct?.bsr ?? null)
-  const bsrSource: 'sp-api' | 'keepa' | null =
-    catalog.bsr > 0 ? 'sp-api' : keepaProduct?.bsr ? 'keepa' : null
 
   // eBay comp fields
   const ebayListings = ebayResult.listings

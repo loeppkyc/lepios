@@ -5,6 +5,9 @@ import {
   getDecision,
   MIN_PROFIT_CAD,
   MIN_ROI_PCT,
+  DEFAULT_MIN_PROFIT_CAD,
+  DEFAULT_MIN_ROI_PCT,
+  DEFAULT_MAX_BSR,
 } from '@/lib/profit/calculator'
 
 describe('calcProfit', () => {
@@ -61,5 +64,47 @@ describe('constants', () => {
 
   it('MIN_ROI_PCT is 50', () => {
     expect(MIN_ROI_PCT).toBe(50)
+  })
+
+  it('DEFAULT_* aliases match compat aliases', () => {
+    expect(DEFAULT_MIN_PROFIT_CAD).toBe(MIN_PROFIT_CAD)
+    expect(DEFAULT_MIN_ROI_PCT).toBe(MIN_ROI_PCT)
+    expect(DEFAULT_MAX_BSR).toBe(0)
+  })
+})
+
+describe('getDecision — with settings override', () => {
+  it('uses settings.min_profit_cad when provided', () => {
+    const settings = { min_profit_cad: 5.0, min_roi_pct: 0, max_bsr: 0 }
+    expect(getDecision(4.99, 100, null, settings)).toBe('skip')
+    expect(getDecision(5.0, 100, null, settings)).toBe('buy')
+  })
+
+  it('uses settings.min_roi_pct when provided', () => {
+    const settings = { min_profit_cad: 0, min_roi_pct: 75, max_bsr: 0 }
+    expect(getDecision(10, 74.99, null, settings)).toBe('skip')
+    expect(getDecision(10, 75, null, settings)).toBe('buy')
+  })
+
+  it('applies BSR gate when max_bsr > 0 and bsr exceeds it', () => {
+    const settings = { min_profit_cad: 0, min_roi_pct: 0, max_bsr: 500000 }
+    expect(getDecision(10, 100, 500001, settings)).toBe('skip')
+    expect(getDecision(10, 100, 500000, settings)).toBe('buy')
+  })
+
+  it('ignores BSR gate when max_bsr is 0 (no limit)', () => {
+    const settings = { min_profit_cad: 0, min_roi_pct: 0, max_bsr: 0 }
+    expect(getDecision(10, 100, 9999999, settings)).toBe('buy')
+  })
+
+  it('ignores BSR gate when bsr is null', () => {
+    const settings = { min_profit_cad: 0, min_roi_pct: 0, max_bsr: 100000 }
+    expect(getDecision(10, 100, null, settings)).toBe('buy')
+  })
+
+  it('falls back to defaults when settings not provided', () => {
+    // With default settings ($3 profit, 50% ROI)
+    expect(getDecision(3.0, 50)).toBe('buy')
+    expect(getDecision(2.99, 50)).toBe('skip')
   })
 })

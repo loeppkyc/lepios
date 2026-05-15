@@ -353,7 +353,13 @@
       "filename": "0204_receipt_lines.sql",
       "claimed_at": "2026-05-14",
       "note": "T-003 — receipt_lines (structured receipt storage, replaces Google Sheets) + receipt_matches (transaction reconciliation). transaction_id stored as TEXT pending bank_transactions migration."
+    },
+    "0205": {
+      "branch": "worktree-agent-aad1f5392c767bbcd",
+      "filename": "0205_scanner_settings.sql",
+      "claimed_at": "2026-05-15",
+      "note": "Scanner settings — per-user BUY/SKIP thresholds (min_profit_cad, min_roi_pct, max_bsr). Moves hardcoded constants from lib/profit/calculator.ts to DB. Single row keyed by person_handle='colin'; SPRINT5-GATE to profiles FK."
     }
   },
-  "next_available": 205
+  "next_available": 206
 }
