@@ -7,6 +7,9 @@
  * Loops every POLL_INTERVAL_MINUTES — does signal review, pre-research,
  * and security scan each tick.
  *
+ * Alerts go via outbound_notifications → /api/harness/notifications-drain
+ * (no bot token needed locally — Vercel handles Telegram delivery).
+ *
  * To start manually:  node scripts/local-ai-worker.mjs
  * To start on boot:   add scripts/start-ai-worker.bat to Windows Startup folder
  *   (%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup)
@@ -25,6 +28,7 @@ const ANALYSIS_MODEL = process.env.OLLAMA_ANALYSIS_MODEL ?? 'qwen2.5-coder:14b'
 const LOOKBACK_HOURS = 12
 const GENERATE_TIMEOUT_MS = 90_000
 const MAX_SOURCE_CHARS = 6000
+const LEPIOS_URL = 'https://lepios-one.vercel.app'
 
 // ── Env loader ────────────────────────────────────────────────────────────────
 
@@ -51,8 +55,9 @@ function loadEnv() {
 
 loadEnv()
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+const CRON_SECRET = process.env.CRON_SECRET?.trim()
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error(
@@ -64,6 +69,20 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
 })
+
+// Loaded from harness_config on startup
+let telegramChatId = null
+
+async function loadRuntimeConfig() {
+  const { data } = await db
+    .from('harness_config')
+    .select('key, value')
+    .in('key', ['TELEGRAM_CHAT_ID'])
+  for (const row of data ?? []) {
+    if (row.key === 'TELEGRAM_CHAT_ID') telegramChatId = row.value
+  }
+  log(`Runtime config: TELEGRAM_CHAT_ID=${telegramChatId ? 'loaded' : 'missing'}`)
+}
 
 // ── Analyst prompt ────────────────────────────────────────────────────────────
 
@@ -145,6 +164,32 @@ async function logEvent(domain, action, opts = {}) {
   }
 }
 
+// ── Telegram notifications via outbound_notifications + drain ─────────────────
+
+async function notify(message) {
+  if (!telegramChatId) {
+    log('notify: no TELEGRAM_CHAT_ID — skipping')
+    return
+  }
+  try {
+    await db.from('outbound_notifications').insert({
+      channel: 'telegram',
+      chat_id: telegramChatId,
+      payload: { text: message },
+      status: 'pending',
+    })
+    if (CRON_SECRET) {
+      await fetch(`${LEPIOS_URL}/api/harness/notifications-drain`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${CRON_SECRET}` },
+        signal: AbortSignal.timeout(10_000),
+      })
+    }
+  } catch (err) {
+    log('notify: failed:', err.message)
+  }
+}
+
 // ── Signal review ─────────────────────────────────────────────────────────────
 
 async function runSignalReview() {
@@ -185,9 +230,12 @@ Format your response as a numbered list of issues found. If no issues, say "No a
   try {
     const result = await ollamaGenerate(prompt)
     const durationMs = Date.now() - start
-    log(`signal_review: done in ${durationMs}ms — ${rows.length} events, ~${result.tokens} tokens`)
+    const hasAnomalies = !result.text.toLowerCase().includes('no anomalies detected')
+    log(
+      `signal_review: done in ${durationMs}ms — ${rows.length} events, ~${result.tokens} tokens${hasAnomalies ? ' — ANOMALIES FOUND' : ''}`
+    )
     await logEvent('ollama', 'signal_review', {
-      status: 'success',
+      status: hasAnomalies ? 'warning' : 'success',
       outputSummary: result.text.slice(0, 300),
       durationMs,
       tokensUsed: result.tokens,
@@ -196,8 +244,12 @@ Format your response as a numbered list of issues found. If no issues, say "No a
         model: ANALYSIS_MODEL,
         events_reviewed: rows.length,
         claude_equivalent_usd: result.claudeEquivUsd,
+        has_anomalies: hasAnomalies,
       },
     })
+    if (hasAnomalies) {
+      await notify(`LepiOS Signal Review — anomalies found:\n\n${result.text.slice(0, 800)}`)
+    }
   } catch (err) {
     log('signal_review: Ollama error:', err.message)
   }
@@ -349,6 +401,7 @@ List only genuine concerns. If nothing stands out as a security issue, say "No s
           claude_equivalent_usd: result.claudeEquivUsd,
         },
       })
+      await notify(`LepiOS Security Alert:\n\n${result.text.slice(0, 800)}`)
     }
   } catch (err) {
     log('security_scan: Ollama error:', err.message)
@@ -393,6 +446,8 @@ async function tick() {
 async function main() {
   log(`Local AI Worker starting — poll every ${POLL_INTERVAL_MINUTES} min, Ollama: ${OLLAMA_URL}`)
   log(`Analysis model: ${ANALYSIS_MODEL}`)
+
+  await loadRuntimeConfig()
 
   while (true) {
     try {
