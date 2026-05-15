@@ -11,6 +11,8 @@
  * chunk: f18-ceiling  task_id: e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c
  */
 
+// F18: bench=module_ceiling_metrics.benchmark_value (per row, source=benchmark_source); surface=/harness/ceiling CeilingTable widget
+
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
