@@ -1,6 +1,6 @@
 # GitHub Prior Art — LepiOS Vision Scan
 
-> **Last updated:** 2026-05-14
+> **Last updated:** 2026-05-16
 > **Scope:** Vision-level scan across all four pillars (Money / Health / Growing / Happy) + cross-cutting infrastructure (behavioral ingestion, Digital Twin, cockpit UI).
 > **Rule:** Every acceptance doc must reference this file. Before building any new module, check the relevant section here first. Verdict codes: **Wrap** (import as dependency) / **Fork** (take their engine, put our shell on top) / **Reference** (read for patterns, write ours) / **Build-new** (last resort, requires Colin approval).
 
@@ -86,6 +86,15 @@ LepiOS `OURA_ACCESS_TOKEN` env var (used in `/api/health/oura` routes) is **diff
 | `jesse-ai/jesse`                   | 5k+   | Python trading framework with ML support.                                        | **Reference** | Similar to freqtrade. Their signal normalization approach (0–1 scoring per indicator) matches our 5-factor plan.                                                                                          |
 | `ta-lib/ta-lib`                    | 9k+   | C library for technical analysis indicators (RSI, MACD, Bollinger, etc.).        | **Wrap**      | Use `talib` npm package or `technicalindicators` (pure TS, no native bindings) for indicator math. Don't re-implement RSI/MACD.                                                                           |
 | `anandanand84/technicalindicators` | 3k+   | Pure TypeScript TA indicators. No native deps.                                   | **Wrap**      | **PREFERRED** over ta-lib for LepiOS. TypeScript, no native bindings, runs on Vercel Edge. Import before writing any indicator math.                                                                      |
+
+### Tech Pulse (GitHackers — A6)
+
+| Repo | Stars | What it does | Verdict | Notes |
+|------|-------|-------------|---------|-------|
+| `nickvdyck/github-trending-scraper` | ~200 | Scrapes GitHub Trending page HTML | **Skip** | Fragile HTML scraper — breaks on GitHub layout changes. Use official search API instead. |
+| `huchenme/github-trending-api` | ~2k | Wrapper around GitHub trending scrape | **Skip** | Same fragility issue as scraper. Official API preferred. |
+| `github/rest-api-description` | — | Official GitHub REST API specs | **Reference** | `GET /search/repositories?q=pushed:>DATE&sort=stars` simulates trending. Unauthenticated: 10 req/min; `GITHUB_TOKEN` → 30/min. |
+| `HackerNews/API` (Firebase + Algolia) | — | Official HN REST API — Firebase for items, Algolia for search | **Reference** | No auth required. Algolia: find "Who is hiring" thread by title search. Firebase: fetch comments by item ID. Both are public. |
 
 ---
 
