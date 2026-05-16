@@ -33,6 +33,12 @@ const ALLOWED_PUBLIC: Array<{ path: string; reason: string; requireToken: string
     reason: "Telegram webhook — verifies signature via Telegram's secret_token header",
     requireToken: 'x-telegram-bot-api-secret-token',
   },
+  {
+    path: 'webhooks/square/route.ts',
+    reason:
+      'Square webhook — verifies HMAC-SHA256 signature via x-square-hmacsha256-signature header',
+    requireToken: 'x-square-hmacsha256-signature',
+  },
 ]
 
 function walk(dir: string): string[] {
