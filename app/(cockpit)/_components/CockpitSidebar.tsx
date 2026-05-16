@@ -167,6 +167,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'System',
     items: [
       { label: 'Status', href: '/status' },
+      { label: 'Systems', href: '/systems' },
       { label: 'Utility', href: '/utility' },
       { label: 'Command Centre', href: null },
       { label: 'Business History', href: null },
