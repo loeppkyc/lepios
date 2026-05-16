@@ -1,37 +1,13 @@
 # LepiOS — Failure Log
 
-**Auto-generated from `failures_log` table.** Last data change: 2026-05-09T13:50:05.755526+00:00.
+**Auto-generated from `failures_log` table.** Last data change: 2026-05-16T00:24:45.88471+00:00.
 Source of truth: `failures_log` table. Edit there (cockpit `/failures` form or via `POST /api/failures/log`).
 
 F-L1–F-L15 live in `CLAUDE.md §9` (canonical hand-written entries kept in prose).
 F-N entries below are auto-rendered from the table.
 
 ---
-## Open (3)
-
-## F-N18 — Single-letter option replies (a/b/c) not handled — webhook_no_match for multi-option escalations (2026-05-09)
-
-- **What:** Coordinator escalated scanner subdir-detection grounding fail with 3 options (a/b/c). Colin replied "a" via Telegram at 03:22 UTC. Webhook received the message (HTTP 200, logged telegram_webhook POST received) but logged webhook_no_match — no handler matched.
-- **Expected:** Single-letter reply "a" to a multi-option awaiting_grounding escalation should set metadata.chosen_option and transition task_queue to queued, re-triggering coordinator.
-- **Actual:** Text handler in PR #160 only matches "approve"/"approved" and "reject"/"rejected". Single-letter "a", "b", "c" fell through all handlers to webhook_no_match log.
-- **Root cause:** PR #160 text handler checks: lc === "approve" || lc === "approved" || lc.startsWith("approve "). The letter "a" satisfies none of these. No fallback for multi-option single-letter responses. Gap is structural: every new escalation pattern (option selection, numeric replies, confirmation codes) needs its own handler branch.
-- **Fix/workaround:** _Open_
-- **Lesson:** Any new coordinator escalation pattern that expects a reply must enumerate the exact reply strings it accepts and add a webhook handler for each. Single-letter (a/b/c) option replies are a common coordinator pattern and must be handled generically: if task has awaiting_grounding status and metadata contains an options array, match reply against option keys and apply.
-- **Severity:** high
-
----
-
-## F-N17 — Telegram approval handlers missing for awaiting_grounding / acceptance_doc_ready tasks (2026-05-09)
-
-- **What:** Coordinator escalated task 3dcf9706 (scanner_fix_subdir_detection) to awaiting_grounding. Colin sent inline button click ~02:12 UTC and text "Approved..." at 02:12:58 UTC. Both webhook POSTs returned 200 but task stayed at awaiting_grounding until manual DB UPDATE.
-- **Expected:** Inline button or text "Approved" should transition task from awaiting_grounding to approved and delegate to builder.
-- **Actual:** Both messages received (HTTP 200). Button click triggered answerCallbackQuery ack but fell through all 5 callback parsers. Text reply handler only queries status = awaiting_review — missed awaiting_grounding and acceptance_doc_ready.
-- **Root cause:** (1) None of 5 callback parsers (thumbs, gate, improve, purpose_review, safety) handle task_queue approval transitions. (2) Text-reply handler only queries status = awaiting_review; missing awaiting_grounding and acceptance_doc_ready.
-- **Fix/workaround:** _Open_
-- **Lesson:** Every new escalation status added to task_queue must be paired with a webhook handler — both a callback_query parser (inline buttons) and a text-reply branch. Missing handlers return 200 silently, invisible without Vercel log inspection.
-- **Severity:** high
-
----
+## Open (1)
 
 ## F-N13 — Puppeteer E2E verification of /failures page blocked by auth gate — no signed-in session available in build session (2026-05-08)
 
@@ -55,7 +31,7 @@ F-N entries below are auto-rendered from the table.
 
 ---
 
-## Fixed (last 30 days) (19)
+## Fixed (last 30 days) (21)
 
 ## F-N5 — /api/bookkeeping/* shipped publicly accessible for ~5 hours (2026-05-05)
 
@@ -111,6 +87,30 @@ F-N entries below are auto-rendered from the table.
 - **Root cause:** Migration 0029_harness_config.sql had the comment: "Service role bypasses RLS by default — no explicit policy needed." TRUE for RLS row-level policies; FALSE for PostgreSQL GRANT enforcement. service_role bypasses RLS but still requires GRANT INSERT/UPDATE/DELETE at the table level. No GRANT statements were included, so Supabase applied only a minimal SELECT grant.
 - **Fix/workaround:** 8c80bcf
 - **Lesson:** service_role bypasses RLS policies but NOT PostgreSQL GRANT enforcement. Every new table migration must include GRANT INSERT, UPDATE, DELETE ON table TO service_role (unless intentionally AD7 restricted). All service client write calls must check error.code 42501 and alert — silent write failures hide this class of bug for months.
+- **Severity:** high
+
+---
+
+## F-N18 — Single-letter option replies (a/b/c) not handled — webhook_no_match for multi-option escalations (2026-05-09)
+
+- **What:** Coordinator escalated scanner subdir-detection grounding fail with 3 options (a/b/c). Colin replied "a" via Telegram at 03:22 UTC. Webhook received the message (HTTP 200, logged telegram_webhook POST received) but logged webhook_no_match — no handler matched.
+- **Expected:** Single-letter reply "a" to a multi-option awaiting_grounding escalation should set metadata.chosen_option and transition task_queue to queued, re-triggering coordinator.
+- **Actual:** Text handler in PR #160 only matches "approve"/"approved" and "reject"/"rejected". Single-letter "a", "b", "c" fell through all handlers to webhook_no_match log.
+- **Root cause:** PR #160 text handler checks: lc === "approve" || lc === "approved" || lc.startsWith("approve "). The letter "a" satisfies none of these. No fallback for multi-option single-letter responses. Gap is structural: every new escalation pattern (option selection, numeric replies, confirmation codes) needs its own handler branch.
+- **Fix/workaround:** 2573b09
+- **Lesson:** Any new coordinator escalation pattern that expects a reply must enumerate the exact reply strings it accepts and add a webhook handler for each. Single-letter (a/b/c) option replies are a common coordinator pattern and must be handled generically: if task has awaiting_grounding status and metadata contains an options array, match reply against option keys and apply.
+- **Severity:** high
+
+---
+
+## F-N17 — Telegram approval handlers missing for awaiting_grounding / acceptance_doc_ready tasks (2026-05-09)
+
+- **What:** Coordinator escalated task 3dcf9706 (scanner_fix_subdir_detection) to awaiting_grounding. Colin sent inline button click ~02:12 UTC and text "Approved..." at 02:12:58 UTC. Both webhook POSTs returned 200 but task stayed at awaiting_grounding until manual DB UPDATE.
+- **Expected:** Inline button or text "Approved" should transition task from awaiting_grounding to approved and delegate to builder.
+- **Actual:** Both messages received (HTTP 200). Button click triggered answerCallbackQuery ack but fell through all 5 callback parsers. Text reply handler only queries status = awaiting_review — missed awaiting_grounding and acceptance_doc_ready.
+- **Root cause:** (1) None of 5 callback parsers (thumbs, gate, improve, purpose_review, safety) handle task_queue approval transitions. (2) Text-reply handler only queries status = awaiting_review; missing awaiting_grounding and acceptance_doc_ready.
+- **Fix/workaround:** 0ed07ef
+- **Lesson:** Every new escalation status added to task_queue must be paired with a webhook handler — both a callback_query parser (inline buttons) and a text-reply branch. Missing handlers return 200 silently, invisible without Vercel log inspection.
 - **Severity:** high
 
 ---
