@@ -64,6 +64,39 @@ type CatalogItemResponse = {
   }>
 }
 
+// Generic keyword search — returns first ASIN match. Lower precision than UPC but works without barcode.
+export async function findAsinByKeywords(query: string): Promise<string | null> {
+  try {
+    const data = await spFetch<SearchResponse>('/catalog/2022-04-01/items', {
+      params: {
+        keywords: query,
+        marketplaceIds: MARKETPLACE_CA,
+        includedData: 'summaries',
+      },
+    })
+    return data.items?.[0]?.asin ?? null
+  } catch {
+    return null
+  }
+}
+
+// UPC/EAN barcode lookup — higher precision than keyword search.
+export async function findAsinByUpc(upc: string): Promise<string | null> {
+  try {
+    const data = await spFetch<SearchResponse>('/catalog/2022-04-01/items', {
+      params: {
+        identifiers: upc,
+        identifiersType: 'EAN',
+        marketplaceIds: MARKETPLACE_CA,
+        includedData: 'summaries',
+      },
+    })
+    return data.items?.[0]?.asin ?? null
+  } catch {
+    return null
+  }
+}
+
 // Port of amazon.py:get_catalog_data
 export async function getCatalogData(asin: string): Promise<CatalogData> {
   const empty: CatalogData = { title: '', imageUrl: '', bsr: 0, bsrCategory: '' }

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { lookupBrandRisk, riskBadgeClass, BRAND_DB } from '@/lib/reselling/brand-risk'
 import type { BrandRiskEntry } from '@/lib/reselling/types'
+import { ArbEngineTab } from './ArbEngineTab'
 
 interface FlippDealItem {
   name: string
@@ -277,6 +278,7 @@ export function RetailHQPage() {
       <Tabs defaultValue="deals">
         <TabsList>
           <TabsTrigger value="deals">Deals ({items.length})</TabsTrigger>
+          <TabsTrigger value="arb-engine">Arb Engine</TabsTrigger>
           <TabsTrigger value="brand-risk">Brand Risk</TabsTrigger>
           <TabsTrigger value="calculator">ROI Calculator</TabsTrigger>
         </TabsList>
@@ -300,6 +302,10 @@ export function RetailHQPage() {
           {items.map((item, i) => (
             <FlippDealRow key={i} item={item} />
           ))}
+        </TabsContent>
+
+        <TabsContent value="arb-engine" className="pt-4">
+          <ArbEngineTab flippDeals={items} />
         </TabsContent>
 
         <TabsContent value="brand-risk" className="pt-4">

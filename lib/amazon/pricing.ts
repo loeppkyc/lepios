@@ -35,3 +35,22 @@ export async function getUsedBuyBox(asin: string): Promise<number | null> {
   }
   return null
 }
+
+export async function getNewBuyBox(asin: string): Promise<number | null> {
+  try {
+    const data = await spFetch<PricingResponse>('/products/pricing/v0/competitivePrice', {
+      params: { Asins: asin, MarketplaceId: MARKETPLACE_CA, ItemType: 'Asin' },
+    })
+    for (const item of data.payload ?? []) {
+      for (const cp of item.Product?.CompetitivePricing?.CompetitivePrices ?? []) {
+        if (cp.condition.toLowerCase() === 'new') {
+          const amount = cp.Price?.LandedPrice?.Amount
+          if (amount) return Number(amount)
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null
+}
