@@ -15,6 +15,14 @@ interface SaveRowInput {
   as_of_date: string
 }
 
+interface AddRowInput {
+  name: string
+  account_type: 'asset' | 'liability'
+  category: string
+  balance: number
+  as_of_date: string
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   bank: 'Business Banking',
   cash: 'Cash',
@@ -135,6 +143,16 @@ export function NetWorthPage() {
   const [pillar, setPillar] = useState<Pillar>('all')
   const [savingSnap, setSavingSnap] = useState(false)
   const [snapMsg, setSnapMsg] = useState<string | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState<AddRowInput>({
+    name: '',
+    account_type: 'asset',
+    category: 'bank',
+    balance: 0,
+    as_of_date: new Date().toISOString().slice(0, 10),
+  })
+  const [addFormErr, setAddFormErr] = useState<string | null>(null)
+  const [addFormSaving, setAddFormSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -186,6 +204,33 @@ export function NetWorthPage() {
       const j = (await r.json()) as { ok?: boolean; error?: string }
       if (!r.ok || j.error) throw new Error(j.error ?? `HTTP ${r.status}`)
       await load()
+    },
+    [load]
+  )
+
+  const addRow = useCallback(
+    async (input: AddRowInput) => {
+      const r = await fetch('/api/balance-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      const j = (await r.json()) as { id?: string; error?: string }
+      if (!r.ok || j.error) throw new Error(j.error ?? `HTTP ${r.status}`)
+      await load()
+    },
+    [load]
+  )
+
+  const deleteRow = useCallback(
+    async (id: string) => {
+      const r = await fetch(`/api/balance-sheet/${id}`, { method: 'DELETE' })
+      if (r.status === 204) {
+        await load()
+        return
+      }
+      const j = (await r.json()) as { error?: string }
+      throw new Error(j.error ?? `HTTP ${r.status}`)
     },
     [load]
   )
@@ -380,6 +425,27 @@ export function NetWorthPage() {
             Edit Balances
           </Link>
           <button
+            onClick={() => {
+              setShowAddForm((v) => !v)
+              setAddFormErr(null)
+            }}
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              padding: '7px 14px',
+              background: showAddForm ? 'var(--color-surface-2)' : 'none',
+              color: showAddForm ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+            }}
+          >
+            {showAddForm ? 'Cancel' : '+ Add Account'}
+          </button>
+          <button
             onClick={saveSnapshot}
             disabled={savingSnap || !data}
             style={{
@@ -412,6 +478,265 @@ export function NetWorthPage() {
           }}
         >
           {snapMsg}
+        </div>
+      )}
+
+      {showAddForm && (
+        <div
+          style={{
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 20px',
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-text-disabled)',
+              marginBottom: 14,
+            }}
+          >
+            New Account
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '2 1 180px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                Name
+              </span>
+              <input
+                type="text"
+                maxLength={100}
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. EQ Bank HISA"
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-primary)',
+                  padding: '5px 10px',
+                  outline: 'none',
+                }}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 120px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                Type
+              </span>
+              <select
+                value={addForm.account_type}
+                onChange={(e) =>
+                  setAddForm((f) => ({
+                    ...f,
+                    account_type: e.target.value as 'asset' | 'liability',
+                  }))
+                }
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-primary)',
+                  padding: '5px 10px',
+                  outline: 'none',
+                }}
+              >
+                <option value="asset">Asset</option>
+                <option value="liability">Liability</option>
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 160px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                Category
+              </span>
+              <select
+                value={addForm.category}
+                onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value }))}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-primary)',
+                  padding: '5px 10px',
+                  outline: 'none',
+                }}
+              >
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 120px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                Balance
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                value={addForm.balance}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, balance: parseFloat(e.target.value) || 0 }))
+                }
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-primary)',
+                  padding: '5px 10px',
+                  outline: 'none',
+                  textAlign: 'right',
+                }}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 140px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                As of Date
+              </span>
+              <input
+                type="date"
+                value={addForm.as_of_date}
+                onChange={(e) => setAddForm((f) => ({ ...f, as_of_date: e.target.value }))}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-primary)',
+                  padding: '5px 10px',
+                  outline: 'none',
+                }}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', paddingBottom: 1 }}>
+              <button
+                onClick={() => {
+                  setShowAddForm(false)
+                  setAddFormErr(null)
+                  setAddForm({
+                    name: '',
+                    account_type: 'asset',
+                    category: 'bank',
+                    balance: 0,
+                    as_of_date: new Date().toISOString().slice(0, 10),
+                  })
+                }}
+                disabled={addFormSaving}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  padding: '5px 12px',
+                  background: 'none',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-muted)',
+                  cursor: addFormSaving ? 'wait' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!addForm.name.trim()) {
+                    setAddFormErr('Name is required.')
+                    return
+                  }
+                  if (!Number.isFinite(addForm.balance)) {
+                    setAddFormErr('Invalid balance.')
+                    return
+                  }
+                  setAddFormSaving(true)
+                  setAddFormErr(null)
+                  try {
+                    await addRow({ ...addForm, name: addForm.name.trim() })
+                    setShowAddForm(false)
+                    setAddForm({
+                      name: '',
+                      account_type: 'asset',
+                      category: 'bank',
+                      balance: 0,
+                      as_of_date: new Date().toISOString().slice(0, 10),
+                    })
+                  } catch (e) {
+                    setAddFormErr(e instanceof Error ? e.message : String(e))
+                  } finally {
+                    setAddFormSaving(false)
+                  }
+                }}
+                disabled={addFormSaving}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  fontWeight: 700,
+                  padding: '5px 14px',
+                  background: 'var(--color-accent-gold)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#000',
+                  cursor: addFormSaving ? 'wait' : 'pointer',
+                }}
+              >
+                {addFormSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+          {addFormErr && (
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: '#e5534b',
+                marginTop: 10,
+              }}
+            >
+              {addFormErr}
+            </div>
+          )}
         </div>
       )}
 
@@ -563,6 +888,7 @@ export function NetWorthPage() {
                       rows={rows}
                       total={cat.total}
                       onSave={saveRow}
+                      onDelete={deleteRow}
                     />
                   )
                 })}
@@ -680,12 +1006,14 @@ function RowGroup({
   rows,
   total,
   onSave,
+  onDelete,
 }: {
   label: string
   isLiability: boolean
   rows: BalanceSheetEntryLite[]
   total: number
   onSave: (input: SaveRowInput) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }) {
   return (
     <>
@@ -720,7 +1048,7 @@ function RowGroup({
         <td />
       </tr>
       {rows.map((r) => (
-        <EditableRow key={r.id} row={r} onSave={onSave} />
+        <EditableRow key={r.id} row={r} onSave={onSave} onDelete={onDelete} />
       ))}
     </>
   )
@@ -729,15 +1057,20 @@ function RowGroup({
 function EditableRow({
   row,
   onSave,
+  onDelete,
 }: {
   row: BalanceSheetEntryLite
   onSave: (input: SaveRowInput) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const [balanceStr, setBalanceStr] = useState(String(row.balance))
   const [asOfDate, setAsOfDate] = useState(row.as_of_date)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteErr, setDeleteErr] = useState<string | null>(null)
 
   function startEdit() {
     setBalanceStr(String(row.balance))
@@ -868,6 +1201,77 @@ function EditableRow({
           >
             —
           </span>
+        ) : confirmDelete ? (
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: '#e5534b',
+              }}
+            >
+              Delete {row.name}? This cannot be undone.
+            </span>
+            <button
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteErr(null)
+              }}
+              disabled={deleting}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-muted)',
+                cursor: deleting ? 'wait' : 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                setDeleting(true)
+                setDeleteErr(null)
+                try {
+                  await onDelete(row.id)
+                } catch (e) {
+                  setDeleteErr(e instanceof Error ? e.message : String(e))
+                  setDeleting(false)
+                  setConfirmDelete(false)
+                }
+              }}
+              disabled={deleting}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                fontWeight: 700,
+                padding: '3px 10px',
+                background: '#e5534b',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: '#fff',
+                cursor: deleting ? 'wait' : 'pointer',
+              }}
+            >
+              {deleting ? 'Deleting…' : 'Confirm'}
+            </button>
+            {deleteErr && (
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: '#e5534b',
+                  alignSelf: 'center',
+                }}
+                title={deleteErr}
+              >
+                ⚠
+              </span>
+            )}
+          </span>
         ) : editing ? (
           <span style={{ display: 'inline-flex', gap: 6 }}>
             <button
@@ -918,21 +1322,43 @@ function EditableRow({
             )}
           </span>
         ) : (
-          <button
-            onClick={startEdit}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-nano)',
-              padding: '3px 10px',
-              background: 'none',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--color-text-disabled)',
-              cursor: 'pointer',
-            }}
-          >
-            Edit
-          </button>
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <button
+              onClick={startEdit}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-disabled)',
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                setConfirmDelete(true)
+                setDeleteErr(null)
+              }}
+              title={`Delete ${row.name}`}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: '0.75rem',
+                padding: '3px 7px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-disabled)',
+                cursor: 'pointer',
+                lineHeight: 1,
+              }}
+            >
+              🗑
+            </button>
+          </span>
         )}
       </td>
     </tr>
