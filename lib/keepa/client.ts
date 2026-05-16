@@ -1,3 +1,5 @@
+import { keepaBreaker } from '@/lib/circuit-breaker'
+
 const KEEPA_BASE = 'https://api.keepa.com'
 
 function keepaKey(): string {
@@ -40,7 +42,7 @@ export async function keepaFetch(
 
   let res: Response
   try {
-    res = await fetch(url.toString())
+    res = await keepaBreaker.call(() => fetch(url.toString()))
   } catch (e) {
     console.error('[keepaFetch] network error:', e)
     return { product: null, tokensLeft: null }

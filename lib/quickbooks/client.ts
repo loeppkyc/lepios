@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { qboBreaker } from '@/lib/circuit-breaker'
 import type {
   AccountBalance,
   QBOAccountsResponse,
@@ -112,10 +113,10 @@ export async function fetchAccounts(): Promise<AccountBalance[]> {
   )
   const url = `${QBO_API_BASE}/${realmId}/query?query=${query}&minorversion=${MINOR_VERSION}`
 
-  const res = await fetch(url, {
+  const res = await qboBreaker.call(() => fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     next: { revalidate: 300 },
-  })
+  }))
 
   if (!res.ok) throw new Error(`QBO accounts query failed: ${res.status} ${await res.text()}`)
 
@@ -145,9 +146,9 @@ export async function fetchTransactions(
   })
   const url = `${QBO_API_BASE}/${realmId}/reports/TransactionList?${params}`
 
-  const res = await fetch(url, {
+  const res = await qboBreaker.call(() => fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  })
+  }))
 
   if (!res.ok) throw new Error(`QBO TransactionList failed: ${res.status} ${await res.text()}`)
 
