@@ -4,6 +4,7 @@ import {
   expandRecurring,
   summariseExpenses,
   type Frequency,
+  type PersonHandle,
   type BusinessExpense,
   type ExpensesResponse,
 } from '@/lib/types/expenses'
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   const [year, mo] = month.split('-').map(Number)
   const lastDay = new Date(year, mo, 0).getDate()
   const from = `${month}-01`
-  const to   = `${month}-${String(lastDay).padStart(2, '0')}`
+  const to = `${month}-${String(lastDay).padStart(2, '0')}`
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -60,6 +61,8 @@ interface CreateBody {
   notes?: unknown
   businessUsePct?: unknown
   frequency?: unknown
+  personHandle?: unknown
+  splitPct?: unknown
 }
 
 export async function POST(request: Request) {
@@ -70,7 +73,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
   }
 
-  const { date, vendor, category, pretax, taxAmount, paymentMethod, hubdoc, notes, businessUsePct, frequency } = body
+  const {
+    date,
+    vendor,
+    category,
+    pretax,
+    taxAmount,
+    paymentMethod,
+    hubdoc,
+    notes,
+    businessUsePct,
+    frequency,
+    personHandle,
+    splitPct,
+  } = body
 
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'date required (YYYY-MM-DD)' }, { status: 400 })
@@ -95,11 +111,30 @@ export async function POST(request: Request) {
   }
   const freq = (frequency ?? 'one-time') as Frequency
   if (!['one-time', 'monthly', 'annual'].includes(freq)) {
-    return NextResponse.json({ error: 'frequency must be one-time | monthly | annual' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'frequency must be one-time | monthly | annual' },
+      { status: 400 }
+    )
   }
 
+  const validHandles: PersonHandle[] = ['colin', 'megan', 'shared']
+  const handle: PersonHandle =
+    typeof personHandle === 'string' && validHandles.includes(personHandle as PersonHandle)
+      ? (personHandle as PersonHandle)
+      : 'colin'
+
+  // split_pct: only meaningful for shared; clamp 1–99
+  const resolvedSplitPct: number | null =
+    handle === 'shared' && typeof splitPct === 'number'
+      ? Math.min(99, Math.max(1, Math.round(splitPct)))
+      : handle === 'shared'
+        ? 50 // default 50/50 when caller omits splitPct
+        : null
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const rows = expandRecurring(date, pretax, taxAmount as number, freq)
@@ -114,6 +149,8 @@ export async function POST(request: Request) {
     hubdoc: hubdoc === true,
     notes: typeof notes === 'string' ? notes.trim() : '',
     business_use_pct: Math.round(businessUsePct as number),
+    person_handle: handle,
+    split_pct: resolvedSplitPct,
   }))
 
   const { error } = await supabase.from('business_expenses').insert(inserts)
