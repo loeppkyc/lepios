@@ -13,6 +13,7 @@ export interface BalanceSheetEntry {
   notes: string | null
   sort_order: number
   source: 'manual' | 'auto_sync'
+  currency: 'CAD' | 'USD'
   updated_at: string
 }
 

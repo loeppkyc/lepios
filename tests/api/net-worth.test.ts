@@ -10,9 +10,10 @@
  *   - changeSinceSnapshot delta math
  *   - Snapshot insertion with correct totals + notes validation
  *   - History limit cap + ASC ordering
+ *   - C6: USD row balance × mocked FX rate is used in total assets calculation
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 interface SupabaseRow {
   id: string
@@ -23,6 +24,7 @@ interface SupabaseRow {
   as_of_date: string
   notes: string | null
   sort_order: number
+  currency?: 'CAD' | 'USD'
 }
 
 interface SnapshotRow {
@@ -54,6 +56,23 @@ vi.mock('@/lib/supabase/server', () => ({
   ),
 }))
 
+// Default fetch mock: Bank of Canada returns a valid FX rate (1.40 for test clarity).
+// Existing tests use CAD-only rows so fxRate has no effect on their math.
+const MOCK_FX_RATE = 1.40
+const MOCK_FX_DATE = '2026-05-16'
+
+function makeFxFetchMock(rate = MOCK_FX_RATE, date = MOCK_FX_DATE) {
+  return vi.fn(() =>
+    Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          observations: [{ d: date, FXUSDCAD: { v: String(rate) } }],
+        }),
+    })
+  )
+}
+
 import { GET as getNetWorth } from '@/app/api/net-worth/route'
 import { POST as postSnapshot } from '@/app/api/net-worth/snapshot/route'
 import { GET as getHistory } from '@/app/api/net-worth/history/route'
@@ -63,6 +82,12 @@ beforeEach(() => {
   mockGetUser.mockReset()
   mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
   insertCapture.row = null
+  // Default: Bank of Canada API succeeds with MOCK_FX_RATE.
+  vi.stubGlobal('fetch', makeFxFetchMock())
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 function makeEntry(overrides: Partial<SupabaseRow>): SupabaseRow {
@@ -75,6 +100,7 @@ function makeEntry(overrides: Partial<SupabaseRow>): SupabaseRow {
     as_of_date: overrides.as_of_date ?? '2026-03-31',
     notes: overrides.notes ?? null,
     sort_order: overrides.sort_order ?? 0,
+    currency: overrides.currency,
   }
 }
 
@@ -233,6 +259,70 @@ describe('GET /api/net-worth — math', () => {
     expect(body.netWorth).toBe(1000)
     expect(body.latestSnapshot.net_worth).toBe(500)
     expect(body.changeSinceSnapshot).toBe(500)
+  })
+})
+
+describe('GET /api/net-worth — C6 currency conversion', () => {
+  it('USD row balance is multiplied by the mocked FX rate in total assets', async () => {
+    // USD row: 5000 USD. At MOCK_FX_RATE=1.40, CAD equivalent = 7000.
+    // CAD row: 10000 CAD. Total assets = 7000 + 10000 = 17000.
+    vi.stubGlobal('fetch', makeFxFetchMock(1.40, '2026-05-16'))
+    setupTables({
+      entries: [
+        makeEntry({ account_type: 'asset', category: 'personal_bank', balance: 5000, currency: 'USD' }),
+        makeEntry({ account_type: 'asset', category: 'bank', balance: 10000, currency: 'CAD' }),
+      ],
+    })
+    const res = await getNetWorth()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Total assets: 5000 * 1.40 (= 7000) + 10000 = 17000
+    expect(body.totalAssets).toBe(17000)
+    expect(body.netWorth).toBe(17000)
+    // FX rate info in response
+    expect(body.fxRate).toBe(1.40)
+    expect(body.fxRateDate).toBe('2026-05-16')
+    expect(body.fxRateFallback).toBe(false)
+    // The USD row itself has balance_native=5000, balance_cad=7000
+    const usdRow = body.rows.find((r: { currency: string }) => r.currency === 'USD')
+    expect(usdRow).toBeTruthy()
+    expect(usdRow.balance_native).toBe(5000)
+    expect(usdRow.balance_cad).toBe(7000)
+    expect(usdRow.balance).toBe(7000) // CAD-converted value used in totals
+  })
+
+  it('falls back to 1.37 rate when Bank of Canada API is unreachable', async () => {
+    // Stub fetch to throw a network error.
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Network error'))))
+    setupTables({
+      entries: [
+        makeEntry({ account_type: 'asset', category: 'personal_bank', balance: 1000, currency: 'USD' }),
+      ],
+    })
+    const res = await getNetWorth()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Fallback rate: 1.37
+    expect(body.fxRateFallback).toBe(true)
+    expect(body.fxRate).toBe(1.37)
+    // 1000 * 1.37 = 1370
+    expect(body.totalAssets).toBe(1370)
+  })
+
+  it('CAD rows are not multiplied by FX rate', async () => {
+    vi.stubGlobal('fetch', makeFxFetchMock(1.50, '2026-05-16'))
+    setupTables({
+      entries: [
+        makeEntry({ account_type: 'asset', category: 'bank', balance: 10000, currency: 'CAD' }),
+        makeEntry({ account_type: 'liability', category: 'loan', balance: 3000, currency: 'CAD' }),
+      ],
+    })
+    const res = await getNetWorth()
+    const body = await res.json()
+    // CAD rows use native balance directly, regardless of FX rate.
+    expect(body.totalAssets).toBe(10000)
+    expect(body.totalLiabilities).toBe(3000)
+    expect(body.netWorth).toBe(7000)
   })
 })
 
