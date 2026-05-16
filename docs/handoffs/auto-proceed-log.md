@@ -361,3 +361,16 @@ outcome: escalated
 escalation_reasons:
   - Q1_colin_decision_required (Phase 1a skip vs supplementary — values trade-off, not pattern-match)
   - Q2_coordinator_md_explicit_approval (doctrine-level edit per ARCHITECTURE.md §3 rule 4)
+
+2026-05-16T00:00:00Z sprint=backlog-tier-e chunk=E4 doc=docs/backlog/tier-e/E4-acceptance.md
+cited_principles: [Architecture-Rule-1 (Beef-Up)]
+trigger_match_evidence: |
+  Rule 1: "Default action: Beef-Up what exists. Build-New requires explicit Colin approval."
+  Situation: InventoryTab.tsx exists with full CRUD, expiration alerts, API routes, and DB table.
+  Three-bucket summary is an additive UI enhancement (add ~10-15 lines above the existing table).
+  Not a new component, not a new route, not a schema change. This is Beef-Up by definition.
+reversibility_check: |
+  InventoryTab.tsx: additive change — add status count bar above existing table. Revert: git revert.
+  No schema migration, no DB change, no external API. Revert cost: trivial.
+confidence: high
+outcome: auto-proceeded (META-C)
