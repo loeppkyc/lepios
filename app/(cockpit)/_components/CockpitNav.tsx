@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { href: '/pallets', label: 'Pallets' },
   { href: '/utility', label: 'Utility' },
   { href: '/status', label: 'Status' },
+  { href: '/system', label: 'System' },
 ]
 
 export function CockpitNav() {
