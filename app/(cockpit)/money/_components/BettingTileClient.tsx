@@ -254,6 +254,7 @@ function FreshStartBanner() {
   const [dismissed, setDismissed] = useState(true) // start hidden to avoid flash
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDismissed(localStorage.getItem(BANNER_KEY) === 'true')
   }, [])
 

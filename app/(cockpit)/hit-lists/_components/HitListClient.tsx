@@ -141,6 +141,7 @@ export function HitListClient() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedId) { setItems([]); return }
     fetchItems(selectedId)
     setBatchActive(false)
