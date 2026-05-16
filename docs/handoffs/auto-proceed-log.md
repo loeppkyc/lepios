@@ -1,3 +1,20 @@
+2026-05-16T17:42:00Z sprint=backlog-tier-c task=9e210b02 doc=docs/backlog/tier-c/C4-acceptance.md
+cited_principles: [15, 1, META-C, open-questions]
+trigger_match_evidence: |
+  Colin approved overall approach (Puppeteer + AutoTrader.ca, 2026-05-16).
+  Q2 resolved: coordinator chose Option A (toast + Edit mode fallback) — reversible.
+  Q3 resolved: coordinator chose confirmation step — reversible.
+  Q1 BLOCKING: Tesla model (Model 3 vs Model Y) — required for AutoTrader.ca URL.
+  Cannot proceed to builder without Q1. Escalating for Q1 only via Telegram [Model 3]/[Model Y] buttons.
+reversibility_check: |
+  Q2 decision (Option A fallback): reversible — change fallback UI via code edit.
+  Q3 decision (confirmation step): reversible — remove confirmation dialog via code edit.
+  Q1 unknown: no code written yet, no reversibility issue — just waiting for Colin's answer.
+confidence: n/a — open Q1 blocks builder. Q2/Q3 coordinator-decided (reversible, confirmed).
+outcome: escalated-for-q1 (coordinator resolved Q2/Q3; Q1 requires Colin factual answer)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
@@ -361,3 +378,33 @@ outcome: escalated
 escalation_reasons:
   - Q1_colin_decision_required (Phase 1a skip vs supplementary — values trade-off, not pattern-match)
   - Q2_coordinator_md_explicit_approval (doctrine-level edit per ARCHITECTURE.md §3 rule 4)
+
+---
+
+2026-05-16T00:00:00Z sprint=standalone task=9e210b02 doc=docs/backlog/tier-c/C4-acceptance.md
+cited_principles: [15, 1, META-C]
+trigger_match_evidence: |
+  Principle 15 trigger: "Proposed module is an outlier from the observed pattern
+  ('we've never done this before')."
+  Situation: This is the first production Vercel API route to use Puppeteer/Chromium
+  in this codebase. browser-handlers.ts exists in harness but is not deployed to
+  production Vercel API routes. New terrain.
+  Principle 1 trigger: "Any external API mentioned in a proposed acceptance doc."
+  Situation: AutoTrader.ca live-tested → HTTP 403 (Puppeteer required — confirmed).
+  Open questions Q1, Q2, Q3 cannot be resolved without Colin's decision.
+  Additionally: package.json is a seam file — new deps require Colin approval per
+  .claude/CLAUDE.md seam rules.
+reversibility_check: |
+  Acceptance doc: new file, fully reversible (delete or rewrite).
+  package.json deps: reversible — npm remove @sparticuz/chromium puppeteer-core.
+  New API route: reversible — delete file.
+  NetWorthPage.tsx button: reversible — remove the button UI.
+  All decisions: LOW cost to reverse.
+confidence: n/a — escalation mandatory (Principle 15 + open questions + seam dep)
+outcome: escalated
+escalation_reasons:
+  - principle_15_new_terrain (first production Vercel Puppeteer route)
+  - open_question_Q1 (Tesla model unknown — required for search query)
+  - open_question_Q2 (fallback UX — needs Colin confirmation)
+  - open_question_Q3 (confirmation step — needs Colin confirmation)
+  - seam_file_package_json (new deps require [seam-approved] — Colin must explicitly approve)

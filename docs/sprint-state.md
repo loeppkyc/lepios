@@ -1,4 +1,27 @@
 # ============================================================
+# C4 — Tesla Auto-Valuation Button (task 9e210b02)
+# ============================================================
+
+backlog_c4:
+  task_id: "9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
+  status: "awaiting-q1-answer"
+  phase: "2-acceptance-doc-approved-q1-blocking"
+  acceptance_doc: "docs/backlog/tier-c/C4-acceptance.md"
+  colin_approved_at: "2026-05-16T17:27:06Z"
+  q1_blocking: "Tesla model (Model 3 or Model Y?) — required for AutoTrader.ca search URL"
+  q2_resolved: "Option A — error toast + open Edit mode (coordinator decision)"
+  q3_resolved: "Confirmation step before save (coordinator decision)"
+  approach: "Puppeteer + AutoTrader.ca Alberta listings, median comparable price"
+  files_to_change:
+    - "package.json (seam — @sparticuz/chromium + puppeteer-core)"
+    - "package-lock.json (seam)"
+    - "app/api/net-worth/tesla-estimate/route.ts (new)"
+    - "app/(cockpit)/net-worth/_components/NetWorthPage.tsx"
+  telegram_q1_notification_sent_at: "2026-05-16T17:42:00Z"
+  opened_at: "2026-05-16T17:20:00Z"
+  last_updated_at: "2026-05-16T17:42:00Z"
+
+# ============================================================
 # retail-scout-arbitrage — task 3a13fc07
 # ============================================================
 
@@ -358,3 +381,24 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# C4 — Tesla Auto-Valuation Button (task 9e210b02, 2026-05-16)
+# ============================================================
+
+tesla_auto_valuation:
+  task_id: "9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
+  status: "awaiting-colin-approval"
+  description: "Add Estimate Value button to Tesla row on Net Worth page — AutoTrader.ca scrape via Puppeteer"
+  acceptance_doc: "docs/backlog/tier-c/C4-acceptance.md"
+  open_questions:
+    - "Q1: What model is the 2022 Tesla? (Model 3 / Model Y / other — required for search URL)"
+    - "Q2: Fallback UX when Puppeteer fails — confirm Option A (toast + open edit mode)?"
+    - "Q3: Confirmation step before saving estimate — confirm yes?"
+    - "seam_approval: package.json needs @sparticuz/chromium + puppeteer-core"
+  branch: "harness/task-9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
+  tesla_row_id: "bbe41f11-ba74-4e16-9912-fe835bc7a6ab"
+  tesla_current_balance: 39500.00
+  autotrader_live_test: "HTTP 403 — Puppeteer required (confirmed)"
+  opened_at: "2026-05-16T00:00:00Z"
+  last_updated_at: "2026-05-16T00:00:00Z"
