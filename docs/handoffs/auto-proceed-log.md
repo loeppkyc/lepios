@@ -361,3 +361,24 @@ outcome: escalated
 escalation_reasons:
   - Q1_colin_decision_required (Phase 1a skip vs supplementary — values trade-off, not pattern-match)
   - Q2_coordinator_md_explicit_approval (doctrine-level edit per ARCHITECTURE.md §3 rule 4)
+
+---
+
+2026-05-16T17:30:00Z sprint=tier-e task=d02c895e doc=docs/backlog/tier-e/E4-acceptance.md
+cited_principles: [Architecture Rule 1 (Beef-Up what exists), META-C, reversibility]
+trigger_match_evidence: |
+  Situation: Add a three-bucket status summary bar (On hand / Low / Out counts) above the
+  inventory table in app/(cockpit)/diet/_components/InventoryTab.tsx. Single file change,
+  no schema migration, no API changes, no seam files, no destructive ops.
+  Architecture Rule 1: InventoryTab is 80% built (CRUD, API, expiration alerts, flat table).
+  The summary bar is a direct beef-up of existing work — same file, same component, additive JSX.
+  META-C trigger: additive UI on an existing LepiOS module (diet cockpit page), in a domain
+  where multiple prior chunks have shipped (diet is not new terrain). Prior coordinator
+  (task 2a374e67) audited and validated the feature scope.
+  All Path C hard-guards passed: no destructive ops, no seam files, no canonical writes,
+  not new terrain (diet module has 7+ shipped components), auto_approve_disabled not set.
+reversibility_check: |
+  Single JSX block insertion (~31 lines) in one component file.
+  Reversible: delete the inserted block. Cost: trivial grep/edit. No schema, no data loss.
+confidence: high
+outcome: auto-proceeded (META-C)

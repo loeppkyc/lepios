@@ -358,3 +358,21 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# Tier-E task E4 — diet InventoryTab three-bucket summary (task d02c895e, 2026-05-16)
+# ============================================================
+
+tier_e_E4:
+task_id: "d02c895e-aaba-40ac-a78f-cf93c77f9e2d"
+coordinator_task_id: "2a374e67-3b80-4ed2-9e25-2b9a34c1bb21"
+status: "in-build"
+description: "Add three-bucket summary bar to /diet InventoryTab — On hand / Low / Out counts above table"
+acceptance_doc: "docs/backlog/tier-e/E4-acceptance.md"
+branch: "harness/task-d02c895e-aaba-40ac-a78f-cf93c77f9e2d"
+files_to_change: ["app/(cockpit)/diet/_components/InventoryTab.tsx"]
+no_schema_change: true
+approval: "META-C auto-proceed — Architecture Rule 1 (Beef-Up), high confidence, trivially reversible"
+builder_delegated_at: "2026-05-16T17:30:00Z"
+opened_at: "2026-05-16T17:06:41Z"
+last_updated_at: "2026-05-16T17:30:00Z"

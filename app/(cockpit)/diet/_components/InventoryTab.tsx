@@ -274,6 +274,37 @@ export function InventoryTab({ inventory }: { inventory: InventoryRow[] }) {
         </div>
       )}
 
+      {inventory.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', gap: 24 }}>
+            {(['On hand', 'Low', 'Out'] as const).map((s) => {
+              const n = inventory.filter((r) => r.status === s).length
+              const color =
+                s === 'Low'
+                  ? 'var(--color-pillar-money)'
+                  : s === 'Out'
+                    ? 'var(--color-critical)'
+                    : 'var(--color-text-primary)'
+              return (
+                <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ ...labelStyle }}>{s}</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-body)',
+                      fontWeight: 700,
+                      color,
+                    }}
+                  >
+                    {n}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {inventory.length === 0 ? (
         <EmptyState message="No inventory items yet." />
       ) : (
