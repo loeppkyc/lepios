@@ -426,12 +426,54 @@
       "claimed_at": "2026-05-16",
       "note": "session_beacons table — one row per active Claude Code window, written by PostToolUse hook. Lets any window detect mid-session peers without window-start opt-in."
     },
+    "0219": {
+      "branch": "harness/task-e1-pet-health",
+      "filename": "0219_pet_health.sql",
+      "claimed_at": "2026-05-16",
+      "note": "E1 — Pet Health Centre. 4 tables: pets, vet_visits, pet_vaccinations, pet_medications."
+    },
+    "0220": {
+      "branch": "harness/task-e2-lego-vault",
+      "filename": "0220_lego_vault.sql",
+      "claimed_at": "2026-05-16",
+      "note": "E2 — Lego Vault. 3 tables: lego_vault, lego_retiring_sets, lego_theme_config."
+    },
     "0221": {
       "branch": "harness/task-e5-shared-expenses",
       "filename": "0221_expenses_person_handle.sql",
       "claimed_at": "2026-05-16",
-      "note": "E5 -- add person_handle + split_pct columns to business_expenses for Colin/Megan/Shared split tracking. See docs/backlog/tier-e/E5-acceptance.md."
+      "note": "E5 — add person_handle + split_pct columns to business_expenses for Colin/Megan/Shared split tracking."
+    },
+    "0222": {
+      "branch": "harness/task-c6-currency-aware",
+      "filename": "0222_balance_sheet_currency.sql",
+      "claimed_at": "2026-05-16",
+      "note": "C6 — Currency-aware Net Worth. Adds currency column to balance_sheet_entries."
+    },
+    "0223": {
+      "branch": "harness/task-a7-behavioral-engine",
+      "filename": "0223_predictions.sql",
+      "claimed_at": "2026-05-16",
+      "note": "A7 — Behavioral Engine / Predictions. predictions table for calibration log + settle."
+    },
+    "0224": {
+      "branch": "harness/task-b4-arb-corpus",
+      "filename": "0224_arb_decisions.sql",
+      "claimed_at": "2026-05-16",
+      "note": "B4 — Arb Corpus. arb_decisions table for buy/skip/unsure training data."
+    },
+    "0225": {
+      "branch": "harness/task-b5-square-webhook",
+      "filename": "0225_local_sales.sql",
+      "claimed_at": "2026-05-16",
+      "note": "B5 — Square Webhook. local_sales table for Square payment events."
+    },
+    "0226": {
+      "branch": "harness/task-b9-hardware-track",
+      "filename": "0226_hardware_components.sql",
+      "claimed_at": "2026-05-16",
+      "note": "B9 — Hardware Track. hardware_components table for PC/peripheral inventory."
     }
   },
-  "next_available": 222
+  "next_available": 227
 }
