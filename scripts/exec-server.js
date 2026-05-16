@@ -10,6 +10,7 @@
  *     service: http://localhost:8002
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 'use strict'
 
 const http = require('http')

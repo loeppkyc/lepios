@@ -141,7 +141,7 @@ describe('AC-C.1: agent_events outcome row (ok)', () => {
   it('inserts chat_ui.tool.ok event after successful execute', async () => {
     const tools = buildTools(BASE_CTX)
     const toolCallId = 'call-ok-001'
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     await tools['getHarnessRollup'].execute({ tier: 'all' }, { toolCallId })
 
     expect(mockInsert).toHaveBeenCalledWith(
@@ -171,7 +171,7 @@ describe('AC-D: tool result shape', () => {
 
   it('returns allowed:true with rollupPct from computeHarnessRollup', async () => {
     const tools = buildTools(BASE_CTX)
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     const result = (await tools['getHarnessRollup'].execute(
       { tier: 'all' },
       { toolCallId: 'call-d-001' },
@@ -186,7 +186,7 @@ describe('AC-D: tool result shape', () => {
 
   it('returns componentCount matching fixture', async () => {
     const tools = buildTools(BASE_CTX)
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     const result = (await tools['getHarnessRollup'].execute(
       {},
       { toolCallId: 'call-d-002' },
@@ -217,7 +217,7 @@ describe('AC-D.1: tool timeout', () => {
     const t0 = Date.now()
 
     await expect(
-      // @ts-expect-error
+      // @ts-expect-error -- dynamic tool access by string key
       tools['getHarnessRollup'].execute({ tier: 'all' }, { toolCallId: 'call-timeout-001' }),
     ).rejects.toThrow()
 
@@ -233,7 +233,7 @@ describe('AC-D.1: tool timeout', () => {
 
     const tools = buildTools(BASE_CTX)
     await expect(
-      // @ts-expect-error
+      // @ts-expect-error -- dynamic tool access by string key
       tools['getHarnessRollup'].execute({ tier: 'all' }, { toolCallId: 'call-timeout-002' }),
     ).rejects.toThrow()
 
@@ -253,7 +253,7 @@ describe('AC-F: denied path', () => {
 
   it('returns allowed:false with reason and auditId', async () => {
     const tools = buildTools(BASE_CTX)
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     const result = (await tools['getHarnessRollup'].execute(
       { tier: 'all' },
       { toolCallId: 'call-denied-001' },
@@ -268,14 +268,14 @@ describe('AC-F: denied path', () => {
 
   it('does NOT call computeHarnessRollup when denied', async () => {
     const tools = buildTools(BASE_CTX)
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     await tools['getHarnessRollup'].execute({ tier: 'all' }, { toolCallId: 'call-denied-002' })
     expect(mockComputeHarnessRollup).not.toHaveBeenCalled()
   })
 
   it('does NOT insert an agent_events outcome row when denied', async () => {
     const tools = buildTools(BASE_CTX)
-    // @ts-expect-error
+    // @ts-expect-error -- dynamic tool access by string key
     await tools['getHarnessRollup'].execute({ tier: 'all' }, { toolCallId: 'call-denied-003' })
     // logToolEvent is only called on execute success/error/timeout, not on deny
     expect(mockInsert).not.toHaveBeenCalled()

@@ -52,6 +52,7 @@ export function BankRegisterPage() {
       .catch((e: unknown) => { setError(String(e)); setLoading(false) })
   }, [selectedAccount, startDate, endDate])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadRegister() }, [loadRegister])
 
   async function saveOpeningBalance() {

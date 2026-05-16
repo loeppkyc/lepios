@@ -156,6 +156,7 @@ export function MonthlyClosePage() {
       .catch((e: unknown) => { setError(String(e)); setLoading(false) })
   }, [year])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
 
   async function handleClose(month: MonthSummary) {

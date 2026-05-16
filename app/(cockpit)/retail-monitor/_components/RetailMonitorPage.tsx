@@ -393,6 +393,7 @@ function AutoScanPanel() {
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadConfigs() }, [loadConfigs])
 
   const toggleStore = (code: string) => {
@@ -604,6 +605,7 @@ export function RetailMonitorPage() {
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [load])
 
   const handleStatusChange = async (id: string, status: RetailWatchlistStatus) => {

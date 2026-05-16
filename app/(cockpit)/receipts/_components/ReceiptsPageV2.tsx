@@ -178,6 +178,7 @@ export function ReceiptsPageV2() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchReceipts()
   }, [fetchReceipts])
 

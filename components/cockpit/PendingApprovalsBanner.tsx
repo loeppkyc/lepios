@@ -45,6 +45,7 @@ export function PendingApprovalsBanner() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchPending()
     const id = setInterval(() => void fetchPending(), 60_000)
     return () => clearInterval(id)
