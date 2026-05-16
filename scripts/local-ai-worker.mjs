@@ -83,10 +83,23 @@ async function loadRuntimeConfig() {
   const { data } = await db
     .from('harness_config')
     .select('key, value')
-    .in('key', ['TELEGRAM_CHAT_ID', 'ALERTS_CLEARED_AT'])
+    .in('key', [
+      'TELEGRAM_CHAT_ID',
+      'ALERTS_CLEARED_AT',
+      'WORKER_ALERT_SIGNAL_REVIEW',
+      'WORKER_ALERT_SECURITY_SCAN',
+      'WORKER_ALERT_HEALTH_DIGEST',
+    ])
   for (const row of data ?? []) {
     if (row.key === 'TELEGRAM_CHAT_ID') telegramChatId = row.value
     if (row.key === 'ALERTS_CLEARED_AT') alertsClearedAt = row.value
+    // Restore per-type cooldowns so restarts don't bypass the 4h window
+    if (row.key === 'WORKER_ALERT_SIGNAL_REVIEW' && row.value)
+      lastAlertAt['signal_review'] = new Date(row.value).getTime()
+    if (row.key === 'WORKER_ALERT_SECURITY_SCAN' && row.value)
+      lastAlertAt['security_scan'] = new Date(row.value).getTime()
+    if (row.key === 'WORKER_ALERT_HEALTH_DIGEST' && row.value)
+      lastAlertAt['health_digest'] = new Date(row.value).getTime()
   }
   log(
     `Runtime config: TELEGRAM_CHAT_ID=${telegramChatId ? 'loaded' : 'missing'}, ALERTS_CLEARED_AT=${alertsClearedAt ?? 'none'}`
@@ -191,6 +204,12 @@ async function notify(message, type = 'general') {
     return
   }
   lastAlertAt[type] = now
+  // Persist cooldown so restarts don't re-fire within the window
+  const configKey = `WORKER_ALERT_${type.toUpperCase().replace(/-/g, '_')}`
+  void db
+    .from('harness_config')
+    .upsert({ key: configKey, value: new Date(now).toISOString() }, { onConflict: 'key' })
+    .catch(() => {})
   try {
     await db.from('outbound_notifications').insert({
       channel: 'telegram',
@@ -239,21 +258,36 @@ async function runSignalReview() {
     return
   }
 
-  const summary = rows
+  // Deduplicate by domain:action — collapse repeated firings into a single count line
+  const grouped = {}
+  for (const r of rows) {
+    const key = `${r.domain}/${r.action}`
+    if (!grouped[key]) {
+      grouped[key] = { action: r.action, status: r.status, count: 0, sample: '' }
+    }
+    grouped[key].count++
+    if (!grouped[key].sample) {
+      grouped[key].sample = (r.error_message ?? r.output_summary ?? '').slice(0, 120)
+    }
+  }
+  const uniquePatterns = Object.values(grouped)
+  const summary = uniquePatterns
     .map(
-      (r) =>
-        `[${r.action}] ${r.status}: ${(r.error_message ?? r.output_summary ?? '').slice(0, 100)}`
+      (p) =>
+        `[${p.action}] ${p.status}${p.count > 1 ? ` (x${p.count} occurrences)` : ''}: ${p.sample}`
     )
     .join('\n')
     .slice(0, 3000)
 
-  const prompt = `You are reviewing ${rows.length} failures and warnings from the last ${LOOKBACK_HOURS} hours of a personal OS (LepiOS). Identify which ones warrant immediate attention vs which are routine noise.
+  const prompt = `You are reviewing ${rows.length} events (${uniquePatterns.length} unique patterns) from the last ${LOOKBACK_HOURS} hours of a personal OS (LepiOS). Identify which ones warrant immediate attention vs which are routine noise.
 
 Context on expected behaviour — do NOT flag these as anomalies:
 - claude_code/claude.usage: token counts vary widely session to session. High variability is normal.
-- orchestrator/task_pickup with reason "coordinator_startup_skipped_quota_forecast": this is the quota guard working correctly.
+- orchestrator/task_pickup with any skip reason (quota limits, burn_rate_cliff_risk, coordinator_startup_skipped, etc.): this cron fires every 5 minutes; skip-reasons are the guards working correctly.
+- knowledge/knowledge.search.fts_only: Ollama embedding unavailable so text search (FTS) was used as a fallback. This is graceful degradation, not an error.
+- orchestrator/night_tick with partial_failure: the nightly health scan found at least one check warning. One or two occurrences per week is expected; only flag if it repeats for 3+ consecutive days.
 
-Issues:
+Issues (deduplicated):
 ${summary}
 
 Format your response as a numbered list of genuine concerns. If nothing needs action, say "No anomalies detected."`
@@ -263,7 +297,7 @@ Format your response as a numbered list of genuine concerns. If nothing needs ac
     const durationMs = Date.now() - start
     const hasAnomalies = !result.text.toLowerCase().includes('no anomalies detected')
     log(
-      `signal_review: done in ${durationMs}ms — ${rows.length} failures/warnings, ~${result.tokens} tokens${hasAnomalies ? ' — ANOMALIES FOUND' : ''}`
+      `signal_review: done in ${durationMs}ms — ${rows.length} raw events, ${uniquePatterns.length} unique patterns, ~${result.tokens} tokens${hasAnomalies ? ' — ANOMALIES FOUND' : ''}`
     )
     await logEvent('ollama', 'signal_review', {
       status: hasAnomalies ? 'warning' : 'success',

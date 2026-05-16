@@ -330,11 +330,11 @@ export async function findKnowledge(
 
     const ftsRows = ftsResult.status === 'fulfilled' ? ftsResult.value : []
 
-    // Vector path unavailable → FTS-only fallback
+    // Vector path unavailable → FTS-only fallback (success — degraded but functional)
     if (embeddingResult.status === 'rejected') {
       void logEvent('knowledge', 'knowledge.search.fts_only', {
         actor: 'system',
-        status: 'warning',
+        status: 'success',
         inputSummary: trimmedQuery.slice(0, 200),
         outputSummary: `Ollama unreachable — fell back to FTS (${ftsRows.length} results)`,
       })
@@ -350,10 +350,10 @@ export async function findKnowledge(
     })
 
     if (vectorError || !vectorData) {
-      // RPC failed — fall back to FTS
+      // RPC failed — fall back to FTS (success — degraded but functional)
       void logEvent('knowledge', 'knowledge.search.fts_only', {
         actor: 'system',
-        status: 'warning',
+        status: 'success',
         inputSummary: trimmedQuery.slice(0, 200),
         outputSummary: `match_knowledge RPC error — fell back to FTS (${ftsRows.length} results)`,
       })
