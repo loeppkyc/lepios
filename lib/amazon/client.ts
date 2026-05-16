@@ -1,5 +1,6 @@
 import { createHmac, createHash } from 'crypto'
 import { logEvent } from '@/lib/knowledge/client'
+import { spApiBreaker } from '@/lib/circuit-breaker'
 
 const SP_API_BASE = 'https://sellingpartnerapi-na.amazon.com'
 
@@ -146,11 +147,11 @@ export async function spFetch<T>(
     const bodyStr = body ? JSON.stringify(body) : ''
     const headers = buildAuthHeaders(method, url, lwaToken, bodyStr)
 
-    const res = await fetch(url.toString(), {
+    const res = await spApiBreaker.call(() => fetch(url.toString(), {
       method,
       headers,
       ...(bodyStr ? { body: bodyStr } : {}),
-    })
+    }))
 
     if (res.status === 429) {
       if (attempt === MAX_RETRIES) {

@@ -6,6 +6,7 @@
 // before the manual Vault-secret-creation step lands.
 
 import { createServiceClient } from '@/lib/supabase/service'
+import { telegramBreaker } from '@/lib/circuit-breaker'
 
 type Db = ReturnType<typeof createServiceClient>
 
@@ -82,7 +83,7 @@ export async function sendDailyBot(
     return { ok: false, error: 'TELEGRAM_CHAT_ID not in harness_config' }
   }
   try {
-    const res = await fetch(`${TG_API_BASE}${token}/sendMessage`, {
+    const res = await telegramBreaker.call(() => fetch(`${TG_API_BASE}${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -91,7 +92,7 @@ export async function sendDailyBot(
         parse_mode: parseMode,
         disable_web_page_preview: true,
       }),
-    })
+    }))
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean
       result?: { message_id?: number }

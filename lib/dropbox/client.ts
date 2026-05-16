@@ -12,6 +12,7 @@
 
 import { httpRequest } from '@/lib/harness/arms-legs/http'
 import { createServiceClient } from '@/lib/supabase/service'
+import { dropboxBreaker } from '@/lib/circuit-breaker'
 import type {
   DeleteResult,
   DropboxEntry,
@@ -100,7 +101,7 @@ export async function getAccessToken(): Promise<string> {
 
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const token = await getAccessToken()
-  const result = await httpRequest({
+  const result = await dropboxBreaker.call(() => httpRequest({
     url: `${API_BASE}${path}`,
     method: 'POST',
     capability: CAP_API,
@@ -110,7 +111,7 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
       'Content-Type': 'application/json',
     },
     body,
-  })
+  }))
   if (!result.ok) {
     throw new Error(`Dropbox API ${path} failed: ${result.status} ${result.body.slice(0, 300)}`)
   }
@@ -175,7 +176,7 @@ export async function getSpaceUsage(): Promise<SpaceUsage> {
  */
 export async function downloadFile(path: string): Promise<string> {
   const token = await getAccessToken()
-  const result = await httpRequest({
+  const result = await dropboxBreaker.call(() => httpRequest({
     url: `${CONTENT_BASE}/files/download`,
     method: 'POST',
     capability: CAP_CONTENT,
@@ -186,7 +187,7 @@ export async function downloadFile(path: string): Promise<string> {
     },
     // No body — Dropbox download uses header-encoded arg
     body: null,
-  })
+  }))
   if (!result.ok) {
     throw new Error(
       `Dropbox download failed for ${path}: ${result.status} ${result.body.slice(0, 200)}`
@@ -205,7 +206,7 @@ export async function uploadFile(
   mode: UploadMode = 'overwrite'
 ): Promise<UploadResult> {
   const token = await getAccessToken()
-  const result = await httpRequest({
+  const result = await dropboxBreaker.call(() => httpRequest({
     url: `${CONTENT_BASE}/files/upload`,
     method: 'POST',
     capability: CAP_CONTENT,
@@ -222,7 +223,7 @@ export async function uploadFile(
       }),
     },
     body: content,
-  })
+  }))
   if (!result.ok) {
     throw new Error(
       `Dropbox upload failed for ${path}: ${result.status} ${result.body.slice(0, 200)}`
