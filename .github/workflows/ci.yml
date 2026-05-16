@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type:check
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Migration grant check
+        run: node scripts/lint-migration-grants.mjs
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_anon_key_for_build_only
+          SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role_key_for_build_only
+          # Other build-time env vars with non-empty placeholders so Next.js
+          # does not error on missing required vars during build.
+          CRON_SECRET: placeholder_cron_secret_for_build_only
+          TELEGRAM_BOT_TOKEN: placeholder
+          TELEGRAM_CHAT_ID: placeholder
+          AMAZON_SP_REFRESH_TOKEN: placeholder
+          AMAZON_SP_CLIENT_ID: placeholder
+          AMAZON_SP_CLIENT_SECRET: placeholder
+          AMAZON_AWS_ACCESS_KEY: placeholder
+          AMAZON_AWS_SECRET_KEY: placeholder
+          AMAZON_SELLER_ID: placeholder
+          KEEPA_API_KEY: placeholder
+          EBAY_APP_ID: placeholder
+          EBAY_CERT_ID: placeholder
+          DROPBOX_APP_KEY: placeholder
+          DROPBOX_APP_SECRET: placeholder
+          DROPBOX_REFRESH_TOKEN: placeholder
+          OURA_ACCESS_TOKEN: placeholder
+          OLLAMA_TUNNEL_URL: http://localhost:11434
