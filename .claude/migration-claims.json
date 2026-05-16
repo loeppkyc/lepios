@@ -407,7 +407,19 @@
       "filename": "0214_systems_ideas_memory_stats.sql",
       "claimed_at": "2026-05-16",
       "note": "Systems page -- ideas (brain dump feed) + memory_stats (Windows RAM telemetry) tables. Harness_config seeds: gpu_day_score, orb_day_score, business_review_pct."
+    },
+    "0216": {
+      "branch": "harness/task-3a13fc07",
+      "filename": "0216_improvement_log.sql",
+      "claimed_at": "2026-05-16",
+      "note": "improvement_log table — baseline metrics + delta per component build. Required for F19 continuous improvement loop measurement."
+    },
+    "0217": {
+      "branch": "harness/task-3a13fc07",
+      "filename": "0217_daily_scan_log.sql",
+      "claimed_at": "2026-05-16",
+      "note": "daily_scan_log table — scan agent output storage for iterative full-pass algorithm."
     }
   },
-  "next_available": 215
+  "next_available": 218
 }

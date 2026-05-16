@@ -14,8 +14,14 @@ type FeesResponse = {
 
 // Port of amazon.py:get_fba_fees + 21_PageProfit.py:958-960 secondary fallback.
 // If SP-API returns exactly 40% (its own fallback), use 15% + $5.50 (more accurate for books).
+// Pass bookMode:false for non-book items to skip the book correction.
 // If SP-API call fails entirely, fall back to flat 40%.
-export async function getFbaFees(asin: string, price: number): Promise<number> {
+export async function getFbaFees(
+  asin: string,
+  price: number,
+  options?: { bookMode?: boolean }
+): Promise<number> {
+  const bookMode = options?.bookMode ?? true
   try {
     const data = await spFetch<FeesResponse>(`/products/fees/v0/items/${asin}/feesEstimate`, {
       method: 'POST',
@@ -36,8 +42,8 @@ export async function getFbaFees(asin: string, price: number): Promise<number> {
     if (amount != null) {
       const fees = Number(amount)
       const flat40 = Math.round(price * 0.4 * 100) / 100
-      // If API returned its own 40% fallback, use the more accurate book estimate
-      if (Math.abs(fees - flat40) < 0.01) {
+      // If API returned its own 40% fallback AND this is a book, use the more accurate book estimate
+      if (bookMode && Math.abs(fees - flat40) < 0.01) {
         return Math.round((price * 0.15 + 5.5) * 100) / 100
       }
       return fees
