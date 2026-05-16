@@ -26,6 +26,20 @@ interface ReconcileQueue {
   pending: PendingTxn[]
   accounts: AccountOption[]
   totalNeedsReview: number
+  approvedCount: number
+  rejectedCount: number
+  bulkEligibleCount: number
+}
+
+interface IngestRun {
+  id: string
+  run_at: string
+  source: string
+  rows_added: number
+  rows_skipped: number
+  period_start: string | null
+  period_end: string | null
+  notes: string | null
 }
 
 interface RowEdit {
@@ -202,12 +216,30 @@ function extractPatternHint(p: PendingTxn): string {
   return tokens.slice(0, 2).join(' ').toUpperCase()
 }
 
+function fmtRunDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export function ReconcilePage() {
   const [data, setData] = useState<ReconcileQueue | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, RowEdit>>({})
   const [refetchKey, setRefetchKey] = useState(0)
+
+  // Ingest freshness
+  const [ingestRuns, setIngestRuns] = useState<IngestRun[]>([])
+  const [ingestLoading, setIngestLoading] = useState(true)
+
+  // Bulk-approve state
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkConfirming, setBulkConfirming] = useState(false)
+  const [bulkFlash, setBulkFlash] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
 
   const reload = useCallback(() => setRefetchKey((k) => k + 1), [])
 
@@ -239,6 +271,60 @@ export function ReconcilePage() {
       cancelled = true
     }
   }, [refetchKey])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadIngest() {
+      setIngestLoading(true)
+      try {
+        const res = await fetch('/api/bookkeeping/ingest-runs', { cache: 'no-store' })
+        if (!res.ok) return
+        const runs = (await res.json()) as IngestRun[]
+        if (!cancelled) setIngestRuns(runs)
+      } catch {
+        // non-fatal — freshness banner falls back to "No ingestion data yet"
+      } finally {
+        if (!cancelled) setIngestLoading(false)
+      }
+    }
+    void loadIngest()
+    return () => {
+      cancelled = true
+    }
+  }, [refetchKey])
+
+  async function bulkApprove() {
+    setBulkBusy(true)
+    setBulkFlash(null)
+    try {
+      const res = await fetch('/api/bookkeeping/reconcile/bulk-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confidence_threshold: 85 }),
+      })
+      const body = (await res.json()) as {
+        approved?: number
+        jes_created?: number
+        errors?: string[]
+        error?: string
+      }
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+      const n = body.approved ?? 0
+      setBulkFlash({
+        kind: 'ok',
+        msg: `Approved ${n} transaction${n !== 1 ? 's' : ''}, ${body.jes_created ?? 0} JEs created`,
+      })
+      setTimeout(reload, 800)
+    } catch (err: unknown) {
+      setBulkFlash({
+        kind: 'err',
+        msg: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setBulkBusy(false)
+      setBulkConfirming(false)
+    }
+  }
 
   function patch(id: string, p: Partial<RowEdit>) {
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...p } }))
@@ -346,10 +432,118 @@ export function ReconcilePage() {
             </span>
           )}
         </span>
-        <button onClick={reload} style={s.btnSecondary}>
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Bulk-approve button */}
+          {data && data.bulkEligibleCount > 0 && !bulkConfirming && (
+            <button
+              onClick={() => setBulkConfirming(true)}
+              disabled={bulkBusy}
+              style={s.btnPrimary}
+            >
+              Bulk Approve ≥85% confidence ({data.bulkEligibleCount})
+            </button>
+          )}
+          {bulkConfirming && (
+            <>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                Approve {data?.bulkEligibleCount ?? 0} transactions? Cannot be undone.
+              </span>
+              <button onClick={() => void bulkApprove()} disabled={bulkBusy} style={s.btnPrimary}>
+                {bulkBusy ? 'Working…' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setBulkConfirming(false)}
+                disabled={bulkBusy}
+                style={s.btnSecondary}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+          {bulkFlash && (
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color:
+                  bulkFlash.kind === 'ok'
+                    ? 'var(--color-positive, #4caf50)'
+                    : 'var(--color-critical)',
+              }}
+            >
+              {bulkFlash.msg}
+            </span>
+          )}
+          <button onClick={reload} style={s.btnSecondary}>
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Progress summary bar */}
+      {data && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-small)',
+            color: 'var(--color-text-muted)',
+            marginBottom: 8,
+            display: 'flex',
+            gap: 16,
+          }}
+        >
+          <span>
+            Approved:{' '}
+            <span style={{ color: 'var(--color-positive, #4caf50)', fontWeight: 600 }}>
+              {data.approvedCount}
+            </span>
+          </span>
+          <span>·</span>
+          <span>
+            Rejected:{' '}
+            <span style={{ color: 'var(--color-critical)', fontWeight: 600 }}>
+              {data.rejectedCount}
+            </span>
+          </span>
+          <span>·</span>
+          <span>
+            Remaining:{' '}
+            <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
+              {data.totalNeedsReview}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* Last ingested banner */}
+      {!ingestLoading && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+            marginBottom: 20,
+          }}
+        >
+          {ingestRuns.length > 0 ? (
+            <>
+              Last ingested: {fmtRunDate(ingestRuns[0].run_at)} — {ingestRuns[0].rows_added} rows
+              loaded{' '}
+              <span style={{ color: 'var(--color-text-muted)' }}>
+                [source: {ingestRuns[0].source}]
+              </span>
+            </>
+          ) : (
+            'No ingestion data yet — run the CLI script first'
+          )}
+        </div>
+      )}
 
       {loading && (
         <div

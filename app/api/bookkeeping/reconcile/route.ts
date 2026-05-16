@@ -28,6 +28,9 @@ export interface ReconcileQueue {
   pending: PendingTxn[]
   accounts: AccountOption[]
   totalNeedsReview: number
+  approvedCount: number
+  rejectedCount: number
+  bulkEligibleCount: number // rows with confidence >= 85 AND suggested_expense_account IS NOT NULL
 }
 
 export async function GET() {
@@ -78,6 +81,28 @@ export async function GET() {
 
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
 
+  // Progress counts: approved, rejected, and bulk-eligible (confidence >= 85 with account set).
+  // 'manual_je' is the post-approval status per pending_transactions CHECK constraint.
+  const { data: allRows } = await supabase
+    .from('pending_transactions')
+    .select('status, confidence, suggested_expense_account')
+
+  let approvedCount = 0
+  let rejectedCount = 0
+  let bulkEligibleCount = 0
+  for (const row of allRows ?? []) {
+    const st = row.status as string
+    if (st === 'manual_je' || st === 'auto_approved') approvedCount++
+    if (st === 'rejected') rejectedCount++
+    if (
+      st === 'needs_review' &&
+      row.confidence != null &&
+      Number(row.confidence) >= 85 &&
+      row.suggested_expense_account != null
+    )
+      bulkEligibleCount++
+  }
+
   const payload: ReconcileQueue = {
     pending: (pending ?? []).map((p) => ({
       id: p.id as string,
@@ -101,6 +126,9 @@ export async function GET() {
       qb_type: a.qb_type as string,
     })),
     totalNeedsReview: pending?.length ?? 0,
+    approvedCount,
+    rejectedCount,
+    bulkEligibleCount,
   }
 
   return NextResponse.json(payload)
