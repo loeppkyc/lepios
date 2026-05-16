@@ -358,3 +358,24 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# C4 — Tesla Auto-Valuation Button (task 9e210b02, 2026-05-16)
+# ============================================================
+
+tesla_auto_valuation:
+  task_id: "9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
+  status: "awaiting-colin-approval"
+  description: "Add Estimate Value button to Tesla row on Net Worth page — AutoTrader.ca scrape via Puppeteer"
+  acceptance_doc: "docs/backlog/tier-c/C4-acceptance.md"
+  open_questions:
+    - "Q1: What model is the 2022 Tesla? (Model 3 / Model Y / other — required for search URL)"
+    - "Q2: Fallback UX when Puppeteer fails — confirm Option A (toast + open edit mode)?"
+    - "Q3: Confirmation step before saving estimate — confirm yes?"
+    - "seam_approval: package.json needs @sparticuz/chromium + puppeteer-core"
+  branch: "harness/task-9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
+  tesla_row_id: "bbe41f11-ba74-4e16-9912-fe835bc7a6ab"
+  tesla_current_balance: 39500.00
+  autotrader_live_test: "HTTP 403 — Puppeteer required (confirmed)"
+  opened_at: "2026-05-16T00:00:00Z"
+  last_updated_at: "2026-05-16T00:00:00Z"
