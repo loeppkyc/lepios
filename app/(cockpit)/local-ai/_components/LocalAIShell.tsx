@@ -24,7 +24,10 @@ function fmtGb(bytes: number) {
 }
 
 function fmtK(n: number) {
-  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k'
+  return String(n)
 }
 
 // ── Shared count-up hook ──────────────────────────────────────────────────────
