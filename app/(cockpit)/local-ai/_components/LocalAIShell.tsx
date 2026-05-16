@@ -195,7 +195,8 @@ function fmtChartDate(dateStr: string) {
 }
 
 function fmtTokenAxis(n: number) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(0) + 'M'
   if (n >= 1000) return (n / 1000).toFixed(0) + 'k'
   return String(n)
 }
@@ -263,7 +264,7 @@ function TokenHistoryChart({ daily }: { daily: TokenDayPoint[] }) {
         </div>
       </div>
       <ChartContainer config={tokenChartConfig} className="h-36 w-full">
-        <BarChart data={daily} margin={{ top: 4, right: 0, left: -16, bottom: 0 }}>
+        <BarChart data={daily} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.4} />
           <XAxis
             dataKey="date"
@@ -280,7 +281,7 @@ function TokenHistoryChart({ daily }: { daily: TokenDayPoint[] }) {
           <YAxis
             tickLine={false}
             axisLine={false}
-            width={44}
+            width={52}
             tickFormatter={fmtTokenAxis}
             tick={{
               fontSize: 10,
