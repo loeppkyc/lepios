@@ -1,3 +1,20 @@
+2026-05-16T17:42:00Z sprint=backlog-tier-c task=9e210b02 doc=docs/backlog/tier-c/C4-acceptance.md
+cited_principles: [15, 1, META-C, open-questions]
+trigger_match_evidence: |
+  Colin approved overall approach (Puppeteer + AutoTrader.ca, 2026-05-16).
+  Q2 resolved: coordinator chose Option A (toast + Edit mode fallback) — reversible.
+  Q3 resolved: coordinator chose confirmation step — reversible.
+  Q1 BLOCKING: Tesla model (Model 3 vs Model Y) — required for AutoTrader.ca URL.
+  Cannot proceed to builder without Q1. Escalating for Q1 only via Telegram [Model 3]/[Model Y] buttons.
+reversibility_check: |
+  Q2 decision (Option A fallback): reversible — change fallback UI via code edit.
+  Q3 decision (confirmation step): reversible — remove confirmation dialog via code edit.
+  Q1 unknown: no code written yet, no reversibility issue — just waiting for Colin's answer.
+confidence: n/a — open Q1 blocks builder. Q2/Q3 coordinator-decided (reversible, confirmed).
+outcome: escalated-for-q1 (coordinator resolved Q2/Q3; Q1 requires Colin factual answer)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |

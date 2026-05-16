@@ -2,9 +2,13 @@
 
 **task_id:** `9e210b02-a0c5-4f17-8e8a-d413d52da9e1`  
 **tier:** C  
-**status:** awaiting-colin-approval  
-**written by:** coordinator (2026-05-16)  
-**branch:** `harness/task-9e210b02-a0c5-4f17-8e8a-d413d52da9e1`
+**status:** awaiting-q1-answer (Tesla model: Model 3 or Model Y?)  
+**written by:** coordinator (2026-05-16), updated (2026-05-16)  
+**branch:** `harness/task-9e210b02-a0c5-4f17-8e8a-d413d52da9e1`  
+**colin_approved:** 2026-05-16 (overall approach — Puppeteer + AutoTrader.ca)  
+**q2_resolved:** Option A — on scrape error, show toast + open inline Edit mode (coordinator decision, reversible)  
+**q3_resolved:** Confirmation step before save — "Comps found: median $XX,XXX from N listings — Use This Value | Cancel" (coordinator decision, reversible)  
+**q1_blocking:** Colin must specify Tesla model — see Open Questions below
 
 ---
 
@@ -75,37 +79,20 @@ No schema migration required (the existing `balance_sheet_entries` table PATCH v
 
 ## Open questions for Colin (REQUIRED before builder proceeds)
 
-### Q1 — Tesla model for the search query
+### Q1 — Tesla model for the search query ⚠️ STILL BLOCKING
 The row is `"2022 Tesla (Vehicle)"` — no model specified. AutoTrader.ca search is much more accurate when filtered by model (Model 3, Model Y, Model S, Model X). Comparable listings for different models vary by $10,000–$20,000 CAD.
 
-**Options:**
-- A) Hardcode `model_y` as the search (common assumption — confirm it's a Model Y)
-- B) Hardcode `model_3` (confirm it's a Model 3)
-- C) Search all 2022 Tesla without model filter (wider pool, less accurate comps)
-- D) Add a `notes` field annotation on the balance_sheet_entry row to specify model, and let the API read it at scrape time
+**Colin: what model is the 2022 Tesla?**
+- Tap **[Model 3]** in Telegram to use `model_3` in the AutoTrader search
+- Tap **[Model Y]** in Telegram to use `model_y` in the AutoTrader search
 
-**Colin: what model is the 2022 Tesla?** (This determines search URL. Builder cannot proceed without an answer.)
+Builder cannot proceed without this answer.
 
-### Q2 — Fallback UX when Puppeteer fails or bundle size exceeds limit
-The task description specifies: *"if Puppeteer bundle exceeds Vercel Hobby limit, fall back to manual-entry-with-reminder."*
+### Q2 — Fallback UX ✅ RESOLVED (coordinator decision)
+**Decision:** Option A — on scrape error, show toast "Auto-estimate failed. Enter value manually." and open the existing inline Edit mode for the Tesla row. Reversible via UI change.
 
-**Options:**
-- A) On button click, if the scrape API returns an error, show a toast: "Auto-estimate failed. Enter value manually." and open inline edit mode for the Tesla row.
-- B) On button click, if the scrape API fails, show a warning with a direct link to AutoTrader.ca Alberta Tesla search.
-- C) Pre-check at deploy time — if `@sparticuz/chromium` exceeds bundle size, the entire route returns a 501 with a message, and the button shows as "Manual Only."
-
-**Recommended:** Option A (simplest fallback, matches stated kill signal)
-
-**Colin: confirm or override Option A?**
-
-### Q3 — Confirm before save: preview vs auto-update
-Suggested UX: button triggers a loading state, then shows a "Comps found: median $XX,XXX from N listings — Use This Value | Cancel" inline. Colin clicks "Use This Value" to trigger the PATCH.
-
-**Alternative:** Just update the balance directly (no confirmation step) — faster but overwrites without preview.
-
-**Recommended:** Confirmation step (grounding principle — balance is a net worth figure, not a real-time feed)
-
-**Colin: confirm confirmation step?**
+### Q3 — Confirmation before save ✅ RESOLVED (coordinator decision)
+**Decision:** Confirmation step retained — "Comps found: median $XX,XXX from N listings — Use This Value | Cancel" inline. Colin clicks "Use This Value" to trigger the PATCH. Protects against silent balance overwrite. Reversible via UI change.
 
 ---
 
