@@ -24,5 +24,18 @@
     "network": {
       "allowedDomains": ["lepios-one.vercel.app"]
     }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/session-heartbeat.mjs"
+          }
+        ]
+      }
+    ]
   }
 }
