@@ -9,6 +9,15 @@ import type {
   NetWorthSnapshot,
 } from '@/app/api/net-worth/route'
 
+function fmtUSD(n: number) {
+  return n.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+}
+
 interface SaveRowInput {
   id: string
   balance: number
@@ -821,6 +830,22 @@ export function NetWorthPage() {
                 </div>
               )}
             </div>
+            {/* FX rate label — always shown when data available */}
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-nano)',
+                color: data.fxRateFallback
+                  ? 'var(--color-text-muted)'
+                  : 'var(--color-text-disabled)',
+                alignSelf: 'flex-end',
+                marginLeft: 'auto',
+              }}
+            >
+              {data.fxRateFallback
+                ? `Rate: ~${data.fxRate.toFixed(2)} CAD/USD (estimated)`
+                : `Rate: 1 USD = ${data.fxRate.toFixed(4)} CAD as of ${data.fxRateDate}`}
+            </div>
           </div>
 
           {/* Pillar tabs */}
@@ -1145,19 +1170,47 @@ function EditableRow({
         }}
       >
         {editing ? (
-          <input
-            type="number"
-            step="0.01"
-            value={balanceStr}
-            onChange={(e) => setBalanceStr(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void save()
-              if (e.key === 'Escape') cancel()
-            }}
-            style={{ ...inputStyle, width: 130, textAlign: 'right' }}
-            autoFocus
-            disabled={saving}
-          />
+          <span>
+            <input
+              type="number"
+              step="0.01"
+              value={balanceStr}
+              onChange={(e) => setBalanceStr(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void save()
+                if (e.key === 'Escape') cancel()
+              }}
+              style={{ ...inputStyle, width: 130, textAlign: 'right' }}
+              autoFocus
+              disabled={saving}
+            />
+            {row.currency === 'USD' && (
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-disabled)',
+                  marginLeft: 4,
+                }}
+              >
+                USD
+              </span>
+            )}
+          </span>
+        ) : row.currency === 'USD' ? (
+          <span>
+            {fmtUSD(row.balance_native)}
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-disabled)',
+                marginLeft: 4,
+              }}
+            >
+              ({'≈'}&nbsp;{fmt(row.balance_cad)}&nbsp;CAD)
+            </span>
+          </span>
         ) : (
           fmt(row.balance)
         )}
