@@ -15,6 +15,7 @@ logs/
 
 # dependencies
 /node_modules
+mcp-server/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
