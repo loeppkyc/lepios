@@ -381,4 +381,9 @@
     background-color: var(--color-accent-dim);
     box-shadow: 0 0 16px var(--color-accent-glow);
   }
+
+  /* Pressure gauge arc — animated stroke-dasharray for GaugePressure component */
+  .gauge-arc {
+    transition: stroke-dasharray 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }

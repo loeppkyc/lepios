@@ -401,7 +401,13 @@
       "filename": "0213_balance_sheet_source.sql",
       "claimed_at": "2026-05-16",
       "note": "Sprint 7 Chunk F -- add source column (manual/auto_sync) to balance_sheet_entries."
+    },
+    "0214": {
+      "branch": "feat/systems-page",
+      "filename": "0214_systems_ideas_memory_stats.sql",
+      "claimed_at": "2026-05-16",
+      "note": "Systems page -- ideas (brain dump feed) + memory_stats (Windows RAM telemetry) tables. Harness_config seeds: gpu_day_score, orb_day_score, business_review_pct."
     }
   },
-  "next_available": 214
+  "next_available": 215
 }
