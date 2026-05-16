@@ -25,7 +25,7 @@ jobs:
         run: npm run lint
 
       - name: Type check
-        run: npm run type:check
+        run: npx tsc --noEmit --project tsconfig.ci.json
 
       - name: Unit tests
         run: npm run test
