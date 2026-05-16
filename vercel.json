@@ -21,6 +21,10 @@
       "schedule": "30 12 * * *"
     },
     {
+      "path": "/api/harness/auto-approve-docs",
+      "schedule": "0 14 * * *"
+    },
+    {
       "path": "/api/cron/deploy-gate-runner",
       "schedule": "0 2 * * *"
     },
