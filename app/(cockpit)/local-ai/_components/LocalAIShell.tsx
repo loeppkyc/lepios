@@ -20,88 +20,92 @@ function fmtK(n: number) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
 }
 
-// ── Live Token Wheel ──────────────────────────────────────────────────────────
+// ── Shared count-up hook ──────────────────────────────────────────────────────
 
-function LiveTokenWheel({ stats }: { stats: TokenStatsResponse | null }) {
-  const weekTokens = stats ? stats.this_week.claude_tokens + stats.this_week.ollama_tokens : 0
-  const weekSaved = stats?.this_week.ollama_saved_usd ?? 0
-  const weekClaudeCost = stats?.this_week.claude_cost_usd ?? 0
-  const ollamaPct = stats && weekTokens > 0 ? stats.this_week.ollama_tokens / weekTokens : 0
-
-  const [display, setDisplay] = useState(0)
-  const prevRef = useRef(0)
+function useCountUp(target: number, duration = 900) {
+  const [display, setDisplay] = useState(target)
+  const prevRef = useRef(target)
   const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (weekTokens === prevRef.current) return
+    if (target === prevRef.current) return
     const start = prevRef.current
-    const end = weekTokens
-    const duration = 900
     const startTime = performance.now()
     const animate = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1)
       const eased = 1 - Math.pow(1 - t, 3)
-      setDisplay(Math.round(start + (end - start) * eased))
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
+      setDisplay(Math.round(start + (target - start) * eased))
+      if (t < 1) rafRef.current = requestAnimationFrame(animate)
     }
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(animate)
-    prevRef.current = end
+    prevRef.current = target
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [weekTokens])
+  }, [target, duration])
 
-  const R = 52
-  const CX = 68
-  const CY = 68
-  const SIZE = 136
+  return display
+}
+
+// ── Single token wheel ────────────────────────────────────────────────────────
+
+function TokenWheel({
+  label,
+  tokens,
+  fillPct,
+  color,
+  moneyLabel,
+  moneyValue,
+  periodLabel,
+}: {
+  label: string
+  tokens: number
+  fillPct: number // 0–1, how full the arc is
+  color: string
+  moneyLabel: string // e.g. "API equiv" or "saved"
+  moneyValue: string // e.g. "$299.32"
+  periodLabel: string
+}) {
+  const display = useCountUp(tokens)
+  const R = 48
+  const CX = 64
+  const CY = 64
+  const SIZE = 128
   const circ = 2 * Math.PI * R
-  const ollamaDash = circ * Math.min(ollamaPct, 1)
-  const claudeDash = circ * Math.max(1 - ollamaPct, 0)
+  const fill = circ * Math.min(Math.max(fillPct, 0), 1)
+  const gap = circ - fill
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
+        minWidth: 128,
+      }}
+    >
       {/* Wheel */}
-      <div style={{ position: 'relative', width: SIZE, height: SIZE, flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-          {/* Background track */}
-          <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1e1e30" strokeWidth={12} />
-          {/* Claude arc (blue) — fills the remainder */}
-          {claudeDash > 0 && (
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1e1e30" strokeWidth={11} />
+          {fill > 0 && (
             <circle
               cx={CX}
               cy={CY}
               r={R}
               fill="none"
-              stroke="#6b8cff"
-              strokeWidth={12}
+              stroke={color}
+              strokeWidth={11}
               strokeLinecap="butt"
-              strokeDasharray={`${claudeDash} ${ollamaDash}`}
-              strokeDashoffset={-ollamaDash}
-              transform={`rotate(-90 ${CX} ${CY})`}
-              style={{ transition: 'stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1)' }}
-            />
-          )}
-          {/* Ollama arc (green) — leads from top */}
-          {ollamaDash > 0 && (
-            <circle
-              cx={CX}
-              cy={CY}
-              r={R}
-              fill="none"
-              stroke="#37c85a"
-              strokeWidth={12}
-              strokeLinecap="butt"
-              strokeDasharray={`${ollamaDash} ${claudeDash}`}
+              strokeDasharray={`${fill} ${gap}`}
               transform={`rotate(-90 ${CX} ${CY})`}
               style={{ transition: 'stroke-dasharray 0.9s cubic-bezier(0.4,0,0.2,1)' }}
             />
           )}
         </svg>
-        {/* Center label */}
+        {/* Center */}
         <div
           style={{
             position: 'absolute',
@@ -115,7 +119,7 @@ function LiveTokenWheel({ stats }: { stats: TokenStatsResponse | null }) {
           <div
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: '1.25rem',
+              fontSize: '1.1rem',
               fontWeight: 700,
               color: '#fff',
               lineHeight: 1,
@@ -126,76 +130,90 @@ function LiveTokenWheel({ stats }: { stats: TokenStatsResponse | null }) {
           <div
             style={{
               fontFamily: 'var(--font-ui)',
-              fontSize: '0.6rem',
+              fontSize: '0.58rem',
               color: 'var(--color-text-muted)',
               marginTop: 3,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
             }}
           >
-            this week
+            {periodLabel}
           </div>
         </div>
       </div>
-
-      {/* Stats alongside */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.68rem',
-              color: '#37c85a',
-              marginBottom: 2,
-            }}
-          >
-            Ollama saved
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '1.4rem',
-              fontWeight: 700,
-              color: '#37c85a',
-              lineHeight: 1,
-            }}
-          >
-            ${weekSaved.toFixed(3)}
-          </div>
-        </div>
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.68rem',
-              color: '#6b8cff',
-              marginBottom: 2,
-            }}
-          >
-            Claude cost
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '1.4rem',
-              fontWeight: 700,
-              color: '#6b8cff',
-              lineHeight: 1,
-            }}
-          >
-            ${weekClaudeCost.toFixed(3)}
-          </div>
-        </div>
+      {/* Label */}
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.78rem', fontWeight: 600, color }}>
+        {label}
+      </div>
+      {/* Money */}
+      <div style={{ textAlign: 'center' }}>
         <div
           style={{
             fontFamily: 'var(--font-ui)',
-            fontSize: '0.7rem',
+            fontSize: '0.65rem',
             color: 'var(--color-text-muted)',
+            marginBottom: 2,
           }}
         >
-          {Math.round(ollamaPct * 100)}% handled locally
+          {moneyLabel}
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '1.3rem',
+            fontWeight: 700,
+            color,
+            lineHeight: 1,
+          }}
+        >
+          {moneyValue}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Dual wheel row ────────────────────────────────────────────────────────────
+
+function LiveTokenWheels({ stats }: { stats: TokenStatsResponse | null }) {
+  const claudeTokens = stats?.this_week.claude_tokens ?? 0
+  const ollamaTokens = stats?.this_week.ollama_tokens ?? 0
+  const total = claudeTokens + ollamaTokens
+  const claudePct = total > 0 ? claudeTokens / total : 0
+  const ollamaPct = total > 0 ? ollamaTokens / total : 0
+  const claudeCost = stats?.this_week.claude_cost_usd ?? 0
+  const ollamaSaved = stats?.this_week.ollama_saved_usd ?? 0
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 40,
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+      }}
+    >
+      <TokenWheel
+        label="Claude"
+        tokens={claudeTokens}
+        fillPct={claudePct}
+        color="#6b8cff"
+        moneyLabel="API equiv"
+        moneyValue={`$${claudeCost.toFixed(2)}`}
+        periodLabel="this week"
+      />
+      {/* Divider */}
+      <div style={{ width: 1, background: '#2a2a3a', alignSelf: 'stretch', margin: '8px 0' }} />
+      <TokenWheel
+        label="Ollama"
+        tokens={ollamaTokens}
+        fillPct={ollamaPct}
+        color="#37c85a"
+        moneyLabel="saved"
+        moneyValue={`$${ollamaSaved.toFixed(2)}`}
+        periodLabel="this week"
+      />
     </div>
   )
 }
@@ -221,9 +239,10 @@ export function LocalAIShell({
       .then((data) => {
         setTokenStats((prev) => {
           const next = data as TokenStatsResponse
-          const prevTotal = prev ? prev.this_week.claude_tokens + prev.this_week.ollama_tokens : 0
-          const nextTotal = next.this_week.claude_tokens + next.this_week.ollama_tokens
-          if (nextTotal !== prevTotal) setPulse(true)
+          const prevC = prev?.this_week.claude_tokens ?? 0
+          const prevO = prev?.this_week.ollama_tokens ?? 0
+          if (next.this_week.claude_tokens !== prevC || next.this_week.ollama_tokens !== prevO)
+            setPulse(true)
           return next
         })
         setLastUpdated(new Date())
@@ -378,7 +397,7 @@ export function LocalAIShell({
           )}
         </div>
 
-        <LiveTokenWheel stats={tokenStats} />
+        <LiveTokenWheels stats={tokenStats} />
       </div>
 
       {/* ── Stat row ─────────────────────────────────────────── */}

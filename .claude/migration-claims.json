@@ -377,7 +377,13 @@
       "filename": "0209_focus.sql",
       "claimed_at": "2026-05-15",
       "note": "Focus system -- open_loops, time_blocks, focus_sessions tables. Pomodoro timer, Zeigarnik brain-dump, time blocking. Applied to prod via Supabase MCP."
+    },
+    "0210": {
+      "branch": "main",
+      "filename": "0210_widen_cost_usd.sql",
+      "claimed_at": "2026-05-16",
+      "note": "Widen cost_usd from NUMERIC(8,6) to NUMERIC(12,4). Claude Code session scans produce $200-300/day API-equivalent values which overflowed the old precision cap of $99.99. Already applied to prod via Supabase MCP."
     }
   },
-  "next_available": 210
+  "next_available": 211
 }

@@ -15,7 +15,7 @@
  *   (%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup)
  */
 
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, statSync, watch } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
@@ -49,6 +49,7 @@ function loadEnv() {
       .slice(eq + 1)
       .trim()
       .replace(/^["']|["']$/g, '')
+      .replace(/\\n$/g, '') // strip trailing literal \n injected by vercel env pull on Windows
     if (!process.env[key]) process.env[key] = val
   }
 }
@@ -357,6 +358,70 @@ async function runPreResearch() {
   log(`pre_research: ${processed} processed, ${skipped} skipped (already had notes)`)
 }
 
+// ── LepiOS health digest ──────────────────────────────────────────────────────
+
+async function runHealthDigest() {
+  const start = Date.now()
+  // Pull recent agent_events across all domains for a quick health snapshot
+  const since = new Date(Date.now() - 60 * 60_000).toISOString() // last 1h
+  const { data } = await db
+    .from('agent_events')
+    .select('domain, action, status, occurred_at')
+    .gte('occurred_at', since)
+    .order('occurred_at', { ascending: false })
+    .limit(40)
+
+  const rows = data ?? []
+  const failures = rows.filter((r) => r.status === 'failure').length
+  const domains = [...new Set(rows.map((r) => r.domain))]
+
+  const summary =
+    rows.length === 0
+      ? 'No events in the last hour.'
+      : rows
+          .map((r) => `[${r.domain}/${r.action}] ${r.status}`)
+          .join('\n')
+          .slice(0, 2000)
+
+  const prompt = `LepiOS health check — last 1 hour of system activity.
+${summary}
+
+In 2-3 sentences: is the system healthy? Flag any domain that looks stalled or failing. If everything looks normal, say so briefly.`
+
+  try {
+    const result = await ollamaGenerate(prompt, {
+      system: 'You are a system health monitor. Be terse. No pleasantries.',
+    })
+    const durationMs = Date.now() - start
+    const isUnhealthy =
+      failures > 0 ||
+      result.text.toLowerCase().includes('fail') ||
+      result.text.toLowerCase().includes('stall')
+    log(
+      `health_digest: ${rows.length} events, ${failures} failures, ${domains.length} domains — ${durationMs}ms, ~${result.tokens} tokens`
+    )
+    await logEvent('ollama', 'health_digest', {
+      status: isUnhealthy ? 'warning' : 'success',
+      outputSummary: result.text.slice(0, 300),
+      durationMs,
+      tokensUsed: result.tokens,
+      costUsd: 0,
+      meta: {
+        model: ANALYSIS_MODEL,
+        events_reviewed: rows.length,
+        failures,
+        domains,
+        claude_equivalent_usd: result.claudeEquivUsd,
+      },
+    })
+    if (isUnhealthy) {
+      await notify(`LepiOS Health Alert:\n\n${result.text.slice(0, 600)}`)
+    }
+  } catch (err) {
+    log('health_digest: Ollama error:', err.message)
+  }
+}
+
 // ── Security scan ─────────────────────────────────────────────────────────────
 
 async function runSecurityScan() {
@@ -408,6 +473,193 @@ List only genuine concerns. If nothing stands out as a security issue, say "No s
   }
 }
 
+// ── Claude Code session scanner ───────────────────────────────────────────────
+
+const CLAUDE_SESSIONS_DIR = 'C:\\Users\\Colin\\.claude\\projects'
+const CLAUDE_CODE_WATERMARK_KEY = 'claude_code_last_scan_at'
+
+// Claude Sonnet 4.6 pricing ($ per 1M tokens)
+const CC_PRICING = { input: 3.0, output: 15.0, cache_read: 0.3, cache_creation: 3.75 }
+
+async function getClaudeCodeWatermark() {
+  try {
+    const { data } = await db
+      .from('harness_config')
+      .select('value')
+      .eq('key', CLAUDE_CODE_WATERMARK_KEY)
+      .single()
+    if (data?.value) return new Date(data.value)
+  } catch {
+    /* no row yet */
+  }
+  // First run: go back 24 h to capture today's sessions
+  return new Date(Date.now() - 24 * 3_600_000)
+}
+
+async function setClaudeCodeWatermark(ts) {
+  try {
+    const { data: existing } = await db
+      .from('harness_config')
+      .select('key')
+      .eq('key', CLAUDE_CODE_WATERMARK_KEY)
+      .maybeSingle()
+    if (existing) {
+      await db
+        .from('harness_config')
+        .update({ value: ts.toISOString() })
+        .eq('key', CLAUDE_CODE_WATERMARK_KEY)
+    } else {
+      await db
+        .from('harness_config')
+        .insert({ key: CLAUDE_CODE_WATERMARK_KEY, value: ts.toISOString() })
+    }
+  } catch (err) {
+    log('claude_code_scan: watermark write failed:', err.message)
+  }
+}
+
+function findJsonlFiles(dir, results = []) {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) findJsonlFiles(full, results)
+      else if (entry.isFile() && entry.name.endsWith('.jsonl')) results.push(full)
+    }
+  } catch {
+    /* skip unreadable dirs */
+  }
+  return results
+}
+
+let claudeCodeScanRunning = false
+
+async function runClaudeCodeUsageScan() {
+  if (claudeCodeScanRunning) return
+  claudeCodeScanRunning = true
+
+  const watermark = await getClaudeCodeWatermark()
+  const now = new Date()
+
+  if (!existsSync(CLAUDE_SESSIONS_DIR)) {
+    log('claude_code_scan: sessions dir not found — skipping')
+    return
+  }
+
+  const files = findJsonlFiles(CLAUDE_SESSIONS_DIR)
+  let inputTokens = 0
+  let outputTokens = 0
+  let cacheReadTokens = 0
+  let cacheCreationTokens = 0
+  let filesScanned = 0
+  let linesWithUsage = 0
+
+  for (const filePath of files) {
+    try {
+      const stat = statSync(filePath)
+      // Skip files not touched since watermark (mtime prefilter — append-only files are safe)
+      if (stat.mtimeMs <= watermark.getTime()) continue
+      const content = readFileSync(filePath, 'utf-8')
+      filesScanned++
+      for (const line of content.split('\n')) {
+        if (!line.trim()) continue
+        try {
+          const obj = JSON.parse(line)
+          // Per-line timestamp filter: skip lines before watermark
+          if (obj.timestamp && new Date(obj.timestamp) <= watermark) continue
+          // Usage lives at obj.message.usage in Claude Code JSONL format
+          const usage = obj.message?.usage ?? obj.usage
+          if (!usage) continue
+          const it = usage.input_tokens ?? 0
+          const ot = usage.output_tokens ?? 0
+          const cr = usage.cache_read_input_tokens ?? 0
+          const cc = usage.cache_creation_input_tokens ?? 0
+          if (it + ot + cr + cc === 0) continue
+          inputTokens += it
+          outputTokens += ot
+          cacheReadTokens += cr
+          cacheCreationTokens += cc
+          linesWithUsage++
+        } catch {
+          /* skip malformed lines */
+        }
+      }
+    } catch {
+      /* skip unreadable files */
+    }
+  }
+
+  await setClaudeCodeWatermark(now)
+
+  if (linesWithUsage === 0) {
+    log(
+      `claude_code_scan: ${filesScanned} files checked — no new usage since ${watermark.toISOString().slice(0, 16)}`
+    )
+    claudeCodeScanRunning = false
+    return
+  }
+
+  const totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens
+  const costUsd =
+    (inputTokens * CC_PRICING.input +
+      outputTokens * CC_PRICING.output +
+      cacheReadTokens * CC_PRICING.cache_read +
+      cacheCreationTokens * CC_PRICING.cache_creation) /
+    1_000_000
+
+  log(
+    `claude_code_scan: ${filesScanned} files, ${linesWithUsage} entries — ` +
+      `${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(4)}`
+  )
+
+  await logEvent('claude_code', 'claude.usage', {
+    inputSummary: `${filesScanned} session files, ${linesWithUsage} usage entries`,
+    outputSummary: `${totalTokens.toLocaleString()} tokens — $${costUsd.toFixed(4)} USD`,
+    tokensUsed: totalTokens,
+    costUsd,
+    meta: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_read_tokens: cacheReadTokens,
+      cache_creation_tokens: cacheCreationTokens,
+      files_scanned: filesScanned,
+      usage_entries: linesWithUsage,
+      watermark_from: watermark.toISOString(),
+      watermark_to: now.toISOString(),
+    },
+  })
+  claudeCodeScanRunning = false
+}
+
+// ── Session file watcher (near-real-time Claude Code token tracking) ──────────
+
+function startSessionWatcher() {
+  if (!existsSync(CLAUDE_SESSIONS_DIR)) {
+    log('session_watcher: dir not found, skipping')
+    return null
+  }
+
+  let debounceTimer = null
+  const DEBOUNCE_MS = 2_000
+
+  const watcher = watch(CLAUDE_SESSIONS_DIR, { recursive: true }, (eventType, filename) => {
+    if (!filename?.endsWith('.jsonl')) return
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(async () => {
+      log(`session_watcher: ${filename} changed — scanning`)
+      try {
+        await runClaudeCodeUsageScan()
+      } catch (err) {
+        log('session_watcher: scan error:', err.message)
+      }
+    }, DEBOUNCE_MS)
+  })
+
+  watcher.on('error', (err) => log('session_watcher: error:', err.message))
+  log(`session_watcher: watching ${CLAUDE_SESSIONS_DIR} (recursive, 2s debounce)`)
+  return watcher
+}
+
 // ── Main loop ─────────────────────────────────────────────────────────────────
 
 function log(...args) {
@@ -420,10 +672,15 @@ function sleep(ms) {
 
 async function tick() {
   log('=== Worker tick start ===')
+
+  // Always run — no Ollama dependency
+  await runClaudeCodeUsageScan()
+
   const health = await ollamaHealth()
 
   if (!health.reachable) {
-    log('Ollama not reachable at', OLLAMA_URL, '— skipping this tick')
+    log('Ollama not reachable at', OLLAMA_URL, '— skipping Ollama tasks')
+    log('=== Worker tick done ===')
     return
   }
 
@@ -433,9 +690,11 @@ async function tick() {
   )
   if (!modelLoaded) {
     log('Analysis model not loaded — skipping AI tasks this tick')
+    log('=== Worker tick done ===')
     return
   }
 
+  await runHealthDigest()
   await runSignalReview()
   await runPreResearch()
   await runSecurityScan()
@@ -448,6 +707,7 @@ async function main() {
   log(`Analysis model: ${ANALYSIS_MODEL}`)
 
   await loadRuntimeConfig()
+  startSessionWatcher()
 
   while (true) {
     try {
