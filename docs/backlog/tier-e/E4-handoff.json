@@ -1,0 +1,19 @@
+{
+  "task_id": "d02c895e-aaba-40ac-a78f-cf93c77f9e2d",
+  "chunk": "E4-diet-inventory-three-bucket-summary",
+  "status": "complete",
+  "files_changed": [
+    "app/(cockpit)/diet/_components/InventoryTab.tsx"
+  ],
+  "commit": "f88a281074e52a4e28e81706f326870b2182d3f3",
+  "tests": {
+    "passing": 0,
+    "failing": 0,
+    "notes": "vitest not installed in node_modules in this environment — test runner unavailable locally. No diet-specific tests exist in the repo for this component. The implementation is pure additive JSX (31 lines) with no logic beyond inline filter counts; no business-logic unit tests were required by the acceptance doc."
+  },
+  "grounding_checkpoint_required": "Colin navigates to /diet -> Inventory tab. Verifies the summary bar shows three tiles (On hand, Low, Out) with correct counts. Cross-check against: SELECT status, COUNT(*) FROM grocery_inventory WHERE status != 'Expired' GROUP BY status ORDER BY status;",
+  "unknowns": [],
+  "next_chunk_blockers": [],
+  "tokens_used": 4200,
+  "timestamp": "2026-05-16T17:30:00Z"
+}
