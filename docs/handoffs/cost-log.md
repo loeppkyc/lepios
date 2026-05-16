@@ -29,3 +29,6 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 2026-05-09T03:40:00Z coordinator sprint=5 chunk=scanner-subdir-fix phase=5+2+3 tokens_in=~8000 tokens_out=~3000 escalated=false auto_proceeded=true
 2026-05-10T03:30:00Z coordinator sprint=5 chunk=ollama-tunnel-url-harness-config phase=2-3 tokens_in=~35000 tokens_out=~6000 escalated=false auto_proceeded=true
 2026-05-15T14:50:00Z coordinator sprint=7 chunk=arb-engine phase=2 tokens_in=~85000 tokens_out=~8000 escalated=true auto_proceeded=false
+2026-05-16T17:00:00Z coordinator sprint=tier-a chunk=A6-githackers phase=0+2 tokens_in=~40000 tokens_out=~10000 escalated=true auto_proceeded=false task_id=5f520ddd run_id=0cafe95b
+  reason: HN API unverifiable from sandbox; twin blocked; medium confidence on META-C
+  notification_row: d82f240b-f690-4c98-ad93-79721f6ab8e9 status=awaiting_approval
