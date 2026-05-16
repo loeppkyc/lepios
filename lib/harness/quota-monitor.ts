@@ -20,6 +20,7 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { preClaimQuotaCheck } from '@/lib/harness/quota-guard'
 import { guardedWrite } from '@/lib/supabase/service-write'
+import { postMessage } from '@/lib/orchestrator/telegram'
 
 export interface QuotaStatus {
   usage_pct: number
@@ -304,6 +305,83 @@ export async function haltContinuousRun(
     modules_shipped_count,
     quota_pct: quotaStatus.usage_pct,
     telegram_lines,
+  }
+}
+
+// ── Quota halt auto-resume check ─────────────────────────────────────────────
+//
+// Called by pickup-runner.ts when HARNESS_HALTED == 'true'.
+// Returns true if the halt was cleared (quota window has rolled), false if halt
+// remains active. Fails open — any error returns false so pickup exits as before.
+
+export async function checkAndClearQuotaHalt(runId: string): Promise<boolean> {
+  try {
+    const db = createServiceClient()
+    const { data: rows } = await db
+      .from('harness_config')
+      .select('key, value')
+      .in('key', [
+        'ROUTINES_INVOCATIONS_TODAY',
+        'ROUTINES_INVOCATIONS_WINDOW_START',
+        'HARNESS_QUOTA_THRESHOLD',
+      ])
+
+    const get = (k: string) =>
+      (rows as { key: string; value: string }[] | null)?.find((r) => r.key === k)?.value ?? ''
+
+    const windowStart = get('ROUTINES_INVOCATIONS_WINDOW_START')
+    const windowStartMs = windowStart ? new Date(windowStart).getTime() : 0
+    const invocationsToday = parseInt(get('ROUTINES_INVOCATIONS_TODAY'), 10) || 0
+    const threshold = parseInt(get('HARNESS_QUOTA_THRESHOLD'), 10) || 85
+
+    const WINDOW_MS = 24 * 60 * 60 * 1000
+    const windowRolled = !windowStartMs || Date.now() - windowStartMs > WINDOW_MS
+    const counterReset = invocationsToday === 0
+
+    // Quota fresh if: window rolled OR counter explicitly reset to 0
+    const quotaFresh = windowRolled || counterReset
+
+    // Secondary gate: even if window hasn't fully rolled, safe to resume if invocations are
+    // below threshold (prevents a halt-clear at 23h59m that would immediately re-halt).
+    const CLIFF = 12
+    const invocationPct = Math.round((invocationsToday / CLIFF) * 100)
+    const belowThreshold = invocationPct < threshold
+
+    if (!quotaFresh && !belowThreshold) return false
+
+    // Clear halt
+    await guardedWrite(
+      db.from('harness_config').update({ value: 'false' }).eq('key', 'HARNESS_HALTED'),
+      'harness_config',
+      'update'
+    )
+
+    // Log to agent_events
+    await db.from('agent_events').insert({
+      domain: 'orchestrator',
+      action: 'quota_auto_resume',
+      actor: 'quota_monitor',
+      status: 'success',
+      task_type: 'quota_auto_resume',
+      output_summary: `quota halt cleared — window rolled or counter reset`,
+      meta: {
+        run_id: runId,
+        invocations_at_resume: invocationsToday,
+        window_start_at: windowStart,
+        quota_pct: invocationPct,
+      },
+      tags: ['harness', 'quota', 'auto-resume'],
+    })
+
+    // Telegram fire-and-forget
+    void postMessage(
+      '[LepiOS Harness] Quota auto-resumed — daily window rolled. Pickup continuing.'
+    ).catch(() => {})
+
+    return true
+  } catch {
+    // Fail open — never blocks pickup
+    return false
   }
 }
 

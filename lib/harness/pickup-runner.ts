@@ -9,6 +9,7 @@ import type { TaskRow, ReclaimRow } from '@/lib/harness/task-pickup'
 import { recordAttribution } from '@/lib/attribution/writer'
 import { scoutCheck, sendScoutBlockAlert } from '@/lib/oss/scout'
 import { forecastQuotaBeforeStart } from '@/lib/harness/quota-forecast'
+import { checkAndClearQuotaHalt } from '@/lib/harness/quota-monitor'
 import { guardedWrite } from '@/lib/supabase/service-write'
 import {
   getActiveSession,
@@ -100,12 +101,18 @@ export async function runPickup(runId: string): Promise<PickupResult> {
       .eq('key', 'HARNESS_HALTED')
       .maybeSingle()
     if (haltRow?.value === 'true') {
-      return {
-        ok: true,
-        claimed: null,
-        reason: 'halted',
-        run_id: runId,
-        duration_ms: Date.now() - start,
+      // Auto-resume check: if the quota window has rolled, clear the halt and continue.
+      const cleared = await checkAndClearQuotaHalt(runId)
+      if (cleared) {
+        // Halt cleared — fall through to normal pickup flow
+      } else {
+        return {
+          ok: true,
+          claimed: null,
+          reason: 'halted',
+          run_id: runId,
+          duration_ms: Date.now() - start,
+        }
       }
     }
   } catch {
