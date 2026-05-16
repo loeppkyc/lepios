@@ -120,6 +120,34 @@ function VelocityPill({ badge }: { badge: VelocityBadge }) {
   )
 }
 
+/**
+ * Fire-and-forget: record a BUY/SKIP/UNSURE decision in arb_decisions corpus.
+ * Silent on failure — write must never break the scan flow.
+ */
+function fireArbDecision(result: ScanResult): void {
+  fetch('/api/arb/decision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scan_result_id: result.scanResultId ?? null,
+      asin: result.asin,
+      isbn: result.isbn ?? null,
+      title: result.title ?? null,
+      decision: result.decision,
+      confidence_pct: null, // TODO: wire from scan engine when confidence scoring lands
+      cost_paid_cad: result.costPaid ?? null,
+      buy_box_price_cad: result.buyBoxPrice ?? null,
+      profit_cad: result.profit ?? null,
+      roi_pct: result.roi ?? null,
+      bsr: result.bsr ?? null,
+      tier: result.tier ?? null,
+      notes: null,
+    }),
+  }).catch(() => {
+    // Intentionally silent — corpus capture must not surface to user
+  })
+}
+
 export function ScannerClient() {
   const searchParams = useSearchParams()
   const palletId = searchParams.get('pallet_id')
@@ -204,7 +232,10 @@ export function ScannerClient() {
             const scanData = await scanRes.json()
             if (!scanRes.ok) setError(scanData.error ?? 'Scan failed')
             else {
-              setResult(scanData as ScanResult)
+              const relayScanResult = scanData as ScanResult
+              setResult(relayScanResult)
+              // Corpus capture — fire-and-forget, never blocks scan flow
+              fireArbDecision(relayScanResult)
               setSparkOpen(false)
               setSparkPoints(null)
               setSaveState('idle')
@@ -245,7 +276,10 @@ export function ScannerClient() {
       const data = await res.json()
       if (!res.ok) setError(data.error ?? 'Scan failed')
       else {
-        setResult(data as ScanResult)
+        const scanResult = data as ScanResult
+        setResult(scanResult)
+        // Corpus capture — fire-and-forget, never blocks scan flow
+        fireArbDecision(scanResult)
         // Reset sparkline + save + routing + listing state on each new scan
         setSparkOpen(false)
         setSparkLoading(false)
@@ -259,7 +293,7 @@ export function ScannerClient() {
         setRouteError(null)
         setListState('idle')
         setListCondition('like_new')
-        setListPrice((data as ScanResult).buyBoxPrice?.toFixed(2) ?? '')
+        setListPrice(scanResult.buyBoxPrice?.toFixed(2) ?? '')
         setListNote('Like New Condition. 100% Satisfaction Guaranteed.')
         setListedSku(null)
         setListedListingId(null)
