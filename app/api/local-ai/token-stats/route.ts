@@ -43,7 +43,7 @@ async function aggregate(
     if (row.action === 'claude.usage') {
       claude_tokens += row.tokens_used ?? 0
       claude_cost_usd += Number(row.cost_usd ?? 0)
-    } else if (row.action === 'ollama.generate') {
+    } else if (row.domain === 'ollama' && row.tokens_used) {
       ollama_tokens += row.tokens_used ?? 0
       const equiv = (row.meta as Record<string, unknown> | null)?.claude_equivalent_usd
       ollama_saved_usd += typeof equiv === 'number' ? equiv : 0
