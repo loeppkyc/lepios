@@ -143,7 +143,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Autonomous', href: '/autonomous' },
       { label: 'AI Coach', href: null },
-      { label: 'Local AI', href: null },
+      { label: 'Local AI', href: '/local-ai' },
       { label: 'Agent Swarm', href: null },
       { label: 'Automations', href: null },
       { label: 'Personal Archive', href: null },
