@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import type { TokenStatsResponse } from '@/app/api/local-ai/token-stats/route'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
+import type { TokenStatsResponse, TokenDayPoint } from '@/app/api/local-ai/token-stats/route'
 
 type OllamaModel = {
   name: string
@@ -169,6 +176,123 @@ function TokenWheel({
           {moneyValue}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Daily token history chart ─────────────────────────────────────────────────
+
+const tokenChartConfig = {
+  claude_tokens: { label: 'Claude', color: '#6b8cff' },
+  ollama_tokens: { label: 'Ollama', color: '#37c85a' },
+} satisfies ChartConfig
+
+function fmtChartDate(dateStr: string) {
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function fmtTokenAxis(n: number) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1000) return (n / 1000).toFixed(0) + 'k'
+  return String(n)
+}
+
+function TokenHistoryChart({ daily }: { daily: TokenDayPoint[] }) {
+  const hasData = daily.some((d) => d.claude_tokens > 0 || d.ollama_tokens > 0)
+  if (!hasData) return null
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.72rem',
+            color: 'var(--color-text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
+          Daily tokens — last 14 days
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 14,
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.7rem',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          <span>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: '#6b8cff',
+                marginRight: 5,
+              }}
+            />
+            Claude
+          </span>
+          <span>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: '#37c85a',
+                marginRight: 5,
+              }}
+            />
+            Ollama
+          </span>
+        </div>
+      </div>
+      <ChartContainer config={tokenChartConfig} className="h-36 w-full">
+        <BarChart data={daily} margin={{ top: 4, right: 0, left: -16, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.4} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={fmtChartDate}
+            tickLine={false}
+            axisLine={false}
+            interval={2}
+            tick={{
+              fontSize: 10,
+              fill: 'var(--color-text-muted)',
+              fontFamily: 'var(--font-ui)',
+            }}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            width={44}
+            tickFormatter={fmtTokenAxis}
+            tick={{
+              fontSize: 10,
+              fill: 'var(--color-text-muted)',
+              fontFamily: 'var(--font-ui)',
+            }}
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar dataKey="claude_tokens" fill="#6b8cff" radius={[2, 2, 0, 0]} opacity={0.85} />
+          <Bar dataKey="ollama_tokens" fill="#37c85a" radius={[2, 2, 0, 0]} opacity={0.85} />
+        </BarChart>
+      </ChartContainer>
     </div>
   )
 }
@@ -398,6 +522,7 @@ export function LocalAIShell({
         </div>
 
         <LiveTokenWheels stats={tokenStats} />
+        {tokenStats?.daily && <TokenHistoryChart daily={tokenStats.daily} />}
       </div>
 
       {/* ── Stat row ─────────────────────────────────────────── */}
