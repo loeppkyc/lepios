@@ -342,6 +342,26 @@ last_updated_at: "2026-05-09T03:40:00Z"
 # Retail Arb Engine (task 3a13fc07, 2026-05-15)
 # ============================================================
 
+# ============================================================
+# GitHackers (task 5f520ddd, 2026-05-16)
+# ============================================================
+
+tier_a_A6:
+  task_id: "5f520ddd-066d-4a1f-b5c3-09dd4fded17c"
+  item_id: "A6"
+  status: "awaiting-colin-approval"
+  description: "GitHackers cockpit page — GitHub trending repos + HN Who's Hiring feed"
+  acceptance_doc: "docs/backlog/tier-a/A6-acceptance.md"
+  acceptance_doc_ready_at: "2026-05-16T17:00:00Z"
+  open_questions:
+    - "Use case intent: tech awareness / freelance / both?"
+    - "Language filter: default all or specific stack?"
+    - "Confirm HN Hiring is for awareness, not employment search"
+  hn_api_note: "HN Algolia + Firebase blocked in coordinator sandbox — builder must verify from Vercel dev"
+  github_api_note: "GitHub search API verified accessible (200); rate limit 10/min unauthenticated, 30/min with GITHUB_TOKEN"
+  opened_at: "2026-05-16T16:52:00Z"
+  last_updated_at: "2026-05-16T17:00:00Z"
+
 retail_arb_engine:
 task_id: "3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 status: "awaiting-colin-approval"

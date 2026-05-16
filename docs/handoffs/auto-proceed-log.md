@@ -361,3 +361,26 @@ outcome: escalated
 escalation_reasons:
   - Q1_colin_decision_required (Phase 1a skip vs supplementary — values trade-off, not pattern-match)
   - Q2_coordinator_md_explicit_approval (doctrine-level edit per ARCHITECTURE.md §3 rule 4)
+
+---
+
+2026-05-16T17:00:00Z sprint=tier-a chunk=A6 doc=docs/backlog/tier-a/A6-acceptance.md
+cited_principles: [8.4 Check-Before-Build, 17 no-speculative-infrastructure, 14 real-grounding, META-C]
+trigger_match_evidence: |
+  Principle 8.4: greps confirmed no existing GitHackers code. Prior art doc updated.
+  Principle 17: v1 defers persistence, language filters, bookmarking — only the display pipeline ships.
+  Principle 14: grounding checkpoint requires real data visible on screen, not tests alone.
+  cache_match_enabled: true (sprint-state.md explicit override, last_reviewed_by_colin_at: 2026-05-01).
+reversibility_check: |
+  New cockpit page files (app/(cockpit)/git-hackers/): fully reversible — delete files.
+  API routes (app/api/git-hackers/): fully reversible — delete files.
+  .env.example GITHUB_TOKEN: additive, reversible.
+  docs/github-prior-art.md: additive section, reversible via git.
+  No schema migrations. No destructive operations. No seam files touched.
+  confidence: medium (escalation correct — HN API not verifiable from coordinator sandbox;
+  twin unreachable for Q&A; open questions about use-case intent require Colin confirmation)
+outcome: escalated
+escalation_reasons:
+  - external_api_unverifiable (HN Algolia and Firebase blocked in coordinator sandbox; builder must verify)
+  - twin_unreachable (domain questions about use-case intent could not be answered)
+  - confidence_below_high (medium → escalate per META-C rule)
