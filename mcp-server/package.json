@@ -1,0 +1,17 @@
+{
+  "name": "lepios-mcp-server",
+  "version": "1.0.0",
+  "description": "Local MCP server for LepiOS — exposes Supabase tables and harness tools as typed MCP tools",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "smoke": "node smoke-test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "dotenv": "^16.4.5",
+    "zod": "^4.4.3"
+  }
+}
