@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireUser } from '@/lib/auth/require-user'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { RetailWatchlistCreate } from '@/lib/retail/types'
 
@@ -15,6 +16,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const gate = await requireUser()
+  if (!gate.ok) return gate.response
+
   const body = (await request.json()) as RetailWatchlistCreate
 
   if (!body.product?.trim()) {
@@ -48,5 +52,21 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ item: data }, { status: 201 })
+
+  // F18 observability — log watchlist_add so conversion metrics can be tracked
+  await db.from('agent_events').insert({
+    domain: 'retail',
+    action: 'watchlist_add',
+    status: 'success',
+    output_summary: `Added "${body.product.trim()}" from ${body.store ?? 'Unknown'} to watchlist`,
+    metadata: {
+      product: body.product.trim(),
+      store: body.store ?? 'Unknown',
+      buy_price: body.buy_price ?? null,
+      pct_off: body.pct_off ?? null,
+      watchlist_id: data?.id ?? null,
+    },
+  })
+
+  return NextResponse.json({ id: data?.id, item: data }, { status: 201 })
 }

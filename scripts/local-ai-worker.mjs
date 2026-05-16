@@ -217,9 +217,10 @@ async function runSignalReview() {
   const since = alertsClearedAt && alertsClearedAt > rollingFloor ? alertsClearedAt : rollingFloor
   const { data, error } = await db
     .from('agent_events')
-    .select('action, status, output_summary, error_message, occurred_at')
+    .select('domain, action, status, output_summary, error_message, occurred_at')
     .gte('occurred_at', since)
     .in('status', ['failure', 'warning']) // only actual problems, not routine success events
+    .neq('domain', 'ollama') // exclude worker's own meta-events — they self-amplify if included
     .order('occurred_at', { ascending: false })
     .limit(50)
 
@@ -243,6 +244,10 @@ async function runSignalReview() {
     .slice(0, 3000)
 
   const prompt = `You are reviewing ${rows.length} failures and warnings from the last ${LOOKBACK_HOURS} hours of a personal OS (LepiOS). Identify which ones warrant immediate attention vs which are routine noise.
+
+Context on expected behaviour — do NOT flag these as anomalies:
+- claude_code/claude.usage: token counts vary widely session to session. High variability is normal.
+- orchestrator/task_pickup with reason "coordinator_startup_skipped_quota_forecast": this is the quota guard working correctly.
 
 Issues:
 ${summary}
@@ -392,6 +397,7 @@ async function runHealthDigest() {
     .from('agent_events')
     .select('domain, action, status, occurred_at')
     .gte('occurred_at', since)
+    .neq('domain', 'ollama') // exclude worker's own meta-events — avoid self-referential loop
     .order('occurred_at', { ascending: false })
     .limit(40)
 
