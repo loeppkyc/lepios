@@ -419,7 +419,13 @@
       "filename": "0217_daily_scan_log.sql",
       "claimed_at": "2026-05-16",
       "note": "daily_scan_log table — scan agent output storage for iterative full-pass algorithm."
+    },
+    "0218": {
+      "branch": "feat/session-beacons",
+      "filename": "0218_session_beacons.sql",
+      "claimed_at": "2026-05-16",
+      "note": "session_beacons table — one row per active Claude Code window, written by PostToolUse hook. Lets any window detect mid-session peers without window-start opt-in."
     }
   },
-  "next_available": 218
+  "next_available": 219
 }
