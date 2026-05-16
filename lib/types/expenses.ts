@@ -87,6 +87,8 @@ export interface RecurringTemplate {
   updated_at: string
 }
 
+export type PersonHandle = 'colin' | 'megan' | 'shared'
+
 export interface BusinessExpense {
   id: string
   date: string // 'YYYY-MM-DD'
@@ -98,6 +100,10 @@ export interface BusinessExpense {
   hubdoc: boolean
   notes: string
   business_use_pct: number
+  /** Who pays: 'colin' (default), 'megan', or 'shared'. */
+  person_handle: PersonHandle
+  /** Colin's share % for shared expenses (1–99). Null for non-shared rows. */
+  split_pct: number | null
   recurring_template_id: string | null
   created_at: string
   updated_at: string

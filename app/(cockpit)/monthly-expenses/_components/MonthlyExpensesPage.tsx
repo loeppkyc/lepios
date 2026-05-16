@@ -10,6 +10,7 @@ import {
   computeTax,
   type BusinessExpense,
   type Frequency,
+  type PersonHandle,
 } from '@/lib/types/expenses'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -136,6 +137,9 @@ const s = {
 
 // ── ExpenseForm (shared add/edit) ─────────────────────────────────────────────
 
+// 'shared-50' = 50/50 split, 'shared-custom' = custom split %
+type WhoPaysSplit = 'colin' | 'megan' | 'shared-50' | 'shared-custom'
+
 interface FormState {
   date: string
   vendor: string
@@ -149,6 +153,8 @@ interface FormState {
   businessUsePct: number
   busMode: 'full' | 'mixed' | 'personal'
   frequency: Frequency
+  whoPaysSplit: WhoPaysSplit
+  splitPct: number // Colin's % (1-99), only used when whoPaysSplit = 'shared-custom'
 }
 
 function blankForm(): FormState {
@@ -165,7 +171,18 @@ function blankForm(): FormState {
     businessUsePct: 100,
     busMode: 'full',
     frequency: 'one-time',
+    whoPaysSplit: 'colin',
+    splitPct: 50,
   }
+}
+
+/** Derive WhoPaysSplit from stored person_handle + split_pct. */
+function deriveWhoPaysSplit(e: BusinessExpense): WhoPaysSplit {
+  if (e.person_handle === 'megan') return 'megan'
+  if (e.person_handle === 'shared') {
+    return (e.split_pct ?? 50) === 50 ? 'shared-50' : 'shared-custom'
+  }
+  return 'colin'
 }
 
 function formFromExpense(e: BusinessExpense): FormState {
@@ -183,6 +200,8 @@ function formFromExpense(e: BusinessExpense): FormState {
     businessUsePct: pct,
     busMode: pct >= 100 ? 'full' : pct <= 0 ? 'personal' : 'mixed',
     frequency: 'one-time',
+    whoPaysSplit: deriveWhoPaysSplit(e),
+    splitPct: e.split_pct ?? 50,
   }
 }
 
@@ -562,6 +581,78 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
         </div>
       )}
 
+      {/* Who Pays */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={s.label}>Who Pays</label>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {(
+            [
+              ['colin', 'Colin'],
+              ['megan', 'Megan'],
+              ['shared-50', 'Shared (50/50)'],
+              ['shared-custom', 'Shared (custom %)'],
+            ] as [WhoPaysSplit, string][]
+          ).map(([val, label]) => (
+            <label
+              key={val}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              <input
+                type="radio"
+                name="whoPaysSplit"
+                value={val}
+                checked={f.whoPaysSplit === val}
+                onChange={() => set('whoPaysSplit', val)}
+                style={{ accentColor: 'var(--color-pillar-money)', cursor: 'pointer' }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        {f.whoPaysSplit === 'shared-custom' && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              Colin&apos;s share:
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={99}
+              step={1}
+              value={f.splitPct}
+              onChange={(e) =>
+                set('splitPct', Math.min(99, Math.max(1, parseInt(e.target.value) || 50)))
+              }
+              style={{ ...s.input, width: 80 }}
+            />
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              % &rarr; Megan&apos;s share: {100 - f.splitPct}%
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Actions */}
       <div style={{ display: 'flex', gap: 8 }}>
         <button
@@ -577,6 +668,174 @@ function ExpenseForm({ initial, isEdit, onSubmit, onCancel, submitting }: Expens
       </div>
     </form>
   )
+}
+
+// ── Shared Expenses Panel ─────────────────────────────────────────────────────
+
+interface SharedPanelProps {
+  expenses: BusinessExpense[]
+  month: string
+}
+
+function SharedExpensesPanel({ expenses, month }: SharedPanelProps) {
+  // Bucket totals by person_handle (pretax only — consistent with existing summary bar)
+  let colinTotal = 0
+  let meganTotal = 0
+  let sharedColinShare = 0
+  let sharedMeganShare = 0
+
+  for (const e of expenses) {
+    const handle = e.person_handle ?? 'colin' // backward-compat default
+    if (handle === 'colin') {
+      colinTotal += e.pretax
+    } else if (handle === 'megan') {
+      meganTotal += e.pretax
+    } else if (handle === 'shared') {
+      const colinPct = (e.split_pct ?? 50) / 100
+      sharedColinShare += e.pretax * colinPct
+      sharedMeganShare += e.pretax * (1 - colinPct)
+    }
+  }
+
+  const colinNetShare = colinTotal + sharedColinShare
+  const meganNetShare = meganTotal + sharedMeganShare
+  const hasSharedData = expenses.some((e) => (e.person_handle ?? 'colin') !== 'colin')
+
+  if (!hasSharedData) return null
+
+  return (
+    <div style={{ ...s.card, marginTop: 20 }}>
+      <div
+        style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 'var(--text-small)',
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--color-text-muted)',
+          marginBottom: 16,
+        }}
+      >
+        Shared Expenses — {monthLabel(month)}
+      </div>
+
+      {/* Three buckets */}
+      <div
+        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}
+      >
+        {[
+          { label: "Colin's Expenses", amount: colinTotal, sub: null },
+          { label: "Megan's Expenses", amount: meganTotal, sub: null },
+          {
+            label: 'Shared (split)',
+            amount: sharedColinShare + sharedMeganShare,
+            sub: `Colin ${fmt(sharedColinShare)} / Megan ${fmt(sharedMeganShare)}`,
+          },
+        ].map(({ label, amount, sub }) => (
+          <div
+            key={label}
+            style={{
+              backgroundColor: 'var(--color-surface-2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '12px 16px',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-disabled)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: 4,
+              }}
+            >
+              {label}
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-body)',
+                fontWeight: 700,
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              ${fmt(amount)}
+            </div>
+            {sub && (
+              <div
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  color: 'var(--color-text-muted)',
+                  marginTop: 4,
+                }}
+              >
+                {sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Settlement line */}
+      <div
+        style={{
+          borderTop: '1px solid var(--color-border)',
+          paddingTop: 12,
+          fontFamily: 'var(--font-ui)',
+          fontSize: 'var(--text-small)',
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>This month:</span>{' '}
+        Colin net share{' '}
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          ${fmt(colinNetShare)}
+        </span>
+        {', '}Megan net share{' '}
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          ${fmt(meganNetShare)}
+        </span>
+        <span
+          style={{
+            marginLeft: 8,
+            fontSize: 'var(--text-nano)',
+            color: 'var(--color-text-disabled)',
+          }}
+        >
+          (display only — estimated pre-tax)
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Split helpers ─────────────────────────────────────────────────────────────
+
+function resolvePersonHandle(whoPaysSplit: WhoPaysSplit): PersonHandle {
+  if (whoPaysSplit === 'megan') return 'megan'
+  if (whoPaysSplit === 'shared-50' || whoPaysSplit === 'shared-custom') return 'shared'
+  return 'colin'
+}
+
+function resolveSplitPct(whoPaysSplit: WhoPaysSplit, customPct: number): number | null {
+  if (whoPaysSplit === 'shared-50') return 50
+  if (whoPaysSplit === 'shared-custom') return customPct
+  return null
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
@@ -648,6 +907,8 @@ export function MonthlyExpensesPage() {
           notes: form.notes,
           businessUsePct: form.businessUsePct,
           frequency: form.frequency,
+          personHandle: resolvePersonHandle(form.whoPaysSplit),
+          splitPct: resolveSplitPct(form.whoPaysSplit, form.splitPct),
         }),
       })
       const body = (await res.json()) as { created?: number; error?: string }
@@ -678,6 +939,8 @@ export function MonthlyExpensesPage() {
           hubdoc: form.hubdoc,
           notes: form.notes,
           businessUsePct: form.businessUsePct,
+          personHandle: resolvePersonHandle(form.whoPaysSplit),
+          splitPct: resolveSplitPct(form.whoPaysSplit, form.splitPct),
         }),
       })
       if (!res.ok) {
@@ -954,6 +1217,7 @@ export function MonthlyExpensesPage() {
                   'Total',
                   'Bus%',
                   'Hubdoc',
+                  'Who',
                   '',
                 ].map((h) => (
                   <th
@@ -1088,6 +1352,27 @@ export function MonthlyExpensesPage() {
                     </td>
                     <td
                       style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-nano)',
+                        color:
+                          (e.person_handle ?? 'colin') === 'shared'
+                            ? 'var(--color-text-muted)'
+                            : (e.person_handle ?? 'colin') === 'megan'
+                              ? 'var(--color-text-secondary)'
+                              : 'var(--color-text-disabled)',
+                        padding: '8px 8px 8px 0',
+                        borderBottom: '1px solid var(--color-border)',
+                        textAlign: 'center',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {(e.person_handle ?? 'colin') === 'shared'
+                        ? `split ${e.split_pct ?? 50}%`
+                        : (e.person_handle ?? 'colin')}
+                    </td>
+                    <td
+                      style={{
                         padding: '8px 0',
                         borderBottom: '1px solid var(--color-border)',
                         textAlign: 'right',
@@ -1110,7 +1395,7 @@ export function MonthlyExpensesPage() {
                   {editingId === e.id && (
                     <tr key={`edit-${e.id}`}>
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         style={{ padding: '16px 0', borderBottom: '1px solid var(--color-border)' }}
                       >
                         <div
@@ -1137,6 +1422,11 @@ export function MonthlyExpensesPage() {
           </table>
         )}
       </div>
+
+      {/* Shared Expenses Panel — only shown when Megan or shared rows exist */}
+      {!loading && !fetchError && expenses.length > 0 && (
+        <SharedExpensesPanel expenses={expenses} month={month} />
+      )}
     </div>
   )
 }

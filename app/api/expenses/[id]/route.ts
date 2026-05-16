@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { type PersonHandle } from '@/lib/types/expenses'
 
 // ── PUT /api/expenses/[id] ────────────────────────────────────────────────────
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
   let body: Record<string, unknown>
@@ -16,7 +14,19 @@ export async function PUT(
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
   }
 
-  const { date, vendor, category, pretax, taxAmount, paymentMethod, hubdoc, notes, businessUsePct } = body
+  const {
+    date,
+    vendor,
+    category,
+    pretax,
+    taxAmount,
+    paymentMethod,
+    hubdoc,
+    notes,
+    businessUsePct,
+    personHandle,
+    splitPct,
+  } = body
 
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'date required (YYYY-MM-DD)' }, { status: 400 })
@@ -40,8 +50,23 @@ export async function PUT(
     return NextResponse.json({ error: 'businessUsePct must be 0–100' }, { status: 400 })
   }
 
+  const validHandles: PersonHandle[] = ['colin', 'megan', 'shared']
+  const handle: PersonHandle =
+    typeof personHandle === 'string' && validHandles.includes(personHandle as PersonHandle)
+      ? (personHandle as PersonHandle)
+      : 'colin'
+
+  const resolvedSplitPct: number | null =
+    handle === 'shared' && typeof splitPct === 'number'
+      ? Math.min(99, Math.max(1, Math.round(splitPct)))
+      : handle === 'shared'
+        ? 50
+        : null
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { error } = await supabase
@@ -56,6 +81,8 @@ export async function PUT(
       hubdoc: hubdoc === true,
       notes: typeof notes === 'string' ? (notes as string).trim() : '',
       business_use_pct: Math.round(businessUsePct as number),
+      person_handle: handle,
+      split_pct: resolvedSplitPct,
     })
     .eq('id', id)
 
@@ -65,20 +92,16 @@ export async function PUT(
 
 // ── DELETE /api/expenses/[id] ─────────────────────────────────────────────────
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { error } = await supabase
-    .from('business_expenses')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('business_expenses').delete().eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
