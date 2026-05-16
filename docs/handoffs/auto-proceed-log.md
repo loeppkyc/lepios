@@ -1,3 +1,20 @@
+2026-05-16T17:20:00Z sprint=backlog chunk=B9 doc=docs/backlog/tier-b/B9-acceptance.md
+cited_principles: [3, 4, 6, F20, F24, META-C]
+trigger_match_evidence: |
+  P4 trigger: "Proposed enum with 'maybe useful later' values"
+  → status enum ships 4 values (wishlist/ordered/owned/installed), all with active write paths.
+  P6 trigger: "Labels or UI text that could imply data we don't have"
+  → budget_cad / actual_cad label what the data actually is (planned / paid).
+  F24 trigger: "Every CREATE TABLE migration must include GRANT"
+  → GRANT INSERT, UPDATE, DELETE ON hardware_components TO service_role included.
+reversibility_check: |
+  New table: reversible via DROP (table is new/empty). New page: delete files.
+  Nav link: remove array item. API route: delete file. All reversible-free.
+confidence: high
+outcome: escalated (twin unreachable for all domain questions — sending Telegram approval button)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |

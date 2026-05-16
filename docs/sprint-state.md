@@ -358,3 +358,23 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# B9 — Hardware Component Tracker (task 7ca3e75f, 2026-05-16)
+# ============================================================
+
+b9_hardware_tracker:
+  task_id: "7ca3e75f-e84e-4495-83ff-6a7426584668"
+  run_id: "cab2fe76-8c1f-40ed-8775-4882e3a7d44a"
+  status: "awaiting-colin-approval"
+  description: "hardware_components table + /systems/hardware CRUD page"
+  acceptance_doc: "docs/backlog/tier-b/B9-acceptance.md"
+  migration_reserved: "0219"
+  open_questions:
+    - "Category enum correct? (cpu/gpu/ram/storage/motherboard/case/cooling/psu/monitor/peripheral/other)"
+    - "Total build budget target — harness_config key or not?"
+    - "Status labels: wishlist/ordered/owned/installed — match Colin's mental model?"
+  twin_status: "unreachable (host not in allowlist in coordinator sandbox)"
+  branch: "harness/task-7ca3e75f-e84e-4495-83ff-6a7426584668"
+  opened_at: "2026-05-16T17:05:00Z"
+  last_updated_at: "2026-05-16T17:20:00Z"
