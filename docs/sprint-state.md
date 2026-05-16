@@ -1,4 +1,20 @@
 # ============================================================
+# C6 — Currency-aware balances on Net Worth (task e464f0f3)
+# ============================================================
+
+c6_currency_aware_balances:
+  task_id: "e464f0f3-89af-4c0c-802d-e8e7e3e97775"
+  status: "awaiting-colin-approval"
+  acceptance_doc: "docs/backlog/tier-c/C6-acceptance.md"
+  migration: "0219_balance_sheet_currency.sql"
+  opened_at: "2026-05-16T00:00:00Z"
+  last_updated_at: "2026-05-16T00:00:00Z"
+  pending_questions:
+    - "Q1: Are there USD rows beyond TD USD Chequing (9924)?"
+    - "Q2: Should usdToCad rate be shown as a footnote on Net Worth page?"
+    - "Q3: Fallback rate of 1.38 acceptable?"
+
+# ============================================================
 # retail-scout-arbitrage — task 3a13fc07
 # ============================================================
 
