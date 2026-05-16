@@ -12,6 +12,7 @@ export interface BalanceSheetEntry {
   as_of_date: string
   notes: string | null
   sort_order: number
+  source: 'manual' | 'auto_sync'
   updated_at: string
 }
 
@@ -24,7 +25,9 @@ export interface BalanceSheetResponse {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data, error } = await supabase
@@ -36,8 +39,12 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const entries = (data ?? []) as BalanceSheetEntry[]
-  const totalAssets = entries.filter(e => e.account_type === 'asset').reduce((s, e) => s + Number(e.balance), 0)
-  const totalLiabilities = entries.filter(e => e.account_type === 'liability').reduce((s, e) => s + Number(e.balance), 0)
+  const totalAssets = entries
+    .filter((e) => e.account_type === 'asset')
+    .reduce((s, e) => s + Number(e.balance), 0)
+  const totalLiabilities = entries
+    .filter((e) => e.account_type === 'liability')
+    .reduce((s, e) => s + Number(e.balance), 0)
 
   return NextResponse.json({
     entries,
@@ -49,10 +56,17 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = (await request.json()) as { id: string; balance: number; as_of_date?: string; notes?: string }
+  const body = (await request.json()) as {
+    id: string
+    balance: number
+    as_of_date?: string
+    notes?: string
+  }
   if (!body.id || body.balance === undefined) {
     return NextResponse.json({ error: 'id and balance required' }, { status: 400 })
   }
@@ -69,4 +83,72 @@ export async function PATCH(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
+}
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = (await request.json()) as {
+    name?: string
+    account_type?: string
+    category?: string
+    balance?: number
+    as_of_date?: string
+    notes?: string | null
+    sort_order?: number
+  }
+
+  // Validation
+  if (!body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {
+    return NextResponse.json(
+      { error: 'name is required and must be a non-empty string' },
+      { status: 400 }
+    )
+  }
+  if (body.name.length > 100) {
+    return NextResponse.json({ error: 'name must be 100 characters or fewer' }, { status: 400 })
+  }
+  if (body.account_type !== 'asset' && body.account_type !== 'liability') {
+    return NextResponse.json(
+      { error: 'account_type must be "asset" or "liability"' },
+      { status: 400 }
+    )
+  }
+  if (!body.category || typeof body.category !== 'string' || body.category.trim().length === 0) {
+    return NextResponse.json(
+      { error: 'category is required and must be a non-empty string' },
+      { status: 400 }
+    )
+  }
+  if (body.balance === undefined || !Number.isFinite(body.balance)) {
+    return NextResponse.json(
+      { error: 'balance is required and must be a finite number' },
+      { status: 400 }
+    )
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const { data, error } = await supabase
+    .from('balance_sheet_entries')
+    .insert({
+      name: body.name.trim(),
+      account_type: body.account_type,
+      category: body.category.trim(),
+      balance: body.balance,
+      as_of_date: body.as_of_date ?? today,
+      notes: body.notes ?? null,
+      sort_order: body.sort_order ?? 999,
+      source: 'manual',
+      updated_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ id: data.id }, { status: 201 })
 }

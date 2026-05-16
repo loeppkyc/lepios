@@ -782,6 +782,8 @@ function EditableRow({
     outline: 'none',
   }
 
+  const isAutoSync = row.source === 'auto_sync'
+
   return (
     <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
       <td
@@ -793,6 +795,11 @@ function EditableRow({
         }}
       >
         {row.name}
+        {isAutoSync && (
+          <span className="text-muted-foreground/60 ring-border ml-2 inline-flex items-center rounded px-1 py-0.5 text-[10px] leading-none font-medium ring-1 ring-inset">
+            auto
+          </span>
+        )}
       </td>
       <td
         style={{
@@ -851,7 +858,17 @@ function EditableRow({
           whiteSpace: 'nowrap',
         }}
       >
-        {editing ? (
+        {isAutoSync ? (
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: 'var(--color-text-disabled)',
+            }}
+          >
+            —
+          </span>
+        ) : editing ? (
           <span style={{ display: 'inline-flex', gap: 6 }}>
             <button
               onClick={cancel}

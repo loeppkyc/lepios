@@ -83,6 +83,10 @@
     {
       "path": "/api/cron/elo-rebuild",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/net-worth-sync",
+      "schedule": "0 8 * * *"
     }
   ]
 }

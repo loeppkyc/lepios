@@ -12,6 +12,7 @@ export interface BalanceSheetEntryLite {
   as_of_date: string
   notes: string | null
   sort_order: number
+  source: 'manual' | 'auto_sync'
 }
 
 export interface NetWorthSnapshot {
@@ -61,7 +62,7 @@ export async function GET() {
   // Pull every row except equity (excluded from net-worth math by design).
   const { data: entries, error: entriesErr } = await supabase
     .from('balance_sheet_entries')
-    .select('id, name, account_type, category, balance, as_of_date, notes, sort_order')
+    .select('id, name, account_type, category, balance, as_of_date, notes, sort_order, source')
     .in('account_type', ['asset', 'liability'])
     .order('account_type', { ascending: false })
     .order('sort_order', { ascending: true })
@@ -72,6 +73,7 @@ export async function GET() {
     ...e,
     balance: Number(e.balance),
     account_type: e.account_type as 'asset' | 'liability',
+    source: (e.source as 'manual' | 'auto_sync') ?? 'manual',
   }))
 
   // Latest snapshot for delta math.
