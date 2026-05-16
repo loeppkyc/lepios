@@ -574,15 +574,19 @@ export async function embed(text: string): Promise<number[]> {
 
   if (!res.ok) {
     const msg = `Ollama /api/embeddings returned HTTP ${res.status}`
+    // 5xx = tunnel/origin unavailable (not an auth issue) — log as warning so
+    // security_scan doesn't flag it as repeated auth failures.
+    // 4xx = genuine client error — log as failure.
     void logEvent('ollama', 'ollama.embed', {
       actor: 'system',
-      status: 'failure',
+      status: res.status >= 500 ? 'warning' : 'failure',
       errorMessage: msg,
       durationMs: Date.now() - start,
       meta: {
         model: modelName,
         actor_type: 'ollama_client',
         error: msg,
+        http_status: res.status,
       },
     })
     throw new OllamaUnreachableError(msg)

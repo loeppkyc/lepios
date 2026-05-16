@@ -282,7 +282,7 @@ export async function runPickup(runId: string): Promise<PickupResult> {
     const duration_ms = Date.now() - start
     void logEvent(
       runId,
-      'warning',
+      'success', // quota guard working as intended — not a failure or warning
       null,
       `coordinator_startup_skipped_quota_forecast: ${forecast.reason}`,
       duration_ms,
@@ -411,7 +411,11 @@ export async function runPickup(runId: string): Promise<PickupResult> {
       `scout_${scoutResult.decision}: ${scoutResult.verdicts.map((v) => `${v.dep}=${v.verdict}`).join(', ')}`,
       scoutResult.latency_ms,
       `scout_${scoutResult.decision}`,
-      { scorer: scoutResult.scorer, verdicts: scoutResult.verdicts, latency_ms: scoutResult.latency_ms }
+      {
+        scorer: scoutResult.scorer,
+        verdicts: scoutResult.verdicts,
+        latency_ms: scoutResult.latency_ms,
+      }
     )
   }
   if (scoutResult.decision === 'block') {
@@ -437,7 +441,8 @@ export async function runPickup(runId: string): Promise<PickupResult> {
   if (scoutResult.decision === 'warn') {
     try {
       const db = createServiceClient()
-      const existing = typeof task.metadata === 'object' && task.metadata !== null ? task.metadata : {}
+      const existing =
+        typeof task.metadata === 'object' && task.metadata !== null ? task.metadata : {}
       await db
         .from('task_queue')
         .update({ metadata: { ...existing, oss_scout: scoutResult } })
@@ -632,7 +637,11 @@ export async function onTaskComplete(params: {
     if (estimationErrorPct !== null) updatePayload.estimation_error_pct = estimationErrorPct
 
     if (Object.keys(updatePayload).length > 0) {
-      await guardedWrite(db.from('task_queue').update(updatePayload).eq('id', taskId), 'task_queue', 'update')
+      await guardedWrite(
+        db.from('task_queue').update(updatePayload).eq('id', taskId),
+        'task_queue',
+        'update'
+      )
     }
   } catch {
     // Non-fatal
