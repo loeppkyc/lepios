@@ -18,7 +18,11 @@
 import { readFileSync, existsSync, readdirSync, statSync, watch } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { createClient } from '@supabase/supabase-js'
+
+const execFileAsync = promisify(execFile)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -662,6 +666,57 @@ async function runClaudeCodeUsageScan() {
   claudeCodeScanRunning = false
 }
 
+// ── GPU metrics poll ──────────────────────────────────────────────────────────
+
+async function runGpuPoll() {
+  try {
+    const { stdout } = await execFileAsync(
+      'nvidia-smi',
+      [
+        '--query-gpu=temperature.gpu,utilization.gpu,utilization.memory,memory.used,memory.total,clocks.current.graphics,clocks.current.memory,fan.speed,power.draw,power.limit',
+        '--format=csv,noheader,nounits',
+      ],
+      { timeout: 10_000 }
+    )
+    const parts = stdout
+      .trim()
+      .split(',')
+      .map((s) => s.trim())
+    if (parts.length < 10) {
+      log('gpu_poll: unexpected output:', stdout.slice(0, 80))
+      return
+    }
+    const p = (s) => {
+      const n = parseFloat(s)
+      return isNaN(n) ? null : n
+    }
+    const metrics = {
+      temp_c: p(parts[0]),
+      gpu_util_pct: p(parts[1]),
+      mem_util_pct: p(parts[2]),
+      mem_used_mb: p(parts[3]),
+      mem_total_mb: p(parts[4]),
+      clock_graphics_mhz: p(parts[5]),
+      clock_memory_mhz: p(parts[6]),
+      fan_speed_pct: p(parts[7]),
+      power_draw_w: p(parts[8]),
+      power_limit_w: p(parts[9]),
+    }
+    await logEvent('gpu', 'gpu.metrics', {
+      actor: 'local_ai_worker',
+      status: 'success',
+      outputSummary: `${metrics.temp_c}°C, GPU ${metrics.gpu_util_pct}%, VRAM ${metrics.mem_used_mb}/${metrics.mem_total_mb}MB`,
+      meta: metrics,
+    })
+    log(
+      `gpu_poll: ${metrics.temp_c}°C | GPU ${metrics.gpu_util_pct}% | VRAM ${metrics.mem_used_mb}MB | fan ${metrics.fan_speed_pct}% | ${metrics.power_draw_w}W`
+    )
+  } catch (err) {
+    // nvidia-smi not found or failed — not an error worth alerting
+    log('gpu_poll: skipped —', err.message.slice(0, 80))
+  }
+}
+
 // ── Session file watcher (near-real-time Claude Code token tracking) ──────────
 
 function startSessionWatcher() {
@@ -736,12 +791,25 @@ async function tick() {
   log('=== Worker tick done ===')
 }
 
+async function gpuLoop() {
+  // Independent 1-minute loop — does not block or interact with Ollama tick loop
+  while (true) {
+    try {
+      await runGpuPoll()
+    } catch (err) {
+      log('gpuLoop error:', err.message)
+    }
+    await sleep(60_000)
+  }
+}
+
 async function main() {
   log(`Local AI Worker starting — poll every ${POLL_INTERVAL_MINUTES} min, Ollama: ${OLLAMA_URL}`)
   log(`Analysis model: ${ANALYSIS_MODEL}`)
 
   await loadRuntimeConfig()
   startSessionWatcher()
+  gpuLoop() // fire-and-forget — 1-min GPU poll independent of Ollama tick
 
   while (true) {
     try {
