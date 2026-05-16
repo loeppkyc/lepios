@@ -167,11 +167,22 @@ async function logEvent(domain, action, opts = {}) {
 
 // ── Telegram notifications via outbound_notifications + drain ─────────────────
 
-async function notify(message) {
+// Per-type cooldown: don't fire the same alert class more than once per 4 hours
+const ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000
+const lastAlertAt = {}
+
+async function notify(message, type = 'general') {
   if (!telegramChatId) {
     log('notify: no TELEGRAM_CHAT_ID — skipping')
     return
   }
+  const now = Date.now()
+  if (lastAlertAt[type] && now - lastAlertAt[type] < ALERT_COOLDOWN_MS) {
+    const cooldownRemaining = Math.round((ALERT_COOLDOWN_MS - (now - lastAlertAt[type])) / 60_000)
+    log(`notify: ${type} cooldown active — ${cooldownRemaining} min remaining, skipping`)
+    return
+  }
+  lastAlertAt[type] = now
   try {
     await db.from('outbound_notifications').insert({
       channel: 'telegram',
@@ -200,8 +211,9 @@ async function runSignalReview() {
   const since = new Date(Date.now() - LOOKBACK_HOURS * 3_600_000).toISOString()
   const { data, error } = await db
     .from('agent_events')
-    .select('action, status, output_summary, occurred_at')
+    .select('action, status, output_summary, error_message, occurred_at')
     .gte('occurred_at', since)
+    .in('status', ['failure', 'warning']) // only actual problems, not routine success events
     .order('occurred_at', { ascending: false })
     .limit(50)
 
@@ -212,28 +224,31 @@ async function runSignalReview() {
 
   const rows = data ?? []
   if (rows.length === 0) {
-    log('signal_review: no events in window, skipping')
+    log('signal_review: no failures/warnings in window — clean')
     return
   }
 
   const summary = rows
-    .map((r) => `[${r.action}] ${r.status}: ${(r.output_summary ?? '').slice(0, 100)}`)
+    .map(
+      (r) =>
+        `[${r.action}] ${r.status}: ${(r.error_message ?? r.output_summary ?? '').slice(0, 100)}`
+    )
     .join('\n')
     .slice(0, 3000)
 
-  const prompt = `You are reviewing the last ${LOOKBACK_HOURS} hours of system events from a personal OS (LepiOS). Identify any anomalies, unexpected patterns, or issues that warrant attention.
+  const prompt = `You are reviewing ${rows.length} failures and warnings from the last ${LOOKBACK_HOURS} hours of a personal OS (LepiOS). Identify which ones warrant immediate attention vs which are routine noise.
 
-Events:
+Issues:
 ${summary}
 
-Format your response as a numbered list of issues found. If no issues, say "No anomalies detected."`
+Format your response as a numbered list of genuine concerns. If nothing needs action, say "No anomalies detected."`
 
   try {
     const result = await ollamaGenerate(prompt)
     const durationMs = Date.now() - start
     const hasAnomalies = !result.text.toLowerCase().includes('no anomalies detected')
     log(
-      `signal_review: done in ${durationMs}ms — ${rows.length} events, ~${result.tokens} tokens${hasAnomalies ? ' — ANOMALIES FOUND' : ''}`
+      `signal_review: done in ${durationMs}ms — ${rows.length} failures/warnings, ~${result.tokens} tokens${hasAnomalies ? ' — ANOMALIES FOUND' : ''}`
     )
     await logEvent('ollama', 'signal_review', {
       status: hasAnomalies ? 'warning' : 'success',
@@ -249,7 +264,10 @@ Format your response as a numbered list of issues found. If no issues, say "No a
       },
     })
     if (hasAnomalies) {
-      await notify(`LepiOS Signal Review — anomalies found:\n\n${result.text.slice(0, 800)}`)
+      await notify(
+        `LepiOS Signal Review — anomalies found:\n\n${result.text.slice(0, 800)}`,
+        'signal_review'
+      )
     }
   } catch (err) {
     log('signal_review: Ollama error:', err.message)
@@ -393,10 +411,8 @@ In 2-3 sentences: is the system healthy? Flag any domain that looks stalled or f
       system: 'You are a system health monitor. Be terse. No pleasantries.',
     })
     const durationMs = Date.now() - start
-    const isUnhealthy =
-      failures > 0 ||
-      result.text.toLowerCase().includes('fail') ||
-      result.text.toLowerCase().includes('stall')
+    // Only alert on actual failure-status events, not on Ollama's word choices
+    const isUnhealthy = failures > 0
     log(
       `health_digest: ${rows.length} events, ${failures} failures, ${domains.length} domains — ${durationMs}ms, ~${result.tokens} tokens`
     )
@@ -415,7 +431,7 @@ In 2-3 sentences: is the system healthy? Flag any domain that looks stalled or f
       },
     })
     if (isUnhealthy) {
-      await notify(`LepiOS Health Alert:\n\n${result.text.slice(0, 600)}`)
+      await notify(`LepiOS Health Alert:\n\n${result.text.slice(0, 600)}`, 'health_digest')
     }
   } catch (err) {
     log('health_digest: Ollama error:', err.message)
@@ -466,7 +482,7 @@ List only genuine concerns. If nothing stands out as a security issue, say "No s
           claude_equivalent_usd: result.claudeEquivUsd,
         },
       })
-      await notify(`LepiOS Security Alert:\n\n${result.text.slice(0, 800)}`)
+      await notify(`LepiOS Security Alert:\n\n${result.text.slice(0, 800)}`, 'security_scan')
     }
   } catch (err) {
     log('security_scan: Ollama error:', err.message)
