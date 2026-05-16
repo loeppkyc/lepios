@@ -395,6 +395,12 @@
       "filename": "0212_bookkeeping_ingest_runs.sql",
       "claimed_at": "2026-05-16",
       "note": "Sprint 7 Chunk D -- ingest_runs table for bookkeeping data-freshness signal."
+    },
+    "0213": {
+      "branch": "harness/task-chunk-F-net-worth",
+      "filename": "0213_balance_sheet_source.sql",
+      "claimed_at": "2026-05-16",
+      "note": "Sprint 7 Chunk F -- add source column (manual/auto_sync) to balance_sheet_entries."
     }
   },
   "next_available": 214
