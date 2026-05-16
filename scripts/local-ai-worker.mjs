@@ -71,18 +71,22 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
 })
 
-// Loaded from harness_config on startup
+// Loaded from harness_config on startup (and refreshed each tick)
 let telegramChatId = null
+let alertsClearedAt = null // ISO string — floor for signal_review / security_scan
 
 async function loadRuntimeConfig() {
   const { data } = await db
     .from('harness_config')
     .select('key, value')
-    .in('key', ['TELEGRAM_CHAT_ID'])
+    .in('key', ['TELEGRAM_CHAT_ID', 'ALERTS_CLEARED_AT'])
   for (const row of data ?? []) {
     if (row.key === 'TELEGRAM_CHAT_ID') telegramChatId = row.value
+    if (row.key === 'ALERTS_CLEARED_AT') alertsClearedAt = row.value
   }
-  log(`Runtime config: TELEGRAM_CHAT_ID=${telegramChatId ? 'loaded' : 'missing'}`)
+  log(
+    `Runtime config: TELEGRAM_CHAT_ID=${telegramChatId ? 'loaded' : 'missing'}, ALERTS_CLEARED_AT=${alertsClearedAt ?? 'none'}`
+  )
 }
 
 // ── Analyst prompt ────────────────────────────────────────────────────────────
@@ -208,7 +212,9 @@ async function runSignalReview() {
   const start = Date.now()
   log('signal_review: fetching last', LOOKBACK_HOURS, 'h of events...')
 
-  const since = new Date(Date.now() - LOOKBACK_HOURS * 3_600_000).toISOString()
+  const rollingFloor = new Date(Date.now() - LOOKBACK_HOURS * 3_600_000).toISOString()
+  // Respect mark-clear watermark: only alert on issues AFTER the last "all clear"
+  const since = alertsClearedAt && alertsClearedAt > rollingFloor ? alertsClearedAt : rollingFloor
   const { data, error } = await db
     .from('agent_events')
     .select('action, status, output_summary, error_message, occurred_at')
@@ -441,7 +447,10 @@ In 2-3 sentences: is the system healthy? Flag any domain that looks stalled or f
 // ── Security scan ─────────────────────────────────────────────────────────────
 
 async function runSecurityScan() {
-  const since = new Date(Date.now() - 24 * 3_600_000).toISOString()
+  const rollingFloor24h = new Date(Date.now() - 24 * 3_600_000).toISOString()
+  // Respect mark-clear watermark: only scan failures AFTER the last "all clear"
+  const since =
+    alertsClearedAt && alertsClearedAt > rollingFloor24h ? alertsClearedAt : rollingFloor24h
   const { data } = await db
     .from('agent_events')
     .select('domain, action, status, error_message, occurred_at')
@@ -688,6 +697,9 @@ function sleep(ms) {
 
 async function tick() {
   log('=== Worker tick start ===')
+
+  // Refresh runtime config each tick so mark-clear watermark is picked up without restart
+  await loadRuntimeConfig()
 
   // Always run — no Ollama dependency
   await runClaudeCodeUsageScan()
