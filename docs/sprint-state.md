@@ -358,3 +358,22 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# E4 — /diet InventoryTab three-bucket summary (2026-05-16)
+# ============================================================
+
+diet_inventory_e4:
+  task_id: "2a374e67-3b80-4ed2-9e25-2b9a34c1bb21"
+  tier: "E"
+  item_id: "E4"
+  status: "in-build"
+  description: "Add three-bucket summary bar (On hand / Low / Out counts) above the inventory table"
+  audit_finding: "InventoryTab 80% done — CRUD, expiration alerts, API routes, DB table all exist. Three-bucket summary missing."
+  acceptance_doc: "docs/backlog/tier-e/E4-acceptance.md"
+  auto_proceed_rationale: "META-C: Architecture Rule 1 (Beef-Up). Single file, additive, trivially reversible. High confidence."
+  builder_task_id: "d02c895e-aaba-40ac-a78f-cf93c77f9e2d"
+  files_to_change: ["app/(cockpit)/diet/_components/InventoryTab.tsx"]
+  no_schema_change: true
+  opened_at: "2026-05-16T17:00:00Z"
+  last_updated_at: "2026-05-16T17:10:00Z"
