@@ -104,6 +104,47 @@ export async function buildProcessEfficiencyLines(): Promise<string> {
       )
     }
 
+    // Write to improvement_log for ceiling detection
+    // Inlined here (not extracted) per acceptance doc open question resolution:
+    // keeping writes adjacent to the computed values avoids variable re-scoping.
+    try {
+      const logDb = createServiceClient()
+      const buildRef = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? 'unknown'
+      const throughputValue = queued24h > 0 ? Math.round((completed24h / queued24h) * 100) : 0
+      const latencyMsValue = latencyMinutes != null ? latencyMinutes * 60_000 : 0
+      const logRows = [
+        {
+          component: 'process-efficiency',
+          metric: 'queue_throughput',
+          unit: 'pct',
+          value: throughputValue,
+        },
+        {
+          component: 'process-efficiency',
+          metric: 'pickup_latency_ms',
+          unit: 'ms',
+          value: latencyMsValue,
+        },
+        {
+          component: 'process-efficiency',
+          metric: 'queue_depth',
+          unit: 'count',
+          value: queueDepth,
+        },
+        {
+          component: 'process-efficiency',
+          metric: 'friction_index',
+          unit: 'count',
+          value: frictionCount,
+        },
+      ]
+      await logDb
+        .from('improvement_log')
+        .insert(logRows.map((r) => ({ ...r, build_ref: buildRef, is_baseline: false })))
+    } catch {
+      // Non-fatal — ceiling detection will just have one fewer data point
+    }
+
     return lines.join('\n')
   } catch {
     return 'Process efficiency: stats unavailable'

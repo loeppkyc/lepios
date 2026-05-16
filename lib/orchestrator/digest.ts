@@ -30,6 +30,7 @@ import { buildSafetyAgentDigestLine } from '@/lib/harness/safety/v2/digest'
 import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
 import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
 import { buildOssAuditDigestLine } from '@/lib/oss-radar/digest'
+import { buildCeilingMetricLines } from '@/lib/harness/ceiling-metrics'
 import {
   buildTradingCompositeDigestLine,
   buildTradingPicksDigestLine,
@@ -260,6 +261,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── 20% Better: Append process efficiency section ─────────────────────────────
   const processEfficiencyLines = await buildProcessEfficiencyLines()
   messageToSend = `${messageToSend}\n${processEfficiencyLines}`
+
+  // ── F19: Ceiling metric layer — flat/declining improvement signals ────────────
+  const ceilingMetricLines = await buildCeilingMetricLines()
+  messageToSend = `${messageToSend}\n${ceilingMetricLines}`
 
   // ── F18: Routines quota cliff signal ─────────────────────────────────────────
   const quotaCliffLine = await buildQuotaCliffLine()
