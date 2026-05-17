@@ -47,6 +47,20 @@ export function InventoryTab({ inventory }: { inventory: InventoryRow[] }) {
   const expiring = expiringSoon(inventory, todayStr, 7)
   const expired = alreadyExpired(inventory, todayStr)
 
+  // Three-bucket counts + filter
+  const [bucketFilter, setBucketFilter] = useState<'all' | 'on-hand' | 'low-out' | 'expired'>('all')
+  const onHandItems = inventory.filter((r) => r.status === 'On hand')
+  const lowOutItems = inventory.filter((r) => r.status === 'Low' || r.status === 'Out')
+  const expiredItems = inventory.filter((r) => r.status === 'Expired')
+  const visibleInventory =
+    bucketFilter === 'on-hand'
+      ? onHandItems
+      : bucketFilter === 'low-out'
+        ? lowOutItems
+        : bucketFilter === 'expired'
+          ? expiredItems
+          : inventory
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!item.trim()) {
@@ -206,6 +220,82 @@ export function InventoryTab({ inventory }: { inventory: InventoryRow[] }) {
         </form>
       </Disclosure>
 
+      {/* Three-bucket summary */}
+      {inventory.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {(
+            [
+              {
+                key: 'on-hand',
+                label: 'On Hand',
+                count: onHandItems.length,
+                color: 'var(--color-pillar-health)',
+                bg: 'rgba(63,185,80,0.08)',
+                border: 'rgba(63,185,80,0.3)',
+              },
+              {
+                key: 'low-out',
+                label: 'Low / Out',
+                count: lowOutItems.length,
+                color: 'var(--color-pillar-money)',
+                bg: 'rgba(230,162,0,0.08)',
+                border: 'rgba(230,162,0,0.3)',
+              },
+              {
+                key: 'expired',
+                label: 'Expired',
+                count: expiredItems.length,
+                color: 'var(--color-critical, #e5534b)',
+                bg: 'rgba(229,83,75,0.08)',
+                border: 'rgba(229,83,75,0.3)',
+              },
+            ] as const
+          ).map(({ key, label, count, color, bg, border }) => (
+            <button
+              key={key}
+              onClick={() => setBucketFilter((f) => (f === key ? 'all' : key))}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 16px',
+                background: bucketFilter === key ? bg : 'var(--color-surface)',
+                border: `1px solid ${bucketFilter === key ? border : 'var(--color-border)'}`,
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                flex: '1 1 160px',
+                textAlign: 'left',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1.6rem',
+                  fontWeight: 700,
+                  color,
+                  lineHeight: 1,
+                }}
+              >
+                {count}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-disabled)',
+                }}
+              >
+                {label}
+                {bucketFilter === key && <span style={{ color, marginLeft: 6 }}>▸ filtered</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {(expired.length > 0 || expiring.length > 0) && (
         <div style={cardStyle}>
           <span style={sectionTitle}>Expiration Alerts</span>
@@ -278,7 +368,10 @@ export function InventoryTab({ inventory }: { inventory: InventoryRow[] }) {
         <EmptyState message="No inventory items yet." />
       ) : (
         <div style={cardStyle}>
-          <span style={sectionTitle}>Inventory ({inventory.length})</span>
+          <span style={sectionTitle}>
+            Inventory ({visibleInventory.length}
+            {bucketFilter !== 'all' ? ` of ${inventory.length}` : ''})
+          </span>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -294,7 +387,7 @@ export function InventoryTab({ inventory }: { inventory: InventoryRow[] }) {
                 </tr>
               </thead>
               <tbody>
-                {inventory.map((r) => (
+                {visibleInventory.map((r) => (
                   <tr key={r.id}>
                     <td style={{ ...tableCell, fontWeight: 600 }}>{r.item}</td>
                     <td style={tableCell}>{r.category}</td>
