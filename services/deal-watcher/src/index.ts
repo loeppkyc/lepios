@@ -1,26 +1,15 @@
 import { supabase } from './supabase.js'
 import { sendAlert } from './telegram.js'
-import { checkAmazon } from './checkers/amazon.js'
-import { checkLego } from './checkers/lego.js'
-import { checkGeneric } from './checkers/generic.js'
-
-interface WatchTarget {
-  id: string
-  name: string
-  type: 'amazon-asin' | 'lego-ca' | 'generic-url'
-  url: string | null
-  asin: string | null
-  lego_item_number: string | null
-  check_interval_min: number
-  alert_on: string
-  threshold_price: number | null
-  last_status: string | null
-  last_checked_at: string | null
-  notes: string | null
-}
+import { getAdapter } from './adapters/index.js'
+import type { WatchTarget } from './adapters/types.js'
 
 // Track when each target was last checked (in-process memory; resets on restart)
 const lastChecked = new Map<string, number>()
+
+function intervalMs(target: WatchTarget): number {
+  if (target.check_interval_sec != null) return target.check_interval_sec * 1000
+  return target.check_interval_min * 60 * 1000
+}
 
 async function checkTarget(target: WatchTarget): Promise<void> {
   let newStatus: string
@@ -28,68 +17,35 @@ async function checkTarget(target: WatchTarget): Promise<void> {
   let message: string | null = null
 
   try {
-    if (target.type === 'amazon-asin') {
-      if (!target.asin) return
-      const status = await checkAmazon(target.asin)
-      newStatus = status.in_stock ? 'in_stock' : 'out_of_stock'
-      const priceStr =
-        status.price_cents != null ? `$${(status.price_cents / 100).toFixed(2)}` : 'unknown price'
+    const adapter = getAdapter(target.type)
+    const result = await adapter.check(target)
+    newStatus = result.raw_status
 
-      if (
-        target.alert_on === 'in_stock' &&
-        newStatus === 'in_stock' &&
-        target.last_status !== 'in_stock'
-      ) {
-        eventType = 'in_stock'
-        message = `🟢 <b>${target.name}</b> is back IN STOCK on Amazon!\n${priceStr}\nhttps://www.amazon.ca/dp/${target.asin}`
-      } else if (
-        target.alert_on === 'price_drop' &&
-        status.price_cents != null &&
-        target.threshold_price != null
-      ) {
-        const priceDollars = status.price_cents / 100
-        if (priceDollars <= target.threshold_price) {
-          eventType = 'price_drop'
-          message = `💰 <b>${target.name}</b> price dropped to ${priceStr} (threshold: $${target.threshold_price.toFixed(2)})\nhttps://www.amazon.ca/dp/${target.asin}`
-        }
-      } else if (target.alert_on === 'any_change' && newStatus !== target.last_status) {
-        eventType = 'status_change'
-        message = `🔔 <b>${target.name}</b> status changed: ${target.last_status ?? 'unknown'} → ${newStatus}\nhttps://www.amazon.ca/dp/${target.asin}`
-      }
-    } else if (target.type === 'lego-ca') {
-      if (!target.url) return
-      const status = await checkLego(target.url)
-      newStatus = status.raw_status
-      const priceStr = status.price_cad != null ? ` $${status.price_cad.toFixed(2)}` : ''
+    const cartUrl = adapter.cartUrl(target)
+    const priceStr = result.price != null ? ` $${result.price.toFixed(2)}` : ''
+    const link = cartUrl ?? target.url ?? ''
 
-      if (target.alert_on === 'in_stock' && status.in_stock && target.last_status !== 'in_stock') {
-        eventType = 'in_stock'
-        message = `🟢 <b>${target.name}</b> is back IN STOCK on LEGO.ca!${priceStr}\n${target.url}`
-      } else if (target.alert_on === 'any_change' && newStatus !== target.last_status) {
-        eventType = 'status_change'
-        message = `🔔 <b>${target.name}</b> status changed: ${target.last_status ?? 'unknown'} → ${newStatus}\n${target.url}`
-      }
-    } else if (target.type === 'generic-url') {
-      if (!target.url) return
-      const pattern = target.notes ?? 'MATCH:in stock'
-      const status = await checkGeneric(target.url, pattern)
-      newStatus = status.raw_status
-
-      if (status.matched && target.last_status !== 'match') {
-        eventType = 'status_change'
-        message = `🔔 <b>${target.name}</b> — alert triggered!\n${target.url}`
-      }
-    } else {
-      return
+    if (target.alert_on === 'in_stock' && result.in_stock && target.last_status !== 'in_stock') {
+      eventType = 'in_stock'
+      message = `🟢 <b>${target.name}</b> is back IN STOCK!${priceStr}\n${link}`
+    } else if (
+      target.alert_on === 'price_drop' &&
+      result.price != null &&
+      target.threshold_price != null &&
+      result.price <= target.threshold_price
+    ) {
+      eventType = 'price_drop'
+      message = `💰 <b>${target.name}</b> price dropped to${priceStr} (threshold: $${target.threshold_price.toFixed(2)})\n${link}`
+    } else if (target.alert_on === 'any_change' && newStatus !== target.last_status) {
+      eventType = 'status_change'
+      message = `🔔 <b>${target.name}</b> status changed: ${target.last_status ?? 'unknown'} → ${newStatus}\n${link}`
     }
 
-    // Update last_status and last_checked_at
     await supabase
       .from('watch_targets')
       .update({ last_status: newStatus, last_checked_at: new Date().toISOString() })
       .eq('id', target.id)
 
-    // Log event and send Telegram if triggered
     if (eventType && message) {
       await supabase.from('watch_events').insert({
         watch_target_id: target.id,
@@ -125,9 +81,8 @@ async function loadTargets(): Promise<WatchTarget[]> {
 async function tick(targets: WatchTarget[]): Promise<void> {
   const now = Date.now()
   for (const target of targets) {
-    const intervalMs = target.check_interval_min * 60 * 1000
     const last = lastChecked.get(target.id) ?? 0
-    if (now - last >= intervalMs) {
+    if (now - last >= intervalMs(target)) {
       lastChecked.set(target.id, now)
       // Don't await — run checks concurrently without blocking the tick loop
       checkTarget(target).catch(() => {})
@@ -149,10 +104,10 @@ async function main(): Promise<void> {
     5 * 60 * 1000
   )
 
-  // Tick every 30 seconds — each target checked against its own interval
+  // Tick every 2 seconds — supports check_interval_sec down to ~2s for hot-drop watching
   setInterval(() => {
     tick(targets).catch((err) => console.error('[deal-watcher] tick error:', err))
-  }, 30_000)
+  }, 2_000)
 
   // Run first tick immediately
   await tick(targets)
