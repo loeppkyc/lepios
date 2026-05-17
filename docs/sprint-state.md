@@ -366,6 +366,17 @@ last_updated_at: "2026-05-09T03:40:00Z"
 # GitHackers (task 5f520ddd, 2026-05-16)
 # ============================================================
 
+tier_e_E6:
+  task_id: "30eb6c0e-a5c9-4ffd-a8fb-bcfad1630a4b"
+  run_id: "0fef7ae3-ba23-4b54-b4bc-e0a90c476d71"
+  item_id: "E6"
+  status: "awaiting-colin-approval"
+  description: "Megan Reminder Inbox — Telegram ingest + /family cockpit section"
+  acceptance_doc: "docs/backlog/tier-e/E6-acceptance.md"
+  blocking_question: "Which Telegram bot does Megan use? Option A (existing bot + MEGAN_TELEGRAM_USER_ID) or Option B (new Megan-specific bot)?"
+  opened_at: "2026-05-17T14:17:00Z"
+  last_updated_at: "2026-05-17T14:20:00Z"
+
 tier_a_A6:
   task_id: "5f520ddd-066d-4a1f-b5c3-09dd4fded17c"
   item_id: "A6"
