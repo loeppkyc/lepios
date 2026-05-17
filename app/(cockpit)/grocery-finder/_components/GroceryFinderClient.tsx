@@ -6,6 +6,7 @@ import type { GroceryProductRow } from '@/lib/diet/types'
 import { GROCERY_STORES, GROCERY_STORE_LABELS } from '@/lib/diet/types'
 import { triggerFlippSync } from '../actions'
 import type { FlippSyncResult } from '@/lib/scraper/flipp-sync'
+import type { DealScore } from '@/lib/diet/deal-score'
 
 const PRICE = (v: number | null) => (v != null ? `$${v.toFixed(2)}` : '—')
 const DATE = (v: string | null) => {
@@ -16,9 +17,11 @@ const DATE = (v: string | null) => {
 export function GroceryFinderClient({
   initialProducts,
   priceHistory = {},
+  dealScores = {},
 }: {
   initialProducts: GroceryProductRow[]
   priceHistory?: Record<string, Array<{ price: number; recorded_at: string }>>
+  dealScores?: Record<string, DealScore>
 }) {
   const [store, setStore] = useState<string>('All')
   const [search, setSearch] = useState('')
@@ -254,6 +257,7 @@ export function GroceryFinderClient({
                 <th style={thStyle}>Last Checked</th>
                 <th style={thStyle}>Flyer</th>
                 <th style={thStyle}>Best</th>
+                <th style={thStyle}>Buy?</th>
                 <th style={thStyle}>Trend</th>
                 <th style={thStyle}>Link</th>
               </tr>
@@ -332,6 +336,9 @@ export function GroceryFinderClient({
                     )}
                   </td>
                   <td style={tdStyle}>
+                    <BuyVerdict score={dealScores[p.id]} />
+                  </td>
+                  <td style={tdStyle}>
                     <Sparkline data={priceHistory[p.id] ?? []} />
                   </td>
                   <td style={tdStyle}>
@@ -363,6 +370,57 @@ export function GroceryFinderClient({
       {/* Add Product modal stub */}
       {addOpen && <AddProductModal onClose={() => setAddOpen(false)} />}
     </div>
+  )
+}
+
+const BUY_LABEL_COLOR: Record<DealScore['buy_recommendation'], string> = {
+  BUY_NOW: '#22c55e',
+  GOOD: 'var(--color-accent-gold)',
+  WAIT: 'var(--color-text-muted)',
+  SKIP: '#ef4444',
+  NEW: 'var(--color-text-disabled)',
+}
+
+const BUY_LABEL_TEXT: Record<DealScore['buy_recommendation'], string> = {
+  BUY_NOW: 'BUY',
+  GOOD: 'GOOD',
+  WAIT: 'WAIT',
+  SKIP: 'SKIP',
+  NEW: 'NEW',
+}
+
+function BuyVerdict({ score }: { score: DealScore | undefined }) {
+  if (!score) return <span style={{ color: 'var(--color-text-disabled)' }}>—</span>
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span
+        title={score.verdict}
+        style={{
+          fontSize: '0.65rem',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          color: BUY_LABEL_COLOR[score.buy_recommendation],
+          cursor: 'default',
+        }}
+      >
+        {BUY_LABEL_TEXT[score.buy_recommendation]}
+      </span>
+      {score.resale_opportunity && (
+        <span
+          title={`Resale margin: ${score.resale_margin_pct?.toFixed(1)}%`}
+          style={{
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            color: 'var(--color-accent-gold)',
+            cursor: 'default',
+          }}
+        >
+          $
+        </span>
+      )}
+    </span>
   )
 }
 

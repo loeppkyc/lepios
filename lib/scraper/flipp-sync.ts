@@ -3,6 +3,8 @@ import { searchFlippItems, mapMerchantToStore } from './flipp'
 import { sendDailyBot } from '@/lib/telegram/daily-bot'
 import { GROCERY_STORE_LABELS } from '@/lib/diet/types'
 import type { GroceryStore } from '@/lib/diet/types'
+import { computeDealScore } from '@/lib/diet/deal-score'
+import type { DealScore } from '@/lib/diet/deal-score'
 
 export interface FlippSyncResult {
   staples_checked: number
@@ -25,7 +27,8 @@ const STORE_SEARCH_BASE: Record<string, string> = {
 
 function buildStoreSearchUrl(store: string, productName: string): string {
   const base = STORE_SEARCH_BASE[store]
-  if (!base) return `https://www.google.ca/search?q=${encodeURIComponent(productName + ' ' + store)}`
+  if (!base)
+    return `https://www.google.ca/search?q=${encodeURIComponent(productName + ' ' + store)}`
   // Use a short version of the name — strip size/weight info after comma
   const shortName = productName.split(',')[0].trim()
   return base + encodeURIComponent(shortName)
@@ -145,7 +148,7 @@ export async function runFlippSync(): Promise<FlippSyncResult> {
   try {
     const { data: flyerDeals } = await supabase
       .from('grocery_products')
-      .select('name, store, sale_price, regular_price, store_url')
+      .select('id, food_catalog_id, name, store, sale_price, regular_price, store_url')
       .eq('in_flyer', true)
       .not('sale_price', 'is', null)
       .not('regular_price', 'is', null)
@@ -163,12 +166,37 @@ export async function runFlippSync(): Promise<FlippSyncResult> {
       .slice(0, 5)
 
     if (filtered.length > 0) {
+      // Compute deal scores in parallel for all top deals
+      const dealScores: Record<string, DealScore> = {}
+      await Promise.all(
+        filtered.map(async (d) => {
+          dealScores[d.id] = await computeDealScore(
+            supabase,
+            d.id,
+            d.sale_price!,
+            d.food_catalog_id ?? undefined
+          )
+        })
+      )
+
+      const BUY_EMOJI: Record<DealScore['buy_recommendation'], string> = {
+        BUY_NOW: '🟢',
+        GOOD: '🟡',
+        WAIT: '🟠',
+        SKIP: '🔴',
+        NEW: '⚪',
+      }
+
       const lines = filtered.map((d) => {
         const storeLabel = GROCERY_STORE_LABELS[d.store as GroceryStore] ?? d.store
         const pct = Math.round(((d.regular_price! - d.sale_price!) / d.regular_price!) * 100)
         const url = d.store_url ?? buildStoreSearchUrl(d.store, d.name)
         const label = `${d.name}: $${d.sale_price!.toFixed(2)} (was $${d.regular_price!.toFixed(2)}, ${pct}% off) @ ${storeLabel}`
-        return `• <a href="${url}">${escapeHtml(label)}</a>`
+        const score = dealScores[d.id]
+        const scoreLine = score
+          ? `\n  ↳ ${BUY_EMOJI[score.buy_recommendation]} ${escapeHtml(score.verdict)}`
+          : ''
+        return `• <a href="${url}">${escapeHtml(label)}</a>${scoreLine}`
       })
       const msg = `Flipp deals this week:\n${lines.join('\n')}`
       await sendDailyBot(msg, 'HTML')

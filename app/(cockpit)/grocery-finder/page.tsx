@@ -1,8 +1,11 @@
 // F18: bench=product_coverage_pct (target ≥80% of household staples with current price); surface=grocery-finder page coverage pill + morning_digest top deals
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { fetchGroceryProducts } from '@/lib/diet/queries'
 import { logEvent } from '@/lib/knowledge/client'
+import { computeDealScore } from '@/lib/diet/deal-score'
+import type { DealScore } from '@/lib/diet/deal-score'
 import { GroceryFinderClient } from './_components/GroceryFinderClient'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +40,22 @@ export default async function GroceryFinderPage() {
       priceHistory[pid].push({ price: row.price as number, recorded_at: row.scraped_at as string })
     }
   }
+
+  // Compute deal scores for all products with a sale price
+  const dealScores: Record<string, DealScore> = {}
+  const supabaseSvc = createServiceClient()
+  await Promise.all(
+    products
+      .filter((p) => p.sale_price != null)
+      .map(async (p) => {
+        dealScores[p.id] = await computeDealScore(
+          supabaseSvc,
+          p.id,
+          p.sale_price!,
+          p.food_catalog_id ?? undefined
+        )
+      })
+  )
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-base)', padding: '24px' }}>
@@ -74,7 +93,11 @@ export default async function GroceryFinderPage() {
         </p>
       </div>
 
-      <GroceryFinderClient initialProducts={products} priceHistory={priceHistory} />
+      <GroceryFinderClient
+        initialProducts={products}
+        priceHistory={priceHistory}
+        dealScores={dealScores}
+      />
     </div>
   )
 }
