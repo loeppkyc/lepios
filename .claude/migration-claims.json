@@ -539,7 +539,19 @@
       "filename": "0239_corolla_balance_sheet_entry.sql",
       "claimed_at": "2026-05-17",
       "note": "E9: Corolla net worth row in balance_sheet_entries"
+    },
+    "0240": {
+      "branch": "feat/reconciliation-paper-trail",
+      "filename": "0240_statement_receipt_matches.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Statement reconciliation -- statement_receipt_matches junction table linking pending_transactions to receipts for Paper Trail page."
+    },
+    "0241": {
+      "branch": "feat/deal-watcher-graphql",
+      "filename": "0241_watch_targets_interval_sec.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Deal Watcher v2 — add check_interval_sec (nullable, overrides check_interval_min) + expand type CHECK to include shopify."
     }
   },
-  "next_available": 239
+  "next_available": 242
 }
