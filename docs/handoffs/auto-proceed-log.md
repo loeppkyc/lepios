@@ -1,3 +1,24 @@
+2026-05-17T19:35:00Z sprint=standalone task=f6b7bfdb doc=docs/backlog/tier-e/E10-trading-journal-acceptance.md
+cited_principles: [own-uncertainty-escalation, principle-1-live-test, META-C]
+trigger_match_evidence: |
+  Situation: New trading_journal table + Sheets backfill + daily sync cron + IBKR research.
+  OQ-1 (sheet tab name) is BLOCKING — readOsSheet() takes literal tab name; wrong name = silent 400.
+  OQ-2 (dedup key) requires Colin's preference on external_id vs composite key.
+  New schema creation on an empty table — reversible but an explicit schema decision.
+  Twin unreachable from coordinator sandbox — all 4 open questions escalate to Colin.
+  Own-uncertainty rule: "if you notice yourself reaching for 'probably Colin would want…'"
+  applies to OQ-1 through OQ-4.
+reversibility_check: |
+  Migration 0235 (CREATE TABLE trading_journal): reversible via DROP TABLE — no existing data.
+  Backfill script: reversible via DELETE WHERE _source='sheets'. No production data affected.
+  New cron route: reversible via file delete + Vercel deploy.
+  sprint-state.md update: document only, fully reversible.
+  All decisions reversible-free or reversible-with-trivial-cost.
+confidence: n/a — escalation correct, own-uncertainty rule triggered
+outcome: escalated (OQ-1 blocking + twin unreachable + new schema decision)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
