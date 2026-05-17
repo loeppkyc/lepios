@@ -143,6 +143,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'AI & Automation',
     items: [
       { label: 'Autonomous', href: '/autonomous' },
+      { label: 'AI Control', href: '/ai-control' },
       { label: 'AI Coach', href: null },
       { label: 'Local AI', href: '/local-ai' },
       { label: 'Agent Swarm', href: null },
