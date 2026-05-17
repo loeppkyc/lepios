@@ -4,22 +4,23 @@
 
 backlog_c4:
   task_id: "9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
-  status: "awaiting-q1-answer"
-  phase: "2-acceptance-doc-approved-q1-blocking"
+  status: "in-build"
+  phase: "3-delegated-to-builder"
   acceptance_doc: "docs/backlog/tier-c/C4-acceptance.md"
-  colin_approved_at: "2026-05-16T17:27:06Z"
-  q1_blocking: "Tesla model (Model 3 or Model Y?) — required for AutoTrader.ca search URL"
+  colin_approved_at: "2026-05-16 (PR #303 comment)"
+  q1_resolved: "2022 Tesla Model Y Long Range AWD, ~119,000 km — Alberta search"
   q2_resolved: "Option A — error toast + open Edit mode (coordinator decision)"
   q3_resolved: "Confirmation step before save (coordinator decision)"
+  seam_approved: true
   approach: "Puppeteer + AutoTrader.ca Alberta listings, median comparable price"
   files_to_change:
-    - "package.json (seam — @sparticuz/chromium + puppeteer-core)"
+    - "package.json (seam — @sparticuz/chromium + puppeteer-core) [seam-approved]"
     - "package-lock.json (seam)"
     - "app/api/net-worth/tesla-estimate/route.ts (new)"
     - "app/(cockpit)/net-worth/_components/NetWorthPage.tsx"
-  telegram_q1_notification_sent_at: "2026-05-16T17:42:00Z"
+  delegated_to_builder_at: "2026-05-16"
   opened_at: "2026-05-16T17:20:00Z"
-  last_updated_at: "2026-05-16T17:42:00Z"
+  last_updated_at: "2026-05-16T18:00:00Z"
 
 # ============================================================
 # retail-scout-arbitrage — task 3a13fc07

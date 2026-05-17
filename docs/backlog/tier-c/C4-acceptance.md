@@ -2,13 +2,14 @@
 
 **task_id:** `9e210b02-a0c5-4f17-8e8a-d413d52da9e1`  
 **tier:** C  
-**status:** awaiting-q1-answer (Tesla model: Model 3 or Model Y?)  
+**status:** approved-by-colin — ready for builder  
 **written by:** coordinator (2026-05-16), updated (2026-05-16)  
 **branch:** `harness/task-9e210b02-a0c5-4f17-8e8a-d413d52da9e1`  
-**colin_approved:** 2026-05-16 (overall approach — Puppeteer + AutoTrader.ca)  
-**q2_resolved:** Option A — on scrape error, show toast + open inline Edit mode (coordinator decision, reversible)  
-**q3_resolved:** Confirmation step before save — "Comps found: median $XX,XXX from N listings — Use This Value | Cancel" (coordinator decision, reversible)  
-**q1_blocking:** Colin must specify Tesla model — see Open Questions below
+**colin_approved:** 2026-05-16 (PR #303 comment — all three questions resolved, seam-approved)  
+**q1_resolved:** 2022 Tesla Model Y Long Range AWD, ~119,000 km — AutoTrader search: Make=Tesla, Model=Model Y, Year=2022, Trim=Long Range AWD, Province=Alberta, Condition=Used  
+**q2_resolved:** Option A — on scrape error, show toast + open inline Edit mode (coordinator decision, confirmed)  
+**q3_resolved:** Confirmation step before save — "Comps found: median $XX,XXX from N listings — Use This Value | Cancel" (coordinator decision, confirmed)  
+**seam_approved:** `@sparticuz/chromium` + `puppeteer-core` deps approved — `[seam-approved]` required in builder's package.json commit
 
 ---
 
@@ -79,14 +80,10 @@ No schema migration required (the existing `balance_sheet_entries` table PATCH v
 
 ## Open questions for Colin (REQUIRED before builder proceeds)
 
-### Q1 — Tesla model for the search query ⚠️ STILL BLOCKING
-The row is `"2022 Tesla (Vehicle)"` — no model specified. AutoTrader.ca search is much more accurate when filtered by model (Model 3, Model Y, Model S, Model X). Comparable listings for different models vary by $10,000–$20,000 CAD.
+### Q1 — Tesla model ✅ RESOLVED (Colin PR #303 comment 2026-05-16)
+**Answer:** 2022 Tesla **Model Y Long Range AWD**, ~119,000 km as of May 2026
 
-**Colin: what model is the 2022 Tesla?**
-- Tap **[Model 3]** in Telegram to use `model_3` in the AutoTrader search
-- Tap **[Model Y]** in Telegram to use `model_y` in the AutoTrader search
-
-Builder cannot proceed without this answer.
+AutoTrader.ca search URL: `Make=Tesla, Model=Model Y, Year=2022, Trim=Long Range AWD, Province=Alberta, Condition=Used`
 
 ### Q2 — Fallback UX ✅ RESOLVED (coordinator decision)
 **Decision:** Option A — on scrape error, show toast "Auto-estimate failed. Enter value manually." and open the existing inline Edit mode for the Tesla row. Reversible via UI change.
