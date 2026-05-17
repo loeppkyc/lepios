@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TodayYesterdayPanel } from './_components/TodayYesterdayPanel'
 import { WhatYouOwePanel } from './_components/WhatYouOwePanel'
+import { WTDPanel } from './_components/WTDPanel'
 import { RecentDaysTable } from './_components/RecentDaysTable'
 import { StatementCoverageGrid } from './_components/StatementCoverageGrid'
 
@@ -54,6 +55,11 @@ export default async function BusinessReviewPage() {
 
       {/* Today + Yesterday panels — Chunk A */}
       <TodayYesterdayPanel />
+
+      {/* Week-to-Date pacing panel — Sprint 8 Chunk B */}
+      <div style={{ marginTop: 24 }}>
+        <WTDPanel />
+      </div>
 
       {/* What You're Owed panel — Chunk B */}
       <div style={{ marginTop: 24 }}>
