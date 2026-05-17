@@ -110,7 +110,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Sports Intel', href: '/sports-intel' },
       { label: 'Polymarket', href: '/polymarket' },
       { label: 'Prediction Engine', href: '/predictions' },
-      { label: 'Sports Betting', href: null },
+      { label: 'Sports Betting', href: '/sports-betting' },
       { label: 'Crypto', href: null },
       { label: 'Calibration', href: '/calibration' },
     ],
@@ -139,6 +139,7 @@ const NAV_SECTIONS: NavSection[] = [
     id: 'life',
     label: 'Life',
     items: [
+      { label: 'Life Signals', href: '/signals' },
       { label: 'Health', href: '/health' },
       { label: 'Oura Health', href: '/oura' },
       { label: 'Focus', href: '/focus' },
