@@ -13,7 +13,13 @@ const DATE = (v: string | null) => {
   return new Date(v).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
 }
 
-export function GroceryFinderClient({ initialProducts }: { initialProducts: GroceryProductRow[] }) {
+export function GroceryFinderClient({
+  initialProducts,
+  priceHistory = {},
+}: {
+  initialProducts: GroceryProductRow[]
+  priceHistory?: Record<string, Array<{ price: number; recorded_at: string }>>
+}) {
   const [store, setStore] = useState<string>('All')
   const [search, setSearch] = useState('')
   const [flyerOnly, setFlyerOnly] = useState(false)
@@ -51,6 +57,28 @@ export function GroceryFinderClient({ initialProducts }: { initialProducts: Groc
       return true
     })
   }, [initialProducts, store, search, flyerOnly])
+
+  // Compute best-price product IDs across stores (per food_catalog_id, 2+ rows required)
+  const bestPriceIds = useMemo(() => {
+    const groups: Record<string, GroceryProductRow[]> = {}
+    for (const p of initialProducts) {
+      if (!p.food_catalog_id) continue
+      if (!groups[p.food_catalog_id]) groups[p.food_catalog_id] = []
+      groups[p.food_catalog_id].push(p)
+    }
+    const result = new Set<string>()
+    for (const rows of Object.values(groups)) {
+      if (rows.length < 2) continue
+      const minPrice = Math.min(
+        ...rows.map((r) => (r.sale_price != null ? r.sale_price : (r.regular_price ?? Infinity)))
+      )
+      for (const r of rows) {
+        const effective = r.sale_price != null ? r.sale_price : (r.regular_price ?? null)
+        if (effective === minPrice) result.add(r.id)
+      }
+    }
+    return result
+  }, [initialProducts])
 
   const inputStyle = {
     fontFamily: 'var(--font-ui)',
@@ -225,6 +253,8 @@ export function GroceryFinderClient({ initialProducts }: { initialProducts: Groc
                 <th style={{ ...thStyle, textAlign: 'right' }}>$/100g</th>
                 <th style={thStyle}>Last Checked</th>
                 <th style={thStyle}>Flyer</th>
+                <th style={thStyle}>Best</th>
+                <th style={thStyle}>Trend</th>
                 <th style={thStyle}>Link</th>
               </tr>
             </thead>
@@ -284,6 +314,25 @@ export function GroceryFinderClient({ initialProducts }: { initialProducts: Groc
                     ) : (
                       <span style={{ color: 'var(--color-text-disabled)' }}>—</span>
                     )}
+                  </td>
+                  <td style={tdStyle}>
+                    {bestPriceIds.has(p.id) ? (
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          color: 'var(--color-accent-gold)',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        BEST
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-text-disabled)' }}>—</span>
+                    )}
+                  </td>
+                  <td style={tdStyle}>
+                    <Sparkline data={priceHistory[p.id] ?? []} />
                   </td>
                   <td style={tdStyle}>
                     {p.store_url ? (
@@ -381,6 +430,29 @@ function EmptyState() {
         Add products manually, or wait for the Edmonton scraper to run
       </div>
     </div>
+  )
+}
+
+function Sparkline({ data }: { data: Array<{ price: number }> }) {
+  if (data.length < 2) return <span style={{ color: 'var(--color-text-disabled)' }}>—</span>
+  const W = 60,
+    H = 20,
+    pad = 2
+  const prices = data.map((d) => d.price)
+  const min = Math.min(...prices),
+    max = Math.max(...prices)
+  const range = max - min || 1
+  const pts = prices
+    .map((p, i) => {
+      const x = pad + (i / (prices.length - 1)) * (W - pad * 2)
+      const y = pad + ((max - p) / range) * (H - pad * 2)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+  return (
+    <svg width={W} height={H} style={{ display: 'block' }}>
+      <polyline points={pts} fill="none" stroke="var(--color-accent-gold)" strokeWidth="1.5" />
+    </svg>
   )
 }
 

@@ -17,6 +17,27 @@ export default async function GroceryFinderPage() {
   void logEvent('grocery-finder', 'page.viewed', { actor: 'user', status: 'success' })
   const products = await fetchGroceryProducts(supabase)
 
+  const productIds = products.map((p) => p.id)
+  const { data: rawHistory } =
+    productIds.length > 0
+      ? await supabase
+          .from('grocery_price_history')
+          .select('grocery_product_id, price, scraped_at')
+          .in('grocery_product_id', productIds)
+          .order('scraped_at', { ascending: false })
+          .limit(productIds.length * 10)
+      : { data: [] }
+
+  // Group by grocery_product_id, keep last 8 entries per product (already DESC so first 8 = most recent)
+  const priceHistory: Record<string, Array<{ price: number; recorded_at: string }>> = {}
+  for (const row of rawHistory ?? []) {
+    const pid = row.grocery_product_id as string
+    if (!priceHistory[pid]) priceHistory[pid] = []
+    if (priceHistory[pid].length < 8) {
+      priceHistory[pid].push({ price: row.price as number, recorded_at: row.scraped_at as string })
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-base)', padding: '24px' }}>
       <div
@@ -53,7 +74,7 @@ export default async function GroceryFinderPage() {
         </p>
       </div>
 
-      <GroceryFinderClient initialProducts={products} />
+      <GroceryFinderClient initialProducts={products} priceHistory={priceHistory} />
     </div>
   )
 }
