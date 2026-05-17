@@ -413,3 +413,26 @@ d5_ceiling_metric_layer:
   escalation_reason: "Twin unreachable (coordinator sandbox host allowlist). CEILING_HEURISTICS text appears verbatim in daily digest — own-uncertainty escalation signal triggered."
   opened_at: "2026-05-16T17:00:00Z"
   last_updated_at: "2026-05-16T17:35:00Z"
+
+# ============================================================
+# E10 — Trading Journal Sheets Sync + IBKR Research (task f6b7bfdb, 2026-05-17)
+# ============================================================
+
+e10_trading_journal:
+  task_id: "f6b7bfdb-5563-40cf-b31b-17abb7b5ab3f"
+  run_id: "00d4d1e5-e465-430a-8df8-d0ca1164dbb7"
+  status: "awaiting-colin-approval"
+  description: "trading_journal table + Sheets backfill + daily sync cron + IBKR research"
+  study_doc: "docs/backlog/tier-e/E10-trading-journal-study.md"
+  acceptance_doc: "docs/backlog/tier-e/E10-trading-journal-acceptance.md"
+  ibkr_research_doc: "docs/backlog/tier-e/E10-ibkr-research.md"
+  branch: "harness/task-f6b7bfdb-5563-40cf-b31b-17abb7b5ab3f"
+  escalation_reason: "Own-uncertainty: OQ-1 (sheet tab name) is blocking. New schema table. Twin unreachable."
+  open_questions:
+    - "OQ-1 (BLOCKING): Exact Google Sheet tab name for MES trades?"
+    - "OQ-2: Dedup key for ongoing sync (row index vs composite key)?"
+    - "OQ-3: Should trading_journal appear in /trading Stats tab?"
+    - "OQ-4: Dedicated trading-journal-sync cron or add step to trading-score cron?"
+  next_migration: "0235"
+  opened_at: "2026-05-17T19:26:00Z"
+  last_updated_at: "2026-05-17T19:35:00Z"
