@@ -14,10 +14,18 @@ c2_statement_coverage_v2:
   delegated_to_builder_at: "2026-05-17T16:35:00Z"
   build_committed_at: "2026-05-17T16:45:00Z"
   build_commit: "6c89306"
+  test_fix_commit: "08e3c8a"
+  handoff_commit: "a96f9dc"
+  tests_passing: 3904
+  tests_failing_preexisting: 159
+  tests_baseline_failing: 175
+  tests_new: 13
   files_changed:
     - "lib/gmail/classifiers/statement-arrivals.ts"
     - "app/api/business-review/statement-coverage/route.ts"
     - "supabase/migrations/0237_cleanup_false_positive_statement_arrivals.sql"
+    - "tests/gmail-scanner.test.ts"
+    - "tests/statement-coverage.test.ts"
   status: "awaiting-grounding"
   phase: "4-awaiting-grounding"
   grounding_checkpoints:
