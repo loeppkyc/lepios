@@ -16,121 +16,121 @@
       "branch": "feat/self-repair-night-watchman-v2",
       "filename": "0140_night_watchman.sql",
       "claimed_at": "2026-05-07",
-      "note": "Night-watchman v2 \u00e2\u20ac\u201d runs/check_results/incidents tables + 4 harness_config keys for killswitch+loop-guards. Applied to prod via Supabase MCP."
+      "note": "Night-watchman v2 â€” runs/check_results/incidents tables + 4 harness_config keys for killswitch+loop-guards. Applied to prod via Supabase MCP."
     },
     "0141": {
       "branch": "chore/self-repair-wire-up",
       "filename": "0141_self_repair_wire_up.sql",
       "claimed_at": "2026-05-07",
-      "note": "Self-repair wire-up \u00e2\u20ac\u201d seed harness_config keys for Sentry/Vercel/Telegram-Vault-pointer with empty-string placeholders. Applied to prod via Supabase MCP. ON CONFLICT DO NOTHING \u00e2\u20ac\u201d re-runnable, never clobbers populated values."
+      "note": "Self-repair wire-up â€” seed harness_config keys for Sentry/Vercel/Telegram-Vault-pointer with empty-string placeholders. Applied to prod via Supabase MCP. ON CONFLICT DO NOTHING â€” re-runnable, never clobbers populated values."
     },
     "0142": {
       "branch": "feat/ai-pick-engine-chunk-a",
       "filename": "0142_ai_pick_engine_schema.sql",
       "claimed_at": "2026-05-07",
-      "note": "AI Pick Engine Chunk A \u00e2\u20ac\u201d predictions, trades, trust_state, prediction_weights tables + mode column on bets. See docs/acceptance/ai-pick-engine-chunk-a-schema.md. Note: originally claimed 0141 but lost the race to PR #109 \u00e2\u20ac\u201d bumped after rebase, no schema impact (different tables)."
+      "note": "AI Pick Engine Chunk A â€” predictions, trades, trust_state, prediction_weights tables + mode column on bets. See docs/acceptance/ai-pick-engine-chunk-a-schema.md. Note: originally claimed 0141 but lost the race to PR #109 â€” bumped after rebase, no schema impact (different tables)."
     },
     "0148": {
       "branch": "feat/health-port",
       "filename": "0148_vitals.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d vitals table (BP/weight/temp/HR/glucose/O2). Originally claimed 0142 but PR #110 took the slot during rebase; renumbered. Applied to prod via Supabase MCP under original name 0142_vitals \u00e2\u20ac\u201d DB tracks by version stamp not filename."
+      "note": "Health module v1 â€” vitals table (BP/weight/temp/HR/glucose/O2). Originally claimed 0142 but PR #110 took the slot during rebase; renumbered. Applied to prod via Supabase MCP under original name 0142_vitals â€” DB tracks by version stamp not filename."
     },
     "0149": {
       "branch": "feat/health-port",
       "filename": "0149_symptoms.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d symptoms table. Active = resolved_on IS NULL. Renumbered from 0143. Applied to prod via MCP."
+      "note": "Health module v1 â€” symptoms table. Active = resolved_on IS NULL. Renumbered from 0143. Applied to prod via MCP."
     },
     "0150": {
       "branch": "feat/health-port",
       "filename": "0150_medications.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d medications table. Active boolean + start_date/end_date. Renumbered from 0144. Applied to prod via MCP."
+      "note": "Health module v1 â€” medications table. Active boolean + start_date/end_date. Renumbered from 0144. Applied to prod via MCP."
     },
     "0151": {
       "branch": "feat/health-port",
       "filename": "0151_doctor_visits.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d doctor_visits table. Diagnosis/outcome/follow-up tracking. Renumbered from 0145. Applied to prod via MCP."
+      "note": "Health module v1 â€” doctor_visits table. Diagnosis/outcome/follow-up tracking. Renumbered from 0145. Applied to prod via MCP."
     },
     "0152": {
       "branch": "feat/health-port",
       "filename": "0152_workouts.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d workouts table. muscle_groups TEXT[]; supercompensation gauge math deferred to v1.1. Renumbered from 0146. Applied to prod via MCP."
+      "note": "Health module v1 â€” workouts table. muscle_groups TEXT[]; supercompensation gauge math deferred to v1.1. Renumbered from 0146. Applied to prod via MCP."
     },
     "0153": {
       "branch": "feat/health-port",
       "filename": "0153_cycle_entries.sql",
       "claimed_at": "2026-05-07",
-      "note": "Health module v1 \u00e2\u20ac\u201d cycle_entries table for Megan's endo monitoring. Multi-select pain_locations TEXT[]. Renumbered from 0147. Applied to prod via MCP."
+      "note": "Health module v1 â€” cycle_entries table for Megan's endo monitoring. Multi-select pain_locations TEXT[]. Renumbered from 0147. Applied to prod via MCP."
     },
     "0154": {
       "branch": "feat/diet-port",
       "filename": "0154_grocery_inventory.sql",
       "claimed_at": "2026-05-07",
-      "note": "Diet module v1 \u00e2\u20ac\u201d grocery_inventory table (item, category, qty, expiration tracking). Applied to prod via MCP."
+      "note": "Diet module v1 â€” grocery_inventory table (item, category, qty, expiration tracking). Applied to prod via MCP."
     },
     "0155": {
       "branch": "feat/diet-port",
       "filename": "0155_grocery_receipts.sql",
       "claimed_at": "2026-05-07",
-      "note": "Diet module v1 \u00e2\u20ac\u201d grocery_receipts table. Negative price = discount row (Streamlit convention preserved). Receipt OCR via Claude Vision deferred to v1.1. Applied to prod via MCP."
+      "note": "Diet module v1 â€” grocery_receipts table. Negative price = discount row (Streamlit convention preserved). Receipt OCR via Claude Vision deferred to v1.1. Applied to prod via MCP."
     },
     "0156": {
       "branch": "feat/diet-port",
       "filename": "0156_meal_log.sql",
       "claimed_at": "2026-05-07",
-      "note": "Diet module v1 \u00e2\u20ac\u201d meal_log table with calories+macros. AI nutrition estimation deferred to v1.1. Applied to prod via MCP."
+      "note": "Diet module v1 â€” meal_log table with calories+macros. AI nutrition estimation deferred to v1.1. Applied to prod via MCP."
     },
     "0157": {
       "branch": "feat/diet-port",
       "filename": "0157_weight_log.sql",
       "claimed_at": "2026-05-07",
-      "note": "Diet module v1 \u00e2\u20ac\u201d weight_log table. UNIQUE(weighed_on) for atomic upsert (Streamlit appends duplicates \u00e2\u20ac\u201d fixed). TDEE projection deferred to v1.1. Applied to prod via MCP."
+      "note": "Diet module v1 â€” weight_log table. UNIQUE(weighed_on) for atomic upsert (Streamlit appends duplicates â€” fixed). TDEE projection deferred to v1.1. Applied to prod via MCP."
     },
     "0158": {
       "branch": "feat/diet-port",
       "filename": "0158_biomarkers.sql",
       "claimed_at": "2026-05-07",
-      "note": "Diet module v1 \u00e2\u20ac\u201d biomarkers table with DB-trigger-derived status (low/normal/high) from value vs ref range. Applied to prod via MCP."
+      "note": "Diet module v1 â€” biomarkers table with DB-trigger-derived status (low/normal/high) from value vs ref range. Applied to prod via MCP."
     },
     "0159": {
       "branch": "feat/resource-budget-tracker",
       "filename": "0159_harness_resource_budgets.sql",
       "claimed_at": "2026-05-07",
-      "note": "P5-4 \u00e2\u20ac\u201d central resource budget registry. Companion to scripts/check-budgets.mjs (pre-commit). Seeds vercel.crons (max 18), package.deps_total (max 300), vercel.env_vars (max 100, externally-synced placeholder)."
+      "note": "P5-4 â€” central resource budget registry. Companion to scripts/check-budgets.mjs (pre-commit). Seeds vercel.crons (max 18), package.deps_total (max 300), vercel.env_vars (max 100, externally-synced placeholder)."
     },
     "0160": {
       "branch": "harness/overnight-autonomy-bootstrap",
       "filename": "0160_task_proposals.sql",
       "claimed_at": "2026-05-07",
-      "note": "Module B prestage landing table \u00e2\u20ac\u201d claimed in PR #133. Stacked under PR #143 in this branch's history."
+      "note": "Module B prestage landing table â€” claimed in PR #133. Stacked under PR #143 in this branch's history."
     },
     "0161": {
       "branch": "harness/phase-1-failures-log",
       "filename": "0161_failures_log.sql",
       "claimed_at": "2026-05-08",
-      "note": "T-006 Phase 1a \u00e2\u20ac\u201d failures_log table with pattern_signature jsonb. Source of truth for /failures + docs/claude-md/failures.md (1b cron sync). Self-repair + Safety Agent both write to it; Safety Agent reads for pattern matching."
+      "note": "T-006 Phase 1a â€” failures_log table with pattern_signature jsonb. Source of truth for /failures + docs/claude-md/failures.md (1b cron sync). Self-repair + Safety Agent both write to it; Safety Agent reads for pattern matching."
     },
     "0162": {
       "branch": "feat/safety-agent-a-signals",
       "filename": "0162_safety_agent_v2.sql",
       "claimed_at": "2026-05-08",
-      "note": "T-002 Safety Agent v2 \u00e2\u20ac\u201d Sub-phase A. task_queue.plan_loc + safety_decisions audit table + harness_config seed (SAFETY_WEIGHT_*, SAFETY_THRESHOLD_*)."
+      "note": "T-002 Safety Agent v2 â€” Sub-phase A. task_queue.plan_loc + safety_decisions audit table + harness_config seed (SAFETY_WEIGHT_*, SAFETY_THRESHOLD_*)."
     },
     "0163": {
       "branch": "harness/task-t001-coordinator-v1",
       "filename": "0163_coordinator_v1.sql",
       "claimed_at": "2026-05-08",
-      "note": "T-001 Coordinator v1 \u00e2\u20ac\u201d add 'api' to task_queue.source, triggered_by to window_sessions, HARNESS_HALTED + HARNESS_REMOTE_INVOCATION_ENABLED to harness_config."
+      "note": "T-001 Coordinator v1 â€” add 'api' to task_queue.source, triggered_by to window_sessions, HARNESS_HALTED + HARNESS_REMOTE_INVOCATION_ENABLED to harness_config."
     },
     "0164": {
       "branch": "harness/task-t001-coordinator-v2",
       "filename": "0164_coordinator_run_state.sql",
       "claimed_at": "2026-05-08",
-      "note": "T-001 v2 \u00e2\u20ac\u201d coordinator_run_state table for continuous-mode run tracking. Seeds HARNESS_QUOTA_THRESHOLD + HARNESS_CONTINUOUS_RUN_ID in harness_config."
+      "note": "T-001 v2 â€” coordinator_run_state table for continuous-mode run tracking. Seeds HARNESS_QUOTA_THRESHOLD + HARNESS_CONTINUOUS_RUN_ID in harness_config."
     },
     "0165": {
       "branch": "fix/harness-config-service-role-grants",
@@ -142,25 +142,25 @@
       "branch": "feat/harness-heartbeat",
       "filename": "0166_harness_heartbeat.sql",
       "claimed_at": "2026-05-09",
-      "note": "Dead-man's-switch heartbeat \u00e2\u20ac\u201d seeds LAST_HEARTBEAT_AT key in harness_config. Service_role GRANTs already in place from 0165. Companion: /api/health/lease endpoint + HeartbeatTile in CockpitSidebar."
+      "note": "Dead-man's-switch heartbeat â€” seeds LAST_HEARTBEAT_AT key in harness_config. Service_role GRANTs already in place from 0165. Companion: /api/health/lease endpoint + HeartbeatTile in CockpitSidebar."
     },
     "0167": {
       "branch": "feat/cockpit-state-machine",
       "filename": "0167_harness_state.sql",
       "claimed_at": "2026-05-09",
-      "note": "4-state harness model \u00e2\u20ac\u201d seeds HARNESS_STATE + HARNESS_STATE_CHANGED_AT in harness_config. Companion: lib/harness/harness-state.ts (computeHarnessState + readHarnessState), extended /api/health/lease (STALLED\u00e2\u2020\u2019503), and cockpit coordinator tile."
+      "note": "4-state harness model â€” seeds HARNESS_STATE + HARNESS_STATE_CHANGED_AT in harness_config. Companion: lib/harness/harness-state.ts (computeHarnessState + readHarnessState), extended /api/health/lease (STALLEDâ†’503), and cockpit coordinator tile."
     },
     "0168": {
       "branch": "feat/pg-cron-liveness-driver",
       "filename": "0168_pg_cron_liveness_driver.sql",
       "claimed_at": "2026-05-09",
-      "note": "F-N29 mitigation \u00e2\u20ac\u201d pg_cron + pg_net liveness driver. Replaces daily-only Vercel Hobby crons with 3 DB-side jobs: heartbeat every 1 min, task-pickup every 5 min, notifications-drain every 5 min (offset 2 min). CRON_SECRET read at call-time from harness_config. Applied to prod via Supabase MCP."
+      "note": "F-N29 mitigation â€” pg_cron + pg_net liveness driver. Replaces daily-only Vercel Hobby crons with 3 DB-side jobs: heartbeat every 1 min, task-pickup every 5 min, notifications-drain every 5 min (offset 2 min). CRON_SECRET read at call-time from harness_config. Applied to prod via Supabase MCP."
     },
     "0169": {
       "branch": "feat/receipts-port",
       "filename": "0169_receipts_v2.sql",
       "claimed_at": "2026-05-09",
-      "note": "Receipts port v2 \u00e2\u20ac\u201d add ocr_source and vendor_key columns to receipts table. Additive migration, reversible."
+      "note": "Receipts port v2 â€” add ocr_source and vendor_key columns to receipts table. Additive migration, reversible."
     },
     "0170": {
       "branch": "feat/dropbox-client",
@@ -172,19 +172,19 @@
       "branch": "feat/pageprofit-port",
       "filename": "0171_pallets_scanner.sql",
       "claimed_at": "2026-05-09",
-      "note": "PageProfit sub-module 1 \u00e2\u20ac\u201d pallets + pallet_invoices tables. Applied to prod. PR #181 open (not merged)."
+      "note": "PageProfit sub-module 1 â€” pallets + pallet_invoices tables. Applied to prod. PR #181 open (not merged)."
     },
     "0172": {
       "branch": "feat/pageprofit-port",
       "filename": "0172_pallet_ap_records.sql",
       "claimed_at": "2026-05-09",
-      "note": "PageProfit sub-module 2 \u00e2\u20ac\u201d pallet_ap_records table + settle trigger. Applied to prod. PR #181 open (not merged)."
+      "note": "PageProfit sub-module 2 â€” pallet_ap_records table + settle trigger. Applied to prod. PR #181 open (not merged)."
     },
     "0173": {
       "branch": "feat/pageprofit-port",
       "filename": "0173_scan_tier_routing.sql",
       "claimed_at": "2026-05-10",
-      "note": "PageProfit sub-module 3 \u00e2\u20ac\u201d author/binding/tier/routing_decision on scan_results + bbv_outbox table. Applied to prod. PR #181 open (not merged)."
+      "note": "PageProfit sub-module 3 â€” author/binding/tier/routing_decision on scan_results + bbv_outbox table. Applied to prod. PR #181 open (not merged)."
     },
     "0174": {
       "branch": "feat/streamlit-modules-lock",
@@ -196,127 +196,127 @@
       "branch": "feat/routines-quota-forecaster",
       "filename": "0175_routines_quota_cursor.sql",
       "claimed_at": "2026-05-10",
-      "note": "Routines quota cursor \u00e2\u20ac\u201d seeds ROUTINES_BACKOFF_UNTIL, ROUTINES_INVOCATIONS_TODAY, ROUTINES_INVOCATIONS_WINDOW_START in harness_config. Gives quota-guard and quota-forecast O(1) reads instead of per-tick agent_events scan. Fix for 429 cliffs at 14:35 + 20:40 UTC 2026-05-09."
+      "note": "Routines quota cursor â€” seeds ROUTINES_BACKOFF_UNTIL, ROUTINES_INVOCATIONS_TODAY, ROUTINES_INVOCATIONS_WINDOW_START in harness_config. Gives quota-guard and quota-forecast O(1) reads instead of per-tick agent_events scan. Fix for 429 cliffs at 14:35 + 20:40 UTC 2026-05-09."
     },
     "0176": {
       "branch": "fix/coordinator-respect-module-lock",
       "filename": "0176_coordinator_module_lock.sql",
       "claimed_at": "2026-05-10",
-      "note": "Add harness_module_id bridge column to streamlit_modules + rewrite claim_next_task() with LEFT JOIN to skip tasks whose matched module is locked (in_progress_branch or manual_owner set). Seed: pages/21_PageProfit.py \u00e2\u2020\u2019 pageprofit-scanner. Companion: pickup-runner.ts module-locked diagnostic shim."
+      "note": "Add harness_module_id bridge column to streamlit_modules + rewrite claim_next_task() with LEFT JOIN to skip tasks whose matched module is locked (in_progress_branch or manual_owner set). Seed: pages/21_PageProfit.py â†’ pageprofit-scanner. Companion: pickup-runner.ts module-locked diagnostic shim."
     },
     "0177": {
       "branch": "task/da21ea58-atomic-quota",
       "filename": "0177_routines_counter_atomic.sql",
       "claimed_at": "2026-05-10",
-      "note": "Task da21ea58 \u00e2\u20ac\u201d replace read-modify-write quota counter in invoke-coordinator.ts with atomic Postgres function increment_routines_counter(). FOR UPDATE row lock prevents concurrent-fire race on ROUTINES_INVOCATIONS_TODAY."
+      "note": "Task da21ea58 â€” replace read-modify-write quota counter in invoke-coordinator.ts with atomic Postgres function increment_routines_counter(). FOR UPDATE row lock prevents concurrent-fire race on ROUTINES_INVOCATIONS_TODAY."
     },
     "0178": {
       "branch": "task/a1f630c9-restore-backoff-clear",
       "filename": "0178_restore_backoff_clear.sql",
       "claimed_at": "2026-05-10",
-      "note": "Task a1f630c9 \u00e2\u20ac\u201d restore ROUTINES_BACKOFF_UNTIL clear in increment_routines_counter(). Was present in PR #201, dropped in #202 sync. Single CREATE OR REPLACE adding one UPDATE line."
+      "note": "Task a1f630c9 â€” restore ROUTINES_BACKOFF_UNTIL clear in increment_routines_counter(). Was present in PR #201, dropped in #202 sync. Single CREATE OR REPLACE adding one UPDATE line."
     },
     "0179": {
       "branch": "feat/oss-audit-step1-step3",
       "filename": "0179_oss_audit.sql",
       "claimed_at": "2026-05-10",
-      "note": "OSS audit Step 1 \u00e2\u20ac\u201d oss_audit_status/at/evidence on streamlit_modules + oss_packages cache table + capability_registry seeds (github/npm/pypi). Companion: lib/oss-radar/audit.ts (rule_based_v1 scorer) + app/api/cron/oss-audit/route.ts (40/tick backfill) + lib/oss-radar/digest.ts (F18 line)."
+      "note": "OSS audit Step 1 â€” oss_audit_status/at/evidence on streamlit_modules + oss_packages cache table + capability_registry seeds (github/npm/pypi). Companion: lib/oss-radar/audit.ts (rule_based_v1 scorer) + app/api/cron/oss-audit/route.ts (40/tick backfill) + lib/oss-radar/digest.ts (F18 line)."
     },
     "0180": {
       "branch": "feat/f-n28-fix-a",
       "filename": "0180_awaiting_approval_status.sql",
       "claimed_at": "2026-05-10",
-      "note": "F-N28-fix-A \u00e2\u20ac\u201d adds awaiting_approval status to task_queue CHECK constraint. Used by coordinator exit-on-notify pattern: coordinator exits and sets task to awaiting_approval; coordinator-resume route transitions back to queued when Colin responds."
+      "note": "F-N28-fix-A â€” adds awaiting_approval status to task_queue CHECK constraint. Used by coordinator exit-on-notify pattern: coordinator exits and sets task to awaiting_approval; coordinator-resume route transitions back to queued when Colin responds."
     },
     "0181": {
       "branch": "feat/mid-batch-family",
       "filename": "0181_family.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch family cluster \u00e2\u20ac\u201d cleaning_clients, cora_activities, family_important_dates tables. See docs/acceptance/mid-batch-family.md."
+      "note": "MID batch family cluster â€” cleaning_clients, cora_activities, family_important_dates tables. See docs/acceptance/mid-batch-family.md."
     },
     "0182": {
       "branch": "feat/mid-batch-family",
       "filename": "0182_cora_future.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch family cluster \u00e2\u20ac\u201d cora_future_items table with status/timeline/deadline tracking. See docs/acceptance/mid-batch-coras-future.md."
+      "note": "MID batch family cluster â€” cora_future_items table with status/timeline/deadline tracking. See docs/acceptance/mid-batch-coras-future.md."
     },
     "0183": {
       "branch": "feat/mid-batch-profile",
       "filename": "0183_profile_columns.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch 2 \u00e2\u20ac\u201d add display_name + module_preferences columns to user_profiles. See docs/acceptance/mid-batch-2-profile.md."
+      "note": "MID batch 2 â€” add display_name + module_preferences columns to user_profiles. See docs/acceptance/mid-batch-2-profile.md."
     },
     "0184": {
       "branch": "feat/mid-batch-profile",
       "filename": "0184_dropbox_audit_runs.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch 2 \u00e2\u20ac\u201d dropbox_audit_runs table for persisted Dropbox storage audits. See docs/acceptance/mid-batch-2-dropbox.md."
+      "note": "MID batch 2 â€” dropbox_audit_runs table for persisted Dropbox storage audits. See docs/acceptance/mid-batch-2-dropbox.md."
     },
     "0185": {
       "branch": "feat/mid-batch-profile",
       "filename": "0185_phone_relay_scans.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch 2 \u00e2\u20ac\u201d phone_relay_scans table for Scanner Phone \u00e2\u2020\u2019 PageProfit desktop relay. See docs/acceptance/mid-batch-2-scanner-phone.md."
+      "note": "MID batch 2 â€” phone_relay_scans table for Scanner Phone â†’ PageProfit desktop relay. See docs/acceptance/mid-batch-2-scanner-phone.md."
     },
     "0189": {
       "branch": "feat/mid-batch-deals",
       "filename": "0189_deal_tracker.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch 3 \u00e2\u20ac\u201d deal_tracker_items + deal_price_history tables. Replaces Google Sheets deal tracking."
+      "note": "MID batch 3 â€” deal_tracker_items + deal_price_history tables. Replaces Google Sheets deal tracking."
     },
     "0190": {
       "branch": "feat/mid-batch-deals",
       "filename": "0190_polymarket_predictions.sql",
       "claimed_at": "2026-05-10",
-      "note": "MID batch 3 \u00e2\u20ac\u201d polymarket_predictions table. Replaces Google Sheets Polymarket log."
+      "note": "MID batch 3 â€” polymarket_predictions table. Replaces Google Sheets Polymarket log."
     },
     "0186": {
       "branch": "chore/streamlit-modules-second-sweep",
       "filename": "0186_add_streamlit_port_evidence.sql",
       "claimed_at": "2026-05-10",
-      "note": "Second-pass sweep \u00e2\u20ac\u201d adds port_evidence TEXT column to streamlit_modules. 29 modules flipped to complete: 13 COMPOUND_PORTED + 12 SUPERSEDED + 4 OBSOLETE. Inventory 152\u00e2\u2020\u2019184/234 (65.0%\u00e2\u2020\u201978.6%)."
+      "note": "Second-pass sweep â€” adds port_evidence TEXT column to streamlit_modules. 29 modules flipped to complete: 13 COMPOUND_PORTED + 12 SUPERSEDED + 4 OBSOLETE. Inventory 152â†’184/234 (65.0%â†’78.6%)."
     },
     "0191": {
       "branch": "feat/insurance-sports-cluster",
       "filename": "0191_sports_picks.sql",
       "claimed_at": "2026-05-10",
-      "note": "Sports Intel MID cluster \u00e2\u20ac\u201d sports_picks table (replaces Google Sheets Sports_Picks_Log). Ports: utils/sports_odds.py, utils/sports_coach.py, tools/sports_predictions.py."
+      "note": "Sports Intel MID cluster â€” sports_picks table (replaces Google Sheets Sports_Picks_Log). Ports: utils/sports_odds.py, utils/sports_coach.py, tools/sports_predictions.py."
     },
     "0192": {
       "branch": "feat/largest-mid-cluster",
       "filename": "0192_marketplace_listings.sql",
       "claimed_at": "2026-05-10",
-      "note": "Reselling cluster \u00e2\u20ac\u201d marketplace_listings table. Replaces Google Sheets Marketplace Hub tab."
+      "note": "Reselling cluster â€” marketplace_listings table. Replaces Google Sheets Marketplace Hub tab."
     },
     "0193": {
       "branch": "feat/largest-mid-cluster",
       "filename": "0193_repricer_rules.sql",
       "claimed_at": "2026-05-10",
-      "note": "Reselling cluster \u00e2\u20ac\u201d repricer_rules + repricer_log tables. Replaces Google Sheets Repricer Rules + Repricer Log tabs. File renumbered from 0191 (collision with feat/insurance-sports-cluster); DB applied as 0191_repricer_rules via MCP \u00e2\u20ac\u201d CREATE TABLE IF NOT EXISTS makes re-apply safe."
+      "note": "Reselling cluster â€” repricer_rules + repricer_log tables. Replaces Google Sheets Repricer Rules + Repricer Log tabs. File renumbered from 0191 (collision with feat/insurance-sports-cluster); DB applied as 0191_repricer_rules via MCP â€” CREATE TABLE IF NOT EXISTS makes re-apply safe."
     },
     "0194": {
       "branch": "feat/retail-cluster",
       "filename": "0194_retail_watchlist.sql",
       "claimed_at": "2026-05-10",
-      "note": "Retail cluster \u00e2\u20ac\u201d retail_watchlist table: product watchlist with flip-profit fields. Renumbered from 0191 (sports collision) then 0192 (reselling collision)."
+      "note": "Retail cluster â€” retail_watchlist table: product watchlist with flip-profit fields. Renumbered from 0191 (sports collision) then 0192 (reselling collision)."
     },
     "0195": {
       "branch": "feat/keepa-product-intel-cluster",
       "filename": "0195_keepa_price_alerts.sql",
       "claimed_at": "2026-05-10",
-      "note": "Keepa/Product Intel cluster \u00e2\u20ac\u201d keepa_price_alerts table. Renumbered 0191\u00e2\u2020\u20190193\u00e2\u2020\u20190195 (multi-collision)."
+      "note": "Keepa/Product Intel cluster â€” keepa_price_alerts table. Renumbered 0191â†’0193â†’0195 (multi-collision)."
     },
     "0196": {
       "branch": "feat/keepa-product-intel-cluster",
       "filename": "0196_keepa_deals.sql",
       "claimed_at": "2026-05-10",
-      "note": "Keepa/Product Intel cluster \u00e2\u20ac\u201d keepa_deals table. Renumbered 0192\u00e2\u2020\u20190194\u00e2\u2020\u20190196 (multi-collision)."
+      "note": "Keepa/Product Intel cluster â€” keepa_deals table. Renumbered 0192â†’0194â†’0196 (multi-collision)."
     },
     "0198": {
       "branch": "feat/sprint6-chunk-D-fba-batches",
       "filename": "0198_fba_batches.sql",
       "claimed_at": "2026-05-11",
-      "note": "Sprint 6 Chunk D \u00e2\u20ac\u201d FBA Batch Manager. fba_batches + fba_batch_items tables. FK to amazon_listings (nullable). Depends on 0197."
+      "note": "Sprint 6 Chunk D â€” FBA Batch Manager. fba_batches + fba_batch_items tables. FK to amazon_listings (nullable). Depends on 0197."
     },
     "0199": {
       "branch": "fix/claim-next-task-race",
@@ -328,13 +328,13 @@
       "branch": "feat/security-hardening",
       "filename": "0200_rls_hardening.sql",
       "claimed_at": "2026-05-14",
-      "note": "Phase 2 Security Hardening \u00e2\u20ac\u201d RLS on 10 tables."
+      "note": "Phase 2 Security Hardening â€” RLS on 10 tables."
     },
     "0201": {
       "branch": "feat/security-hardening",
       "filename": "0201_agent_events_hardening.sql",
       "claimed_at": "2026-05-14",
-      "note": "Phase 2 Security Hardening \u00e2\u20ac\u201d Lock down agent_events to service_role."
+      "note": "Phase 2 Security Hardening â€” Lock down agent_events to service_role."
     },
     "0202": {
       "branch": "feat/two-way-sms",
@@ -352,25 +352,25 @@
       "branch": "harness/task-91adca3c-receipts-coordinator",
       "filename": "0204_receipt_lines.sql",
       "claimed_at": "2026-05-14",
-      "note": "T-003 \u00e2\u20ac\u201d receipt_lines (structured receipt storage, replaces Google Sheets) + receipt_matches (transaction reconciliation). transaction_id stored as TEXT pending bank_transactions migration."
+      "note": "T-003 â€” receipt_lines (structured receipt storage, replaces Google Sheets) + receipt_matches (transaction reconciliation). transaction_id stored as TEXT pending bank_transactions migration."
     },
     "0205": {
       "branch": "worktree-agent-aad1f5392c767bbcd",
       "filename": "0205_scanner_settings.sql",
       "claimed_at": "2026-05-15",
-      "note": "Scanner settings \u00e2\u20ac\u201d per-user BUY/SKIP thresholds (min_profit_cad, min_roi_pct, max_bsr). Moves hardcoded constants from lib/profit/calculator.ts to DB. Single row keyed by person_handle='colin'; SPRINT5-GATE to profiles FK."
+      "note": "Scanner settings â€” per-user BUY/SKIP thresholds (min_profit_cad, min_roi_pct, max_bsr). Moves hardcoded constants from lib/profit/calculator.ts to DB. Single row keyed by person_handle='colin'; SPRINT5-GATE to profiles FK."
     },
     "0206": {
       "branch": "harness/task-e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c",
       "filename": "0206_module_ceiling_metrics.sql",
       "claimed_at": "2026-05-15",
-      "note": "F18 Ceiling Metric Layer \u00e2\u20ac\u201d module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
+      "note": "F18 Ceiling Metric Layer â€” module_ceiling_metrics table with 3 seed rows (vercel-cron, ollama-embed, twin). Companion: /api/metrics/ceiling GET endpoint + /harness/ceiling dashboard. builder_task_id=e1d3c848-ce4f-4d9d-a4f2-1f8eb6585d5c."
     },
     "0208": {
       "branch": "harness/coordinator-trading-sprint7",
       "filename": "0208_trading_sessions.sql",
       "claimed_at": "2026-05-15",
-      "note": "Trading sessions daily journal \u00e2\u20ac\u201d trading_sessions table with session_date/ticker/outcome/net_pnl/trades_json. Applied to prod via Supabase MCP in trading-sprint7 session. File restored to repo for tracking (was untracked when session closed)."
+      "note": "Trading sessions daily journal â€” trading_sessions table with session_date/ticker/outcome/net_pnl/trades_json. Applied to prod via Supabase MCP in trading-sprint7 session. File restored to repo for tracking (was untracked when session closed)."
     },
     "0209": {
       "branch": "feat/focus-page",
@@ -412,85 +412,85 @@
       "branch": "harness/task-3a13fc07",
       "filename": "0216_improvement_log.sql",
       "claimed_at": "2026-05-16",
-      "note": "improvement_log table \u00e2\u20ac\u201d baseline metrics + delta per component build. Required for F19 continuous improvement loop measurement."
+      "note": "improvement_log table â€” baseline metrics + delta per component build. Required for F19 continuous improvement loop measurement."
     },
     "0217": {
       "branch": "harness/task-3a13fc07",
       "filename": "0217_daily_scan_log.sql",
       "claimed_at": "2026-05-16",
-      "note": "daily_scan_log table \u00e2\u20ac\u201d scan agent output storage for iterative full-pass algorithm."
+      "note": "daily_scan_log table â€” scan agent output storage for iterative full-pass algorithm."
     },
     "0218": {
       "branch": "feat/session-beacons",
       "filename": "0218_session_beacons.sql",
       "claimed_at": "2026-05-16",
-      "note": "session_beacons table \u00e2\u20ac\u201d one row per active Claude Code window, written by PostToolUse hook. Lets any window detect mid-session peers without window-start opt-in."
+      "note": "session_beacons table â€” one row per active Claude Code window, written by PostToolUse hook. Lets any window detect mid-session peers without window-start opt-in."
     },
     "0219": {
       "branch": "harness/task-e1-pet-health",
       "filename": "0219_pet_health.sql",
       "claimed_at": "2026-05-16",
-      "note": "E1 \u00e2\u20ac\u201d Pet Health Centre. 4 tables: pets, vet_visits, pet_vaccinations, pet_medications."
+      "note": "E1 â€” Pet Health Centre. 4 tables: pets, vet_visits, pet_vaccinations, pet_medications."
     },
     "0220": {
       "branch": "harness/task-e2-lego-vault",
       "filename": "0220_lego_vault.sql",
       "claimed_at": "2026-05-16",
-      "note": "E2 \u00e2\u20ac\u201d Lego Vault. 3 tables: lego_vault, lego_retiring_sets, lego_theme_config."
+      "note": "E2 â€” Lego Vault. 3 tables: lego_vault, lego_retiring_sets, lego_theme_config."
     },
     "0221": {
       "branch": "harness/task-e5-shared-expenses",
       "filename": "0221_expenses_person_handle.sql",
       "claimed_at": "2026-05-16",
-      "note": "E5 \u00e2\u20ac\u201d add person_handle + split_pct columns to business_expenses for Colin/Megan/Shared split tracking."
+      "note": "E5 â€” add person_handle + split_pct columns to business_expenses for Colin/Megan/Shared split tracking."
     },
     "0222": {
       "branch": "harness/task-c6-currency-aware",
       "filename": "0222_balance_sheet_currency.sql",
       "claimed_at": "2026-05-16",
-      "note": "C6 \u00e2\u20ac\u201d Currency-aware Net Worth. Adds currency column to balance_sheet_entries."
+      "note": "C6 â€” Currency-aware Net Worth. Adds currency column to balance_sheet_entries."
     },
     "0223": {
       "branch": "harness/task-a7-behavioral-engine",
       "filename": "0223_predictions.sql",
       "claimed_at": "2026-05-16",
-      "note": "A7 \u00e2\u20ac\u201d Behavioral Engine / Predictions. predictions table for calibration log + settle."
+      "note": "A7 â€” Behavioral Engine / Predictions. predictions table for calibration log + settle."
     },
     "0224": {
       "branch": "harness/task-b4-arb-corpus",
       "filename": "0224_arb_decisions.sql",
       "claimed_at": "2026-05-16",
-      "note": "B4 \u00e2\u20ac\u201d Arb Corpus. arb_decisions table for buy/skip/unsure training data."
+      "note": "B4 â€” Arb Corpus. arb_decisions table for buy/skip/unsure training data."
     },
     "0225": {
       "branch": "harness/task-b5-square-webhook",
       "filename": "0225_local_sales.sql",
       "claimed_at": "2026-05-16",
-      "note": "B5 \u00e2\u20ac\u201d Square Webhook. local_sales table for Square payment events."
+      "note": "B5 â€” Square Webhook. local_sales table for Square payment events."
     },
     "0226": {
       "branch": "harness/task-b9-hardware-track",
       "filename": "0226_hardware_components.sql",
       "claimed_at": "2026-05-16",
-      "note": "B9 \u00e2\u20ac\u201d Hardware Track. hardware_components table for PC/peripheral inventory."
+      "note": "B9 â€” Hardware Track. hardware_components table for PC/peripheral inventory."
     },
     "0227": {
       "branch": "main",
       "filename": "0227_food_catalog.sql",
       "claimed_at": "2026-05-17",
-      "note": "Food catalog \u00e2\u20ac\u201d master nutrition database (calories, protein, sugar, etc.) for household foods."
+      "note": "Food catalog â€” master nutrition database (calories, protein, sugar, etc.) for household foods."
     },
     "0228": {
       "branch": "main",
       "filename": "0228_grocery_products.sql",
       "claimed_at": "2026-05-17",
-      "note": "Grocery products \u00e2\u20ac\u201d scraper-ready store listings linked to food_catalog."
+      "note": "Grocery products â€” scraper-ready store listings linked to food_catalog."
     },
     "0229": {
       "branch": "main",
       "filename": "0229_grocery_price_history.sql",
       "claimed_at": "2026-05-17",
-      "note": "Grocery price history \u00e2\u20ac\u201d append-only price log per store product."
+      "note": "Grocery price history â€” append-only price log per store product."
     },
     "0230": {
       "branch": "main",
@@ -533,6 +533,12 @@
       "filename": "0238_watch_targets.sql",
       "claimed_at": "2026-05-17",
       "note": "Deal Watcher -- watch_targets + watch_events tables. Persistent Railway polling service for Amazon ASIN / LEGO.ca / generic-url restock and price-drop alerts via Telegram."
+    },
+    "0239": {
+      "branch": "feat/e9-diet-c2-c4",
+      "filename": "0239_corolla_balance_sheet_entry.sql",
+      "claimed_at": "2026-05-17",
+      "note": "E9: Corolla net worth row in balance_sheet_entries"
     }
   },
   "next_available": 239
