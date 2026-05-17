@@ -403,3 +403,23 @@ escalation_reasons:
   - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
   - twin_unreachable
   - confidence_below_high
+
+---
+
+2026-05-17T19:45:00Z sprint=tier-e chunk=E7 doc=docs/backlog/tier-e/E7-sports-betting-acceptance.md
+cited_principles: [8.4 Check-Before-Build, 15 new-terrain, META-C]
+trigger_match_evidence: |
+  Principle 8.4: prior art audit found ~70% already built (Odds API route, bets table, bets API,
+  sports-intel page all live). Acceptance doc scoped to genuine gap only: /sports-betting page UI.
+  Cannot cache-match: open design questions (simplified vs full TodaysGamesTab, mood_state enum),
+  schema migration requires Colin approval, twin unreachable in coordinator sandbox.
+reversibility_check: |
+  /sports-betting page: new files only — reversible by deleting. No schema changes to existing tables.
+  CockpitSidebar.tsx href change: reversible by reverting to null. Trivial grep/edit cost.
+  mood_state migration: nullable ADD COLUMN — reversible via DROP COLUMN. No data loss.
+confidence: medium — open questions + schema change lower confidence below cache-match threshold
+outcome: escalated
+escalation_reasons:
+  - open_design_questions (simplified_vs_full_tab, mood_state_enum_approval)
+  - schema_migration_requires_colin_approval
+  - twin_unreachable (coordinator sandbox host not in allowlist)
