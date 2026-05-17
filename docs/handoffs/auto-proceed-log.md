@@ -402,6 +402,32 @@ outcome: escalated
 escalation_reasons:
   - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
   - twin_unreachable
+
+---
+
+2026-05-17T16:20:00Z sprint=backlog chunk=C2 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [META-C, 8.4 Check-Before-Build, F17, F18]
+trigger_match_evidence: |
+  Situation: Replace 3 placeholder STATEMENT_ACCOUNTS in existing classifier with 8 real
+  accounts, and augment coverage route to union Dropbox + gmail_statement_arrivals.
+  Pattern candidate: "correcting placeholder data in a shipped module" — same class as
+  fixing KNOWN_EVENT_DOMAINS (that auto-proceeded). However: this changes runtime behavior
+  (what emails get classified as statement arrivals), not just a string list expansion.
+  Sender domains for Q1 were answered ambiguously ("all loeppkycolin@gmail.com" = recipient,
+  not sender domains). The actual FROM domains in the STATEMENT_ACCOUNTS are initial estimates.
+  Twin unreachable — no confidence scores available.
+  Gap: cannot confirm subject_patterns match Colin's real emails without a scan run.
+reversibility_check: |
+  statement-arrivals.ts change: replace STATEMENT_ACCOUNTS array. Reversible via git revert (trivial).
+  coverage route change: add getGmailStatementCoverage() helper + union logic.
+  Reversible via git revert. No migration. No data loss.
+  All changes: LOW cost to reverse.
+confidence: medium — sender domain ambiguity + twin unreachable lowers below high threshold
+outcome: escalated
+escalation_reasons:
+  - twin_unreachable (all questions blocked — no confidence score available)
+  - q1_domain_ambiguity (Colin's Q1 answer "all loeppkycolin@gmail.com" is recipient, not sender domains — initial estimates used in doc)
+  - confidence_below_high (medium confidence per META-C rules)
   - confidence_below_high
 
 ---

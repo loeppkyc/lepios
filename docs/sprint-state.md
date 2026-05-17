@@ -382,6 +382,31 @@ tier_a_A6:
   opened_at: "2026-05-16T16:52:00Z"
   last_updated_at: "2026-05-16T17:00:00Z"
 
+# ============================================================
+# C2 — Statement Coverage Grid v2 (task 05e8c359, 2026-05-17)
+# ============================================================
+
+tier_c_C2:
+  task_id: "05e8c359-1f69-431d-b2f5-caa4f7e8bbaa"
+  item_id: "C2"
+  status: "awaiting-colin-approval"
+  description: "Statement Coverage Grid v2 — fix placeholder STATEMENT_ACCOUNTS + union Gmail detection with Dropbox"
+  acceptance_doc: "docs/backlog/tier-c/C2-acceptance.md"
+  acceptance_doc_ready_at: "2026-05-17T16:22:00Z"
+  colin_answers_incorporated:
+    - "Q1: All statements arrive at loeppkycolin@gmail.com (single Gmail account)"
+    - "Q2: All 8 accounts have distinct subject patterns"
+    - "Q3: Statements arrive following month → covered_period = arrival_month - 1 for ALL accounts"
+    - "Q4: Gmail account = loeppkycolin@gmail.com"
+  escalation_reason: "Twin unreachable + Q1 sender domains ambiguous (initial estimates used) → medium confidence → cannot cache-match"
+  files_to_change:
+    - "lib/gmail/classifiers/statement-arrivals.ts"
+    - "app/api/business-review/statement-coverage/route.ts"
+    - "tests/statement-coverage.test.ts"
+  no_migration: true
+  opened_at: "2026-05-16T16:45:00Z"
+  last_updated_at: "2026-05-17T16:22:00Z"
+
 retail_arb_engine:
 task_id: "3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 status: "awaiting-colin-approval"
