@@ -25,6 +25,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Dashboard',
     items: [
       { label: 'Business Review', href: '/business-review' },
+      { label: 'Money', href: '/money' },
       { label: 'Position', href: '/position' },
       { label: 'Life P&L', href: '/life-pnl' },
       { label: 'Net Worth', href: '/net-worth' },
@@ -121,6 +122,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Utilities', href: null },
       { label: 'Phone Plans', href: null },
       { label: 'Groceries', href: '/diet' },
+      { label: 'Grocery Finder', href: '/grocery-finder' },
     ],
   },
   {

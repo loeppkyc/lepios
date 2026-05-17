@@ -40,6 +40,32 @@ export const DEFAULT_WEIGHT_LBS = 197
 
 export type BiomarkerStatus = 'low' | 'normal' | 'high' | 'unknown'
 
+export const FOOD_SOURCES = ['open_food_facts', 'manual', 'usda'] as const
+export type FoodSource = (typeof FOOD_SOURCES)[number]
+
+export const GROCERY_STORES = [
+  'superstore',
+  'save-on',
+  'walmart',
+  'costco',
+  'safeway',
+  'no-frills',
+  'sobeys',
+  'other',
+] as const
+export type GroceryStore = (typeof GROCERY_STORES)[number]
+
+export const GROCERY_STORE_LABELS: Record<GroceryStore, string> = {
+  superstore: 'Real Canadian Superstore',
+  'save-on': 'Save-On-Foods',
+  walmart: 'Walmart',
+  costco: 'Costco',
+  safeway: 'Safeway',
+  'no-frills': 'No Frills',
+  sobeys: 'Sobeys',
+  other: 'Other',
+}
+
 export interface InventoryRow {
   id: string
   item: string
@@ -107,4 +133,49 @@ export interface BiomarkerRow {
   notes: string
   created_at: string
   updated_at: string
+}
+
+export interface FoodCatalogRow {
+  id: string
+  name: string
+  brand: string | null
+  barcode: string | null
+  category: string
+  serving_size: number | null
+  serving_unit: string
+  calories: number | null
+  protein_g: number | null
+  fat_g: number | null
+  saturated_fat_g: number | null
+  carbs_g: number | null
+  sugar_g: number | null
+  fiber_g: number | null
+  sodium_mg: number | null
+  cholesterol_mg: number | null
+  is_household_staple: boolean
+  source: FoodSource
+  off_id: string | null
+  verified: boolean
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GroceryProductRow {
+  id: string
+  food_catalog_id: string | null
+  name: string
+  store: GroceryStore
+  store_sku: string | null
+  store_url: string | null
+  unit_size: string | null
+  regular_price: number | null
+  sale_price: number | null
+  price_per_100g: number | null
+  last_scraped_at: string | null
+  in_flyer: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  food_catalog?: FoodCatalogRow | null
 }

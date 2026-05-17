@@ -473,7 +473,25 @@
       "filename": "0226_hardware_components.sql",
       "claimed_at": "2026-05-16",
       "note": "B9 — Hardware Track. hardware_components table for PC/peripheral inventory."
+    },
+    "0227": {
+      "branch": "main",
+      "filename": "0227_food_catalog.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Food catalog — master nutrition database (calories, protein, sugar, etc.) for household foods."
+    },
+    "0228": {
+      "branch": "main",
+      "filename": "0228_grocery_products.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Grocery products — scraper-ready store listings linked to food_catalog."
+    },
+    "0229": {
+      "branch": "main",
+      "filename": "0229_grocery_price_history.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Grocery price history — append-only price log per store product."
     }
   },
-  "next_available": 227
+  "next_available": 230
 }

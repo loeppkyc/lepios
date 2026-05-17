@@ -9,6 +9,7 @@ import { MealLogTab } from './MealLogTab'
 import { WeightTab } from './WeightTab'
 import { BiomarkersTab } from './BiomarkersTab'
 import { ExportTab } from './ExportTab'
+import { FoodCatalogTab } from './FoodCatalogTab'
 
 const TABS = [
   { id: 'inventory', label: 'Inventory' },
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'meals', label: 'Meal Log' },
   { id: 'weight', label: 'Weight' },
   { id: 'biomarkers', label: 'Biomarkers' },
+  { id: 'catalog', label: 'Food Catalog' },
   { id: 'export', label: 'Export' },
 ] as const
 
@@ -81,6 +83,7 @@ export function DietShell({ initialTab, bundle }: { initialTab: string; bundle: 
         {activeTab === 'meals' && <MealLogTab meals={bundle.meals} />}
         {activeTab === 'weight' && <WeightTab weights={bundle.weights} />}
         {activeTab === 'biomarkers' && <BiomarkersTab biomarkers={bundle.biomarkers} />}
+        {activeTab === 'catalog' && <FoodCatalogTab catalog={bundle.catalog} />}
         {activeTab === 'export' && <ExportTab bundle={bundle} />}
       </div>
     </div>
