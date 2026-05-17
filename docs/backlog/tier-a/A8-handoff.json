@@ -1,0 +1,43 @@
+{
+  "chunk_id": "A8",
+  "acceptance_doc_path": "docs/backlog/tier-a/A8-acceptance.md",
+  "files_changed": [
+    "lib/edmonton-open-data/events.ts",
+    "lib/edmonton-open-data/digest.ts",
+    "lib/eventbrite/events.ts",
+    "app/api/events/route.ts",
+    "app/api/events/viewed/route.ts",
+    "app/(cockpit)/events/page.tsx",
+    "app/(cockpit)/events/_components/EventCard.tsx",
+    "app/(cockpit)/events/_components/EventsPageClient.tsx",
+    "tests/events/edmonton-open-data.test.ts",
+    ".env.example"
+  ],
+  "tests": {
+    "passing": 0,
+    "failing": 0,
+    "new": 12,
+    "note": "Tests written; could not execute — node_modules not installed in main lepios checkout (pre-existing env issue). b5 worktree has node_modules but is on a different branch. Test file: tests/events/edmonton-open-data.test.ts. Run from worktree with node_modules once env is resolved."
+  },
+  "migrations_applied": [],
+  "deploy_url": "https://github.com/loeppkyc/lepios/pull/316",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/316",
+  "grounding_checkpoint_required": [
+    "BLOCKER: Verify correct Edmonton Open Data dataset ID. Live test of jx5c-8cxn returns 404 — dataset does not exist at data.edmonton.ca as of 2026-05-16. Colin must find the correct dataset ID (or confirm Open Data is not the right source) and update OPEN_DATA_DATASET_ID constant in lib/edmonton-open-data/events.ts.",
+    "Navigate to /events in browser after PR is merged and deployed — confirm page loads without 500 error and shows either event cards (if dataset is fixed) or the empty-state 'No upcoming free events' message.",
+    "Check agent_events for action='events_fetched' row after page load — confirm both open_data_count and eventbrite_count are logged.",
+    "If EVENTBRITE_API_KEY is available: add it to Vercel env, reload /events — confirm Eventbrite events appear in the list."
+  ],
+  "unknowns": [
+    "BLOCKER: Dataset jx5c-8cxn returns 404 (dataset.missing) from data.edmonton.ca. Confirmed via live curl test 2026-05-16. This is a kill signal per acceptance doc §7. Page is built with graceful empty state and will show 'No upcoming free events' until the correct dataset ID is confirmed. Coordinator must surface this to Colin and get the correct dataset ID or an alternative source (e.g. Edmonton Recreation Events API, or a different Open Data dataset). The fix is a 1-line change to OPEN_DATA_DATASET_ID in lib/edmonton-open-data/events.ts.",
+    "CockpitSidebar nav link not added — app/(cockpit)/_components/CockpitSidebar.tsx is outside this window's scope contract. Coordinator must add Events link to the 'Life' section of CockpitSidebar in a separate window or Colin can add manually. The link should be: { label: 'Free Events', href: '/events' }",
+    "Morning digest wiring not done — lib/orchestrator/digest.ts is outside this window's scope contract. buildEventsLine() is pre-built at lib/edmonton-open-data/digest.ts. Coordinator must add: import { buildEventsLine } from '@/lib/edmonton-open-data/digest' and call it in the digest composition function.",
+    "Unit tests could not be executed — node_modules not installed in main lepios checkout. This is a pre-existing environment issue (the worktrees use a junction to lepios-b5/node_modules, but lepios main has no junction). Tests are written at tests/events/edmonton-open-data.test.ts and should pass when run from a worktree that has node_modules."
+  ],
+  "next_chunk_blockers": [
+    "Dataset jx5c-8cxn is dead — grounding checkpoint cannot pass until Colin confirms replacement dataset ID.",
+    "CockpitSidebar nav link and digest wiring need a separate window with the correct scope to add them."
+  ],
+  "tokens_used": 28000,
+  "timestamp": "2026-05-17T01:02:00.000Z"
+}
