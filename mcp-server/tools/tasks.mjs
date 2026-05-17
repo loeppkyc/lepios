@@ -16,17 +16,17 @@ import { z } from 'zod'
  * @param {(toolName: string, latencyMs: number) => void} [logFn]
  */
 export function registerTaskTools(server, db, logFn) {
-  const VALID_STATUSES = ['queued', 'claimed', 'complete', 'parked']
+  const VALID_STATUSES = ['queued', 'in_progress', 'completed', 'failed', 'awaiting_approval', 'awaiting_grounding', 'approved']
 
   // ── get_task_queue ──────────────────────────────────────────────────────
   server.registerTool(
     'get_task_queue',
     {
       description:
-        'Returns task_queue rows filtered by status. Valid statuses: queued, claimed, complete, parked. No raw SQL — purpose-built for the harness workflow.',
+        'Returns task_queue rows filtered by status. Valid statuses: queued, in_progress, completed, failed, awaiting_approval, awaiting_grounding, approved. No raw SQL — purpose-built for the harness workflow.',
       inputSchema: z.object({
         status: z
-          .enum(['queued', 'claimed', 'complete', 'parked'])
+          .enum(['queued', 'in_progress', 'completed', 'failed', 'awaiting_approval', 'awaiting_grounding', 'approved'])
           .optional()
           .describe('Filter by task status. Optional — omit to return all statuses.'),
         limit: z.number().optional().describe('Maximum rows to return. Defaults to 50.'),
@@ -82,9 +82,9 @@ export function registerTaskTools(server, db, logFn) {
     'post_task',
     {
       description:
-        'Insert a new task into the task_queue with source="mcp". Returns the created row id, title, priority, status, and created_at.',
+        'Insert a new task into the task_queue with source="mcp". Returns the created row id, task, priority, status, and created_at.',
       inputSchema: z.object({
-        title: z.string().min(1).describe('Short title for the task (required).'),
+        title: z.string().min(1).describe('Short task name / title (required). Stored in the "task" column.'),
         description: z.string().optional().describe('Full description of the task. Optional.'),
         priority: z
           .number()
@@ -117,13 +117,13 @@ export function registerTaskTools(server, db, logFn) {
       const { data, error } = await db
         .from('task_queue')
         .insert({
-          title: title.trim(),
+          task: title.trim(),
           description: description ?? null,
           priority: taskPriority,
           source: 'mcp',
           status: 'queued',
         })
-        .select('id, title, priority, status, created_at')
+        .select('id, task, priority, status, created_at')
         .single()
 
       if (error) {
