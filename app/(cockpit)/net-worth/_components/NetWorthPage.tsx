@@ -674,18 +674,23 @@ function LegendDot({ color }: { color: string }) {
   )
 }
 
+// SPRINT5-GATE: Tesla row ID scoped to Colin's balance sheet entry
+const TESLA_ROW_ID = 'bbe41f11-ba74-4e16-9912-fe835bc7a6ab'
+
 function RowGroup({
   label,
   isLiability,
   rows,
   total,
   onSave,
+  onRefresh,
 }: {
   label: string
   isLiability: boolean
   rows: BalanceSheetEntryLite[]
   total: number
   onSave: (input: SaveRowInput) => Promise<void>
+  onRefresh: () => Promise<void>
 }) {
   return (
     <>
@@ -720,7 +725,13 @@ function RowGroup({
         <td />
       </tr>
       {rows.map((r) => (
-        <EditableRow key={r.id} row={r} onSave={onSave} />
+        <EditableRow
+          key={r.id}
+          row={r}
+          onSave={onSave}
+          onRefresh={onRefresh}
+          isTeslaRow={r.id === TESLA_ROW_ID}
+        />
       ))}
     </>
   )
