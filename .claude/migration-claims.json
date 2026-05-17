@@ -493,17 +493,23 @@
       "note": "Grocery price history \u00e2\u20ac\u201d append-only price log per store product."
     },
     "0230": {
-      "branch": "feat/sprint-8",
-      "filename": "0230_fba_batches_shipment.sql",
+      "branch": "main",
+      "filename": "0230_grocery_products_catalog_store_unique.sql",
       "claimed_at": "2026-05-17",
-      "note": "Sprint 8 Chunk C -- FBA Batches shipment planning. Adds shipment_plan_id + shipment_status columns to fba_batches."
+      "note": "UNIQUE(food_catalog_id, store) for Flipp sync upsert"
     },
     "0231": {
       "branch": "main",
       "filename": "0231_food_catalog_amazon_asin.sql",
       "claimed_at": "2026-05-17",
       "note": "Add amazon_asin column to food_catalog. Wires household staples into Keepa price-alert infrastructure."
+    },
+    "0232": {
+      "branch": "feat/sprint-8",
+      "filename": "0232_fba_batches_shipment.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Sprint 8 Chunk C -- FBA Batches shipment planning. Adds shipment_plan_id + shipment_status to fba_batches."
     }
   },
-  "next_available": 232
+  "next_available": 233
 }

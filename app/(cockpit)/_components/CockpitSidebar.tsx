@@ -39,7 +39,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Amazon', href: '/amazon' },
       { label: 'PageProfit', href: '/scan' },
-      { label: 'Shipment Manager', href: null },
+      { label: 'Shipment Manager', href: '/shipment-manager' },
       { label: 'Inventory', href: '/inventory' },
       { label: 'Repricer', href: '/repricer' },
       { label: 'FBA Batches', href: '/batches' },
