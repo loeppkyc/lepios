@@ -117,6 +117,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Subscriptions', href: '/subscriptions' },
       { label: 'Savings Goals', href: '/savings-goals' },
       { label: 'Vehicles', href: '/vehicles' },
+      { label: 'Permit Pre-Screener', href: '/permit' },
       { label: 'Utilities', href: null },
       { label: 'Phone Plans', href: null },
       { label: 'Groceries', href: '/diet' },
