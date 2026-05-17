@@ -509,7 +509,19 @@
       "filename": "0232_fba_batches_shipment.sql",
       "claimed_at": "2026-05-17",
       "note": "Sprint 8 Chunk C -- FBA Batches shipment planning. Adds shipment_plan_id + shipment_status to fba_batches."
+    },
+    "0233": {
+      "branch": "feat/sprint-10",
+      "filename": "0233_mood_log.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Sprint 10 Chunk D -- mood_log table for daily Telegram mood check-in ingestion."
+    },
+    "0234": {
+      "branch": "feat/sprint-10",
+      "filename": "0234_weather_log.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Sprint 10 Chunk D -- weather_log table for hourly Edmonton weather ingestion via Open-Meteo."
     }
   },
-  "next_available": 233
+  "next_available": 235
 }

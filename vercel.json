@@ -95,6 +95,34 @@
     {
       "path": "/api/scraper/flipp-sync",
       "schedule": "0 14 * * 4"
+    },
+    {
+      "path": "/api/cron/trading-picks-scan",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/trading-weights-tune",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/sports-picks-scan",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/sports-results-fetch",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/sports-weights-tune",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/mood-prompt",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/weather-tick",
+      "schedule": "0 * * * *"
     }
   ]
 }

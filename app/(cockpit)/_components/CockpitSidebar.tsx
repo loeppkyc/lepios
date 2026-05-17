@@ -110,6 +110,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Prediction Engine', href: '/predictions' },
       { label: 'Sports Betting', href: null },
       { label: 'Crypto', href: null },
+      { label: 'Calibration', href: '/calibration' },
     ],
   },
   {
