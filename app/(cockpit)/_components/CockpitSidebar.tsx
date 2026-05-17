@@ -25,12 +25,11 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Dashboard',
     items: [
       { label: 'Business Review', href: '/business-review' },
+      { label: 'Position', href: '/position' },
       { label: 'Life P&L', href: '/life-pnl' },
       { label: 'Net Worth', href: '/net-worth' },
       { label: 'Accounts', href: '/accounts' },
       { label: 'Annual Review', href: '/annual-review' },
-      { label: 'Trading Journal', href: null },
-      { label: 'Sports Betting', href: null },
     ],
   },
   {
@@ -102,6 +101,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Crypto', href: null },
       { label: 'Prediction Engine', href: null },
+      { label: 'Sports Betting', href: null },
     ],
   },
   {
