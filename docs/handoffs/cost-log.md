@@ -37,3 +37,4 @@ Format: {timestamp} coordinator sprint={N} chunk={id} phase={1-6} tokens_in={N} 
 2026-05-16T17:35:00Z coordinator sprint=backlog-tier-d chunk=D5 phase=2 tokens_in=~40000 tokens_out=~6000 escalated=true auto_proceeded=false
 
 2026-05-17T16:25:00Z coordinator sprint=backlog chunk=C2 phase=2 tokens_in=~85000 tokens_out=~8000 escalated=true auto_proceeded=false
+2026-05-17T16:30:00Z coordinator sprint=C2 chunk=C2-acceptance phase=1d tokens_in=~45000 tokens_out=~8000 escalated=true auto_proceeded=false

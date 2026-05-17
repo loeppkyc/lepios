@@ -435,27 +435,31 @@ escalation_reasons:
 2026-05-17T14:30:00Z sprint=backlog-tier-c chunk=C2 doc=docs/backlog/tier-c/C2-acceptance.md
 cited_principles: [META-C, colin-principles §1 (live-test), ARCHITECTURE.md §3 rule 3 (Colin decides)]
 trigger_match_evidence: |
-  Task: replace Dropbox file-presence logic in statement-coverage route with Supabase query on
-  gmail_statement_arrivals. No schema migration. Additive code change to existing route.
-  META-C would normally apply (cache_match_enabled=true per sprint-state.md 2026-05-01).
-  HOWEVER: 4 BLOCKER items require Colin's direct input — domain facts about bank email
-  sender addresses and per-account arrival offsets. These are not in the codebase, not in
-  the Twin corpus (Twin unreachable), and not derivable from any principle.
-  Specifically: (1) sender_domains for 7 accounts unknown; (2) subject patterns to distinguish
-  same-domain accounts (Amex vs Amex Bonvoy, TD Bank vs TD Visa vs TD USD); (3) arrival offset
-  per TD account; (4) confirmation of gmail_account_name strings.
-  Without these, builder cannot write a correct classifier or route mapping.
+  Prior coordinator (session 1): 4 domain-specific questions escalated to Colin before acceptance
+  doc could be written. sender_domains, subject patterns, arrival offset, gmail account all unknown.
+confidence: low
+outcome: escalated (questions sent to Colin via Telegram)
+escalation_reasons:
+  - blocker_Q1: sender_domains for 7 accounts unknown
+  - blocker_Q2: same-domain account disambiguation (Amex vs Bonvoy, TD family)
+  - blocker_Q3: arrival offset per account
+  - blocker_Q4: gmail_account_name confirmation
+
+---
+2026-05-17T16:00:00Z sprint=C2 chunk=C2-acceptance doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [Non-negotiable #3 (destructive ops), META-C]
+trigger_match_evidence: |
+  Non-negotiable #3: migration contains DELETE from gmail_statement_arrivals (destructive op).
+  Colin's Q1-Q4 answers received via Telegram text. Partial resolution: TD Bank + Amex sender
+  domains confirmed from gmail_messages DB. 3 open questions remain (TD Visa/USD disambiguation,
+  CIBC/CT no-email confirmation, Amex Bonvoy subject pattern).
 reversibility_check: |
-  route.ts change: reversible — revert file, Dropbox logic restored. No schema.
-  statement-arrivals.ts change: reversible — revert file, placeholder data restored.
-  No migrations. No destructive ops. No seam files.
-  All decisions LOW cost to reverse.
-confidence: low — 4 open domain-specific questions; cannot satisfy META-C condition (b)
-  (domain facts = new information, not cached pattern). Twin unreachable (host allowlist).
+  DELETE from gmail_statement_arrivals: confirmed false positives — IB/Newton/AWS rows.
+    Irreversible without restore; mitigated by specific WHERE clause.
+  STATEMENT_ACCOUNTS update: reversible via git revert.
+  Route.ts rewrite (Dropbox → Supabase): reversible via git revert.
+confidence: medium
 outcome: escalated
 escalation_reasons:
-  - blocker_Q1: sender_domains for 7 accounts (domain facts, not derivable from codebase)
-  - blocker_Q2: subject patterns for same-domain account disambiguation
-  - blocker_Q3: per-account arrival offset confirmation for TD accounts
-  - blocker_Q4: gmail_account_name string confirmation
-  - twin_unreachable: cannot use Path C (all questions domain-specific, not answerable from code)
+  - destructive_op_requires_colin_approval (DELETE from gmail_statement_arrivals)
+  - open_questions (TD Visa/USD disambiguation, CIBC/CT no email, Amex Bonvoy subject)
