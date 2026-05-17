@@ -413,3 +413,26 @@ d5_ceiling_metric_layer:
   escalation_reason: "Twin unreachable (coordinator sandbox host allowlist). CEILING_HEURISTICS text appears verbatim in daily digest — own-uncertainty escalation signal triggered."
   opened_at: "2026-05-16T17:00:00Z"
   last_updated_at: "2026-05-16T17:35:00Z"
+
+# ============================================================
+# E8 — Life Signals page (/signals) (task da9a9e3c, 2026-05-17)
+# ============================================================
+
+e8_life_signals:
+  task_id: "da9a9e3c-63e4-4ba9-9d94-6c2a84af431d"
+  run_id: "9989289a-074e-42c2-8cbf-7c6e78c7cff7"
+  item_id: "E8"
+  status: "awaiting-colin-approval"
+  description: "Build /signals cockpit page — one row per life signal, 7-day sparkline, color-coded status, freshness inline"
+  study_doc: "docs/backlog/tier-e/E8-study.md"
+  acceptance_doc: "docs/backlog/tier-e/E8-acceptance.md"
+  branch: "harness/task-da9a9e3c-63e4-4ba9-9d94-6c2a84af431d"
+  key_finding: "Most signal tables empty (mood_log/weather_log/bets/trades = 0 rows for colin). Only oura_daily (32 rows) and amazon_financial_events (644 rows) have live data. Page must handle empty-state gracefully."
+  escalation_reason: "Twin unreachable; 4 open questions (amazon label, P&L window, manual Telegram signals, sidebar label); confidence=medium."
+  open_questions:
+    - "Amazon revenue: gross (gross_contribution) or net? Honest label?"
+    - "P&L rolling window: 30-day placeholder ok or specify?"
+    - "Manual Telegram signals (family flags, derm flare): confirm defer to v2?"
+    - "Sidebar label: 'Signals' or 'Life Signals'?"
+  opened_at: "2026-05-17T19:35:00Z"
+  last_updated_at: "2026-05-17T19:45:00Z"
