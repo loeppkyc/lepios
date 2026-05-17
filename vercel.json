@@ -123,6 +123,10 @@
     {
       "path": "/api/cron/weather-tick",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/rfd-scan",
+      "schedule": "0 15 * * *"
     }
   ]
 }
