@@ -17,6 +17,26 @@ retail_scout_arbitrage:
   last_updated_at: "2026-05-15T00:00:00Z"
 
 # ============================================================
+# A8 — Edmonton Free Events Scanner (task 1b9edb82)
+# ============================================================
+
+a8_edmonton_free_events:
+  task_id: "1b9edb82-648a-4171-a335-e4954f352531"
+  item_id: "A8"
+  status: "awaiting-colin-approval"
+  description: "Edmonton Free Events Scanner — Open Data (jx5c-8cxn) + Eventbrite"
+  study_doc: "docs/backlog/tier-a/A8-study.md"
+  acceptance_doc: "docs/backlog/tier-a/A8-acceptance.md"
+  check_before_build: "No prior art. Fully greenfield."
+  twin_status: "unreachable (host not in allowlist)"
+  escalation_reasons:
+    - "F17 justification missing — lifestyle module, no behavioral engine signal documented"
+    - "ARCHITECTURE.md §11 gap — no direct money connection"
+    - "Twin unreachable — 7 open questions in acceptance doc (surface, free definition, env var, refresh)"
+  opened_at: "2026-05-16T00:00:00Z"
+  last_updated_at: "2026-05-16T00:00:00Z"
+
+# ============================================================
 
 # harness-e2e — throwaway plumbing test (parallel track)
 

@@ -1,3 +1,32 @@
+2026-05-16T00:00:00Z sprint=backlog-tier-a task=1b9edb82 doc=docs/backlog/tier-a/A8-acceptance.md
+cited_principles: [F17, F18, ARCHITECTURE.md §11, META-C, escalation]
+trigger_match_evidence: |
+  Situation: A8 — Edmonton Free Events Scanner (Open Data + Eventbrite). Greenfield feature,
+  no Streamlit predecessor, no prior art in codebase. Task brief minimal ("upcoming free
+  Edmonton events next 14 days; kill signal: dataset jx5c-8cxn").
+  Twin endpoint unreachable (host not in allowlist) — all questions escalate to Colin.
+  Three mandatory escalation triggers:
+  (1) F17 justification missing — lifestyle module with no documented behavioral engine signal
+  (2) ARCHITECTURE.md §11 — no direct money connection; free events scanner is lifestyle/QOL
+  (3) Scope under-defined — surface (cockpit/Telegram/both), "free" definition, EVENTBRITE_API_KEY
+  presence, refresh strategy all unresolved.
+  META-C not applied: confidence is low due to missing F17/F18 and all 3 escalation triggers firing.
+reversibility_check: |
+  Study doc: new file docs/backlog/tier-a/A8-study.md — fully reversible (delete).
+  Acceptance doc: new file docs/backlog/tier-a/A8-acceptance.md — fully reversible (delete).
+  sprint-state.md update: document only, no code/schema effect.
+  No code written. No schema changed. No external calls made.
+  All decisions: LOW cost to reverse.
+confidence: low — F17 missing + §11 gap + twin unreachable + scope undefined
+outcome: escalated
+escalation_reasons:
+  - F17_justification_missing (lifestyle module; no behavioral engine signal documented)
+  - architecture_s11_gap (no money connection; lifestyle/QOL not obviously permitted)
+  - twin_unreachable (all 7 questions surface to Colin)
+  - scope_undefined (surface, free definition, env var, refresh strategy)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
