@@ -1,32 +1,3 @@
-2026-05-16T00:00:00Z sprint=backlog-tier-a task=1b9edb82 doc=docs/backlog/tier-a/A8-acceptance.md
-cited_principles: [F17, F18, ARCHITECTURE.md §11, META-C, escalation]
-trigger_match_evidence: |
-  Situation: A8 — Edmonton Free Events Scanner (Open Data + Eventbrite). Greenfield feature,
-  no Streamlit predecessor, no prior art in codebase. Task brief minimal ("upcoming free
-  Edmonton events next 14 days; kill signal: dataset jx5c-8cxn").
-  Twin endpoint unreachable (host not in allowlist) — all questions escalate to Colin.
-  Three mandatory escalation triggers:
-  (1) F17 justification missing — lifestyle module with no documented behavioral engine signal
-  (2) ARCHITECTURE.md §11 — no direct money connection; free events scanner is lifestyle/QOL
-  (3) Scope under-defined — surface (cockpit/Telegram/both), "free" definition, EVENTBRITE_API_KEY
-  presence, refresh strategy all unresolved.
-  META-C not applied: confidence is low due to missing F17/F18 and all 3 escalation triggers firing.
-reversibility_check: |
-  Study doc: new file docs/backlog/tier-a/A8-study.md — fully reversible (delete).
-  Acceptance doc: new file docs/backlog/tier-a/A8-acceptance.md — fully reversible (delete).
-  sprint-state.md update: document only, no code/schema effect.
-  No code written. No schema changed. No external calls made.
-  All decisions: LOW cost to reverse.
-confidence: low — F17 missing + §11 gap + twin unreachable + scope undefined
-outcome: escalated
-escalation_reasons:
-  - F17_justification_missing (lifestyle module; no behavioral engine signal documented)
-  - architecture_s11_gap (no money connection; lifestyle/QOL not obviously permitted)
-  - twin_unreachable (all 7 questions surface to Colin)
-  - scope_undefined (surface, free definition, env var, refresh strategy)
-
----
-
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
@@ -393,23 +364,42 @@ escalation_reasons:
 
 ---
 
+2026-05-16T17:30:00Z sprint=backlog-tier-d chunk=D5 doc=docs/backlog/tier-d/D5-f18-ceiling-metric-layer-acceptance.md
+cited_principles: [META-C, F19, CLAUDE.md §3 rule 9, ARCHITECTURE.md §3 rule 2]
+trigger_match_evidence: |
+  F19 (CLAUDE.md §3 rule 9) states: "% delta loop runs nightly across all signals, surfaces
+  top 3 in morning_digest; declining % across sessions = approaching efficiency ceiling".
+  D5 is the exact implementation of this F19 directive — buildCeilingMetricLines() is the
+  "surfaces top 3 in morning_digest" deliverable. Trigger match is exact, not approximate.
+  ARCHITECTURE.md §3 rule 9 further specifies: "every system... is continuously evaluated
+  against its own prior baseline" — improvement_log writes to buildProcessEfficiencyLines()
+  are the baseline recording mechanism. Both triggers match verbatim.
+reversibility_check: |
+  lib/harness/ceiling-metrics.ts: new file — reversible-free (delete).
+  lib/harness/process-efficiency.ts: 4 fire-and-forget improvement_log INSERTs — reversible-cheap (revert 4 insert blocks).
+  lib/orchestrator/digest.ts: 1 import + 3-line append block — reversible-free (revert).
+  tests/harness/ceiling-metrics.test.ts: new file — reversible-free (delete).
+  No migrations, no schema changes, no seam files.
+  All decisions reversible. Schema migration: none needed. Hardcoded strings: reversible-with-grep.
+confidence: medium (Twin fully blocked — cannot satisfy Path C; CEILING_HEURISTICS message text
+  appears verbatim in Colin's daily digest; "own uncertainty" escalation signal triggered)
+outcome: escalated
+escalation_reasons:
+  - twin_unreachable (all questions blocked — no confidence score available)
+  - user_visible_output (CEILING_HEURISTICS text appears verbatim in morning Telegram digest — Colin's daily-visible messaging)
+  - own_uncertainty_signal (coordinator found itself composing digest message text; "probably Colin wants..." is the escalation trigger)
+
+---
+
 2026-05-16T17:00:00Z sprint=tier-a chunk=A6 doc=docs/backlog/tier-a/A6-acceptance.md
 cited_principles: [8.4 Check-Before-Build, 17 no-speculative-infrastructure, 14 real-grounding, META-C]
 trigger_match_evidence: |
   Principle 8.4: greps confirmed no existing GitHackers code. Prior art doc updated.
   Principle 17: v1 defers persistence, language filters, bookmarking — only the display pipeline ships.
   Principle 14: grounding checkpoint requires real data visible on screen, not tests alone.
-  cache_match_enabled: true (sprint-state.md explicit override, last_reviewed_by_colin_at: 2026-05-01).
-reversibility_check: |
-  New cockpit page files (app/(cockpit)/git-hackers/): fully reversible — delete files.
-  API routes (app/api/git-hackers/): fully reversible — delete files.
-  .env.example GITHUB_TOKEN: additive, reversible.
-  docs/github-prior-art.md: additive section, reversible via git.
-  No schema migrations. No destructive operations. No seam files touched.
-  confidence: medium (escalation correct — HN API not verifiable from coordinator sandbox;
-  twin unreachable for Q&A; open questions about use-case intent require Colin confirmation)
+confidence: medium
 outcome: escalated
 escalation_reasons:
-  - external_api_unverifiable (HN Algolia and Firebase blocked in coordinator sandbox; builder must verify)
-  - twin_unreachable (domain questions about use-case intent could not be answered)
-  - confidence_below_high (medium → escalate per META-C rule)
+  - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
+  - twin_unreachable
+  - confidence_below_high

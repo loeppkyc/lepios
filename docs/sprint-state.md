@@ -398,3 +398,18 @@ open_questions:
 branch: "harness/task-3a13fc07-2db6-4d0e-a245-4397a5c0978c"
 opened_at: "2026-05-15T14:25:02Z"
 last_updated_at: "2026-05-15T14:42:00Z"
+
+# ============================================================
+# D5 — F18 Ceiling Metric Layer (task 726ee202, 2026-05-16)
+# ============================================================
+
+d5_ceiling_metric_layer:
+  task_id: "726ee202-95ca-4650-87ed-26375e11bcb7"
+  run_id: "82acdf4a-6cfb-44b9-b93e-fe498b471deb"
+  status: "awaiting-colin-approval"
+  description: "Add buildCeilingMetricLines() to morning digest + improvement_log writes to buildProcessEfficiencyLines()"
+  acceptance_doc: "docs/backlog/tier-d/D5-f18-ceiling-metric-layer-acceptance.md"
+  branch: "harness/task-726ee202-95ca-4650-87ed-26375e11bcb7"
+  escalation_reason: "Twin unreachable (coordinator sandbox host allowlist). CEILING_HEURISTICS text appears verbatim in daily digest — own-uncertainty escalation signal triggered."
+  opened_at: "2026-05-16T17:00:00Z"
+  last_updated_at: "2026-05-16T17:35:00Z"
