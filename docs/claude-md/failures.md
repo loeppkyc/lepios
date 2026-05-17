@@ -1,37 +1,13 @@
 # LepiOS — Failure Log
 
-**Auto-generated from `failures_log` table.** Last data change: 2026-05-16T00:24:45.88471+00:00.
+**Auto-generated from `failures_log` table.** Last data change: 2026-05-16T11:39:37.190195+00:00.
 Source of truth: `failures_log` table. Edit there (cockpit `/failures` form or via `POST /api/failures/log`).
 
 F-L1–F-L15 live in `CLAUDE.md §9` (canonical hand-written entries kept in prose).
 F-N entries below are auto-rendered from the table.
 
 ---
-## Open (1)
-
-## F-N13 — Puppeteer E2E verification of /failures page blocked by auth gate — no signed-in session available in build session (2026-05-08)
-
-- **What:** Phase 1c spec required puppeteer verification against /failures: load page, sort by severity, submit manual entry form, click promote-to-test, verify outcomes. Page uses requireUser() auth gate which redirects to /login without a signed-in Supabase session. Build session has no cached cookies and no test-mode auth bypass. Vercel preview URL inherits the same auth requirement. Result: puppeteer would only verify the redirect, not the full UI flow.
-- **Root cause:** Three structural gaps: (1) cockpit pages have no test-mode auth bypass, (2) puppeteer integration has no cached test-user session, (3) Vercel preview URLs require the same Supabase auth as prod (no preview-only bypass token). Each gap is reasonable on its own; in combination they make autonomous UI verification impossible from within a build session.
-- **Fix/workaround:** (none — verification deferred to T-002 v2)
-- **Lesson:** Exactly what T-002 v2 (Safety Agent E2E requirement) is designed to solve: Safety Agent runs puppeteer with a signed-in test user against the surface URL specified in done_state, with E2E pass required before merge. Until T-002 v2 ships, accept that build sessions cannot autonomously verify auth-gated UI; manual user testing is the only path. Track as: 'post-merge live verification by Colin' in PR test plan.
-- **Severity:** medium
-
----
-
-## Recurring (1)
-
-## F-N10 — F-N8 RECURRENCE — concurrent Claude session contaminated working tree during T-006 Phase 1c build (2026-05-08)
-
-- **What:** During Phase 1c build (T-006 cockpit page), a parallel Claude session checked out branch audit/safety-agent-mapping while I was actively working on harness/phase-1c-failures-cockpit. The branch switch dragged unfamiliar staged file docs/lepios/safety-agent-audit.md into my working tree. window-check-edits caught the out-of-scope edit; pre-commit gate would have blocked the commit. My in-flight Phase 1c work was preserved via lint-staged auto-stash and recovered after switching back to the correct branch.
-- **Root cause:** Same as F-N8: parallel Claude sessions sharing the same git working tree. F-N8 lessons (pre-commit branch invariant, isolated worktrees) are still aspirational — branch guard runs on coordinator-initiated git ops only, not developer commits. Worktree isolation hasn't been adopted as default workflow yet.
-- **Fix/workaround:** recovered via git stash pop + git checkout (manual)
-- **Lesson:** F-N8 prescriptions still need shipping: (1) pre-commit branch invariant assertion, (2) pre-commit index invariant assertion, (3) parallel Claude sessions MUST use isolated git worktree checkouts (one worktree per session). The worktree fix is structural; the pre-commit invariants are the cheap defensive layer. Track: branch_drift_detected + unintended_staged_files in agent_events.
-- **Severity:** high
-
----
-
-## Fixed (last 30 days) (21)
+## Fixed (last 30 days) (23)
 
 ## F-N5 — /api/bookkeeping/* shipped publicly accessible for ~5 hours (2026-05-05)
 
@@ -111,6 +87,16 @@ F-N entries below are auto-rendered from the table.
 - **Root cause:** (1) None of 5 callback parsers (thumbs, gate, improve, purpose_review, safety) handle task_queue approval transitions. (2) Text-reply handler only queries status = awaiting_review; missing awaiting_grounding and acceptance_doc_ready.
 - **Fix/workaround:** 0ed07ef
 - **Lesson:** Every new escalation status added to task_queue must be paired with a webhook handler — both a callback_query parser (inline buttons) and a text-reply branch. Missing handlers return 200 silently, invisible without Vercel log inspection.
+- **Severity:** high
+
+---
+
+## F-N10 — F-N8 RECURRENCE — concurrent Claude session contaminated working tree during T-006 Phase 1c build (2026-05-08)
+
+- **What:** During Phase 1c build (T-006 cockpit page), a parallel Claude session checked out branch audit/safety-agent-mapping while I was actively working on harness/phase-1c-failures-cockpit. The branch switch dragged unfamiliar staged file docs/lepios/safety-agent-audit.md into my working tree. window-check-edits caught the out-of-scope edit; pre-commit gate would have blocked the commit. My in-flight Phase 1c work was preserved via lint-staged auto-stash and recovered after switching back to the correct branch.
+- **Root cause:** Parallel Claude sessions sharing the same git working tree. Between-session claim pruning created a window where the repo had worktrees but no live claims, so the old F-N8 guard (fires when other windows are live) passed despite the risk still being present.
+- **Fix/workaround:** cde7be8
+- **Lesson:** window-start.mjs now refuses main-checkout claims whenever any linked worktree exists (hasOtherWorktrees()), regardless of live claims. Fix shipped PR #154 (T-002 sub-phase E). Guard is structural — worktree presence is permanent once created.
 - **Severity:** high
 
 ---
@@ -209,6 +195,16 @@ F-N entries below are auto-rendered from the table.
 - **Root cause:** GitHub push protection (different from secret scanning post-merge alerts) runs a static regex scan and blocks any push containing token-shaped strings, regardless of whether they're real. Test fixtures that match production detector regex are indistinguishable from leaked keys to the scanner.
 - **Fix/workaround:** c156474
 - **Lesson:** When writing tests that assert against secret-detection regex, build token fixtures at runtime via string concatenation (e.g. `['sk', 'live', 'X'.repeat(24)].join('_')`). Never put a literal token shape in source — even fake ones. Apply also to AWS / Supabase / JWT / GitHub PAT shapes.
+- **Severity:** medium
+
+---
+
+## F-N13 — Puppeteer E2E verification of /failures page blocked by auth gate — no signed-in session available in build session (2026-05-08)
+
+- **What:** Phase 1c spec required puppeteer verification against /failures: load page, sort by severity, submit manual entry form, click promote-to-test, verify outcomes. Page uses requireUser() auth gate which redirects to /login without a signed-in Supabase session. Build session has no cached cookies and no test-mode auth bypass. Vercel preview URL inherits the same auth requirement. Result: puppeteer would only verify the redirect, not the full UI flow.
+- **Root cause:** Three structural gaps: (1) cockpit pages have no test-mode auth bypass, (2) puppeteer integration has no cached test-user session, (3) Vercel preview URLs require the same Supabase auth as prod (no preview-only bypass token). Each gap is reasonable on its own; in combination they make autonomous UI verification impossible from within a build session.
+- **Fix/workaround:** 0f1890c
+- **Lesson:** Exactly what T-002 v2 (Safety Agent E2E requirement) is designed to solve: Safety Agent runs puppeteer with a signed-in test user against the surface URL specified in done_state, with E2E pass required before merge. Until T-002 v2 ships, accept that build sessions cannot autonomously verify auth-gated UI; manual user testing is the only path. Track as: 'post-merge live verification by Colin' in PR test plan.
 - **Severity:** medium
 
 ---
