@@ -15,7 +15,6 @@ import {
   previousMonth,
   cellStatus,
   monthFromAbbrev,
-  ACCOUNTS,
 } from '@/app/api/business-review/statement-coverage/route'
 
 // ── Required timezone boundary tests (from acceptance doc) ────────────────────
@@ -179,96 +178,81 @@ describe('monthFromAbbrev', () => {
   })
 })
 
-// ── Per-account filename parsers ──────────────────────────────────────────────
+// ── Gmail coverage rule: arrival month M → covered month M-1 ─────────────────
+// These tests verify the previousMonth() coverage mapping used by the route.
+// (Filename parsers removed in v2 — route now uses gmail_statement_arrivals,
+//  not Dropbox file listings. Coverage rule is arrival_date - 1 month.)
 
-describe('filename parsers', () => {
-  it('TD Bank: period-end month, no M-1 (Oct_01-Oct_31_2025.pdf → Oct 2025)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'td_bank')!.filenameParser
-    expect(parser('Oct_01-Oct_31_2025.pdf')).toEqual({ year: 2025, month: 10, applyMinus1: false })
+describe('coverage rule: arrival month → covered month (previousMonth)', () => {
+  it('TD Bank arrives May 5 → covers April 2026', () => {
+    // Simulates a "arrival_date = 2026-05-05" row → covered month 2026-04
+    const { year, month } = previousMonth(2026, 5)
+    const covered = `${year}-${String(month).padStart(2, '0')}`
+    expect(covered).toBe('2026-04')
   })
 
-  it('Amex: issue date, M-1 applies (2025-12-01.pdf → covered Nov 2025)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'amex')!.filenameParser
-    expect(parser('2025-12-01.pdf')).toEqual({ year: 2025, month: 12, applyMinus1: true })
+  it('Amex arrives May 2 → covers April 2026', () => {
+    const { year, month } = previousMonth(2026, 5)
+    const covered = `${year}-${String(month).padStart(2, '0')}`
+    expect(covered).toBe('2026-04')
   })
 
-  it('CIBC dated: issue date, M-1 applies (onlineStatement_2026-01-14.pdf → covered Dec 2025)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'cibc')!.filenameParser
-    expect(parser('onlineStatement_2026-01-14.pdf')).toEqual({
-      year: 2026,
-      month: 1,
-      applyMinus1: true,
-    })
+  it('arrival in January covers December of prior year', () => {
+    const { year, month } = previousMonth(2026, 1)
+    const covered = `${year}-${String(month).padStart(2, '0')}`
+    expect(covered).toBe('2025-12')
   })
 
-  it('CIBC undated: returns null → server_modified fallback', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'cibc')!.filenameParser
-    expect(parser('onlineStatement.pdf')).toBeNull()
-    expect(parser('onlineStatement (1).pdf')).toBeNull()
-    expect(parser('onlineStatement (2).pdf')).toBeNull()
+  it('arrival in February covers January same year', () => {
+    const { year, month } = previousMonth(2026, 2)
+    const covered = `${year}-${String(month).padStart(2, '0')}`
+    expect(covered).toBe('2026-01')
   })
 
-  it('Capital One: MM+YYYY groups swapped (Statement_012025_abc.pdf → Jan 2025, covered Dec 2024)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'capital_one')!.filenameParser
-    expect(parser('Statement_012025_abc.pdf')).toEqual({ year: 2025, month: 1, applyMinus1: true })
-  })
-
-  it('TD Visa: month abbreviation parsed (TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf → covered Jan 2026)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'td_visa')!.filenameParser
-    expect(parser('TD_AEROPLAN_VISA_BUSINESS_1234_Feb_01-2026.pdf')).toEqual({
-      year: 2026,
-      month: 2,
-      applyMinus1: true,
-    })
-  })
-
-  it('Canadian Tire: date prefix parsed (2026-02-13-TriangleMC.pdf → covered Jan 2026)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'ct_card')!.filenameParser
-    expect(parser('2026-02-13-TriangleMC.pdf')).toEqual({ year: 2026, month: 2, applyMinus1: true })
-  })
-
-  it('TD USD: date parsed (View PDF Statement_2025-12-01.pdf → covered Nov 2025)', () => {
-    const parser = ACCOUNTS.find((a) => a.key === 'td_usd')!.filenameParser
-    expect(parser('View PDF Statement_2025-12-01.pdf')).toEqual({
-      year: 2025,
-      month: 12,
-      applyMinus1: true,
-    })
+  it('arrival in December covers November same year', () => {
+    const { year, month } = previousMonth(2026, 12)
+    const covered = `${year}-${String(month).padStart(2, '0')}`
+    expect(covered).toBe('2026-11')
   })
 })
 
-// ── NO_ACTIVITY overrides ─────────────────────────────────────────────────────
+// ── NO_ACTIVITY overrides (GET-level, Gmail-based route) ─────────────────────
+// Route v2 reads from gmail_statement_arrivals (Supabase). Dropbox removed.
 
 describe('NO_ACTIVITY overrides (GET-level)', () => {
   beforeEach(() => {
     vi.resetModules()
   })
   afterEach(() => {
-    vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
-  function mockDropbox(cibcEntries: unknown[] = []) {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
-      if (String(url).includes('oauth2/token')) {
-        return new Response(JSON.stringify({ access_token: 'test-token' }), { status: 200 })
+  function mockRequireUser(arrivals: Array<{ account_name: string; arrival_date: string }> = []) {
+    // Build a mock supabase that returns arrivals for gmail_statement_arrivals
+    // and empty rows for statement_coverage_overrides
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'gmail_statement_arrivals') {
+        return { select: vi.fn().mockResolvedValue({ data: arrivals, error: null }) }
       }
-      // Route list_folder calls by path
-      const body = JSON.parse(((init as RequestInit)?.body as string) ?? '{}') as { path?: string }
-      if (typeof body.path === 'string' && body.path.includes('Costco')) {
-        return new Response(JSON.stringify({ entries: cibcEntries, has_more: false }), {
-          status: 200,
-        })
+      if (table === 'statement_coverage_overrides') {
+        return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
       }
-      return new Response(JSON.stringify({ entries: [], has_more: false }), { status: 200 })
+      return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
     })
+
+    vi.doMock('@/lib/auth/require-user', () => ({
+      requireUser: vi.fn().mockResolvedValue({
+        ok: true,
+        user: { id: 'test-user', email: 'test@example.com' },
+        profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+        supabase: { from: fromMock },
+      }),
+    }))
   }
 
-  it('override month shows no_activity when no file exists', async () => {
-    vi.stubEnv('DROPBOX_APP_KEY', 'key')
-    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
-    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
-    mockDropbox([])
+  it('CIBC 2026-03 shows no_activity when no gmail arrivals exist for CIBC', async () => {
+    // CIBC has no email notifications — covered by NO_ACTIVITY const
+    mockRequireUser([])
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
     const res = await GET()
     const body = await res.json()
@@ -276,67 +260,78 @@ describe('NO_ACTIVITY overrides (GET-level)', () => {
     expect(cibc.coverage['2026-03']).toBe('no_activity')
   })
 
-  it('override wins even when a file resolves to that month (override beats filed)', async () => {
-    vi.stubEnv('DROPBOX_APP_KEY', 'key')
-    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
-    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
-    // onlineStatement_2026-04-15.pdf → parser → year=2026, month=4, applyMinus1=true → covered 2026-03
-    mockDropbox([
-      {
-        '.tag': 'file',
-        name: 'onlineStatement_2026-04-15.pdf',
-        server_modified: '2026-04-15T12:00:00Z',
-      },
-    ])
+  it('TD Bank May arrival (2026-05-05) → April 2026 shows filed', async () => {
+    // TD Chequing arrival in May → covered month April
+    mockRequireUser([{ account_name: 'TD Chequing', arrival_date: '2026-05-05' }])
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
     const res = await GET()
     const body = await res.json()
-    const cibc = body.accounts.find((a: { key: string }) => a.key === 'cibc')
-    expect(cibc.coverage['2026-03']).toBe('no_activity')
+    const tdBank = body.accounts.find((a: { key: string }) => a.key === 'td_bank')
+    expect(tdBank.coverage['2026-04']).toBe('filed')
   })
 })
 
-// ── F15: Vercel CLI Windows CRLF trim test ────────────────────────────────────
-// When Vercel CLI stdin adds on Windows, stored env values contain trailing \r\n
-// (2 extra bytes). The route must trim before using creds — Dropbox rejects
-// untrimmed values as invalid_client (HTTP 400).
+// ── Gmail-based route: response shape ────────────────────────────────────────
+// Verifies the route returns 7 accounts (no capital_one) and correct structure.
 
-describe('env var trimming (F15 — Vercel CLI Windows CRLF)', () => {
+describe('GET /api/business-review/statement-coverage — response shape', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
   afterEach(() => {
-    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 
-  it('GET returns 503 when DROPBOX_APP_KEY is whitespace-only after trim', async () => {
-    vi.stubEnv('DROPBOX_APP_KEY', '   \r\n')
-    vi.stubEnv('DROPBOX_APP_SECRET', 'secret')
-    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'token')
+  it('returns 7 accounts with no capital_one', async () => {
+    vi.doMock('@/lib/auth/require-user', () => ({
+      requireUser: vi.fn().mockResolvedValue({
+        ok: true,
+        user: { id: 'test-user', email: 'test@example.com' },
+        profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+        supabase: {
+          from: vi.fn().mockImplementation(() => ({
+            select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          })),
+        },
+      }),
+    }))
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
     const res = await GET()
-    expect(res.status).toBe(503)
     const body = await res.json()
-    expect(body.error).toBe('dropbox_credentials_missing')
+    expect(body.accounts).toHaveLength(7)
+    const keys = body.accounts.map((a: { key: string }) => a.key)
+    expect(keys).not.toContain('capital_one')
+    expect(keys).toContain('td_bank')
+    expect(keys).toContain('amex')
+    expect(keys).toContain('amex_bonvoy')
+    expect(keys).toContain('cibc')
+    expect(keys).toContain('ct_card')
+    expect(keys).toContain('td_visa')
+    expect(keys).toContain('td_usd')
   })
 
-  it('trimmed creds with trailing \\r\\n still attempt auth (no 503)', async () => {
-    vi.stubEnv('DROPBOX_APP_KEY', 'validkey\r\n')
-    vi.stubEnv('DROPBOX_APP_SECRET', 'validsecret\r\n')
-    vi.stubEnv('DROPBOX_REFRESH_TOKEN', 'validtoken\r\n')
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })
-      )
+  it('returns 502 when gmail_statement_arrivals query fails', async () => {
+    vi.doMock('@/lib/auth/require-user', () => ({
+      requireUser: vi.fn().mockResolvedValue({
+        ok: true,
+        user: { id: 'test-user', email: 'test@example.com' },
+        profile: { user_id: 'test-user', email: 'test@example.com', role: 'business' },
+        supabase: {
+          from: vi.fn().mockImplementation((table: string) => {
+            if (table === 'gmail_statement_arrivals') {
+              return {
+                select: vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
+              }
+            }
+            return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
+          }),
+        },
+      }),
+    }))
     const { GET } = await import('@/app/api/business-review/statement-coverage/route')
-    await GET()
-    // fetch was called (credentials were not empty after trim → auth attempted)
-    expect(fetchSpy).toHaveBeenCalled()
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('https://api.dropboxapi.com/oauth2/token')
-    // Body must NOT contain raw \r\n bytes inside the field values
-    const body = new URLSearchParams(init.body as string)
-    expect(body.get('client_id')).toBe('validkey')
-    expect(body.get('client_secret')).toBe('validsecret')
-    expect(body.get('refresh_token')).toBe('validtoken')
-    vi.restoreAllMocks()
+    const res = await GET()
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.error).toBe('gmail_arrivals_fetch_failed')
   })
 })
