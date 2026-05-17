@@ -527,7 +527,13 @@
       "filename": "0237_rfd_deals.sql",
       "claimed_at": "2026-05-17",
       "note": "RFD deal watcher -- rfd_deals + rfd_watch_keywords tables. Daily RSS scan with Telegram keyword alerts. Renumbered from 0235 (collision with balance_sheet_qbo_link)."
+    },
+    "0238": {
+      "branch": "feat/deal-watcher",
+      "filename": "0238_watch_targets.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Deal Watcher -- watch_targets + watch_events tables. Persistent Railway polling service for Amazon ASIN / LEGO.ca / generic-url restock and price-drop alerts via Telegram."
     }
   },
-  "next_available": 238
+  "next_available": 239
 }
