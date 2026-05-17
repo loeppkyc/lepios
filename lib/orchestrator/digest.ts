@@ -37,6 +37,7 @@ import {
   buildTradingPicksDigestLine,
   buildSportsPicksDigestLine,
 } from '@/lib/trading/digest'
+import { buildGroceryDealsLine } from '@/lib/diet/grocery-digest'
 export function composeMorningDigest(tick: TickResult): string {
   const date = tick.started_at.slice(0, 10)
   const lines: string[] = [`LepiOS night report — ${date}`, '']
@@ -374,6 +375,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   if (tradingPicksLine) messageToSend = `${messageToSend}${tradingPicksLine}`
   const sportsPicksLine = await buildSportsPicksDigestLine()
   if (sportsPicksLine) messageToSend = `${messageToSend}${sportsPicksLine}`
+
+  // ── Grocery: top 3 flyer deals from Flipp sync ──────────────────────────────
+  const groceryDealsLine = await buildGroceryDealsLine()
+  if (groceryDealsLine) messageToSend = `${messageToSend}\n${groceryDealsLine}`
 
   characterCount = messageToSend.length
 
