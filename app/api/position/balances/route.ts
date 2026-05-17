@@ -32,7 +32,7 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Fetch QBO accounts — build a map by QBO id
-  let qboMap: Record<string, number> = {}
+  const qboMap: Record<string, number> = {}
   try {
     const qboAccounts = await fetchAccounts()
     for (const a of qboAccounts) {
