@@ -413,3 +413,22 @@ d5_ceiling_metric_layer:
   escalation_reason: "Twin unreachable (coordinator sandbox host allowlist). CEILING_HEURISTICS text appears verbatim in daily digest — own-uncertainty escalation signal triggered."
   opened_at: "2026-05-16T17:00:00Z"
   last_updated_at: "2026-05-16T17:35:00Z"
+
+# ============================================================
+# B5 — Square Webhook Handler (task a327d5c1, 2026-05-17)
+# ============================================================
+
+tier_b_B5:
+  task_id: "a327d5c1-3e1f-4029-9054-efef6b746e2f"
+  run_id: "92d795c8-ebf9-4979-ac41-1f6118ee2ca5"
+  item_id: "B5"
+  status: "awaiting-colin-approval"
+  description: "Square Webhook Handler — /api/webhooks/square + HMAC-SHA256 sig verify + local_sales insert"
+  acceptance_doc: "docs/backlog/tier-b/B5-acceptance.md"
+  acceptance_doc_ready_at: "2026-05-17T14:25:00Z"
+  check_before_build: "local_sales table already exists in production (correct schema, F24 grants). No migration file — migration 0235 captures idempotently."
+  twin_status: "unreachable (coordinator sandbox host allowlist)"
+  escalation_reason: "Twin unreachable + HMAC URL+body verification new to this codebase → medium confidence, cannot cache-match"
+  branch: "harness/task-a327d5c1-3e1f-4029-9054-efef6b746e2f"
+  opened_at: "2026-05-17T14:00:00Z"
+  last_updated_at: "2026-05-17T14:25:00Z"
