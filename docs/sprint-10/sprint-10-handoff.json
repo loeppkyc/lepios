@@ -1,0 +1,132 @@
+{
+  "sprint": 10,
+  "chunk_ids": ["A", "B", "C", "D", "E"],
+  "branch": "feat/sprint-10",
+  "commit_sha": "0bf350f",
+  "pr_url": "https://github.com/loeppkyc/lepios/pull/326",
+  "pr_title": "feat(sprint-10): AIPE complete — trading/sports scan, calibration, mood+weather ingestion, T/SB UI",
+  "files_changed": [
+    ".claude/migration-claims.json",
+    "app/(cockpit)/_components/CockpitSidebar.tsx",
+    "app/(cockpit)/calibration/_components/CalibrationPage.tsx",
+    "app/(cockpit)/calibration/page.tsx",
+    "app/api/calibration/league-perf/route.ts",
+    "app/api/cron/mood-prompt/route.ts",
+    "app/api/cron/sports-picks-scan/route.ts",
+    "app/api/cron/sports-results-fetch/route.ts",
+    "app/api/cron/sports-weights-tune/route.ts",
+    "app/api/cron/trading-picks-scan/route.ts",
+    "app/api/cron/trading-weights-tune/route.ts",
+    "app/api/cron/weather-tick/route.ts",
+    "app/api/telegram/mood-response/route.ts",
+    "app/api/trust-state/[domain]/flip-mode/route.ts",
+    "app/api/trust-state/[domain]/route.ts",
+    "app/api/trust-state/[domain]/thresholds/route.ts",
+    "lib/calibration-metrics/metrics.ts",
+    "lib/trust/gate.ts",
+    "lib/trust/state.ts",
+    "supabase/migrations/0231_mood_log.sql",
+    "supabase/migrations/0232_weather_log.sql",
+    "vercel.json"
+  ],
+  "migrations_applied_to_production": false,
+  "migrations_pending": [
+    {
+      "file": "supabase/migrations/0231_mood_log.sql",
+      "table": "mood_log",
+      "status": "written to worktree, in PR, NOT YET applied to production Supabase",
+      "action_required": "Apply via Supabase MCP apply_migration or dashboard SQL editor before merging PR"
+    },
+    {
+      "file": "supabase/migrations/0232_weather_log.sql",
+      "table": "weather_log",
+      "status": "written to worktree, in PR, NOT YET applied to production Supabase",
+      "action_required": "Apply via Supabase MCP apply_migration or dashboard SQL editor before merging PR"
+    }
+  ],
+  "chunks_completed": {
+    "A": {
+      "description": "Trading scan + weight-tuning cron routes",
+      "new_files": [
+        "app/api/cron/trading-picks-scan/route.ts",
+        "app/api/cron/trading-weights-tune/route.ts"
+      ],
+      "compliance": ["F22: requireCronSecret used"]
+    },
+    "B": {
+      "description": "Sports pick scan, results-fetch, and weight-tuning cron routes",
+      "new_files": [
+        "app/api/cron/sports-picks-scan/route.ts",
+        "app/api/cron/sports-results-fetch/route.ts",
+        "app/api/cron/sports-weights-tune/route.ts"
+      ],
+      "compliance": ["F22: requireCronSecret used on all three routes"]
+    },
+    "C": {
+      "description": "Trust gate state machine + calibration dashboard",
+      "new_files": [
+        "lib/trust/state.ts",
+        "lib/trust/gate.ts",
+        "lib/calibration-metrics/metrics.ts",
+        "app/api/trust-state/[domain]/route.ts",
+        "app/api/trust-state/[domain]/flip-mode/route.ts",
+        "app/api/trust-state/[domain]/thresholds/route.ts",
+        "app/api/calibration/league-perf/route.ts",
+        "app/(cockpit)/calibration/page.tsx",
+        "app/(cockpit)/calibration/_components/CalibrationPage.tsx"
+      ],
+      "compliance": ["F20: no inline style= in TSX", "F-N5: supabase.auth.getUser() in all user-facing routes"]
+    },
+    "D": {
+      "description": "Behavioral ingestion — mood log, weather log, Telegram webhook",
+      "new_files": [
+        "supabase/migrations/0231_mood_log.sql",
+        "supabase/migrations/0232_weather_log.sql",
+        "app/api/cron/mood-prompt/route.ts",
+        "app/api/cron/weather-tick/route.ts",
+        "app/api/telegram/mood-response/route.ts"
+      ],
+      "compliance": ["F22: requireCronSecret on cron routes", "F24: GRANT INSERT,UPDATE,DELETE on both tables"]
+    },
+    "E": {
+      "description": "Nav wiring — CockpitSidebar + vercel.json crons",
+      "modified_files": [
+        "app/(cockpit)/_components/CockpitSidebar.tsx",
+        "vercel.json"
+      ],
+      "new_crons_added": [
+        "/api/cron/trading-picks-scan",
+        "/api/cron/trading-weights-tune",
+        "/api/cron/sports-picks-scan",
+        "/api/cron/sports-results-fetch",
+        "/api/cron/sports-weights-tune",
+        "/api/cron/mood-prompt",
+        "/api/cron/weather-tick"
+      ],
+      "compliance": ["seam-approved in commit message for both CockpitSidebar.tsx and vercel.json"]
+    }
+  },
+  "grounding_checkpoint_required": [
+    "Apply migrations 0231 and 0232 to production Supabase BEFORE merging PR",
+    "After merge+deploy: navigate to /calibration — verify both trading and sports domain panels render without 500",
+    "Trigger /api/cron/weather-tick manually with CRON_SECRET bearer token — verify one row appears in weather_log table",
+    "Trigger /api/cron/mood-prompt — verify Telegram message arrives asking 1-5 energy rating",
+    "Reply to mood prompt with a number (e.g. '4') — verify row appears in mood_log with energy=4",
+    "Check agent_events table for any error rows from the new cron routes after first automated run",
+    "Verify all 7 new crons appear in the Vercel dashboard Cron Jobs tab after deploy (Vercel Hobby allows max 1 hourly — weather-tick is hourly; confirm Hobby plan allows it or upgrade needed)"
+  ],
+  "unknowns": [
+    "Vercel Hobby plan cron limit: weather-tick runs every hour (`0 * * * *`). Hobby plan historically limits hourly crons to 1. There is already no other hourly cron in vercel.json before Sprint 10, so weather-tick should be the only hourly cron — but this should be verified in the Vercel dashboard after deploy.",
+    "The ODDS_API_KEY env var is required by sports-picks-scan but its presence in Vercel env was not verified in this session. If the key is missing, sports-picks-scan will return 500 on first run.",
+    "TELEGRAM_WEBHOOK_SECRET env var is required by the mood-response webhook. Its presence in Vercel env was not verified (it appears in .env.local key list but value was not confirmed).",
+    "The sports-picks-scan uses the `predictions` table (AIPE, migration 0142) while the existing sports-results cron uses the older `sports_picks` table. The new sports-results-FETCH cron also reads from `predictions`. These two tables serve different purposes — the split is intentional but should be confirmed with Colin before going live."
+  ],
+  "next_chunk_blockers": [
+    "Migrations 0231 and 0232 must be applied to production Supabase before any Sprint 11 chunk that reads mood_log or weather_log",
+    "PR #326 must be merged before any Sprint 11 chunk that imports from lib/trust/ or lib/calibration-metrics/"
+  ],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "note": "PR NOT merged per instructions — parallel sprints in flight. Do NOT merge until coordinator confirms.",
+  "tokens_used": "~95000 (estimated across full Sprint 10 build session)",
+  "timestamp": "2026-05-17T12:36:00Z"
+}

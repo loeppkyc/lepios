@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { AccountBalance } from '@/lib/quickbooks/types'
 
 interface HeroData {
   cash: number
@@ -23,16 +22,11 @@ export function MoneyHeroTiles() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/quickbooks/accounts')
+    fetch('/api/accounts')
       .then((r) => r.json())
-      .then((d: { accounts: AccountBalance[]; error?: string }) => {
+      .then((d: { totalCash: number; totalCardsOwing: number; netWorth: number; error?: string }) => {
         if (d.error) { setError(d.error); return }
-        const accounts = d.accounts ?? []
-        const cash = accounts.filter((a) => a.type === 'bank').reduce((s, a) => s + a.balance, 0)
-        const debt = accounts
-          .filter((a) => a.type === 'credit_card')
-          .reduce((s, a) => s + a.balance, 0)
-        setData({ cash, debt, net: cash - debt })
+        setData({ cash: d.totalCash, debt: d.totalCardsOwing, net: d.netWorth })
       })
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false))
@@ -81,7 +75,7 @@ export function MoneyHeroTiles() {
           fontSize: 'var(--text-small)',
         }}
       >
-        QuickBooks: {error}
+        {error}
       </div>
     )
   }

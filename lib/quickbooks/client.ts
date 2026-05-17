@@ -115,7 +115,7 @@ export async function fetchAccounts(): Promise<AccountBalance[]> {
 
   const res = await qboBreaker.call(() => fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    next: { revalidate: 300 },
+    cache: 'no-store',
   }))
 
   if (!res.ok) throw new Error(`QBO accounts query failed: ${res.status} ${await res.text()}`)
