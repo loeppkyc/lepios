@@ -152,6 +152,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Dropbox Archiver', href: null },
       { label: 'GPU Day', href: null },
       { label: 'GitHackers', href: '/git-hackers' },
+      { label: 'Free Events', href: '/events' },
     ],
   },
   {

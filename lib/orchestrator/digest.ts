@@ -31,6 +31,7 @@ import { buildModuleLockDigestLine } from '@/lib/streamlit-modules/lock'
 import { buildPageProfitScanLine } from '@/lib/pageprofit/digest'
 import { buildOssAuditDigestLine } from '@/lib/oss-radar/digest'
 import { buildCeilingMetricLines } from '@/lib/harness/ceiling-metrics'
+import { buildEventsLine } from '@/lib/edmonton-open-data/digest'
 import {
   buildTradingCompositeDigestLine,
   buildTradingPicksDigestLine,
@@ -265,6 +266,10 @@ export async function sendMorningDigest(): Promise<DigestStatus> {
   // ── F19: Ceiling metric layer — flat/declining improvement signals ────────────
   const ceilingMetricLines = await buildCeilingMetricLines()
   messageToSend = `${messageToSend}\n${ceilingMetricLines}`
+
+  // ── A8: Edmonton free events ──────────────────────────────────────────────────
+  const eventsLine = await buildEventsLine()
+  if (eventsLine) messageToSend = `${messageToSend}\n${eventsLine}`
 
   // ── F18: Routines quota cliff signal ─────────────────────────────────────────
   const quotaCliffLine = await buildQuotaCliffLine()

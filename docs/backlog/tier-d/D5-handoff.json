@@ -1,0 +1,27 @@
+{
+  "chunk_id": "D5",
+  "acceptance_doc_path": "docs/backlog/tier-d/D5-f18-ceiling-metric-layer-acceptance.md",
+  "files_changed": [
+    "lib/harness/ceiling-metrics.ts",
+    "lib/harness/process-efficiency.ts",
+    "lib/orchestrator/digest.ts",
+    "tests/harness/ceiling-metrics.test.ts"
+  ],
+  "tests": { "passing": 11, "failing": 0, "new": 11 },
+  "migrations_applied": [],
+  "deploy_url": "https://lepios-one.vercel.app",
+  "grounding_checkpoint_required": [
+    "Trigger or wait for the next morning digest after deploy. The digest message must include a ceiling section. On first run it will say 'Improvement ceilings: none detected' (DB has insufficient improvement_log history). After 5+ morning digest runs have accumulated improvement_log rows for the 4 process signals, flat or declining trends will appear with cause + lift cost text.",
+    "Run this SQL after one morning digest fires post-deploy: SELECT component, metric, unit, value, recorded_at FROM improvement_log WHERE component = 'process-efficiency' ORDER BY metric, recorded_at DESC; — expect 4 new rows per digest run (queue_throughput, pickup_latency_ms, queue_depth, friction_index)."
+  ],
+  "unknowns": [
+    "Acceptance doc is still marked AWAITING_COLIN_APPROVAL in the doc header and in sprint-state.md. However, PR #295 (commit 16dc3d5) was authored and merged to main by Colin Loeppky (loeppkycolin@gmail.com) on 2026-05-16. The merge constitutes de facto approval. Coordinator should update acceptance doc status to APPROVED and sprint-state.md status to 'complete' to close the gap.",
+    "Implementation deviates from acceptance doc spec in three places: (1) CEILING_HEURISTICS keys use 'process-efficiency:{metric}' not 'harness:{metric}' — matches what process-efficiency.ts actually writes to improvement_log; (2) improvement_log writes use component='process-efficiency' not 'harness'; (3) digest output header is 'Improvement ceilings:' not 'Ceiling signals (F19):'. These deviations were decided by Colin when authoring the implementation commit. The acceptance doc open questions remain open in the doc but were resolved in code. Coordinator may want to back-update the acceptance doc to reflect as-built.",
+    "Tests could not be run locally — vitest binary not accessible via bash in this environment (node_modules junction issue in worktree context). Test count of 11 reported from PR #295 commit message. Colin merged the PR, implying CI passed. If test verification is required, run: node_modules\\.bin\\vitest run tests/harness/ceiling-metrics.test.ts from the lepios checkout on Windows."
+  ],
+  "next_chunk_blockers": [
+    "The D5 improvement_log writes use component='process-efficiency' (not 'harness'). Any follow-up chunk that reads improvement_log for ceiling detection on the 4 harness process signals must query WHERE component = 'process-efficiency', not WHERE component = 'harness'."
+  ],
+  "tokens_used": 18500,
+  "timestamp": "2026-05-16T21:00:00Z"
+}
