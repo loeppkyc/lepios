@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Receipt } from '@/lib/types/receipts'
 import type { BusinessExpense } from '@/lib/types/expenses'
+import { StatementReconciliation } from './StatementReconciliation'
 
 interface ReceiptCandidate {
   receipt: Receipt
@@ -40,6 +41,7 @@ function currentMonth(): string {
 }
 
 export function ReconciliationPage() {
+  const [tab, setTab] = useState<'statement' | 'receipts'>('statement')
   const [month, setMonth] = useState(currentMonth)
   const [data, setData] = useState<CandidatesData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -149,353 +151,406 @@ export function ReconciliationPage() {
         >
           Paper Trail
         </h1>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--text-small)',
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--color-text-primary)',
-            padding: '5px 10px',
-          }}
-        />
-        <button
-          onClick={runAutoMatch}
-          disabled={autoRunning || loading}
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            fontWeight: 600,
-            letterSpacing: '0.06em',
-            padding: '6px 16px',
-            background: autoRunning ? 'var(--color-surface-2)' : 'var(--color-accent-gold)',
-            color: autoRunning ? 'var(--color-text-disabled)' : '#000',
-            border: 'none',
-            borderRadius: 'var(--radius-sm)',
-            cursor: autoRunning ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {autoRunning ? 'Running…' : 'Auto-Match'}
-        </button>
-      </div>
-
-      {/* ── Auto-match result banner ── */}
-      {autoResult && (
-        <div
-          style={{
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '10px 16px',
-            marginBottom: 20,
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            color: 'var(--color-text-primary)',
-            display: 'flex',
-            gap: 20,
-          }}
-        >
-          <span>
-            Auto-matched:{' '}
-            <strong style={{ color: 'var(--color-positive, #22c55e)' }}>
-              {autoResult.autoMatched}
-            </strong>
-          </span>
-          <span>
-            Needs review:{' '}
-            <strong style={{ color: 'var(--color-warning, #f59e0b)' }}>
-              {autoResult.needsReview}
-            </strong>
-          </span>
-          <span>
-            No match:{' '}
-            <strong style={{ color: 'var(--color-text-muted)' }}>{autoResult.noMatch}</strong>
-          </span>
-          <span style={{ color: 'var(--color-text-disabled)' }}>
-            of {autoResult.total} receipts
-          </span>
-        </div>
-      )}
-
-      {/* ── Error ── */}
-      {fetchError && (
-        <div
-          style={{
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-negative, #ef4444)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '10px 16px',
-            marginBottom: 20,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--text-small)',
-            color: 'var(--color-negative, #ef4444)',
-          }}
-        >
-          {fetchError}
-        </div>
-      )}
-
-      {loading && (
-        <p
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
-          Loading…
-        </p>
-      )}
-
-      {!loading && data && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-          {/* ── Left: Unmatched Receipts ── */}
-          <div>
-            <div
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['statement', 'receipts'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
+                fontSize: 'var(--text-small)',
+                fontWeight: tab === t ? 700 : 500,
+                padding: '5px 14px',
+                background: tab === t ? 'var(--color-surface-2)' : 'transparent',
+                border: `1px solid ${tab === t ? 'var(--color-border)' : 'transparent'}`,
+                borderRadius: 'var(--radius-sm)',
+                color: tab === t ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                cursor: 'pointer',
+                letterSpacing: '0.06em',
                 textTransform: 'uppercase',
-                color: 'var(--color-text-muted)',
-                marginBottom: 10,
               }}
             >
-              Unmatched Receipts ({unmatchedReceipts.length})
+              {t === 'statement' ? 'Statements' : 'Receipts'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Statement tab ── */}
+      {tab === 'statement' && <StatementReconciliation />}
+
+      {/* ── Receipts tab ── */}
+      {tab === 'receipts' && (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 20,
+              flexWrap: 'wrap',
+            }}
+          >
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-small)',
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-primary)',
+                padding: '5px 10px',
+              }}
+            />
+            <button
+              onClick={runAutoMatch}
+              disabled={autoRunning || loading}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                padding: '6px 16px',
+                background: autoRunning ? 'var(--color-surface-2)' : 'var(--color-accent-gold)',
+                color: autoRunning ? 'var(--color-text-disabled)' : '#000',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: autoRunning ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {autoRunning ? 'Running…' : 'Auto-Match'}
+            </button>
+          </div>
+
+          {/* ── Auto-match result banner ── */}
+          {autoResult && (
+            <div
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 16px',
+                marginBottom: 20,
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-primary)',
+                display: 'flex',
+                gap: 20,
+              }}
+            >
+              <span>
+                Auto-matched:{' '}
+                <strong style={{ color: 'var(--color-positive, #22c55e)' }}>
+                  {autoResult.autoMatched}
+                </strong>
+              </span>
+              <span>
+                Needs review:{' '}
+                <strong style={{ color: 'var(--color-warning, #f59e0b)' }}>
+                  {autoResult.needsReview}
+                </strong>
+              </span>
+              <span>
+                No match:{' '}
+                <strong style={{ color: 'var(--color-text-muted)' }}>{autoResult.noMatch}</strong>
+              </span>
+              <span style={{ color: 'var(--color-text-disabled)' }}>
+                of {autoResult.total} receipts
+              </span>
             </div>
+          )}
 
-            {unmatchedReceipts.length === 0 && (
-              <p
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-small)',
-                  color: 'var(--color-positive, #22c55e)',
-                }}
-              >
-                All receipts matched.
-              </p>
-            )}
+          {/* ── Error ── */}
+          {fetchError && (
+            <div
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-negative, #ef4444)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 16px',
+                marginBottom: 20,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-negative, #ef4444)',
+              }}
+            >
+              {fetchError}
+            </div>
+          )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[...withCandidate, ...withoutCandidate].map(({ receipt, topCandidate }) => {
-                const conf = topCandidate ? confidenceLabel(topCandidate.score) : null
-                const total = receipt.total ?? (receipt.pretax ?? 0) + receipt.tax_amount
-                return (
-                  <div
-                    key={receipt.id}
+          {loading && (
+            <p
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-small)',
+                color: 'var(--color-text-disabled)',
+              }}
+            >
+              Loading…
+            </p>
+          )}
+
+          {!loading && data && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              {/* ── Left: Unmatched Receipts ── */}
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-muted)',
+                    marginBottom: 10,
+                  }}
+                >
+                  Unmatched Receipts ({unmatchedReceipts.length})
+                </div>
+
+                {unmatchedReceipts.length === 0 && (
+                  <p
                     style={{
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '10px 12px',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      color: 'var(--color-positive, #22c55e)',
                     }}
                   >
-                    {/* Receipt info */}
-                    <div
-                      style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: 'var(--text-small)',
-                          fontWeight: 600,
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {receipt.vendor}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 'var(--text-small)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {fmt(total)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 'var(--text-nano)',
-                        color: 'var(--color-text-disabled)',
-                        marginBottom: topCandidate ? 8 : 0,
-                      }}
-                    >
-                      {receipt.receipt_date ?? receipt.upload_date} ·{' '}
-                      {receipt.category || 'Uncategorized'}
-                    </div>
+                    All receipts matched.
+                  </p>
+                )}
 
-                    {/* Candidate suggestion */}
-                    {topCandidate && conf && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[...withCandidate, ...withoutCandidate].map(({ receipt, topCandidate }) => {
+                    const conf = topCandidate ? confidenceLabel(topCandidate.score) : null
+                    const total = receipt.total ?? (receipt.pretax ?? 0) + receipt.tax_amount
+                    return (
                       <div
+                        key={receipt.id}
                         style={{
-                          background: 'var(--color-surface)',
+                          background: 'var(--color-surface-2)',
                           border: '1px solid var(--color-border)',
                           borderRadius: 'var(--radius-sm)',
-                          padding: '7px 10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
+                          padding: '10px 12px',
                         }}
                       >
-                        <span
+                        {/* Receipt info */}
+                        <div
                           style={{
-                            fontFamily: 'var(--font-ui)',
-                            fontSize: 'var(--text-nano)',
-                            fontWeight: 700,
-                            color: conf.color,
-                            minWidth: 48,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: 6,
                           }}
                         >
-                          {conf.label}
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 'var(--text-small)',
+                              fontWeight: 600,
+                              color: 'var(--color-text-primary)',
+                            }}
+                          >
+                            {receipt.vendor}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 'var(--text-small)',
+                              color: 'var(--color-text-primary)',
+                            }}
+                          >
+                            {fmt(total)}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 'var(--text-nano)',
+                            color: 'var(--color-text-disabled)',
+                            marginBottom: topCandidate ? 8 : 0,
+                          }}
+                        >
+                          {receipt.receipt_date ?? receipt.upload_date} ·{' '}
+                          {receipt.category || 'Uncategorized'}
+                        </div>
+
+                        {/* Candidate suggestion */}
+                        {topCandidate && conf && (
+                          <div
+                            style={{
+                              background: 'var(--color-surface)',
+                              border: '1px solid var(--color-border)',
+                              borderRadius: 'var(--radius-sm)',
+                              padding: '7px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-ui)',
+                                fontSize: 'var(--text-nano)',
+                                fontWeight: 700,
+                                color: conf.color,
+                                minWidth: 48,
+                              }}
+                            >
+                              {conf.label}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontFamily: 'var(--font-ui)',
+                                  fontSize: 'var(--text-nano)',
+                                  color: 'var(--color-text-muted)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {topCandidate.expense.vendor}
+                              </div>
+                              <div
+                                style={{
+                                  fontFamily: 'var(--font-mono)',
+                                  fontSize: 'var(--text-nano)',
+                                  color: 'var(--color-text-disabled)',
+                                }}
+                              >
+                                {topCandidate.expense.date} ·{' '}
+                                {fmt(topCandidate.expense.pretax + topCandidate.expense.tax_amount)}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() =>
+                                void linkToExpense(receipt.id, topCandidate.expense.id)
+                              }
+                              disabled={linkingId === receipt.id}
+                              style={{
+                                fontFamily: 'var(--font-ui)',
+                                fontSize: 'var(--text-nano)',
+                                fontWeight: 600,
+                                padding: '3px 10px',
+                                background: 'none',
+                                border: '1px solid var(--color-accent-gold)',
+                                borderRadius: 'var(--radius-sm)',
+                                color: 'var(--color-accent-gold)',
+                                cursor: linkingId === receipt.id ? 'not-allowed' : 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {linkingId === receipt.id ? '…' : 'Link'}
+                            </button>
+                          </div>
+                        )}
+
+                        {!topCandidate && (
                           <div
                             style={{
                               fontFamily: 'var(--font-ui)',
                               fontSize: 'var(--text-nano)',
-                              color: 'var(--color-text-muted)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {topCandidate.expense.vendor}
-                          </div>
-                          <div
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: 'var(--text-nano)',
                               color: 'var(--color-text-disabled)',
                             }}
                           >
-                            {topCandidate.expense.date} ·{' '}
-                            {fmt(topCandidate.expense.pretax + topCandidate.expense.tax_amount)}
+                            No matching expense found
                           </div>
-                        </div>
-                        <button
-                          onClick={() => void linkToExpense(receipt.id, topCandidate.expense.id)}
-                          disabled={linkingId === receipt.id}
-                          style={{
-                            fontFamily: 'var(--font-ui)',
-                            fontSize: 'var(--text-nano)',
-                            fontWeight: 600,
-                            padding: '3px 10px',
-                            background: 'none',
-                            border: '1px solid var(--color-accent-gold)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--color-accent-gold)',
-                            cursor: linkingId === receipt.id ? 'not-allowed' : 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {linkingId === receipt.id ? '…' : 'Link'}
-                        </button>
+                        )}
                       </div>
-                    )}
+                    )
+                  })}
+                </div>
+              </div>
 
-                    {!topCandidate && (
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: 'var(--text-nano)',
-                          color: 'var(--color-text-disabled)',
-                        }}
-                      >
-                        No matching expense found
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+              {/* ── Right: Expenses Missing Receipts ── */}
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-text-muted)',
+                    marginBottom: 10,
+                  }}
+                >
+                  Expenses Missing Receipts ({unmatchedExpenses.length})
+                </div>
 
-          {/* ── Right: Expenses Missing Receipts ── */}
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--color-text-muted)',
-                marginBottom: 10,
-              }}
-            >
-              Expenses Missing Receipts ({unmatchedExpenses.length})
-            </div>
-
-            {unmatchedExpenses.length === 0 && (
-              <p
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-small)',
-                  color: 'var(--color-positive, #22c55e)',
-                }}
-              >
-                All expenses have receipts.
-              </p>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {unmatchedExpenses.map((expense) => {
-                const total = expense.pretax + expense.tax_amount
-                return (
-                  <div
-                    key={expense.id}
+                {unmatchedExpenses.length === 0 && (
+                  <p
                     style={{
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '10px 12px',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 'var(--text-small)',
+                      color: 'var(--color-positive, #22c55e)',
                     }}
                   >
-                    <div
-                      style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}
-                    >
-                      <span
+                    All expenses have receipts.
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {unmatchedExpenses.map((expense) => {
+                    const total = expense.pretax + expense.tax_amount
+                    return (
+                      <div
+                        key={expense.id}
                         style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: 'var(--text-small)',
-                          fontWeight: 600,
-                          color: 'var(--color-text-primary)',
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '10px 12px',
                         }}
                       >
-                        {expense.vendor}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 'var(--text-small)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        {fmt(total)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 'var(--text-nano)',
-                        color: 'var(--color-text-disabled)',
-                      }}
-                    >
-                      {expense.date} · {expense.category}
-                    </div>
-                  </div>
-                )
-              })}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: 4,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 'var(--text-small)',
+                              fontWeight: 600,
+                              color: 'var(--color-text-primary)',
+                            }}
+                          >
+                            {expense.vendor}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 'var(--text-small)',
+                              color: 'var(--color-text-primary)',
+                            }}
+                          >
+                            {fmt(total)}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 'var(--text-nano)',
+                            color: 'var(--color-text-disabled)',
+                          }}
+                        >
+                          {expense.date} · {expense.category}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   )
