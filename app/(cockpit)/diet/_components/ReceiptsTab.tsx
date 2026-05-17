@@ -18,6 +18,7 @@ import {
   tableCell,
   tableHeaderCell,
 } from './DietCommon'
+import { ScanReceiptButton } from './ScanReceiptButton'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -96,6 +97,7 @@ export function ReceiptsTab({ receipts }: { receipts: ReceiptRow[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <ScanReceiptButton />
       <Disclosure title="+ Add Receipt Item">
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
@@ -198,7 +200,7 @@ export function ReceiptsTab({ receipts }: { receipts: ReceiptRow[] }) {
       </Disclosure>
 
       {receipts.length === 0 ? (
-        <EmptyState message="No receipts logged yet. v1.1 will add Claude Vision OCR." />
+        <EmptyState message="No receipts logged yet. Use Scan Receipt above or add items manually." />
       ) : (
         <>
           {stores.length > 1 && (
