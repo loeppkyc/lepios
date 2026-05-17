@@ -1,17 +1,58 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type {
-  TodayYesterdayResponse,
-  DebugOrder,
-} from '@/app/api/business-review/today-yesterday/route'
-import type { DayPanelData } from '@/lib/amazon/orders'
+// Inline types — do NOT import from route files. Route handlers import server-only modules
+// (lib/amazon/client uses Node.js `crypto`). Turbopack traverses the import type graph
+// and leaks server-only modules into the client bundle, silently breaking the component. (F11)
 import { useDevMode } from '@/lib/hooks/useDevMode'
 import { DebugSection } from '@/components/cockpit/DebugSection'
 
+// ── Inline types (mirrored from route — F11 safe) ────────────────────────────
+
+interface DayPanelData {
+  confirmedCount: number
+  unitsSold: number
+  revenueCad: number
+  pendingCount: number
+  taxCad: number
+}
+
+interface DebugOrder {
+  id: string
+  status: string
+  purchaseDate: string | undefined
+  units: number
+  orderTotal: string | undefined
+}
+
+interface TodayYesterdayResponse {
+  today: DayPanelData
+  yesterday: DayPanelData
+  fetchedAt: string
+  payout_estimate: number | null
+  margin_mtd: number | null
+  _debug: {
+    today: DebugOrder[]
+    yesterday: DebugOrder[]
+    todayAfter: string
+    yesterdayAfter: string
+    yesterdayBefore: string
+  }
+}
+
 // ── Primitive: single stat row ────────────────────────────────────────────────
 
-function StatRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatRow({
+  label,
+  value,
+  sub,
+  valueColor,
+}: {
+  label: string
+  value: string
+  sub?: string
+  valueColor?: string
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span
@@ -31,7 +72,7 @@ function StatRow({ label, value, sub }: { label: string; value: string; sub?: st
           fontFamily: 'var(--font-mono)',
           fontSize: 'var(--text-pillar-value)',
           fontWeight: 700,
-          color: 'var(--color-text-primary)',
+          color: valueColor ?? 'var(--color-text-primary)',
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -58,11 +99,17 @@ function DayPanel({
   heading,
   data,
   showPendingIndicator,
+  payoutEstimate,
+  marginMtd,
 }: {
   heading: string
   data: DayPanelData
   /** Today panel surfaces pending orders as a sub-line — never in the headline counts */
   showPendingIndicator: boolean
+  /** Estimated open settlement payout — null when not yet available. Today panel only. */
+  payoutEstimate?: number | null
+  /** Gross margin month-to-date from settlements — null when no data. Today panel only. */
+  marginMtd?: number | null
 }) {
   // Headline numbers always reflect CONFIRMED only — matches Amazon "Sales today
   // so far". Pending orders are not sales and never appear in the bold headline.
@@ -117,8 +164,19 @@ function DayPanel({
         <StatRow label="Orders" value={displayOrders.toString()} sub={ordersSub} />
         <StatRow label="Revenue" value={revenueValue} sub={revenueSub} />
         <StatRow label="Units" value={displayUnits.toString()} />
-        {/* Constraint 6: static payout label — no number */}
-        <StatRow label="Payout" value="—" sub="Full payout estimate in Sprint 5" />
+        <StatRow
+          label="Est. Payout"
+          value={payoutEstimate != null ? `$${payoutEstimate.toFixed(2)}` : '—'}
+          sub={payoutEstimate != null ? 'Open settlement period' : undefined}
+        />
+        {marginMtd != null && (
+          <StatRow
+            label="Margin MTD"
+            value={`$${marginMtd.toFixed(2)}`}
+            sub="Estimated · settlement basis"
+            valueColor={marginMtd >= 0 ? 'var(--color-positive)' : 'var(--color-critical)'}
+          />
+        )}
       </div>
     </div>
   )
@@ -336,7 +394,13 @@ export function TodayYesterdayPanel() {
     <div>
       {/* Panels row */}
       <div style={{ display: 'flex', gap: 16 }}>
-        <DayPanel heading="Today" data={data.today} showPendingIndicator={true} />
+        <DayPanel
+          heading="Today"
+          data={data.today}
+          showPendingIndicator={true}
+          payoutEstimate={data.payout_estimate}
+          marginMtd={data.margin_mtd}
+        />
         <DayPanel heading="Yesterday" data={data.yesterday} showPendingIndicator={false} />
       </div>
 
