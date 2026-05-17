@@ -1,4 +1,27 @@
 # ============================================================
+# E9 — Vehicle Tracker (task abdf87d5, 2026-05-17)
+# ============================================================
+
+e9_vehicle_tracker:
+  task_id: "abdf87d5-836f-462a-9620-6be0ce46766b"
+  run_id: "f265e5dd-f8c0-4c70-bf9a-596420d11cb6"
+  status: "awaiting-colin-approval"
+  description: "Corolla balance_sheet_entries asset row + Tesla loan details + /vehicles page loan history"
+  acceptance_doc: "docs/backlog/tier-e/E9-vehicle-tracker-acceptance.md"
+  pivot_signal: "Tesla loan already paid off ($0 in balance_sheet_entries since 2026-05-06) — task was written with Feb 2026 active loan data"
+  open_questions:
+    - "Q1: Corolla value — coordinator proposes $8,500 CAD"
+    - "Q2: Tesla Loan entry — update notes only or insert separate historical row?"
+    - "Q3: Loan history UI — add 4 columns to vehicles table? (a/b/c choice)"
+    - "Q4: Separate odometer_log table or use existing current_km?"
+    - "Q5: km/month agent_events behavioral signal — approve?"
+  twin_status: "unreachable — all 5 questions escalated to Colin"
+  canonical_write: "balance_sheet_entries (money table) — requires explicit Colin approval"
+  branch: "harness/task-abdf87d5-836f-462a-9620-6be0ce46766b"
+  opened_at: "2026-05-17T00:00:00Z"
+  last_updated_at: "2026-05-17T00:00:00Z"
+
+# ============================================================
 # retail-scout-arbitrage — task 3a13fc07
 # ============================================================
 
