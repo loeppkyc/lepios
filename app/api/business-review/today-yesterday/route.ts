@@ -14,6 +14,7 @@ import {
   type DayPanelData,
 } from '@/lib/amazon/orders'
 import { getOrderItemsBatch, upsertOrderItems } from '@/lib/amazon/order-items-cache'
+import { createClient } from '@/lib/supabase/server'
 
 // Always serve fresh — `revalidate = 60` produced stale-while-revalidate
 // behavior: first hit after an overnight gap returned the previous day's
@@ -36,6 +37,13 @@ export interface TodayYesterdayResponse {
   today: DayPanelData
   yesterday: DayPanelData
   fetchedAt: string
+  /** Estimated net payout from the current open settlement period, or null if unavailable. */
+  payout_estimate: number | null
+  /**
+   * Gross profit MTD from amazon_settlements (net_payout sum for current calendar month,
+   * Succeeded or Processing settlements). Labeled "Estimated" — not audited bookkeeping.
+   */
+  margin_mtd: number | null
   _debug: {
     today: DebugOrder[]
     yesterday: DebugOrder[]
@@ -113,6 +121,57 @@ function toDebugOrder(o: SpOrder): DebugOrder {
   }
 }
 
+/** Query payout estimate and margin MTD from amazon_settlements. Non-throwing. */
+async function querySettlementStats(): Promise<{
+  payout_estimate: number | null
+  margin_mtd: number | null
+}> {
+  try {
+    const supabase = await createClient()
+    const now = new Date()
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+
+    const { data } = await supabase
+      .from('amazon_settlements')
+      .select('net_payout, fund_transfer_status, period_end_at')
+      .gte('period_end_at', monthStart)
+      .lt('period_end_at', monthEnd)
+
+    if (!data || data.length === 0) {
+      // Fall back to most recent open settlement as payout estimate
+      const { data: recent } = await supabase
+        .from('amazon_settlements')
+        .select('net_payout, fund_transfer_status')
+        .neq('fund_transfer_status', 'Succeeded')
+        .order('period_end_at', { ascending: false })
+        .limit(1)
+
+      const payout_estimate = recent && recent.length > 0 ? Number(recent[0].net_payout ?? 0) : null
+      return { payout_estimate, margin_mtd: null }
+    }
+
+    // payout_estimate: sum of non-Succeeded (open/processing) settlements this month
+    const openSettlements = data.filter((r) => r.fund_transfer_status !== 'Succeeded')
+    const payout_estimate =
+      openSettlements.length > 0
+        ? openSettlements.reduce((s, r) => s + Number(r.net_payout ?? 0), 0)
+        : null
+
+    // margin_mtd: sum of all settlements this month (Succeeded + Processing)
+    const margin_mtd = data.reduce((s, r) => s + Number(r.net_payout ?? 0), 0)
+
+    return {
+      payout_estimate: payout_estimate !== null ? Math.round(payout_estimate * 100) / 100 : null,
+      margin_mtd: Math.round(margin_mtd * 100) / 100,
+    }
+  } catch {
+    // DB error — return nulls, don't break the orders panel
+    return { payout_estimate: null, margin_mtd: null }
+  }
+}
+
 export async function GET() {
   const gate = await requireUser({ minRole: 'business' })
   if (!gate.ok) return gate.response
@@ -129,9 +188,10 @@ export async function GET() {
     // Constraint 1 (CreatedBefore future-date rule):
     // Today query: omit CreatedBefore — today's end is in the future → HTTP 400
     // Yesterday query: both boundaries are in the past → safe to use both
-    const [todayOrders, yesterdayOrders] = await Promise.all([
+    const [todayOrders, yesterdayOrders, settlementStats] = await Promise.all([
       fetchOrders({ createdAfter: todayAfter }),
       fetchOrders({ createdAfter: yesterdayAfter, createdBefore: yesterdayBefore }),
+      querySettlementStats(),
     ])
 
     // Fetch per-item prices for confirmed orders — required for pre-tax revenue.
@@ -148,6 +208,8 @@ export async function GET() {
       today,
       yesterday,
       fetchedAt: new Date().toISOString(),
+      payout_estimate: settlementStats.payout_estimate,
+      margin_mtd: settlementStats.margin_mtd,
       _debug: {
         today: todayOrders.map(toDebugOrder),
         yesterday: yesterdayOrders.map(toDebugOrder),

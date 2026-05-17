@@ -1,14 +1,13 @@
+// F18-EXEMPT: Shipment Manager is an operational hub — metric is shipment plan creation
+// success rate (ShipmentId returned from SP-API). No behavioral signal.
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { TodayYesterdayPanel } from './_components/TodayYesterdayPanel'
-import { WhatYouOwePanel } from './_components/WhatYouOwePanel'
-import { WTDPanel } from './_components/WTDPanel'
-import { RecentDaysTable } from './_components/RecentDaysTable'
-import { StatementCoverageGrid } from './_components/StatementCoverageGrid'
+import { ShipmentManagerClient } from './_components/ShipmentManagerClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BusinessReviewPage() {
+export default async function ShipmentManagerPage() {
+  // F-N5: server component auth check
   const supabase = await createClient()
   const {
     data: { user },
@@ -38,7 +37,7 @@ export default async function BusinessReviewPage() {
             margin: 0,
           }}
         >
-          Business Review
+          Shipment Manager
         </h1>
         <p
           style={{
@@ -49,32 +48,12 @@ export default async function BusinessReviewPage() {
             letterSpacing: '0.04em',
           }}
         >
-          Sprint 4 — confirmed orders only · Pending excluded from all numbers
+          Create Amazon FBA inbound shipment plans · Print FNSKU labels
         </p>
       </div>
 
-      {/* Today + Yesterday panels — Chunk A */}
-      <TodayYesterdayPanel />
-
-      {/* Week-to-Date pacing panel — Sprint 8 Chunk B */}
-      <div style={{ marginTop: 24 }}>
-        <WTDPanel />
-      </div>
-
-      {/* What You're Owed panel — Chunk B */}
-      <div style={{ marginTop: 24 }}>
-        <WhatYouOwePanel />
-      </div>
-
-      {/* Recent Days Table — Chunk C */}
-      <div style={{ marginTop: 24 }}>
-        <RecentDaysTable />
-      </div>
-
-      {/* Statement Coverage Grid — Chunk D */}
-      <div style={{ marginTop: 24 }}>
-        <StatementCoverageGrid />
-      </div>
+      {/* Client component */}
+      <ShipmentManagerClient />
     </div>
   )
 }
