@@ -4,23 +4,23 @@
 
 backlog_c4:
   task_id: "9e210b02-a0c5-4f17-8e8a-d413d52da9e1"
-  status: "in-build"
-  phase: "3-delegated-to-builder"
+  status: "awaiting-grounding"
+  phase: "4-build-complete"
   acceptance_doc: "docs/backlog/tier-c/C4-acceptance.md"
   colin_approved_at: "2026-05-16 (PR #303 comment)"
-  q1_resolved: "2022 Tesla Model Y Long Range AWD, ~119,000 km — Alberta search"
-  q2_resolved: "Option A — error toast + open Edit mode (coordinator decision)"
-  q3_resolved: "Confirmation step before save (coordinator decision)"
-  seam_approved: true
-  approach: "Puppeteer + AutoTrader.ca Alberta listings, median comparable price"
-  files_to_change:
-    - "package.json (seam — @sparticuz/chromium + puppeteer-core) [seam-approved]"
-    - "package-lock.json (seam)"
+  build_complete_at: "2026-05-17T19:28:00Z"
+  commits: ["6f52629 (WIP — deps + scaffold)", "394f132 (TypeScript fix + complete implementation)"]
+  tests: "3766 passing, 154 pre-existing failing (unrelated test files)"
+  files_changed:
+    - "package.json + package-lock.json (@sparticuz/chromium + puppeteer-core) [seam-approved]"
     - "app/api/net-worth/tesla-estimate/route.ts (new)"
     - "app/(cockpit)/net-worth/_components/NetWorthPage.tsx"
-  delegated_to_builder_at: "2026-05-16"
+  unknowns:
+    - "AutoTrader.ca selector accuracy — confirmed at grounding"
+    - "Vercel bundle size — kill signal path implemented (501 + graceful UI)"
+  pr: "303"
   opened_at: "2026-05-16T17:20:00Z"
-  last_updated_at: "2026-05-16T18:00:00Z"
+  last_updated_at: "2026-05-17T19:28:00Z"
 
 # ============================================================
 # retail-scout-arbitrage — task 3a13fc07
