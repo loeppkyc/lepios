@@ -1,4 +1,22 @@
 # ============================================================
+# E7 — Sports Betting (task 48cde92d, 2026-05-17)
+# ============================================================
+
+tier_e_E7:
+  task_id: "48cde92d-cfc7-4c51-b585-3aaa5dc49e27"
+  item_id: "E7"
+  status: "awaiting-colin-approval"
+  description: "Sports Betting /sports-betting page — manual bet journal (today's odds, log-bet form, bet history + P&L sparkline)"
+  study_doc: "docs/backlog/tier-e/E7-sports-betting-study.md"
+  acceptance_doc: "docs/backlog/tier-e/E7-sports-betting-acceptance.md"
+  pivot_signal: "~70% already built — Odds API route, bets table, bets API, sports-intel page all exist. Gap: /sports-betting page (href:null placeholder), log-bet form UI, P&L sparkline, mood_state field."
+  open_questions:
+    - "Q1: Simplified today's games tab vs. reuse full TodaysGamesTab (with Elo/AI controls)?"
+    - "Q2: Add mood_state TEXT CHECK(IN calm|sharp|tilted|degenerate) migration? (nullable, reversible)"
+  opened_at: "2026-05-17T19:30:00Z"
+  last_updated_at: "2026-05-17T19:45:00Z"
+
+# ============================================================
 # retail-scout-arbitrage — task 3a13fc07
 # ============================================================
 
