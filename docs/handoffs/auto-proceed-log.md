@@ -1,3 +1,20 @@
+2026-05-17T00:00:00Z sprint=E9 chunk=E9 doc=docs/backlog/tier-e/E9-vehicle-tracker-acceptance.md
+cited_principles: [canonical_write_escalation, META-C]
+trigger_match_evidence: |
+  balance_sheet_entries is a user-visible money table (shown on /balance-sheet + /net-worth).
+  Coordinator.md: "canonical write about to happen — any write to a source-of-truth table
+  (ledger, audit, tax, user-visible money) → escalate."
+  Task proposes INSERT (Corolla asset row) + UPDATE (Tesla Loan notes) to balance_sheet_entries.
+  Also: twin unreachable for all 5 questions. Corolla exact value is Colin's personal data decision.
+reversibility_check: |
+  balance_sheet_entries INSERT (Corolla): reversible via DELETE
+  balance_sheet_entries UPDATE (Tesla Loan notes): reversible via UPDATE to original text
+  vehicles UPDATE (current_value_estimate): reversible via UPDATE NULL
+  vehicles ALTER ADD COLUMN: reversible via ALTER DROP COLUMN
+  All reversible — but canonical write escalation is ALWAYS regardless of reversibility.
+confidence: high
+outcome: escalated-to-colin (canonical write + twin unreachable + value requires Colin's data decision)
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
