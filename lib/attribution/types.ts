@@ -5,6 +5,7 @@
 export type ActorType =
   | 'improvement_engine'
   | 'coordinator'
+  | 'builder'
   | 'task_pickup_cron'
   | 'cron'
   | 'human'
