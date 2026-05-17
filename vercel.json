@@ -91,6 +91,10 @@
     {
       "path": "/api/cron/net-worth-sync",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/scraper/flipp-sync",
+      "schedule": "0 14 * * 4"
     }
   ]
 }

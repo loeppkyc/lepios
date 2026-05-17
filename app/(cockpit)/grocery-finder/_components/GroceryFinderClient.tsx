@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { GroceryProductRow } from '@/lib/diet/types'
 import { GROCERY_STORES, GROCERY_STORE_LABELS } from '@/lib/diet/types'
+import { triggerFlippSync } from '../actions'
+import type { FlippSyncResult } from '@/lib/scraper/flipp-sync'
 
 const PRICE = (v: number | null) => (v != null ? `$${v.toFixed(2)}` : '—')
 const DATE = (v: string | null) => {
@@ -15,6 +18,23 @@ export function GroceryFinderClient({ initialProducts }: { initialProducts: Groc
   const [search, setSearch] = useState('')
   const [flyerOnly, setFlyerOnly] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [syncResult, setSyncResult] = useState<FlippSyncResult | null>(null)
+  const [syncError, setSyncError] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+
+  function handleSync() {
+    setSyncError(false)
+    startTransition(async () => {
+      try {
+        const result = await triggerFlippSync()
+        setSyncResult(result)
+        router.refresh()
+      } catch {
+        setSyncError(true)
+      }
+    })
+  }
 
   const filtered = useMemo(() => {
     return initialProducts.filter((p) => {
@@ -111,24 +131,68 @@ export function GroceryFinderClient({ initialProducts }: { initialProducts: Groc
         >
           {filtered.length} listing{filtered.length !== 1 ? 's' : ''}
         </span>
-        <button
-          onClick={() => setAddOpen(true)}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={handleSync}
+            disabled={isPending}
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              fontWeight: 600,
+              padding: '6px 14px',
+              background: isPending ? 'var(--color-surface-2)' : 'transparent',
+              color: isPending ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: isPending ? 'default' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            {isPending ? 'Syncing...' : 'Sync Flyer Deals'}
+          </button>
+          <button
+            onClick={() => setAddOpen(true)}
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-small)',
+              fontWeight: 600,
+              padding: '6px 14px',
+              background: 'var(--color-pillar-money)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+            }}
+          >
+            + Add Product
+          </button>
+        </div>
+      </div>
+
+      {/* Sync result / error feedback */}
+      {syncError && (
+        <div
           style={{
-            marginLeft: 'auto',
             fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-small)',
-            fontWeight: 600,
-            padding: '6px 14px',
-            background: 'var(--color-pillar-money)',
-            color: '#000',
-            border: 'none',
-            borderRadius: 'var(--radius-sm)',
-            cursor: 'pointer',
+            fontSize: '0.7rem',
+            color: 'var(--color-text-muted)',
           }}
         >
-          + Add Product
-        </button>
-      </div>
+          Sync failed — check console for details
+        </div>
+      )}
+      {syncResult && !syncError && (
+        <div
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.7rem',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          Sync complete: {syncResult.products_upserted} products updated, {syncResult.not_found}/
+          {syncResult.staples_checked} staples not in Edmonton flyers
+        </div>
+      )}
 
       {/* Store coverage summary */}
       {initialProducts.length > 0 && <StoreSummary products={initialProducts} />}
