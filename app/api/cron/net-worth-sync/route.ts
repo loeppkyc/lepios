@@ -8,16 +8,39 @@ export const maxDuration = 60
 /**
  * POST /api/cron/net-worth-sync
  *
- * Daily cron (08:00 UTC) that auto-updates the balance_sheet_entries rows for
- * category='amazon' and category='inventory' from live source tables:
- *   - amazon: SUM(net_payout) from amazon_settlements WHERE NOT Succeeded/Closed
- *   - inventory: value_at_cost from latest inventory_snapshots row
+ * Daily cron (08:00 UTC) that auto-updates balance_sheet_entries rows for
+ * amazon (by currency/ID) and inventory from live source tables.
  *
- * F22: auth via requireCronSecret (never inline CRON_SECRET check).
- * Logs to agent_events for F18 observability.
+ * Amazon splits by currency to prevent double-count:
+ *   - CAD settlements → Amazon.ca row (c02fd74c...)
+ *   - USD settlements → Amazon.com row (9d7ca28d...), converted to CAD at BoC rate
+ *
+ * NULL fund_transfer_status is treated as pending (NOT IN + IS NULL filter).
+ *
+ * F22: auth via requireCronSecret. Logs to agent_events for F18 observability.
  */
+
+const AMAZON_CA_ID = 'c02fd74c-00a7-4ace-a73a-4f1ea657c2ca'
+const AMAZON_COM_ID = '9d7ca28d-7d96-4c80-95bd-d75519790287'
+const FALLBACK_FX_RATE = 1.37
+
+async function fetchFxRate(): Promise<number> {
+  try {
+    const r = await fetch(
+      'https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?recent=1'
+    )
+    if (!r.ok) return FALLBACK_FX_RATE
+    const data = (await r.json()) as {
+      observations?: Array<{ FXUSDCAD: { v: string } }>
+    }
+    const rate = Number(data.observations?.[0]?.FXUSDCAD?.v)
+    return isFinite(rate) && rate > 0 ? rate : FALLBACK_FX_RATE
+  } catch {
+    return FALLBACK_FX_RATE
+  }
+}
+
 export async function POST(request: Request) {
-  // auth: see lib/auth/cron-secret.ts (F22)
   const unauthorized = requireCronSecret(request)
   if (unauthorized) return unauthorized
 
@@ -25,28 +48,35 @@ export async function POST(request: Request) {
   const today = new Date().toISOString().slice(0, 10)
   const warnings: string[] = []
 
-  // --- 1. Amazon Receivable ---
-  // Sum net_payout for all settlements that are NOT yet paid out (Succeeded/Closed)
-  const { data: amazonRows, error: amazonErr } = await db
-    .from('amazon_settlements')
-    .select('net_payout')
-    .not('fund_transfer_status', 'in', '("Succeeded","Closed")')
+  // --- FX rate (needed for USD→CAD conversion) ---
+  const fxRate = await fetchFxRate()
 
-  let amazonBalance = 0
-  if (amazonErr) {
-    warnings.push(`amazon_settlements query failed: ${amazonErr.message}`)
-  } else if (!amazonRows || amazonRows.length === 0) {
-    warnings.push('amazon_settlements: no pending rows found — setting amazon balance to 0')
-    amazonBalance = 0
+  // --- 1. Amazon settlements — split by currency, include NULL status as pending ---
+  // PostgREST: fund_transfer_status IS NULL OR (NOT IN Succeeded, Closed)
+  const { data: settlements, error: settlementsErr } = await db
+    .from('amazon_settlements')
+    .select('currency, net_payout')
+    .or('fund_transfer_status.is.null,and(fund_transfer_status.neq.Succeeded,fund_transfer_status.neq.Closed)')
+
+  let amazonCadBalance = 0
+  let amazonUsdBalanceCad = 0
+
+  if (settlementsErr) {
+    warnings.push(`amazon_settlements query failed: ${settlementsErr.message}`)
   } else {
-    for (const row of amazonRows) {
-      amazonBalance += Number(row.net_payout ?? 0)
+    for (const row of settlements ?? []) {
+      const amount = Number(row.net_payout ?? 0)
+      if (row.currency === 'USD') {
+        amazonUsdBalanceCad += amount * fxRate
+      } else {
+        amazonCadBalance += amount
+      }
     }
-    amazonBalance = Math.round(amazonBalance * 100) / 100
+    amazonCadBalance = Math.round(amazonCadBalance * 100) / 100
+    amazonUsdBalanceCad = Math.round(amazonUsdBalanceCad * 100) / 100
   }
 
-  // --- 2. Inventory ---
-  // Latest inventory_snapshots row by snapshot_date
+  // --- 2. Inventory — latest inventory_snapshots row ---
   const { data: invRows, error: invErr } = await db
     .from('inventory_snapshots')
     .select('snapshot_date, value_at_cost')
@@ -64,46 +94,39 @@ export async function POST(request: Request) {
     inventorySnapshotDate = invRows[0].snapshot_date as string
   }
 
-  // --- 3. Update balance_sheet_entries (amazon) ---
-  const { error: amazonUpdateErr } = await db
+  // --- 3. Update Amazon.ca (CAD settlements only) ---
+  const { error: caUpdateErr } = await db
     .from('balance_sheet_entries')
-    .update({
-      balance: amazonBalance,
-      as_of_date: today,
-      source: 'auto_sync',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('category', 'amazon')
+    .update({ balance: amazonCadBalance, as_of_date: today, source: 'auto_sync', updated_at: new Date().toISOString() })
+    .eq('id', AMAZON_CA_ID)
 
-  if (amazonUpdateErr) {
-    warnings.push(`balance_sheet_entries amazon update failed: ${amazonUpdateErr.message}`)
+  if (caUpdateErr) {
+    warnings.push(`amazon.ca update failed: ${caUpdateErr.message}`)
   }
 
-  // --- 4. Update balance_sheet_entries (inventory) — skip if no snapshot ---
+  // --- 4. Update Amazon.com (USD settlements → CAD) ---
+  const { error: comUpdateErr } = await db
+    .from('balance_sheet_entries')
+    .update({ balance: amazonUsdBalanceCad, as_of_date: today, source: 'auto_sync', updated_at: new Date().toISOString() })
+    .eq('id', AMAZON_COM_ID)
+
+  if (comUpdateErr) {
+    warnings.push(`amazon.com update failed: ${comUpdateErr.message}`)
+  }
+
+  // --- 5. Update inventory ---
   if (inventoryBalance !== null && inventorySnapshotDate !== null) {
     const { error: invUpdateErr } = await db
       .from('balance_sheet_entries')
-      .update({
-        balance: inventoryBalance,
-        as_of_date: inventorySnapshotDate,
-        source: 'auto_sync',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ balance: inventoryBalance, as_of_date: inventorySnapshotDate, source: 'auto_sync', updated_at: new Date().toISOString() })
       .eq('category', 'inventory')
 
     if (invUpdateErr) {
-      warnings.push(`balance_sheet_entries inventory update failed: ${invUpdateErr.message}`)
+      warnings.push(`inventory update failed: ${invUpdateErr.message}`)
     }
   }
 
-  // --- 5. Log to agent_events (F18 observability) ---
-  const meta: Record<string, unknown> = {
-    amazon_balance: amazonBalance,
-    inventory_balance: inventoryBalance,
-    snapshot_date: inventorySnapshotDate,
-    warnings: warnings.length > 0 ? warnings : undefined,
-  }
-
+  // --- 6. Log to agent_events (F18) ---
   await db
     .from('agent_events')
     .insert({
@@ -111,23 +134,28 @@ export async function POST(request: Request) {
       action: 'net_worth_sync',
       actor: 'cron',
       status: warnings.length > 0 ? 'warning' : 'success',
-      meta,
+      meta: {
+        amazon_ca_balance: amazonCadBalance,
+        amazon_com_balance_cad: amazonUsdBalanceCad,
+        inventory_balance: inventoryBalance,
+        snapshot_date: inventorySnapshotDate,
+        fx_rate: fxRate,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      },
       occurred_at: new Date().toISOString(),
     })
-    .then(
-      () => void 0,
-      () => void 0
-    ) // non-fatal: do not fail the sync if logging fails
+    .then(() => void 0, () => void 0)
 
   return NextResponse.json({
     ok: true,
-    amazon_balance: amazonBalance,
+    amazon_ca_balance: amazonCadBalance,
+    amazon_com_balance_cad: amazonUsdBalanceCad,
     inventory_balance: inventoryBalance,
+    fx_rate: fxRate,
     ...(warnings.length > 0 ? { warnings } : {}),
   })
 }
 
-// Allow GET for manual browser testing (same auth)
 export async function GET(request: Request) {
   return POST(request)
 }
