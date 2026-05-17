@@ -5,16 +5,15 @@
 c2_statement_coverage_v2:
   task_id: "05e8c359-1f69-431d-b2f5-caa4f7e8bbaa"
   item_id: "C2"
-  status: "awaiting-colin-approval"
+  status: "in-build"
   description: "Replace Dropbox file-presence with gmail_statement_arrivals for statement coverage"
   acceptance_doc: "docs/backlog/tier-c/C2-acceptance.md"
-  phase: "1d-complete"
-  escalation_reason: "Destructive operation (DELETE from gmail_statement_arrivals) requires Colin approval; 3 open questions (TD Visa/USD disambiguation, CIBC/CT no email, Amex Bonvoy subject)"
-  colin_answers_received_at: "2026-05-17"
+  phase: "3-delegated-to-builder"
+  colin_approved_at: "2026-05-17T16:30:00Z"
+  colin_approval_action: "approve (Telegram callback, correlation_id=cad13247)"
+  delegated_to_builder_at: "2026-05-17T16:35:00Z"
   opened_at: "2026-05-17T00:00:00Z"
-  pending_notification_id: "75175fa8-1f11-47be-827a-8e09e9f9db88"
-  pending_notification_correlation_id: "cad13247"
-  last_updated_at: "2026-05-17T00:00:00Z"
+  last_updated_at: "2026-05-17T16:35:00Z"
 
 # ============================================================
 # retail-scout-arbitrage — task 3a13fc07

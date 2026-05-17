@@ -1,3 +1,21 @@
+2026-05-17T16:35:00Z sprint=backlog-c task=05e8c359 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [destructive-ops-escalation, colin-explicit-approval]
+trigger_match_evidence: |
+  Situation: C2 acceptance doc contains DELETE from gmail_statement_arrivals (false positives).
+  Per escalation rule: "Destructive ops — Principle 19. Always." Escalated to Colin.
+  Also: 3 open questions (TD Visa/USD disambiguation, CIBC/CT no email, Amex Bonvoy subject).
+  Colin explicitly approved via Telegram callback (correlation_id=cad13247, action=approve).
+reversibility_check: |
+  DELETE false positives: reversible — rows were incorrectly classified; real data
+  will be re-inserted on next gmail-scan cron run. Not truly destructive of good data.
+  STATEMENT_ACCOUNTS rewrite: reversible via git revert.
+  Route.ts Dropbox→Supabase: reversible via git revert.
+  No DROP/ALTER/TRUNCATE. No schema changes beyond one DELETE-with-WHERE migration.
+confidence: high — Colin explicitly approved after seeing the full doc
+outcome: approved-by-colin-explicit (Telegram button, 2026-05-17)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
