@@ -12,8 +12,23 @@ c2_statement_coverage_v2:
   colin_approved_at: "2026-05-17T16:30:00Z"
   colin_approval_action: "approve (Telegram callback, correlation_id=cad13247)"
   delegated_to_builder_at: "2026-05-17T16:35:00Z"
+  build_committed_at: "2026-05-17T16:45:00Z"
+  build_commit: "6c89306"
+  files_changed:
+    - "lib/gmail/classifiers/statement-arrivals.ts"
+    - "app/api/business-review/statement-coverage/route.ts"
+    - "supabase/migrations/0237_cleanup_false_positive_statement_arrivals.sql"
+  status: "awaiting-grounding"
+  phase: "4-awaiting-grounding"
+  grounding_checkpoints:
+    - "Apply migration 0237 to production Supabase (DELETE false positives)"
+    - "SELECT count(*) FROM gmail_statement_arrivals WHERE account_name = 'RBC Visa' → 0"
+    - "SELECT account_name, arrival_date FROM gmail_statement_arrivals ORDER BY arrival_date DESC → TD Chequing May 2026 rows"
+    - "GET /api/business-review/statement-coverage → 7 accounts (no capital_one), td_bank Apr 2026 = filed, amex Mar 2026 = filed"
+    - "Visual: Business Review page Statement Coverage grid shows green for past months"
+  pr: "335"
   opened_at: "2026-05-17T00:00:00Z"
-  last_updated_at: "2026-05-17T16:35:00Z"
+  last_updated_at: "2026-05-17T16:45:00Z"
 
 # ============================================================
 # retail-scout-arbitrage — task 3a13fc07
