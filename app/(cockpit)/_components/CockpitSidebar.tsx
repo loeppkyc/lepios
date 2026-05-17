@@ -79,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Monthly Expenses', href: '/monthly-expenses' },
       { label: 'Recurring Expenses', href: '/recurring' },
       { label: 'Import Statement', href: '/import' },
+      { label: 'Statement Lines', href: '/statement-lines' },
       { label: 'Monthly P&L', href: '/monthly-pnl' },
       { label: 'Category P&L', href: '/cogs' },
       { label: 'Balance Sheet', href: '/balance-sheet' },
