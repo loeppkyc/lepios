@@ -403,3 +403,27 @@ escalation_reasons:
   - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
   - twin_unreachable
   - confidence_below_high
+
+---
+
+2026-05-17T19:45:00Z sprint=backlog-tier-e chunk=E8 doc=docs/backlog/tier-e/E8-acceptance.md
+cited_principles: [6 honest-labels, 11 placeholders-in-one-place, 15 new-terrain, 17 no-speculative-infra, META-C]
+trigger_match_evidence: |
+  Principle 6: empty tables → "awaiting data" not "0" — exact trigger.
+  Principle 11: thresholds unknown → centralized constants w/ TODO — exact trigger.
+  Principle 15: manual Telegram signals = new terrain (no table, no write path) — exact trigger.
+  Principle 17: manual Telegram ingestion = speculative for this chunk — exact trigger.
+reversibility_check: |
+  app/(cockpit)/signals/page.tsx: new file — reversible-free.
+  app/(cockpit)/signals/_components/: new files — reversible-free.
+  lib/signals/queries.ts: new file — reversible-free.
+  lib/signals/thresholds.ts: new file — reversible-free.
+  CockpitSidebar.tsx: 1 nav link — reversible-free.
+  No migrations. No schema changes. No canonical writes. No seam files.
+confidence: medium
+outcome: escalated
+escalation_reasons:
+  - twin_unreachable
+  - confidence_below_high
+  - 4_open_questions (amazon label, P&L window, manual Telegram signals, sidebar label)
+  - most_signal_tables_empty (data reality changes UX significantly)
