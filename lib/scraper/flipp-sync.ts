@@ -1,5 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import { searchFlippItems, mapMerchantToStore } from './flipp'
+import { sendDailyBot } from '@/lib/telegram/daily-bot'
+import { GROCERY_STORE_LABELS } from '@/lib/diet/types'
+import type { GroceryStore } from '@/lib/diet/types'
 
 export interface FlippSyncResult {
   staples_checked: number
@@ -113,6 +116,45 @@ export async function runFlippSync(): Promise<FlippSyncResult> {
       errors,
     },
   })
+
+  // ── Telegram: top 5 deals >20% off ───────────────────────────────────────────
+  // Supabase JS doesn't support column-vs-column comparisons, so we fetch
+  // all in-flyer products with both prices set and filter in memory.
+  try {
+    const { data: flyerDeals } = await supabase
+      .from('grocery_products')
+      .select('name, store, sale_price, regular_price')
+      .eq('in_flyer', true)
+      .not('sale_price', 'is', null)
+      .not('regular_price', 'is', null)
+
+    const filtered = (flyerDeals ?? [])
+      .filter(
+        (d) =>
+          d.sale_price != null && d.regular_price != null && d.sale_price < d.regular_price * 0.8
+      )
+      .sort((a, b) => {
+        const savA = (a.regular_price! - a.sale_price!) / a.regular_price!
+        const savB = (b.regular_price! - b.sale_price!) / b.regular_price!
+        return savB - savA
+      })
+      .slice(0, 5)
+
+    if (filtered.length > 0) {
+      const lines = filtered.map((d) => {
+        const storeLabel = GROCERY_STORE_LABELS[d.store as GroceryStore] ?? d.store
+        const pct = Math.round(((d.regular_price! - d.sale_price!) / d.regular_price!) * 100)
+        return `• ${d.name}: $${d.sale_price!.toFixed(2)} (was $${d.regular_price!.toFixed(2)}, ${pct}% off) @ ${storeLabel}`
+      })
+      const msg = `Flipp deals this week:\n${lines.join('\n')}`
+      await sendDailyBot(msg)
+    }
+  } catch (err) {
+    console.error(
+      '[flipp-sync] Telegram push failed:',
+      err instanceof Error ? err.message : String(err)
+    )
+  }
 
   return {
     staples_checked: staples.length,
