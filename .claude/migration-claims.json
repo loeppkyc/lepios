@@ -522,12 +522,12 @@
       "claimed_at": "2026-05-17",
       "note": "Sprint 10 Chunk D -- weather_log table for hourly Edmonton weather ingestion via Open-Meteo."
     },
-    "0235": {
+    "0237": {
       "branch": "feat/rfd-deal-watcher",
-      "filename": "0235_rfd_deals.sql",
+      "filename": "0237_rfd_deals.sql",
       "claimed_at": "2026-05-17",
-      "note": "RFD deal watcher -- rfd_deals + rfd_watch_keywords tables. Daily RSS scan with Telegram keyword alerts."
+      "note": "RFD deal watcher -- rfd_deals + rfd_watch_keywords tables. Daily RSS scan with Telegram keyword alerts. Renumbered from 0235 (collision with balance_sheet_qbo_link)."
     }
   },
-  "next_available": 236
+  "next_available": 238
 }
