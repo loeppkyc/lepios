@@ -13,6 +13,28 @@ export interface FlippSyncResult {
   duration_ms: number
 }
 
+const STORE_SEARCH_BASE: Record<string, string> = {
+  costco: 'https://www.costco.ca/s?keyword=',
+  walmart: 'https://www.walmart.ca/search?q=',
+  sobeys: 'https://www.sobeys.com/en/search/?q=',
+  'save-on': 'https://www.saveonfoods.com/sm/planning/rsid/2000/results?q=',
+  superstore: 'https://www.realcanadiansuperstore.ca/search?search-bar=',
+  'no-frills': 'https://www.nofrills.ca/search?q=',
+  safeway: 'https://www.safeway.ca/en/shop/search-results.html?q=',
+}
+
+function buildStoreSearchUrl(store: string, productName: string): string {
+  const base = STORE_SEARCH_BASE[store]
+  if (!base) return `https://www.google.ca/search?q=${encodeURIComponent(productName + ' ' + store)}`
+  // Use a short version of the name — strip size/weight info after comma
+  const shortName = productName.split(',')[0].trim()
+  return base + encodeURIComponent(shortName)
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 export async function runFlippSync(): Promise<FlippSyncResult> {
   const supabase = createServiceClient()
   const started = Date.now()
@@ -123,7 +145,7 @@ export async function runFlippSync(): Promise<FlippSyncResult> {
   try {
     const { data: flyerDeals } = await supabase
       .from('grocery_products')
-      .select('name, store, sale_price, regular_price')
+      .select('name, store, sale_price, regular_price, store_url')
       .eq('in_flyer', true)
       .not('sale_price', 'is', null)
       .not('regular_price', 'is', null)
@@ -144,10 +166,12 @@ export async function runFlippSync(): Promise<FlippSyncResult> {
       const lines = filtered.map((d) => {
         const storeLabel = GROCERY_STORE_LABELS[d.store as GroceryStore] ?? d.store
         const pct = Math.round(((d.regular_price! - d.sale_price!) / d.regular_price!) * 100)
-        return `• ${d.name}: $${d.sale_price!.toFixed(2)} (was $${d.regular_price!.toFixed(2)}, ${pct}% off) @ ${storeLabel}`
+        const url = d.store_url ?? buildStoreSearchUrl(d.store, d.name)
+        const label = `${d.name}: $${d.sale_price!.toFixed(2)} (was $${d.regular_price!.toFixed(2)}, ${pct}% off) @ ${storeLabel}`
+        return `• <a href="${url}">${escapeHtml(label)}</a>`
       })
       const msg = `Flipp deals this week:\n${lines.join('\n')}`
-      await sendDailyBot(msg)
+      await sendDailyBot(msg, 'HTML')
     }
   } catch (err) {
     console.error(
