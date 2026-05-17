@@ -27,7 +27,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'name and type required' }, { status: 400 })
   }
 
-  const validTypes = ['amazon-asin', 'lego-ca', 'generic-url']
+  const validTypes = ['amazon-asin', 'lego-ca', 'generic-url', 'shopify']
   if (!validTypes.includes(type)) {
     return NextResponse.json({ error: 'invalid type' }, { status: 400 })
   }

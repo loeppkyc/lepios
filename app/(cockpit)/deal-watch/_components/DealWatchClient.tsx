@@ -123,6 +123,77 @@ function typeLabel(type: string): string {
   return 'Generic'
 }
 
+// ─── LEGO Quick-Add ──────────────────────────────────────────────────────────
+
+function LegoQuickAdd({ onAdded }: { onAdded: (target: WatchTarget) => void }) {
+  const [code, setCode] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = code.trim().replace(/\D/g, '')
+    if (!trimmed) return
+    setSaving(true)
+    setFeedback(null)
+    try {
+      const res = await fetch('/api/deal-watch/lego-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_code: trimmed }),
+      })
+      const d = (await res.json()) as {
+        target?: WatchTarget
+        current_status?: string
+        error?: string
+      }
+      if (!res.ok || !d.target) {
+        setFeedback({ ok: false, msg: d.error ?? `HTTP ${res.status}` })
+      } else {
+        onAdded(d.target)
+        setCode('')
+        const statusNote =
+          d.current_status === 'in_stock' ? ' — currently IN STOCK' : ' — currently out of stock'
+        setFeedback({ ok: true, msg: `Watching "${d.target.name}"${statusNote}` })
+      }
+    } catch (err) {
+      setFeedback({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cockpit-surface)] p-4">
+      <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">
+        Watch a LEGO Set
+      </h3>
+      <form onSubmit={handleAdd} className="flex gap-2">
+        <Input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Set number, e.g. 10313"
+          className="h-9 max-w-xs text-sm"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          disabled={saving}
+        />
+        <Button type="submit" size="sm" className="h-9 text-sm" disabled={saving || !code.trim()}>
+          {saving ? 'Looking up…' : 'Watch'}
+        </Button>
+      </form>
+      {feedback && (
+        <p className={`mt-2 text-xs ${feedback.ok ? 'text-green-400' : 'text-red-400'}`}>
+          {feedback.msg}
+        </p>
+      )}
+      <p className="mt-2 text-xs text-[var(--color-text-disabled)]">
+        Alerts you on Telegram the moment it restocks · checks every 30 seconds
+      </p>
+    </div>
+  )
+}
+
 // ─── Add Target Form ─────────────────────────────────────────────────────────
 
 function AddTargetForm({ onAdded }: { onAdded: (target: WatchTarget) => void }) {
@@ -414,7 +485,10 @@ export function DealWatchClient({ initialTargets, initialEvents }: Props) {
         </div>
       </div>
 
-      {/* Add Target Form */}
+      {/* LEGO Quick-Add */}
+      <LegoQuickAdd onAdded={handleAdded} />
+
+      {/* Add Target Form (generic — Amazon, generic-url, etc.) */}
       <AddTargetForm onAdded={handleAdded} />
 
       {actionError && (
