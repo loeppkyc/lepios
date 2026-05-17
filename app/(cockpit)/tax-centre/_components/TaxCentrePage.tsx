@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { QuarterReadiness, QuarterStatus } from '@/app/api/tax-centre/summary/route'
+import { GSTEstimateTile } from './GSTEstimateTile'
 // Inline type — avoids server-only module leak per F11 (route imports supabase/server)
 interface GstAccrualResponse {
   currentYear: {
@@ -887,6 +888,9 @@ export function TaxCentrePage() {
               ))}
             </div>
           </section>
+
+          {/* GST Estimate — live quarterly ITC balance */}
+          <GSTEstimateTile />
 
           {/* Year-end checklist */}
           {!isFiled && <YearEndChecklist readiness={data.quarterReadiness} year={year} />}

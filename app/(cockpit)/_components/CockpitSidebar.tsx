@@ -44,10 +44,10 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Repricer', href: '/repricer' },
       { label: 'FBA Batches', href: '/batches' },
       { label: 'Sales Charts', href: '/amazon-sales' },
-      { label: 'Amazon Orders', href: null },
+      { label: 'Amazon Orders', href: '/amazon-orders' },
       { label: 'Amazon Legal', href: '/amazon-legal' },
       { label: 'Payouts', href: '/payouts' },
-      { label: 'Inventory Spend', href: null },
+      { label: 'Inventory Spend', href: '/inventory-spend' },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readOsSheet, parseDollar } from '@/lib/sheets/client'
 import { requireUser } from '@/lib/auth/require-user'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export const revalidate = 3600
 
@@ -44,11 +45,15 @@ export interface GoalRow {
   actualProfit: number
 }
 
+/** keyed by 'YYYY-MM', value = sum of net_payout (Succeeded settlements) */
+export type SettlementByMonth = Record<string, number>
+
 export interface MonthlyPnlResponse {
   months: MonthlyPnlRow[]
   totals: MonthlyPnlRow
   comparison2025: MonthlyPnlRow | null
   goals: GoalRow[]
+  settlementRevenueByMonth: SettlementByMonth
 }
 
 export async function GET() {
@@ -68,6 +73,30 @@ export async function GET() {
       { error: `Sheets read failed: ${e instanceof Error ? e.message : String(e)}` },
       { status: 502 }
     )
+  }
+
+  // Fetch settlement revenue grouped by month (Succeeded only)
+  const supabase = createServiceClient()
+  const settlementRevenueByMonth: SettlementByMonth = {}
+  try {
+    const { data: settlements } = await supabase
+      .from('amazon_settlements')
+      .select('period_end_at, net_payout')
+      .eq('fund_transfer_status', 'Succeeded')
+      .not('period_end_at', 'is', null)
+      .not('net_payout', 'is', null)
+
+    for (const s of settlements ?? []) {
+      const monthKey = String(s.period_end_at).slice(0, 7) // 'YYYY-MM'
+      settlementRevenueByMonth[monthKey] =
+        (settlementRevenueByMonth[monthKey] ?? 0) + Number(s.net_payout)
+    }
+    // Round values
+    for (const k of Object.keys(settlementRevenueByMonth)) {
+      settlementRevenueByMonth[k] = Math.round(settlementRevenueByMonth[k] * 100) / 100
+    }
+  } catch {
+    // Non-fatal: settlement data is supplementary
   }
 
   // P&L: headers at row 4 (index 4), data rows 5-16 (months Jan-Dec)
@@ -139,5 +168,6 @@ export async function GET() {
     },
     comparison2025,
     goals,
+    settlementRevenueByMonth,
   } satisfies MonthlyPnlResponse)
 }
