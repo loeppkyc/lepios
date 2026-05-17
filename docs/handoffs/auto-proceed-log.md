@@ -1,3 +1,21 @@
+2026-05-17T16:35:00Z sprint=backlog-c task=05e8c359 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [destructive-ops-escalation, colin-explicit-approval]
+trigger_match_evidence: |
+  Situation: C2 acceptance doc contains DELETE from gmail_statement_arrivals (false positives).
+  Per escalation rule: "Destructive ops — Principle 19. Always." Escalated to Colin.
+  Also: 3 open questions (TD Visa/USD disambiguation, CIBC/CT no email, Amex Bonvoy subject).
+  Colin explicitly approved via Telegram callback (correlation_id=cad13247, action=approve).
+reversibility_check: |
+  DELETE false positives: reversible — rows were incorrectly classified; real data
+  will be re-inserted on next gmail-scan cron run. Not truly destructive of good data.
+  STATEMENT_ACCOUNTS rewrite: reversible via git revert.
+  Route.ts Dropbox→Supabase: reversible via git revert.
+  No DROP/ALTER/TRUNCATE. No schema changes beyond one DELETE-with-WHERE migration.
+confidence: high — Colin explicitly approved after seeing the full doc
+outcome: approved-by-colin-explicit (Telegram button, 2026-05-17)
+
+---
+
 2026-05-15T14:30:00Z sprint=standalone task=9c6cbd80 doc=docs/sprint-5/cockpit-money-pnl-wiring-acceptance.md
 cited_principles: [META-C, escalation]
 trigger_match_evidence: |
@@ -402,4 +420,64 @@ outcome: escalated
 escalation_reasons:
   - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
   - twin_unreachable
+
+---
+
+2026-05-17T16:20:00Z sprint=backlog chunk=C2 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [META-C, 8.4 Check-Before-Build, F17, F18]
+trigger_match_evidence: |
+  Situation: Replace 3 placeholder STATEMENT_ACCOUNTS in existing classifier with 8 real
+  accounts, and augment coverage route to union Dropbox + gmail_statement_arrivals.
+  Pattern candidate: "correcting placeholder data in a shipped module" — same class as
+  fixing KNOWN_EVENT_DOMAINS (that auto-proceeded). However: this changes runtime behavior
+  (what emails get classified as statement arrivals), not just a string list expansion.
+  Sender domains for Q1 were answered ambiguously ("all loeppkycolin@gmail.com" = recipient,
+  not sender domains). The actual FROM domains in the STATEMENT_ACCOUNTS are initial estimates.
+  Twin unreachable — no confidence scores available.
+  Gap: cannot confirm subject_patterns match Colin's real emails without a scan run.
+reversibility_check: |
+  statement-arrivals.ts change: replace STATEMENT_ACCOUNTS array. Reversible via git revert (trivial).
+  coverage route change: add getGmailStatementCoverage() helper + union logic.
+  Reversible via git revert. No migration. No data loss.
+  All changes: LOW cost to reverse.
+confidence: medium — sender domain ambiguity + twin unreachable lowers below high threshold
+outcome: escalated
+escalation_reasons:
+  - twin_unreachable (all questions blocked — no confidence score available)
+  - q1_domain_ambiguity (Colin's Q1 answer "all loeppkycolin@gmail.com" is recipient, not sender domains — initial estimates used in doc)
+  - confidence_below_high (medium confidence per META-C rules)
   - confidence_below_high
+
+---
+
+2026-05-17T14:30:00Z sprint=backlog-tier-c chunk=C2 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [META-C, colin-principles §1 (live-test), ARCHITECTURE.md §3 rule 3 (Colin decides)]
+trigger_match_evidence: |
+  Prior coordinator (session 1): 4 domain-specific questions escalated to Colin before acceptance
+  doc could be written. sender_domains, subject patterns, arrival offset, gmail account all unknown.
+confidence: low
+outcome: escalated (questions sent to Colin via Telegram)
+escalation_reasons:
+  - blocker_Q1: sender_domains for 7 accounts unknown
+  - blocker_Q2: same-domain account disambiguation (Amex vs Bonvoy, TD family)
+  - blocker_Q3: arrival offset per account
+  - blocker_Q4: gmail_account_name confirmation
+
+---
+2026-05-17T16:00:00Z sprint=C2 chunk=C2-acceptance doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [Non-negotiable #3 (destructive ops), META-C]
+trigger_match_evidence: |
+  Non-negotiable #3: migration contains DELETE from gmail_statement_arrivals (destructive op).
+  Colin's Q1-Q4 answers received via Telegram text. Partial resolution: TD Bank + Amex sender
+  domains confirmed from gmail_messages DB. 3 open questions remain (TD Visa/USD disambiguation,
+  CIBC/CT no-email confirmation, Amex Bonvoy subject pattern).
+reversibility_check: |
+  DELETE from gmail_statement_arrivals: confirmed false positives — IB/Newton/AWS rows.
+    Irreversible without restore; mitigated by specific WHERE clause.
+  STATEMENT_ACCOUNTS update: reversible via git revert.
+  Route.ts rewrite (Dropbox → Supabase): reversible via git revert.
+confidence: medium
+outcome: escalated
+escalation_reasons:
+  - destructive_op_requires_colin_approval (DELETE from gmail_statement_arrivals)
+  - open_questions (TD Visa/USD disambiguation, CIBC/CT no email, Amex Bonvoy subject)

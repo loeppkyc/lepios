@@ -1,0 +1,34 @@
+{
+  "task_id": "05e8c359-1f69-431d-b2f5-caa4f7e8bbaa",
+  "chunk_id": "C2",
+  "status": "complete",
+  "files_changed": [
+    "lib/gmail/classifiers/statement-arrivals.ts",
+    "app/api/business-review/statement-coverage/route.ts",
+    "supabase/migrations/0237_cleanup_false_positive_statement_arrivals.sql",
+    "tests/gmail-scanner.test.ts",
+    "tests/statement-coverage.test.ts"
+  ],
+  "migration_applied": false,
+  "migration_file": "supabase/migrations/0237_cleanup_false_positive_statement_arrivals.sql",
+  "tests": {
+    "passing": 3904,
+    "failing": 159,
+    "new": 13,
+    "baseline_failing": 175,
+    "note": "All 175 pre-existing failures reduced to 159 — 16 C2-related test failures fixed. 13 new tests added (5 coverage-rule tests + 2 NO_ACTIVITY GET-level + 2 response-shape + 3 no-op from rewrite). No new failures introduced."
+  },
+  "grounding_checkpoint_required": "Colin runs: (1) SELECT count(*) FROM gmail_statement_arrivals WHERE account_name = 'RBC Visa' → 0 after migration applied; (2) SELECT account_name, arrival_date FROM gmail_statement_arrivals ORDER BY arrival_date DESC LIMIT 10 → shows TD Chequing rows with May 2026 arrival dates; (3) GET /api/business-review/statement-coverage → 7 accounts, no capital_one; td_bank April 2026 = filed; amex March 2026 = filed; (4) Visual check: Business Review page shows Statement Coverage grid with TD Bank and Amex showing green for past months",
+  "unknowns": [
+    "migration-claims.json does not have entries for 0235/0236/0237 — these migrations were committed without claims. The migration file itself is correct and Colin-approved per the acceptance doc. This is a process gap from the prior builder run (6c89306), not a correctness issue.",
+    "Migration 0237 has NOT been applied to production DB yet — it's committed on the task branch but will need to be applied via Supabase MCP after PR #335 is reviewed and merged.",
+    "TD Visa / TD USD subject ambiguity (acceptance doc Open Question 1): generic 'Your TD statement is now available' emails may match TD Chequing first-match, leaving TD Visa and TD USD uncovered. Acceptable for v2 per acceptance doc, but Colin should confirm via grounding step 3 whether TD Visa and TD USD show filed or missing.",
+    "Amex Bonvoy vs Amex Business (acceptance doc Open Question 3): if Amex Bonvoy does not include 'Bonvoy' or 'Marriott' in the subject, all Amex emails will classify as 'Amex Business' (first match). Colin should check whether Amex Bonvoy statement emails contain a distinguishing subject keyword."
+  ],
+  "next_chunk_blockers": [
+    "Migration 0237 must be applied to production before the route returns correct data. Coordinator should apply via Supabase MCP: apply_migration with the contents of 0237_cleanup_false_positive_statement_arrivals.sql."
+  ],
+  "commit_sha": "08e3c8aa035bd4f635a6d2823947e019bf63c51d",
+  "notes": "Parts A (STATEMENT_ACCOUNTS rewrite), B (route.ts rewrite), and C (migration file) were already committed in the prior builder run (6c89306) before this session. This session fixed 16 failing tests in gmail-scanner.test.ts and statement-coverage.test.ts that still referenced the old Dropbox-era API (ACCOUNTS export, filenameParser, Dropbox env vars). All 5 test accounts now use real subjects/senders confirmed from the DB. No component changes made — StatementCoverageGrid.tsx untouched.",
+  "timestamp": "2026-05-17T16:46:00Z"
+}

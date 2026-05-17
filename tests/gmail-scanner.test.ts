@@ -142,8 +142,8 @@ describe('filterNewMessages', () => {
 describe('classifyStatementArrival', () => {
   it('returns high confidence when FROM matches sender_domain AND subject matches pattern', () => {
     const msg = makeMessage({
-      fromAddress: 'statements@td.com',
-      subject: 'Your e-statement is ready',
+      fromAddress: 'alerts@td.com',
+      subject: 'TD Bank - Your Online Banking Statement Is Available',
     })
     const knownSenders = new Set<string>(['td.com'])
 
@@ -160,14 +160,14 @@ describe('classifyStatementArrival', () => {
 
   // ── Test 4: subject match only → medium ──────────────────────────────────────
 
-  it('returns medium confidence when subject matches RBC pattern but FROM is unknown domain', () => {
+  it('returns medium confidence when subject matches Amex pattern but FROM is unknown domain', () => {
     const msg = makeMessage({
-      fromAddress: 'noreply@unknown-bank.com',
-      subject: 'Your eStatement is now available',
+      fromAddress: 'noreply@unknown-sender.com',
+      subject: 'Your American Express Online Statement is Now Ready',
     })
     const knownSenders = new Set<string>()
 
-    // Subject matches RBC's /e-?statement/i pattern but sender domain is unknown
+    // Subject matches Amex Business pattern but sender domain is unknown
     const result = classifyStatementArrival(msg, knownSenders)
 
     expect(result).not.toBeNull()
@@ -298,8 +298,8 @@ describe('classifyStatementArrival — count accuracy', () => {
     const messages: GmailMessage[] = [
       makeMessage({
         messageId: 'msg-1',
-        fromAddress: 'noreply@td.com',
-        subject: 'Your e-statement is ready',
+        fromAddress: 'alerts@td.com',
+        subject: 'TD Bank - Your Online Banking Statement Is Available',
       }),
       makeMessage({
         messageId: 'msg-2',
@@ -308,19 +308,19 @@ describe('classifyStatementArrival — count accuracy', () => {
       }),
       makeMessage({
         messageId: 'msg-3',
-        fromAddress: 'noreply@rbc.com',
-        subject: 'Your eStatement is available',
+        fromAddress: 'AmericanExpress@welcome.americanexpress.com',
+        subject: 'Your American Express Online Statement is Now Ready',
       }),
     ]
 
-    const knownSenders = new Set<string>(['td.com', 'rbc.com'])
+    const knownSenders = new Set<string>(['td.com', 'americanexpress.com'])
     const results = messages
       .map((m) => classifyStatementArrival(m, knownSenders))
       .filter((r): r is NonNullable<typeof r> => r !== null)
 
-    // msg-1: td.com sender + e-statement subject → high (classified)
+    // msg-1: td.com sender + TD Bank statement subject → high (classified as TD Chequing)
     // msg-2: etsy.com, no statement subject → null (not classified)
-    // msg-3: rbc.com sender + "eStatement is available" matches /e-?statement/i → high (classified)
+    // msg-3: americanexpress.com sender + Amex statement subject → high (classified as Amex Business)
     expect(results).toHaveLength(2)
     expect(results.every((r) => r !== null)).toBe(true)
   })
@@ -329,13 +329,15 @@ describe('classifyStatementArrival — count accuracy', () => {
 // ── Synthetic verification ────────────────────────────────────────────────────
 // Verifies: account_name='TD Chequing', confidence='high', arrival_date set,
 // statement_period_start=null, statement_period_end=null
+// Uses subject confirmed from gmail_messages DB: "TD Bank - Your Online Banking Statement Is Available"
+// from sender alerts@td.com (verified 2026-05-17).
 
 describe('synthetic verification — classifyStatementArrival TD Chequing', () => {
   it('classifies synthetic TD message (message_id=synth-test-001) with expected field values', () => {
     const syntheticMsg: GmailMessage = {
       messageId: 'synth-test-001',
-      fromAddress: 'statements@td.com',
-      subject: 'Your e-statement is ready',
+      fromAddress: 'alerts@td.com',
+      subject: 'TD Bank - Your Online Banking Statement Is Available',
       sentAt: new Date('2026-04-01T10:00:00Z'),
       hasAttachment: false,
     }

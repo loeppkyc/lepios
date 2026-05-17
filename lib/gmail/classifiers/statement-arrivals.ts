@@ -19,24 +19,66 @@ export interface StatementArrivalResult {
   confidence: 'high' | 'medium'
 }
 
-// ── PLACEHOLDER accounts — Colin replaces domains/patterns before v1 launch ──
-// TODO: tune sender_domains and subject_patterns with real account emails before launch
+// ── Real business accounts — confirmed from gmail_messages DB query 2026-05-17 ──
+// Sender domains verified: alerts@td.com, TD.eStatementNoReplyAccount@td.com,
+// AmericanExpress@welcome.americanexpress.com
 const STATEMENT_ACCOUNTS: StatementArrivalAccount[] = [
   {
     account_name: 'TD Chequing',
-    sender_domains: ['td.com', 'tdbank.com'],
-    subject_patterns: [/e-?statement/i, /statement.*ready/i, /account statement/i],
+    sender_domains: ['td.com'],
+    subject_patterns: [
+      /td bank.*online banking statement/i,
+      /td bank.*statement.*available/i,
+      /your td.*statement.*available/i,
+      /td.*chequing.*statement/i,
+    ],
   },
   {
-    account_name: 'RBC Visa',
-    sender_domains: ['rbc.com', 'rbcroyalbank.com'],
-    subject_patterns: [/e-?statement/i, /statement.*available/i],
+    account_name: 'Amex Business',
+    sender_domains: ['americanexpress.com', 'welcome.americanexpress.com'],
+    subject_patterns: [
+      /american express.*online statement/i,
+      /your.*amex.*statement/i,
+      /american express.*statement.*ready/i,
+    ],
   },
   {
-    account_name: 'AMEX',
-    sender_domains: ['americanexpress.com', 'aexp.com'],
-    subject_patterns: [/statement/i, /your.*statement/i],
+    account_name: 'Amex Bonvoy',
+    sender_domains: ['americanexpress.com', 'welcome.americanexpress.com'],
+    subject_patterns: [
+      /bonvoy.*statement/i,
+      /marriott.*statement/i,
+      /amex.*bonvoy.*statement/i,
+    ],
   },
+  {
+    account_name: 'TD Visa',
+    sender_domains: ['td.com'],
+    subject_patterns: [
+      /td.*visa.*statement/i,
+      /aeroplan.*visa.*statement/i,
+      /td.*visa.*available/i,
+    ],
+  },
+  {
+    account_name: 'TD USD Chequing',
+    sender_domains: ['td.com'],
+    subject_patterns: [
+      /td.*usd.*statement/i,
+      /td.*us dollar.*statement/i,
+      /td.*foreign.*statement/i,
+    ],
+  },
+  // CIBC and Canadian Tire CC: no email statement notification detected in DB.
+  // These accounts use manual overrides only (Colin marks cells via the UI).
+]
+
+// ── Exclusion list — known non-bank statement senders ──────────────────────────
+const EXCLUDED_SENDERS = [
+  'interactivebrokers.com', // IB daily activity statements
+  'newton.co', // Newton crypto statements
+  'aws.com', // AWS billing
+  'invoicing@aws.com',
 ]
 
 // ── Classifier ───────────────────────────────────────────────────────────────
@@ -59,6 +101,9 @@ export function classifyStatementArrival(
 ): StatementArrivalResult | null {
   const fromLower = message.fromAddress.toLowerCase()
   const subjectLower = message.subject.toLowerCase()
+
+  // Exclude known non-bank statement senders before checking accounts
+  if (EXCLUDED_SENDERS.some((s) => fromLower.includes(s.toLowerCase()))) return null
 
   for (const account of STATEMENT_ACCOUNTS) {
     const senderMatch = account.sender_domains.some((domain) =>
