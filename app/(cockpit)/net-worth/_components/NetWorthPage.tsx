@@ -563,6 +563,7 @@ export function NetWorthPage() {
                       rows={rows}
                       total={cat.total}
                       onSave={saveRow}
+                      onRefresh={load}
                     />
                   )
                 })}
@@ -737,18 +738,31 @@ function RowGroup({
   )
 }
 
+interface TeslaEstimateState {
+  status: 'idle' | 'loading' | 'confirm' | 'saving' | 'error'
+  medianPrice?: number
+  listingCount?: number
+  errorMsg?: string
+}
+
 function EditableRow({
   row,
   onSave,
+  onRefresh,
+  isTeslaRow,
 }: {
   row: BalanceSheetEntryLite
   onSave: (input: SaveRowInput) => Promise<void>
+  onRefresh?: () => Promise<void>
+  isTeslaRow?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [balanceStr, setBalanceStr] = useState(String(row.balance))
   const [asOfDate, setAsOfDate] = useState(row.as_of_date)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [teslaState, setTeslaState] = useState<TeslaEstimateState>({ status: 'idle' })
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   function startEdit() {
     setBalanceStr(String(row.balance))
@@ -782,6 +796,64 @@ function EditableRow({
     setEditing(false)
   }
 
+  async function runTeslaEstimate() {
+    setTeslaState({ status: 'loading' })
+    try {
+      const res = await fetch('/api/net-worth/tesla-estimate', { method: 'POST' })
+      const json = (await res.json()) as
+        | { median_price_cad: number; listing_count: number; scraped_at: string }
+        | { error: string }
+
+      if ('error' in json) {
+        // On scrape error: show toast + open inline edit mode (Q2 resolution)
+        setTeslaState({ status: 'idle' })
+        setToastMsg('Auto-estimate failed. Enter value manually.')
+        startEdit()
+        return
+      }
+
+      setTeslaState({
+        status: 'confirm',
+        medianPrice: json.median_price_cad,
+        listingCount: json.listing_count,
+      })
+    } catch {
+      setTeslaState({ status: 'idle' })
+      setToastMsg('Auto-estimate failed. Enter value manually.')
+      startEdit()
+    }
+  }
+
+  async function useEstimatedValue() {
+    if (teslaState.medianPrice === undefined) return
+    const today = new Date().toISOString().slice(0, 10)
+    setTeslaState({ ...teslaState, status: 'saving' })
+    try {
+      const res = await fetch('/api/balance-sheet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: row.id,
+          balance: teslaState.medianPrice,
+          as_of_date: today,
+        }),
+      })
+      const j = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok || j.error) throw new Error(j.error ?? `HTTP ${res.status}`)
+      setTeslaState({ status: 'idle' })
+      if (onRefresh) await onRefresh()
+    } catch (e) {
+      setTeslaState({
+        status: 'error',
+        errorMsg: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  function cancelEstimate() {
+    setTeslaState({ status: 'idle' })
+  }
+
   const inputStyle: React.CSSProperties = {
     fontFamily: 'var(--font-mono)',
     fontSize: 'var(--text-small)',
@@ -809,6 +881,34 @@ function EditableRow({
         {isAutoSync && (
           <span className="text-muted-foreground/60 ring-border ml-2 inline-flex items-center rounded px-1 py-0.5 text-[10px] leading-none font-medium ring-1 ring-inset">
             auto
+          </span>
+        )}
+        {/* Toast message for tesla estimate errors */}
+        {toastMsg && (
+          <span
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-nano)',
+              color: '#e5534b',
+              marginLeft: 10,
+              fontStyle: 'italic',
+            }}
+          >
+            {toastMsg}
+            <button
+              onClick={() => setToastMsg(null)}
+              style={{
+                marginLeft: 4,
+                background: 'none',
+                border: 'none',
+                color: '#e5534b',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+              }}
+            >
+              ✕
+            </button>
           </span>
         )}
       </td>
@@ -879,6 +979,78 @@ function EditableRow({
           >
             —
           </span>
+        ) : teslaState.status === 'confirm' && isTeslaRow ? (
+          // Confirmation UI (Q3 resolution): show median + Use This Value | Cancel
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--text-nano)',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              Estimated: {fmt(teslaState.medianPrice ?? 0)} from {teslaState.listingCount} Alberta
+              listings
+            </span>
+            <button
+              onClick={() => void useEstimatedValue()}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                fontWeight: 700,
+                padding: '3px 10px',
+                background: 'var(--color-accent-gold)',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: '#000',
+                cursor: 'pointer',
+              }}
+            >
+              Use This Value
+            </button>
+            <button
+              onClick={cancelEstimate}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </span>
+        ) : teslaState.status === 'error' && isTeslaRow ? (
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                color: '#e5534b',
+              }}
+            >
+              Save failed
+            </span>
+            <button
+              onClick={cancelEstimate}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              Dismiss
+            </button>
+          </span>
         ) : editing ? (
           <span style={{ display: 'inline-flex', gap: 6 }}>
             <button
@@ -929,21 +1101,47 @@ function EditableRow({
             )}
           </span>
         ) : (
-          <button
-            onClick={startEdit}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-nano)',
-              padding: '3px 10px',
-              background: 'none',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--color-text-disabled)',
-              cursor: 'pointer',
-            }}
-          >
-            Edit
-          </button>
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            {isTeslaRow && (
+              <button
+                onClick={() => void runTeslaEstimate()}
+                disabled={teslaState.status === 'loading' || teslaState.status === 'saving'}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: 'var(--text-nano)',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  background: 'none',
+                  border: '1px solid var(--color-accent-gold)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-accent-gold)',
+                  cursor:
+                    teslaState.status === 'loading' || teslaState.status === 'saving'
+                      ? 'wait'
+                      : 'pointer',
+                  opacity:
+                    teslaState.status === 'loading' || teslaState.status === 'saving' ? 0.6 : 1,
+                }}
+              >
+                {teslaState.status === 'loading' ? 'Estimating…' : 'Estimate Value'}
+              </button>
+            )}
+            <button
+              onClick={startEdit}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-nano)',
+                padding: '3px 10px',
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-disabled)',
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+          </span>
         )}
       </td>
     </tr>
