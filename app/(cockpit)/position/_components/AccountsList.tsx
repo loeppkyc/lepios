@@ -50,7 +50,6 @@ export function AccountsList() {
   const [saving, setSaving] = useState(false)
 
   function load() {
-    setLoading(true)
     fetch('/api/position/balances')
       .then((r) => r.json())
       .then((d: { rows: BalanceRow[]; error?: string }) => {
@@ -75,6 +74,7 @@ export function AccountsList() {
       })
       if (!res.ok) throw new Error('Save failed')
       setEditId(null)
+      setLoading(true)
       load()
     } catch (e: unknown) {
       setError(String(e))
