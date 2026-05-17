@@ -11,11 +11,21 @@ import {
   insertStatementArrivals,
   type StatementArrivalResult,
 } from '@/lib/gmail/classifiers/statement-arrivals'
+import {
+  classifyReceipt,
+  insertReceiptClassifications,
+  type ReceiptClassificationResult,
+} from '@/lib/gmail/classifiers/receipt'
+import {
+  classifyInvoice,
+  insertInvoiceClassifications,
+  type InvoiceClassificationResult,
+} from '@/lib/gmail/classifiers/invoice'
+import type { KnownSender } from '@/lib/gmail/classifiers/types'
 import { recordAttribution } from '@/lib/attribution/writer'
 import { upsertHeartbeat } from '@/lib/orchestrator/heartbeat'
 
 export const dynamic = 'force-dynamic'
-
 
 export async function GET(request: Request) {
   // auth: see lib/auth/cron-secret.ts
@@ -91,19 +101,30 @@ export async function GET(request: Request) {
     ? new Date(wmRow.finished_at as string)
     : new Date(Date.now() - 25 * 60 * 60 * 1000)
 
-  // Load known senders for confidence scoring (all non-ignored senders)
+  // Load ALL known senders (including 'ignore') — classifiers need trust_level + sender_type
   const { data: knownSenderRows } = await db
     .from('gmail_known_senders')
-    .select('email_address')
-    .neq('trust_level', 'ignore')
+    .select('email_address, trust_level, sender_type')
 
-  const knownSendersSet = new Set<string>(
-    (knownSenderRows ?? []).map((r: { email_address: string }) => r.email_address)
-  )
+  const knownSendersMap = new Map<string, KnownSender>()
+  const knownSendersSet = new Set<string>()
+  for (const row of (knownSenderRows ?? []) as {
+    email_address: string
+    trust_level: KnownSender['trust_level']
+    sender_type: string
+  }[]) {
+    knownSendersMap.set(row.email_address.toLowerCase(), {
+      trust_level: row.trust_level,
+      sender_type: row.sender_type,
+    })
+    if (row.trust_level !== 'ignore') knownSendersSet.add(row.email_address)
+  }
 
   let rawMessages: Awaited<ReturnType<typeof scanMessages>> = []
   let newMessages: typeof rawMessages = []
   let statementResults: StatementArrivalResult[] = []
+  let receiptResults: ReceiptClassificationResult[] = []
+  let invoiceResults: InvoiceClassificationResult[] = []
   let errorsCount = 0
   let errorSummary: string | null = null
 
@@ -149,14 +170,49 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, run_id: runId, error: 'scan_failed', reason: errMsg })
   }
 
-  // Steps 6–7: Classify — isolated try/catch so failure downgrades to 'partial', not 'error'.
-  // TODO(post-#40): add classifyInvoice + classifyReceipt here via Promise.allSettled
+  // Steps 6–8: Classify — each classifier isolated so one failure doesn't block the others.
+  // Statement arrivals (sync classifier — no Gmail re-fetch needed)
   try {
     statementResults = newMessages
       .map((msg) => classifyStatementArrival(msg, knownSendersSet))
       .filter((r): r is StatementArrivalResult => r !== null)
-
     await insertStatementArrivals(statementResults, db)
+  } catch (err) {
+    errorsCount += 1
+    errorSummary = (err instanceof Error ? err.message : String(err)).slice(0, 500)
+  }
+
+  // Inline receipts (async — re-fetches full message body for keyword-matched emails)
+  try {
+    const settled = await Promise.allSettled(
+      newMessages.map((msg) => classifyReceipt(msg, service, knownSendersMap))
+    )
+    receiptResults = settled
+      .filter(
+        (r): r is PromiseFulfilledResult<ReceiptClassificationResult | null> =>
+          r.status === 'fulfilled'
+      )
+      .map((r) => r.value)
+      .filter((r): r is ReceiptClassificationResult => r !== null)
+    await insertReceiptClassifications(receiptResults, db)
+  } catch (err) {
+    errorsCount += 1
+    errorSummary = (err instanceof Error ? err.message : String(err)).slice(0, 500)
+  }
+
+  // Invoices with PDF/document attachments
+  try {
+    const settled = await Promise.allSettled(
+      newMessages.map((msg) => classifyInvoice(msg, service, knownSendersMap))
+    )
+    invoiceResults = settled
+      .filter(
+        (r): r is PromiseFulfilledResult<InvoiceClassificationResult | null> =>
+          r.status === 'fulfilled'
+      )
+      .map((r) => r.value)
+      .filter((r): r is InvoiceClassificationResult => r !== null)
+    await insertInvoiceClassifications(invoiceResults, db)
   } catch (err) {
     errorsCount += 1
     errorSummary = (err instanceof Error ? err.message : String(err)).slice(0, 500)
@@ -166,10 +222,12 @@ export async function GET(request: Request) {
   const scanned = rawMessages.length
   const newMessageCount = newMessages.length
   const dedupHits = scanned - newMessageCount
-  const classified = statementResults.length
+  const statementsCount = statementResults.length
+  const receiptsCount = receiptResults.length
+  const invoicesCount = invoiceResults.length
   const finalStatus = errorsCount > 0 ? 'partial' : 'ok'
 
-  // Step 8: Close the audit row with final counts
+  // Step 9: Close the audit row with final counts
   await db
     .from('gmail_daily_scan_runs')
     .update({
@@ -177,28 +235,30 @@ export async function GET(request: Request) {
       status: finalStatus,
       messages_fetched: scanned,
       messages_new: newMessageCount,
-      statements_classified: classified,
-      invoices_classified: 0, // deferred: blocked on PR #40
-      receipts_classified: 0, // deferred: blocked on PR #40
+      statements_classified: statementsCount,
+      invoices_classified: invoicesCount,
+      receipts_classified: receiptsCount,
       errors_count: errorsCount,
       error_summary: errorSummary,
     })
     .eq('id', runId)
 
-  // Step 9: Log agent_events — F18 measurement
+  // Step 10: Log agent_events — F18 measurement
   await db.from('agent_events').insert({
     domain: 'gmail',
     action: 'gmail.scan',
     actor: 'cron',
     status: finalStatus === 'ok' ? 'success' : 'warning',
     task_type: 'gmail_scan',
-    output_summary: `gmail.scan: scanned=${scanned} new=${newMessageCount} dedup=${dedupHits} classified=${classified}`,
+    output_summary: `gmail.scan: scanned=${scanned} new=${newMessageCount} dedup=${dedupHits} statements=${statementsCount} receipts=${receiptsCount} invoices=${invoicesCount}`,
     meta: {
       run_id: runId,
       scanned,
       new_messages: newMessageCount,
       dedup_hits: dedupHits,
-      statement_arrivals_classified: classified,
+      statement_arrivals_classified: statementsCount,
+      receipts_classified: receiptsCount,
+      invoices_classified: invoicesCount,
       duration_ms: durationMs,
     },
     tags: ['gmail', 'cron'],
@@ -209,14 +269,14 @@ export async function GET(request: Request) {
     { actor_type: 'cron', actor_id: 'gmail-scan-cron' },
     { type: 'gmail_scan', id: runId },
     'scan_completed',
-    { scanned, classified }
+    { scanned, statements: statementsCount, receipts: receiptsCount, invoices: invoicesCount }
   )
 
   void recordAttribution(
     { actor_type: 'cron', actor_id: 'gmail-scan-cron' },
     { type: 'gmail_statement_arrival', id: 'batch' },
     'classified',
-    { count: classified }
+    { count: statementsCount }
   )
 
   return NextResponse.json({
@@ -224,7 +284,9 @@ export async function GET(request: Request) {
     run_id: runId,
     scanned,
     new_messages: newMessageCount,
-    classified,
+    statements: statementsCount,
+    receipts: receiptsCount,
+    invoices: invoicesCount,
     duration_ms: durationMs,
     status: finalStatus,
   })
