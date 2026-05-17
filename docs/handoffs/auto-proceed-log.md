@@ -50,6 +50,25 @@ outcome: escalated (canonical-write-rule)
 
 ---
 
+2026-05-17T14:25:00Z sprint=backlog task=a327d5c1 doc=docs/backlog/tier-b/B5-acceptance.md
+cited_principles: [META-C, Principle-15-new-terrain, Principle-17-no-speculative-infra, F24]
+trigger_match_evidence: |
+  Situation: greenfield Square webhook handler. HMAC-SHA256 body+URL signature verification
+  (new in this codebase) + INSERT into local_sales (existing table). Route pattern exists
+  (n8n-webhook, twilio/webhook, telegram/webhook). crypto.timingSafeEqual already used in n8n.
+  HMAC-SHA256 body verification is a natural extension, not used before in LepiOS.
+  Twin unreachable (coordinator sandbox host allowlist) — cannot satisfy Path C condition 1.
+reversibility_check: |
+  Route file (app/api/webhooks/square/route.ts): reversible — delete file. No downstream deps.
+  Migration 0235: CREATE TABLE IF NOT EXISTS (safe re-apply) + CREATE POLICY IF NOT EXISTS (safe).
+  All decisions reversible-free or reversible-with-delete. No destructive ops. No seam files.
+confidence: medium — HMAC URL+body concatenation not previously used in this codebase; 
+  standard pattern per Square docs but not exercised in LepiOS. Twin unreachable so cannot
+  confirm via Path C. Medium confidence → escalate per coordinator.md rule.
+outcome: escalated (medium confidence; twin unreachable)
+
+---
+
 2026-04-19T12:30:00-06:00 sprint=4 chunk=null doc=docs/sprint-4/plan.md
 cited_principles: [CHUNK-ORDERING, plan-ratification]
 trigger_match_evidence: Plan ratification escalated per coordinator.md Phase 1 step 5. Colin reviewed plan end-to-end and returned two edits: D parallel-eligible after A (not strictly fourth), Chunk B cost-basis decision must land in Phase 2 not plan phase. Plan approved as edited.
