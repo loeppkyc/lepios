@@ -403,3 +403,33 @@ escalation_reasons:
   - external_api_unverifiable (HN Algolia blocked in coordinator sandbox)
   - twin_unreachable
   - confidence_below_high
+
+---
+
+2026-05-17T14:30:00Z sprint=backlog-tier-c chunk=C2 doc=docs/backlog/tier-c/C2-acceptance.md
+cited_principles: [META-C, colin-principles §1 (live-test), ARCHITECTURE.md §3 rule 3 (Colin decides)]
+trigger_match_evidence: |
+  Task: replace Dropbox file-presence logic in statement-coverage route with Supabase query on
+  gmail_statement_arrivals. No schema migration. Additive code change to existing route.
+  META-C would normally apply (cache_match_enabled=true per sprint-state.md 2026-05-01).
+  HOWEVER: 4 BLOCKER items require Colin's direct input — domain facts about bank email
+  sender addresses and per-account arrival offsets. These are not in the codebase, not in
+  the Twin corpus (Twin unreachable), and not derivable from any principle.
+  Specifically: (1) sender_domains for 7 accounts unknown; (2) subject patterns to distinguish
+  same-domain accounts (Amex vs Amex Bonvoy, TD Bank vs TD Visa vs TD USD); (3) arrival offset
+  per TD account; (4) confirmation of gmail_account_name strings.
+  Without these, builder cannot write a correct classifier or route mapping.
+reversibility_check: |
+  route.ts change: reversible — revert file, Dropbox logic restored. No schema.
+  statement-arrivals.ts change: reversible — revert file, placeholder data restored.
+  No migrations. No destructive ops. No seam files.
+  All decisions LOW cost to reverse.
+confidence: low — 4 open domain-specific questions; cannot satisfy META-C condition (b)
+  (domain facts = new information, not cached pattern). Twin unreachable (host allowlist).
+outcome: escalated
+escalation_reasons:
+  - blocker_Q1: sender_domains for 7 accounts (domain facts, not derivable from codebase)
+  - blocker_Q2: subject patterns for same-domain account disambiguation
+  - blocker_Q3: per-account arrival offset confirmation for TD accounts
+  - blocker_Q4: gmail_account_name string confirmation
+  - twin_unreachable: cannot use Path C (all questions domain-specific, not answerable from code)

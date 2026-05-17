@@ -413,3 +413,24 @@ d5_ceiling_metric_layer:
   escalation_reason: "Twin unreachable (coordinator sandbox host allowlist). CEILING_HEURISTICS text appears verbatim in daily digest — own-uncertainty escalation signal triggered."
   opened_at: "2026-05-16T17:00:00Z"
   last_updated_at: "2026-05-16T17:35:00Z"
+
+# ============================================================
+# C2 — Statement Coverage Grid v2 (task 05e8c359, 2026-05-17)
+# ============================================================
+
+tier_c_C2:
+  task_id: "05e8c359-1f69-431d-b2f5-caa4f7e8bbaa"
+  run_id: "49afa387-af3f-454f-8d4e-619aaa3333fd"
+  item_id: "C2"
+  status: "awaiting-colin-approval"
+  description: "Statement Coverage Grid v2 — replace Dropbox file-presence with gmail_statement_arrivals"
+  acceptance_doc: "docs/backlog/tier-c/C2-acceptance.md"
+  acceptance_doc_ready_at: "2026-05-17T14:30:00Z"
+  branch: "harness/task-05e8c359-1f69-431d-b2f5-caa4f7e8bbaa"
+  blocker: "Colin must answer 4 domain questions before builder starts (sender_domains for 7 accounts, subject patterns for same-domain accounts, per-account arrival offset for TD, account_name strings to use)"
+  escalation_reason: "Domain facts (bank email sender addresses) not in codebase or Twin corpus. Twin unreachable. 4 open questions require Colin input."
+  accounts_excluded: ["capital_one"]
+  accounts_covered: ["td_bank", "amex", "cibc", "ct_card", "amex_bonvoy", "td_visa", "td_usd"]
+  gmail_statement_arrivals_current_data: "10 rows with placeholder names (AMEX, RBC Visa, TD Chequing), all confidence=medium — will be replaced by correct classifier"
+  opened_at: "2026-05-17T14:25:00Z"
+  last_updated_at: "2026-05-17T14:30:00Z"
