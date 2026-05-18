@@ -29,6 +29,7 @@ export async function saveSnapshot(input: SnapshotInput): Promise<void> {
   const domain = input.domain ?? 6
   const source = input.source ?? 'keepa'
 
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   const rows = Object.entries(input.prices)
     .filter(([, v]) => v != null && v > 0)
     .map(([price_type, value]) => ({
@@ -37,14 +38,15 @@ export async function saveSnapshot(input: SnapshotInput): Promise<void> {
       price_type,
       value,
       source,
+      snapped_date: today,
     }))
 
   if (rows.length === 0) return
 
-  // ON CONFLICT DO NOTHING via ignoreDuplicates — unique index on (asin, domain, price_type, snapped_at::date)
+  // ON CONFLICT DO NOTHING — unique index on (asin, domain, price_type, snapped_date)
   await supabase
     .from('price_snapshots')
-    .upsert(rows, { onConflict: 'asin,domain,price_type', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'asin,domain,price_type,snapped_date', ignoreDuplicates: true })
 }
 
 /** Compute rolling stats for an ASIN from stored snapshots. */
