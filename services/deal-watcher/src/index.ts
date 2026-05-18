@@ -57,6 +57,27 @@ async function checkTarget(target: WatchTarget): Promise<void> {
       await sendAlert(message)
       console.log(`[deal-watcher] ALERT sent for ${target.name}: ${eventType}`)
     }
+
+    // Log every status transition for lego-ca targets to lego_restock_events
+    if (target.type === 'lego-ca' && newStatus !== target.last_status) {
+      const setNumberMatch = target.url?.match(/-(\d+)$/)
+      const setNumber = setNumberMatch ? setNumberMatch[1] : null
+      if (setNumber) {
+        const { error: restockErr } = await supabase.from('lego_restock_events').insert({
+          set_number: setNumber,
+          url: target.url,
+          status_from: target.last_status ?? null,
+          status_to: newStatus,
+          source: 'watcher',
+          occurred_at: new Date().toISOString(),
+        })
+        if (restockErr) {
+          console.error(
+            `[deal-watcher] lego_restock_events insert failed for ${target.name}: ${restockErr.message}`
+          )
+        }
+      }
+    }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     console.error(`[deal-watcher] Error checking ${target.name}: ${errMsg}`)

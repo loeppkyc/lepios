@@ -551,7 +551,13 @@
       "filename": "0241_watch_targets_interval_sec.sql",
       "claimed_at": "2026-05-17",
       "note": "Deal Watcher v2 — add check_interval_sec (nullable, overrides check_interval_min) + expand type CHECK to include shopify."
+    },
+    "0244": {
+      "branch": "feat/restock-tracker",
+      "filename": "0244_lego_restock_events.sql",
+      "claimed_at": "2026-05-17",
+      "note": "Drop-bot intelligence — lego_restock_events log. deal-watcher adapter writes stock transitions; restock-patterns API computes avg gap + predicted next window. Applied to prod via Supabase MCP."
     }
   },
-  "next_available": 242
+  "next_available": 245
 }
