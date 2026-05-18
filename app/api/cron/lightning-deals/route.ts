@@ -43,7 +43,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   // ── 1. Fetch lightning deals from Keepa ────────────────────────────────────
-  const { deals, tokensLeft } = await getLightningDeals(6, 20, 100)
+  const { deals, tokensLeft } = await getLightningDeals(6, 25, 100)
 
   if (tokensLeft != null && tokensLeft < 100) {
     console.warn(`[lightning-deals] Keepa tokens low: ${tokensLeft} remaining`)
@@ -110,8 +110,27 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const pending = pendingRows ?? []
 
+  // Read brand allowlist from harness_config — empty value = no filter
+  const { data: brandRow } = await db
+    .from('harness_config')
+    .select('value')
+    .eq('key', 'LIGHTNING_BRAND_ALLOWLIST')
+    .maybeSingle()
+
+  const brandAllowlist: string[] = brandRow?.value
+    ? (brandRow.value as string).split(',').map((b) => b.trim().toLowerCase()).filter(Boolean)
+    : []
+
+  const filtered =
+    brandAllowlist.length > 0
+      ? pending.filter((row) => {
+          const t = ((row.title as string | null) ?? '').toLowerCase()
+          return brandAllowlist.some((b) => t.includes(b))
+        })
+      : pending
+
   // ── 4. Fire Telegram alerts + mark alerted ─────────────────────────────────
-  for (const row of pending) {
+  for (const row of filtered) {
     const dealPriceStr = row.deal_price != null ? `$${(row.deal_price as number).toFixed(2)}` : 'N/A'
     const origPriceStr = row.orig_price != null ? `$${(row.orig_price as number).toFixed(2)}` : 'N/A'
     const discountStr = row.discount_pct != null ? `${(row.discount_pct as number).toFixed(0)}%` : ''
@@ -174,8 +193,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     actor: 'cron_lightning_deals',
     status: 'success',
     duration_ms: Date.now() - started,
-    output_summary: `scanned=${scanned} alerted=${alerted}`,
-    meta: { scanned, alerted, tokensLeft },
+    output_summary: `scanned=${scanned} alerted=${alerted} brand_filtered=${pending.length - filtered.length}`,
+    meta: { scanned, alerted, brand_filtered: pending.length - filtered.length, tokensLeft },
   })
 
   return NextResponse.json({ ok: true, scanned, alerted })
