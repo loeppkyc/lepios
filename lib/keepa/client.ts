@@ -1,4 +1,5 @@
 import { keepaBreaker } from '@/lib/circuit-breaker'
+import { saveSnapshot } from '@/lib/price-intel/snapshots'
 
 const KEEPA_BASE = 'https://api.keepa.com'
 
@@ -24,6 +25,12 @@ export interface KeepaRawProduct {
 interface KeepaResponse {
   products?: KeepaRawProduct[]
   tokensLeft?: number
+}
+
+// Keepa price units: integer hundredths of the currency (2999 = $29.99). -1 = unavailable.
+function keepaPriceToCAD(units: number | undefined | null): number | null {
+  if (units == null || units < 0) return null
+  return units / 100
 }
 
 export async function keepaFetch(
@@ -61,8 +68,27 @@ export async function keepaFetch(
     return { product: null, tokensLeft: null }
   }
 
+  const product = data.products?.[0] ?? null
+
+  // Fire-and-forget snapshot write — never blocks or throws on the caller
+  if (product) {
+    void saveSnapshot({
+      asin,
+      domain,
+      prices: {
+        amazon: keepaPriceToCAD(product.stats?.current?.[0]),
+        new: keepaPriceToCAD(product.stats?.current?.[1]),
+        used: keepaPriceToCAD(product.stats?.current?.[2]),
+        buybox: keepaPriceToCAD(product.stats?.current?.[18]),
+        bsr: product.stats?.current?.[3] != null && product.stats.current[3] > 0
+          ? product.stats.current[3]
+          : null,
+      },
+    }).catch((e) => console.error('[keepaFetch] snapshot write failed:', e))
+  }
+
   return {
-    product: data.products?.[0] ?? null,
+    product,
     tokensLeft: data.tokensLeft ?? null,
   }
 }

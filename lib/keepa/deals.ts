@@ -1,4 +1,5 @@
 import { keepaConfigured } from './client'
+import { saveSnapshot } from '@/lib/price-intel/snapshots'
 
 const KEEPA_BASE = 'https://api.keepa.com'
 
@@ -97,7 +98,26 @@ async function batchFetchProducts(asins: string[], domain: number): Promise<RawP
     const res = await fetch(url.toString())
     if (!res.ok) return []
     const data = (await res.json()) as KeepaApiResponse
-    return data.products ?? []
+    const products = data.products ?? []
+
+    // Fire-and-forget snapshot write for each product in the batch
+    for (const p of products) {
+      void saveSnapshot({
+        asin: p.asin,
+        domain,
+        prices: {
+          amazon: keepaPriceToCAD(p.stats?.current?.[0]),
+          new: keepaPriceToCAD(p.stats?.current?.[1]),
+          used: keepaPriceToCAD(p.stats?.current?.[2]),
+          buybox: keepaPriceToCAD(p.stats?.current?.[18]),
+          bsr: p.stats?.current?.[3] != null && p.stats.current[3] > 0
+            ? p.stats.current[3]
+            : null,
+        },
+      }).catch((e) => console.error('[batchFetchProducts] snapshot write failed:', e))
+    }
+
+    return products
   } catch {
     return []
   }
