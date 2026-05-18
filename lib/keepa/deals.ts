@@ -1,29 +1,11 @@
 import { keepaConfigured } from './client'
 import { saveSnapshot } from '@/lib/price-intel/snapshots'
+export { CA_CATEGORIES, US_CATEGORIES } from './categories'
 
 const KEEPA_BASE = 'https://api.keepa.com'
 
 function keepaKey(): string {
   return process.env.KEEPA_API_KEY ?? ''
-}
-
-// Canadian Amazon category node IDs
-export const CA_CATEGORIES: Record<string, number> = {
-  Books: 927726,
-  'Toys & Games': 963136,
-  Electronics: 667823051,
-  'Video Games': 963124,
-  'Sports & Outdoors': 3371694011,
-  'Tools & Home': 3000849011,
-  Clothing: 2422877011,
-  Baby: 2425487011,
-}
-
-export const US_CATEGORIES: Record<string, number> = {
-  Books: 283155,
-  'Toys & Games': 165793011,
-  Electronics: 172282,
-  'Video Games': 468642,
 }
 
 export interface KeepaDeal {
