@@ -101,6 +101,9 @@ export function VehiclesPage() {
             ))}
           </div>
 
+          {/* Monthly mileage log */}
+          <MileageTable />
+
           {/* All maintenance log */}
           <MaintenanceTable
             vehicles={data.vehicles}
@@ -496,6 +499,133 @@ function VehicleCard({ v, onChange }: { v: VehicleData; onChange: () => void }) 
       >
         Maintenance: {v.maintenance.length} entries · {fmt(v.total_maintenance_cost)}
       </div>
+    </div>
+  )
+}
+
+const MILEAGE_LOG = [
+  { month: 'Jan 2026', business: 1580.2, personal: 1723.0, total: 3303.2, pct: 47.8 },
+  { month: 'Feb 2026', business: 1085.1, personal: 499.9, total: 1585.0, pct: 68.5 },
+  { month: 'Mar 2026', business: 152.0, personal: 108.2, total: 260.2, pct: 58.4 },
+]
+
+function MileageTable() {
+  const fmtKm2 = (n: number) =>
+    n.toLocaleString('en-CA', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' km'
+
+  return (
+    <div
+      style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden',
+        marginBottom: 24,
+      }}
+    >
+      <div
+        style={{
+          padding: '10px 16px',
+          background: 'var(--color-surface-2)',
+          borderBottom: '1px solid var(--color-border)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'var(--color-text-disabled)',
+          }}
+        >
+          Mileage Log — 2026 YTD (Tesla Model Y)
+        </span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {['Month', 'Business km', 'Personal km', 'Total km', 'Business %'].map((h, i) => (
+              <th
+                key={h}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-disabled)',
+                  textAlign: i === 0 ? 'left' : 'right',
+                  borderBottom: '1px solid var(--color-border)',
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {MILEAGE_LOG.map((row) => (
+            <tr key={row.month} style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <td
+                style={{
+                  padding: '8px 12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.78rem',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                {row.month}
+              </td>
+              <td
+                style={{
+                  padding: '8px 12px',
+                  textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-pillar-money)',
+                }}
+              >
+                {fmtKm2(row.business)}
+              </td>
+              <td
+                style={{
+                  padding: '8px 12px',
+                  textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                {fmtKm2(row.personal)}
+              </td>
+              <td
+                style={{
+                  padding: '8px 12px',
+                  textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                {fmtKm2(row.total)}
+              </td>
+              <td
+                style={{
+                  padding: '8px 12px',
+                  textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-small)',
+                  fontWeight: 700,
+                  color: 'var(--color-accent-gold)',
+                }}
+              >
+                {row.pct.toFixed(1)}%
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
