@@ -12,7 +12,7 @@ import {
 import { execSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 
-export const STALE_MS = 30 * 60 * 1000 // 30 minutes — heartbeat older than this = window is dead
+export const STALE_MS = 10 * 60 * 1000 // 10 minutes — heartbeat older than this = window is dead
 
 /**
  * Path to the active-windows claim directory. Always resolves to the MAIN checkout's

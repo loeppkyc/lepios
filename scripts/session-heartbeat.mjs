@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { homedir, hostname } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { heartbeat as bumpWindowClaim } from './lib/window-claim.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const STATE_DIR = join(homedir(), '.claude', 'sessions')
@@ -44,6 +45,9 @@ async function main() {
   let branch = 'unknown'
   try { branch = execSync('git branch --show-current', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch {}
   if (!branch) branch = 'detached'
+
+  // Bump local window claim heartbeat on every tool call (cheap file write, no-op if unclaimed)
+  try { bumpWindowClaim(branch) } catch { /* ignore */ }
 
   // Throttle: skip if we wrote < 60s ago
   mkdirSync(STATE_DIR, { recursive: true })
