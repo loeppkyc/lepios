@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -186,9 +185,11 @@ function HabitCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
-            <Checkbox
+            <input
+              type="checkbox"
               checked={completedToday}
-              onCheckedChange={(v) => onToggle(habit.id, !!v)}
+              onChange={(e) => onToggle(habit.id, e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-primary"
             />
             <div>
               <div className="font-medium text-sm">{habit.name}</div>
