@@ -9,11 +9,56 @@ const MAX_ALERTS_PER_RUN = 3;
 const MIN_DISCOUNT_PCT = 25;
 const DOMAIN = 6; // Amazon.ca
 
+// Fee constants (Amazon.ca 2025)
+const REFERRAL_FEE_PCT = 0.15;   // 15% — Toys & Games category
+const INBOUND_SHIP_FLAT = 2.00;  // per-unit estimate: prep + ship to FC
+
 const BRAND_ALLOWLIST = [
   'lego', 'hot wheels', 'hasbro', 'mattel', 'nintendo', 'sony',
   'funko', 'fisher-price', 'melissa & doug', 'spin master',
   'ravensburger', 'clue', 'monopoly', 'jenga', 'play-doh',
 ];
+
+// ── Amazon.ca FBA fulfillment fee lookup (2025 estimates) ─────────────────────
+// Keepa packageLength/Width/Height are in mm; packageWeight in grams.
+// Dims sorted longest→shortest for tier matching.
+function getFbaFee(mmL: number, mmW: number, mmH: number, grams: number): { tier: string; fee: number } {
+  const dims = [mmL / 10, mmW / 10, mmH / 10].filter((d) => d > 0).sort((a, b) => b - a);
+  const longest = dims[0] ?? 0;
+  const median = dims[1] ?? 0;
+  const shortest = dims[2] ?? 0;
+
+  // Small standard: ≤ 28 × 14 × 4.5 cm, ≤ 400 g
+  if (longest <= 28 && median <= 14 && shortest <= 4.5 && grams <= 400) {
+    return { tier: 'Sm Std', fee: grams <= 200 ? 3.60 : 3.90 };
+  }
+
+  // Large standard: ≤ 45 × 34 × 26 cm, ≤ 12 kg
+  if (longest <= 45 && median <= 34 && shortest <= 26 && grams <= 12_000) {
+    const tiers: [number, number][] = [
+      [500, 4.60], [1_000, 5.10], [1_500, 5.70], [2_000, 6.20],
+      [3_000, 7.20], [4_000, 8.20], [5_000, 9.20], [9_000, 10.50], [12_000, 11.50],
+    ];
+    for (const [maxG, fee] of tiers) {
+      if (grams <= maxG) return { tier: 'Lg Std', fee };
+    }
+    return { tier: 'Lg Std', fee: 11.50 };
+  }
+
+  // Small oversize: ≤ 76 × 38 × 30 cm, ≤ 14.9 kg
+  if (longest <= 76 && median <= 38 && shortest <= 30 && grams <= 14_900) {
+    const extra = Math.max(0, Math.ceil((grams - 2_000) / 100));
+    return { tier: 'Sm Oversize', fee: +(12.00 + extra * 0.40).toFixed(2) };
+  }
+
+  // Medium oversize: ≤ 165 × 97 × 46 cm, ≤ 22.7 kg
+  if (longest <= 165 && median <= 97 && shortest <= 46 && grams <= 22_700) {
+    const extra = Math.max(0, Math.ceil((grams - 2_000) / 100));
+    return { tier: 'Med Oversize', fee: +(18.00 + extra * 0.40).toFixed(2) };
+  }
+
+  return { tier: 'Lg Oversize', fee: 35.00 };
+}
 
 function validPrice(val: number | undefined): number | null {
   return val != null && val > 0 ? val : null;
@@ -96,20 +141,18 @@ Deno.serve(async (req: Request) => {
     const scanned = rawDeals.length;
 
     // ── 2. Parse and upsert deals ─────────────────────────────────────────────
-    // Note: deal endpoint avg[] is compressed (4 elements, often all -1 for CA).
-    // orig_price will be null for most CA items — resolved via product API below.
+    // orig_price stays null — filled by product API below.
     const rows = rawDeals
       .map((d) => {
         const deal = d as Record<string, unknown>;
         const current = deal.current as number[] | undefined;
-        const typeIdx = currentTypeIdx(current);
         const rawCurrent = extractCurrentPrice(current);
         const dealPrice = rawCurrent != null ? rawCurrent / 100 : null;
         return {
           asin: (deal.asin as string) ?? '',
           title: (deal.title as string) ?? null,
           deal_price: dealPrice,
-          orig_price: null as number | null, // will be filled by product API lookup
+          orig_price: null as number | null,
           discount_pct: null as number | null,
           deal_type: ((deal.lightningStart as number) > 0) ? 'lightning' : 'best',
           starts_at: toDateIso(deal.lightningStart as number),
@@ -143,20 +186,21 @@ Deno.serve(async (req: Request) => {
 
     const brandFiltered = (pending ?? [])
       .filter((row) => {
-        // Check first 30 chars only — brand names lead toy titles; avoids substring
-        // false positives like "Sony sensor" in a third-party webcam description.
+        // First 30 chars only — brand names lead toy titles; avoids Sony-webcam false positives.
         const titleStart = ((row.title as string | null) ?? '').toLowerCase().slice(0, 30);
         return BRAND_ALLOWLIST.some((b) => titleStart.includes(b));
       })
       .filter((row) => row.deal_price != null);
 
-    // ── 4. Product API lookup for brand items missing orig_price ──────────────
-    // The deal endpoint avg[] is compressed and often empty for Amazon.ca.
-    // The product endpoint (stats=365, history=0) has full 36-type avg arrays.
-    // Cost: ~0.5 tokens per ASIN (history=0 is half price).
+    // ── 4. Product API lookup: avg prices + dimensions for fee calculation ────
+    // Cost: ~0.5 tokens/ASIN (history=0 is half price).
+    // Returns: stats.avg/avg90/avg180/avg365 (36-type arrays) + package dimensions.
     const needsLookup = brandFiltered
       .filter((row) => row.orig_price == null)
       .map((row) => row.asin as string);
+
+    // feeData maps ASIN → { tier, fbaFee } computed from product dimensions
+    const feeData = new Map<string, { tier: string; fbaFee: number }>();
 
     if (needsLookup.length > 0) {
       const productUrl = [
@@ -173,18 +217,38 @@ Deno.serve(async (req: Request) => {
 
       if (productRes?.ok) {
         interface KeepaStats {
-          avg?: number[];    // 30d avg, 36 price types
-          avg90?: number[];  // 90d avg
+          avg?: number[];
+          avg90?: number[];
           avg180?: number[];
           avg365?: number[];
         }
-        interface KeepaProduct { asin?: string; stats?: KeepaStats }
+        interface KeepaProduct {
+          asin?: string;
+          stats?: KeepaStats;
+          // Dimensions in mm, weight in grams
+          packageLength?: number;
+          packageWidth?: number;
+          packageHeight?: number;
+          packageWeight?: number;
+        }
         const productJson = await productRes.json() as { products?: KeepaProduct[] };
 
         for (const product of productJson.products ?? []) {
-          if (!product.asin || !product.stats) continue;
+          if (!product.asin) continue;
+
+          // Dimensions → FBA tier (store even when avg is missing — we always show fees)
+          const mmL = product.packageLength ?? 0;
+          const mmW = product.packageWidth ?? 0;
+          const mmH = product.packageHeight ?? 0;
+          const grams = product.packageWeight ?? 0;
+          if (mmL > 0 && mmW > 0 && mmH > 0 && grams > 0) {
+            const { tier, fee: fbaFee } = getFbaFee(mmL, mmW, mmH, grams);
+            feeData.set(product.asin, { tier, fbaFee });
+          }
+
+          // Avg price from stats
+          if (!product.stats) continue;
           const s = product.stats;
-          // Try 30d → 90d → 180d → 365d avg across Amazon, Marketplace New, Buy Box
           const origHundredths =
             extractStatAvg(s.avg)
             ?? extractStatAvg(s.avg90)
@@ -200,13 +264,11 @@ Deno.serve(async (req: Request) => {
               const discountPct = origPrice > dealPrice
                 ? Math.max(0, (origPrice - dealPrice) / origPrice * 100)
                 : null;
-              // Persist the enriched prices
               await db
                 .from('keepa_lightning_deals')
                 .update({ orig_price: origPrice, discount_pct: discountPct })
                 .eq('asin', product.asin)
                 .eq('domain', DOMAIN);
-              // Update in-memory row for notification formatting below
               row.orig_price = origPrice;
               row.discount_pct = discountPct;
             }
@@ -215,7 +277,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Re-sort after enrichment (discount_pct may now be populated)
+    // Re-sort after enrichment
     brandFiltered.sort((a, b) =>
       ((b.discount_pct as number | null) ?? 0) - ((a.discount_pct as number | null) ?? 0)
     );
@@ -227,18 +289,28 @@ Deno.serve(async (req: Request) => {
     for (const row of toAlert) {
       const dealPrice = row.deal_price as number;
       const origPrice = row.orig_price as number | null;
-      const buyStr = `$${dealPrice.toFixed(2)}`;
       const title = (row.title as string | null) ?? (row.asin as string);
 
       let profitLine: string;
-      if (origPrice != null && origPrice > dealPrice) {
-        const gross = origPrice - dealPrice;
-        const roi = (gross / dealPrice) * 100;
-        profitLine = `Buy ${buyStr} → Avg $${origPrice.toFixed(2)} | Gross $${gross.toFixed(2)} (+${roi.toFixed(0)}% ROI est.)`;
-      } else if (origPrice != null) {
-        profitLine = `Buy ${buyStr} → Avg $${origPrice.toFixed(2)}`;
+      let feeLine: string | null = null;
+
+      if (origPrice != null) {
+        const referral = origPrice * REFERRAL_FEE_PCT;
+        const fee = feeData.get(row.asin as string);
+        const fbaFee = fee?.fbaFee ?? 4.50; // flat estimate when dimensions unavailable
+        const fbaLabel = fee?.tier ?? '~Std';
+        const totalFees = referral + fbaFee + INBOUND_SHIP_FLAT;
+        const net = origPrice - dealPrice - totalFees;
+        const netRoi = (net / dealPrice) * 100;
+
+        if (origPrice > dealPrice) {
+          profitLine = `Buy $${dealPrice.toFixed(2)} → Sell ~$${origPrice.toFixed(2)} | Net ~$${net.toFixed(2)} (${netRoi >= 0 ? '+' : ''}${netRoi.toFixed(0)}% ROI)`;
+          feeLine = `Fees: $${referral.toFixed(2)} ref + $${fbaFee.toFixed(2)} FBA (${fbaLabel}) + $${INBOUND_SHIP_FLAT.toFixed(2)} ship`;
+        } else {
+          profitLine = `Buy $${dealPrice.toFixed(2)} → Avg $${origPrice.toFixed(2)} (deal ≥ avg)`;
+        }
       } else {
-        profitLine = `Buy ${buyStr} | No price history on Keepa`;
+        profitLine = `Buy $${dealPrice.toFixed(2)} | No price history on Keepa`;
       }
 
       const typeLabel = row.deal_type === 'lightning' ? 'Lightning Deal' : 'Best Deal';
@@ -253,6 +325,7 @@ Deno.serve(async (req: Request) => {
         `${typeLabel} — Amazon.ca`,
         title,
         profitLine,
+        feeLine,
         endsStr,
         `amazon.ca/dp/${row.asin as string}`,
       ].filter((l): l is string => l != null);
