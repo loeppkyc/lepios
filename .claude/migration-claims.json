@@ -598,13 +598,13 @@
       "branch": "feat/asin-harvest",
       "filename": "0249_asin_catalog.sql",
       "claimed_at": "2026-05-18",
-      "note": "Universal ASIN catalog table — harvested from Keepa /bestsellers. Category, domain, rank, first/last seen. Feeds deal alerts. Applied to prod via Supabase MCP."
+      "note": "Universal ASIN catalog table — harvested from Keepa /bestsellers. Category, domain, rank, first/last seen. Feeds deal alerts."
     },
     "0250": {
       "branch": "feat/asin-harvest",
       "filename": "0250_pg_cron_asin_harvest.sql",
       "claimed_at": "2026-05-18",
-      "note": "pg_cron weekly job: trigger_asin_harvest() fires /api/cron/asin-harvest once per week (Sundays 6am UTC). Applied to prod via Supabase MCP."
+      "note": "pg_cron weekly job: trigger_asin_harvest() fires /api/cron/asin-harvest once per week (Sundays 6am UTC)."
     }
   },
   "next_available": 251
