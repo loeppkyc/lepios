@@ -33,21 +33,35 @@ function keepaKey(): string {
 }
 
 /**
- * Extract a valid positive value from a Keepa field that may be either:
- * - A plain integer (hundredths of currency, or a percentage)
- * - A price-history array: [keepaTime, value, keepaTime, value, ...]
- * Returns the last positive value found, or null.
+ * Extract a valid price from a Keepa field (scalar or price-history array).
+ * Rejects ≤ 0 (Keepa uses -1 for "unavailable").
  */
-function keepaScalarOrLast(val: unknown): number | null {
+function keepaPriceOrLast(val: unknown): number | null {
   if (typeof val === 'number') return val > 0 ? val : null
   if (!Array.isArray(val) || val.length === 0) return null
-  // Price history arrays alternate [timestamp, price, timestamp, price, ...].
-  // Scan backwards — odd indices (1, 3, 5...) are the price/value slots.
   for (let i = val.length - 1; i >= 1; i -= 2) {
     const v = val[i]
     if (typeof v === 'number' && v > 0) return v
   }
   return null
+}
+
+/**
+ * Extract deltaPercent from a Keepa deal field.
+ * Keepa returns delta as a NEGATIVE number for price drops (e.g. -35 = 35% off).
+ * Returns the absolute value, or null if zero/absent.
+ */
+function keepaDeltaPct(val: unknown): number | null {
+  const raw = (() => {
+    if (typeof val === 'number') return val !== 0 ? val : null
+    if (!Array.isArray(val) || val.length === 0) return null
+    for (let i = val.length - 1; i >= 1; i -= 2) {
+      const v = val[i]
+      if (typeof v === 'number' && v !== 0) return v
+    }
+    return null
+  })()
+  return raw != null ? Math.abs(raw) : null
 }
 
 export interface LightningDeal {
@@ -102,15 +116,15 @@ export async function getLightningDeals(
   domain = 6,
   minDiscountPct = 25,
   limit = 50
-): Promise<{ deals: LightningDeal[]; tokensLeft: number | null }> {
-  if (!keepaConfigured()) return { deals: [], tokensLeft: null }
+): Promise<{ deals: LightningDeal[]; tokensLeft: number | null; rawSample: unknown }> {
+  if (!keepaConfigured()) return { deals: [], tokensLeft: null, rawSample: null }
 
   const apiKey = keepaKey()
 
   const selection: KeepaLightningSelection = {
     domainId: domain,
     deltaPercentRange: [minDiscountPct, -1], // -1 = no upper bound on discount
-    priceTypes: 0, // 0 = Amazon price
+    priceTypes: 1, // 1 = new (includes marketplace new + Amazon)
     page: 0,
     perPage: limit,
     isFilterEnabled: true,
@@ -128,11 +142,13 @@ export async function getLightningDeals(
     json = (await res.json()) as KeepaDealsResponse
   } catch (e) {
     console.error('[lightning] fetch error:', e)
-    return { deals: [], tokensLeft: null }
+    return { deals: [], tokensLeft: null, rawSample: null }
   }
 
   const tokensLeft: number | null = json.tokensLeft ?? null
   const rawDeals: KeepaRawDeal[] = json.deals?.dr ?? []
+  // rawSample: first deal object for debugging — stored in harness_config by route
+  const rawSample: unknown = rawDeals.length > 0 ? rawDeals[0] : null
 
   if (rawDeals.length > 0) {
     const d0 = rawDeals[0] as Record<string, unknown>
@@ -150,10 +166,9 @@ export async function getLightningDeals(
 
   const deals: LightningDeal[] = rawDeals
     .map((d) => {
-      // Price fields: may be scalar or price-history array — extract last valid value
-      const rawDeal = keepaScalarOrLast(d.dealPrice)
-      const rawOrig = keepaScalarOrLast(d.currentPrice)
-      const rawDiscount = keepaScalarOrLast(d.deltaPercent)
+      const rawDeal = keepaPriceOrLast(d.dealPrice)
+      const rawOrig = keepaPriceOrLast(d.currentPrice)
+      const rawDiscount = keepaDeltaPct(d.deltaPercent)
 
       // Convert Keepa time (minutes since 2011-01-01) to Date
       const toDate = (val: unknown): Date | null => {
@@ -178,5 +193,5 @@ export async function getLightningDeals(
   // Sort by discount descending
   deals.sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0))
 
-  return { deals, tokensLeft }
+  return { deals, tokensLeft, rawSample }
 }

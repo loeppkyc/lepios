@@ -43,10 +43,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   // ── 1. Fetch lightning deals from Keepa ────────────────────────────────────
-  const { deals, tokensLeft } = await getLightningDeals(6, 25, 100)
+  const { deals, tokensLeft, rawSample } = await getLightningDeals(6, 25, 100)
 
   if (tokensLeft != null && tokensLeft < 100) {
     console.warn(`[lightning-deals] Keepa tokens low: ${tokensLeft} remaining`)
+  }
+
+  // Store raw deal sample in harness_config so we can inspect actual Keepa field structure
+  if (rawSample != null) {
+    await db.from('harness_config').upsert(
+      { key: 'DEBUG_DEAL_SAMPLE', value: JSON.stringify(rawSample) },
+      { onConflict: 'key' }
+    )
   }
 
   let scanned = deals.length
