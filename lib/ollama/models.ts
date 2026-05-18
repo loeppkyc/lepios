@@ -15,7 +15,7 @@ export const OLLAMA_MODELS = {
     return process.env.OLLAMA_GENERAL_MODEL ?? 'qwen2.5:7b'
   },
   get ANALYSIS() {
-    return process.env.OLLAMA_ANALYSIS_MODEL ?? 'qwen2.5-coder:14b'
+    return process.env.OLLAMA_ANALYSIS_MODEL ?? 'phi4:14b'
   },
   get CODE() {
     return process.env.OLLAMA_CODE_MODEL ?? 'qwen2.5-coder:7b'
@@ -24,7 +24,7 @@ export const OLLAMA_MODELS = {
     return process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text'
   },
   get TWIN() {
-    return process.env.OLLAMA_TWIN_MODEL ?? 'qwen2.5-coder:14b'
+    return process.env.OLLAMA_TWIN_MODEL ?? 'phi4:14b'
   },
 } as const
 

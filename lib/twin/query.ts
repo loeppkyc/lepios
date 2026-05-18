@@ -73,7 +73,7 @@ const SYSTEM_PROMPT =
 
 export function getTwinConfig() {
   return {
-    ollamaModel: (process.env.OLLAMA_TWIN_MODEL ?? 'qwen2.5:32b').trim(),
+    ollamaModel: (process.env.OLLAMA_TWIN_MODEL ?? 'phi4:14b').trim(),
     confidenceThreshold: parseFloat((process.env.TWIN_CONFIDENCE_THRESHOLD ?? '0.80').trim()),
   }
 }

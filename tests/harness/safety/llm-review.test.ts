@@ -110,7 +110,7 @@ describe('llmReview', () => {
     const r = await llmReview({ diff: '+const x = 1' })
     expect(r.severity).toBe('pass')
     expect(r.rationale).toContain('No destructive')
-    expect(r.model).toBe('qwen2.5:32b')
+    expect(r.model).toBe('phi4:14b')
     expect(r.latency_ms).toBeGreaterThanOrEqual(0)
   })
 

@@ -3,7 +3,7 @@
  *
  * Reaches Ollama via OLLAMA_TUNNEL_URL (Cloudflare tunnel in production)
  * or http://localhost:11434 in local dev. All model names are env-configurable
- * with sensible defaults for Colin's Qwen 2.5 setup.
+ * with sensible defaults for Colin's Phi-4 14B setup (max supported: 14B params).
  *
  * Uncertainty detection is ported from Streamlit utils/local_ai.py:
  * hedging phrases → lower confidence signal → caller escalates to Claude API.
@@ -391,7 +391,7 @@ export async function generate(
     // Probe succeeded — fall through to generate
   }
 
-  // Analysis tasks use qwen2.5:32b which can take >15s to load from cold.
+  // Analysis tasks use phi4:14b which can take >15s to load from cold.
   const defaultTimeout = task === 'analysis' ? 60_000 : 15_000
   let res: Response
   try {

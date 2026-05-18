@@ -258,7 +258,7 @@ Context degradation under scope is the #1 quality risk. Model accuracy falls _ex
 - **Payments:** Stripe (not v1-critical)
 - **Hosting:** Vercel
 - **UI:** React + Tailwind + shadcn/ui as foundation only; heavily customized per Design Council
-- **Local AI:** Ollama (Qwen 2.5 32B, Phi-4 14B; flash attention; KV cache tuned for 16–24GB VRAM)
+- **Local AI:** Ollama (default: Phi-4 14B; max supported: 14B params — GPU VRAM constraint; flash attention; KV cache tuned for 16–24GB VRAM)
 - **Ingestion:** Telegram Bot API
 - **Testing:** Puppeteer end-to-end; acceptance tests per module
 - **Dev env:** Claude Code with sub-agents, `/loop`, git worktrees, CLAUDE.md, hooks
