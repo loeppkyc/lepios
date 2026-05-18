@@ -581,6 +581,12 @@
       "filename": "0246_price_snapshots.sql",
       "claimed_at": "2026-05-18",
       "note": "Price Intel Phase 1 — universal price_snapshots table. Append-only snapshots from every Keepa API call."
+    },
+    "0247": {
+      "branch": "feat/price-intel-lightning",
+      "filename": "0247_keepa_lightning_deals.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Price Intel Phase 2 — keepa_lightning_deals table for lightning deal cron storage + dedup."
     }
   },
   "next_available": 249
