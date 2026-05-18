@@ -719,7 +719,37 @@
       "filename": "0269_keepa_lightning_deals_dedup.sql",
       "claimed_at": "2026-05-18",
       "note": "keepa_lightning_deals dedup fix — deleted 299 null-discount rows, dropped idx_kld_asin_starts, created UNIQUE(asin,domain) index. Route onConflict updated to 'asin,domain'. PR #367 merged 2026-05-18."
+    },
+    "0270": {
+      "branch": "feat/external-benchmarks",
+      "filename": "0270_external_benchmarks.sql",
+      "claimed_at": "2026-05-18",
+      "note": "External Benchmarking Layer — external_benchmarks table for competitive parity scores vs named external systems. See docs/acceptance/external-benchmarks.md."
+    },
+    "0271": {
+      "branch": "feat/hybrid-ai-routing",
+      "filename": "0271_ai_routing_harness_config.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Hybrid Stack Routing Rule — seeds ai.routing.* keys in harness_config (no new table; harness_config grants already in 0165). See docs/acceptance/hybrid-ai-routing.md."
+    },
+    "0272": {
+      "branch": "feat/competitive-intel",
+      "filename": "0272_competitive_intel.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Competitive Intelligence Engine — competitive_intel table + COMPETITIVE_INTEL_RELEVANCE_THRESHOLD + COMPETITIVE_INTEL_ENABLED harness_config seeds. See docs/acceptance/competitive-intel.md."
+    },
+    "0273": {
+      "branch": "feat/competitive-intel",
+      "filename": "0273_pg_cron_competitive_intel.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Competitive Intelligence Engine — pg_cron daily job at 9 AM UTC (via net.http_post) calling /api/cron/competitive-intel. Same branch as 0272."
+    },
+    "0274": {
+      "branch": "feat/synthesis-engine",
+      "filename": "0274_synthesis_debates.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Synthesis Engine — synthesis_debates table with synthesis_source + synthesis_status_enum types. See docs/acceptance/synthesis-engine.md."
     }
   },
-  "next_available": 270
+  "next_available": 275
 }
