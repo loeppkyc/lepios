@@ -57,7 +57,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     )
   }
 
-  let scanned = deals.length
+  const scanned = deals.length
   let alerted = 0
 
   if (scanned === 0) {
