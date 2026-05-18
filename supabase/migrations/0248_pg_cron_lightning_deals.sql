@@ -1,0 +1,69 @@
+-- 0248_pg_cron_lightning_deals.sql
+--
+-- pg_cron job: call /api/cron/lightning-deals every 4 hours.
+-- CRON_SECRET read at call-time from harness_config (same pattern as 0168).
+-- No extra cost — uses Supabase's built-in pg_cron + pg_net extensions.
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+GRANT USAGE ON SCHEMA cron TO postgres;
+GRANT USAGE ON SCHEMA net  TO postgres;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Function: trigger_lightning_deals_scan()
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.trigger_lightning_deals_scan()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_secret text;
+BEGIN
+  SELECT value INTO v_secret FROM harness_config WHERE key = 'CRON_SECRET';
+  IF v_secret IS NULL OR v_secret = '' THEN
+    RAISE WARNING 'trigger_lightning_deals_scan: CRON_SECRET missing from harness_config — skipping';
+    RETURN;
+  END IF;
+
+  PERFORM net.http_post(
+    url     := 'https://lepios-one.vercel.app/api/cron/lightning-deals',
+    headers := jsonb_build_object(
+                 'Authorization', 'Bearer ' || v_secret,
+                 'Content-Type',  'application/json'
+               ),
+    body    := '{}'::jsonb
+  );
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Schedule: every 4 hours (idempotent)
+-- ─────────────────────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'lightning_deals_4h') THEN
+    PERFORM cron.unschedule('lightning_deals_4h');
+  END IF;
+END;
+$$;
+
+SELECT cron.schedule(
+  'lightning_deals_4h',
+  '0 */4 * * *',
+  'SELECT public.trigger_lightning_deals_scan()'
+);
+
+-- Verify
+DO $$
+DECLARE v_count int;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM cron.job WHERE jobname = 'lightning_deals_4h';
+  IF v_count = 0 THEN
+    RAISE EXCEPTION 'lightning_deals_4h cron job not found after schedule';
+  END IF;
+  RAISE NOTICE 'lightning_deals_4h scheduled OK (every 4 hours)';
+END;
+$$;

@@ -587,6 +587,12 @@
       "filename": "0247_keepa_lightning_deals.sql",
       "claimed_at": "2026-05-18",
       "note": "Price Intel Phase 2 — keepa_lightning_deals table for lightning deal cron storage + dedup."
+    },
+    "0248": {
+      "branch": "main",
+      "filename": "0248_pg_cron_lightning_deals.sql",
+      "claimed_at": "2026-05-18",
+      "note": "pg_cron job: trigger_lightning_deals_scan() fires /api/cron/lightning-deals every 4 hours. Applied to prod via Supabase MCP. Cron job ID: 6."
     }
   },
   "next_available": 249
