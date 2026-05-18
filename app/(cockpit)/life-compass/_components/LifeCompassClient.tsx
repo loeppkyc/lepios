@@ -2,9 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronDown, Save } from 'lucide-react'
 import {
   ChartContainer,
@@ -58,44 +56,44 @@ function AreaCard({
     'text-red-500'
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="border border-border">
-        <CardHeader className="pb-2">
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-3">
-                <span className={`text-xl font-bold ${scoreColor}`}>{score}</span>
-                <span className="font-medium text-sm">{area.label}</span>
-              </div>
-              <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </div>
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CardContent className="pb-2">
-          <Slider
-            value={[score]}
-            min={0}
-            max={10}
-            step={1}
-            onValueChange={([v]) => onChange(area.key, v)}
-            className="w-full"
-          />
-          <CollapsibleContent>
-            <div className="mt-3 space-y-2">
-              <textarea
-                className="w-full text-sm bg-muted rounded p-2 border border-border resize-none h-20 focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Notes..."
-                value={localNotes}
-                onChange={(e) => setLocalNotes(e.target.value)}
-              />
-              <Button size="sm" onClick={() => onSave(area.key, score, localNotes)}>
-                <Save className="w-3.5 h-3.5 mr-1" /> Save
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </CardContent>
-      </Card>
-    </Collapsible>
+    <Card className="border border-border">
+      <CardHeader className="pb-2">
+        <div
+          className="flex items-center justify-between cursor-pointer"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <div className="flex items-center gap-3">
+            <span className={`text-xl font-bold ${scoreColor}`}>{score}</span>
+            <span className="font-medium text-sm">{area.label}</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </div>
+      </CardHeader>
+      <CardContent className="pb-2">
+        <input
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={score}
+          onChange={(e) => onChange(area.key, Number(e.target.value))}
+          className="w-full accent-primary"
+        />
+        {open && (
+          <div className="mt-3 space-y-2">
+            <textarea
+              className="w-full text-sm bg-muted rounded p-2 border border-border resize-none h-20 focus:outline-none focus:ring-1 focus:ring-ring"
+              placeholder="Notes..."
+              value={localNotes}
+              onChange={(e) => setLocalNotes(e.target.value)}
+            />
+            <Button size="sm" onClick={() => onSave(area.key, score, localNotes)}>
+              <Save className="w-3.5 h-3.5 mr-1" /> Save
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
