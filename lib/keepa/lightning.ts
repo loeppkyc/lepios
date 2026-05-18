@@ -137,7 +137,7 @@ export async function getLightningDeals(
     const res = await fetch(url, { next: { revalidate: 0 } })
     if (!res.ok) {
       console.error(`[lightning] Keepa deal endpoint ${res.status}`)
-      return { deals: [], tokensLeft: null }
+      return { deals: [], tokensLeft: null, rawSample: null }
     }
     json = (await res.json()) as KeepaDealsResponse
   } catch (e) {
