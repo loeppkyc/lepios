@@ -6,6 +6,9 @@
  * Keepa deal endpoint: GET https://api.keepa.com/deal?key=<KEY>&selection=<JSON>
  * Cost: ~50 tokens per call (flat, not per-ASIN).
  *
+ * Selection shape: { domainId, deltaPercentRange: [min, -1], priceTypes: 0, page, perPage, isFilterEnabled }
+ * Response shape: { deals: { dr: KeepaRawDeal[] }, tokensLeft: number }
+ *
  * Price units in Keepa: integer values in hundredths of the currency unit.
  *   -1 = no offer / unavailable.
  *   2999 = $29.99
@@ -36,12 +39,11 @@ export interface LightningDeal {
 
 interface KeepaLightningSelection {
   domainId: number
-  deltaPercent: number
-  isLightningDeal: boolean
-  dateRange: number
-  priceTypes: number[]
+  deltaPercentRange: [number, number] // [minPct, -1] — -1 means no upper bound
+  priceTypes: number
   page: number
   perPage: number
+  isFilterEnabled: boolean
 }
 
 interface KeepaRawDeal {
@@ -56,7 +58,7 @@ interface KeepaRawDeal {
 }
 
 interface KeepaDealsResponse {
-  deals?: KeepaRawDeal[]
+  deals?: { dr?: KeepaRawDeal[] } | null
   tokensLeft?: number
 }
 
@@ -72,7 +74,7 @@ interface KeepaDealsResponse {
 export async function getLightningDeals(
   domain = 6,
   minDiscountPct = 20,
-  limit = 50,
+  limit = 50
 ): Promise<{ deals: LightningDeal[]; tokensLeft: number | null }> {
   if (!keepaConfigured()) return { deals: [], tokensLeft: null }
 
@@ -80,12 +82,11 @@ export async function getLightningDeals(
 
   const selection: KeepaLightningSelection = {
     domainId: domain,
-    deltaPercent: minDiscountPct,
-    isLightningDeal: false, // false = all price-drop deals; true = Amazon Lightning Deals only (rare on .ca)
-    dateRange: 1,           // last 24h
-    priceTypes: [0, 1, 7],  // Amazon, Marketplace New, New (3rd party)
+    deltaPercentRange: [minDiscountPct, -1], // -1 = no upper bound on discount
+    priceTypes: 0, // 0 = Amazon price
     page: 0,
     perPage: limit,
+    isFilterEnabled: true,
   }
 
   const url = `${KEEPA_BASE}/deal?key=${apiKey}&selection=${encodeURIComponent(JSON.stringify(selection))}`
@@ -104,7 +105,7 @@ export async function getLightningDeals(
   }
 
   const tokensLeft: number | null = json.tokensLeft ?? null
-  const rawDeals: KeepaRawDeal[] = json.deals ?? []
+  const rawDeals: KeepaRawDeal[] = json.deals?.dr ?? []
 
   const deals: LightningDeal[] = rawDeals
     .map((d) => ({
