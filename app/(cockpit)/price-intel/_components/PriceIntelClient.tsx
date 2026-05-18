@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { CA_CATEGORIES } from '@/lib/keepa/deals'
+import { CA_CATEGORIES } from '@/lib/keepa/categories'
 
 // Types inlined here (not imported from server lib) to avoid client-bundle Turbopack traversal (F11)
 interface FoundProduct {
