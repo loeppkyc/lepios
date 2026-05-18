@@ -49,12 +49,13 @@ interface KeepaLightningSelection {
 interface KeepaRawDeal {
   asin?: string
   title?: string
-  dealPrice?: number
-  currentPrice?: number
-  deltaPercent?: number
+  // Keepa deal fields can be scalar ints or price-history arrays — treat as unknown
+  dealPrice?: unknown
+  currentPrice?: unknown
+  deltaPercent?: unknown
   isLightningDeal?: boolean
-  lightningStart?: number
-  lightningEnd?: number
+  lightningStart?: unknown
+  lightningEnd?: unknown
 }
 
 interface KeepaDealsResponse {
@@ -111,14 +112,16 @@ export async function getLightningDeals(
     .map((d) => ({
       asin: d.asin ?? '',
       title: d.title ?? null,
-      // Keepa price units: integer hundredths → divide by 100
-      dealPrice: d.dealPrice != null && d.dealPrice > 0 ? d.dealPrice / 100 : null,
-      origPrice: d.currentPrice != null && d.currentPrice > 0 ? d.currentPrice / 100 : null,
-      discountPct: d.deltaPercent ?? null,
+      // Keepa price units: integer hundredths → divide by 100.
+      // Guard: some Keepa deal fields are price-history arrays — only use if scalar > 0.
+      dealPrice: typeof d.dealPrice === 'number' && d.dealPrice > 0 ? d.dealPrice / 100 : null,
+      origPrice:
+        typeof d.currentPrice === 'number' && d.currentPrice > 0 ? d.currentPrice / 100 : null,
+      discountPct: typeof d.deltaPercent === 'number' ? d.deltaPercent : null,
       dealType: d.isLightningDeal ? ('lightning' as const) : ('best' as const),
       // Keepa timestamps: minutes since Unix epoch → multiply by 60 000 for ms
-      startsAt: d.lightningStart ? new Date(d.lightningStart * 60_000) : null,
-      endsAt: d.lightningEnd ? new Date(d.lightningEnd * 60_000) : null,
+      startsAt: typeof d.lightningStart === 'number' ? new Date(d.lightningStart * 60_000) : null,
+      endsAt: typeof d.lightningEnd === 'number' ? new Date(d.lightningEnd * 60_000) : null,
     }))
     .filter((d) => d.asin.length > 0)
 
