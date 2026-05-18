@@ -8,7 +8,7 @@
  * Returns up to 10,000 ASINs (first page of the bestseller list).
  *
  * Response shape:
- *   { categories: { "<catId>": { bestSellersList: string[] } }, tokensLeft: number }
+ *   { bestSellersList: { asinList: string[], lastUpdate: number }, tokensLeft: number }
  */
 
 import { keepaConfigured } from './client'
@@ -40,12 +40,8 @@ export const HARVEST_CATEGORIES: BestsellerCategory[] = [
   { id: 2242989011, name: 'Sports', slug: 'sports' },
 ]
 
-interface KeepaCategory {
-  bestSellersList?: string[]
-}
-
 interface KeepabestsellersResponse {
-  categories?: Record<string, KeepaCategory>
+  bestSellersList?: { asinList?: string[]; lastUpdate?: number }
   tokensLeft?: number
 }
 
@@ -92,14 +88,7 @@ export async function getBestsellerAsins(
     return { asins: [], tokensLeft: null }
   }
 
-  // Log response shape to diagnose category ID / key mismatches
-  const catKeys = Object.keys(json.categories ?? {})
-  console.log(
-    `[bestsellers] cat=${categoryId} domain=${domain} tokensLeft=${json.tokensLeft} catKeys=${catKeys.join(',')} rawPreview=${JSON.stringify(json).slice(0, 300)}`
-  )
-
-  const catKey = String(categoryId)
-  const asins = json.categories?.[catKey]?.bestSellersList ?? []
+  const asins = json.bestSellersList?.asinList ?? []
 
   return {
     asins,
