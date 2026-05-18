@@ -171,6 +171,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'GPU Day', href: '/gpu-day' },
       { label: 'GitHackers', href: '/git-hackers' },
       { label: 'Free Events', href: '/events' },
+      { label: 'Synthesis', href: '/synthesis' },
     ],
   },
   {
