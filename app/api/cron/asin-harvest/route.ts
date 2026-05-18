@@ -56,6 +56,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       tokensLeft = remaining
     }
 
+    if (tokensLeft != null && tokensLeft < 200) {
+      console.warn(`[asin-harvest] Keepa tokens low: ${tokensLeft} remaining — stopping early`)
+      break
+    }
+
     if (asins.length === 0) {
       console.warn(
         `[asin-harvest] No ASINs returned for category ${category.slug} (${category.id})`
@@ -110,10 +115,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     // we track total rows as "processed" and log the category size.
     totalUpdated = 0 // will be approximated in summary
 
-    if (tokensLeft != null && tokensLeft < 200) {
-      console.warn(`[asin-harvest] Keepa tokens low: ${tokensLeft} remaining — stopping early`)
-      break
-    }
   }
 
   // ── 3. Get accurate new/updated counts via a post-upsert count query ────────

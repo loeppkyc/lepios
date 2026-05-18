@@ -92,6 +92,12 @@ export async function getBestsellerAsins(
     return { asins: [], tokensLeft: null }
   }
 
+  // Log response shape to diagnose category ID / key mismatches
+  const catKeys = Object.keys(json.categories ?? {})
+  console.log(
+    `[bestsellers] cat=${categoryId} domain=${domain} tokensLeft=${json.tokensLeft} catKeys=${catKeys.join(',')} rawPreview=${JSON.stringify(json).slice(0, 300)}`
+  )
+
   const catKey = String(categoryId)
   const asins = json.categories?.[catKey]?.bestSellersList ?? []
 
