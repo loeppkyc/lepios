@@ -65,6 +65,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Flyer Intel', href: '/flyer-intel' },
       { label: 'Deal Tracker', href: '/deal-tracker' },
       { label: 'Deal Watch', href: '/deal-watch' },
+      { label: 'RA Scout', href: '/ra-scout' },
       { label: 'Cashback HQ', href: null },
       { label: 'Coupon Lady', href: null },
     ],
