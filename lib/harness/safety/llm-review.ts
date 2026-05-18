@@ -110,7 +110,7 @@ function buildReviewPrompt(input: LlmReviewInput): string {
 }
 
 export async function llmReview(input: LlmReviewInput): Promise<LlmReviewResult> {
-  const model = (process.env.OLLAMA_TWIN_MODEL ?? 'qwen2.5:32b').trim()
+  const model = (process.env.OLLAMA_TWIN_MODEL ?? 'phi4:14b').trim()
   const start = Date.now()
   const prompt = buildReviewPrompt(input)
 

@@ -52,7 +52,7 @@ scoped — next scope session when harness clears the queue.
 - **Payments:** Stripe (not v1-critical)
 - **Hosting:** Vercel
 - **UI:** React + Tailwind v4 + shadcn/ui — heavily customized per Design Council; no generic SaaS look
-- **Local AI:** Ollama (Qwen 2.5 32B, Phi-4 14B)
+- **Local AI:** Ollama (default: Phi-4 14B; max supported: 14B params — GPU VRAM constraint)
 - **Ingestion:** Telegram Bot API
 - **Testing:** Puppeteer E2E, acceptance tests per module
 
