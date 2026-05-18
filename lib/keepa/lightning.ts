@@ -119,9 +119,16 @@ export async function getLightningDeals(
         typeof d.currentPrice === 'number' && d.currentPrice > 0 ? d.currentPrice / 100 : null,
       discountPct: typeof d.deltaPercent === 'number' ? d.deltaPercent : null,
       dealType: d.isLightningDeal ? ('lightning' as const) : ('best' as const),
-      // Keepa timestamps: minutes since Unix epoch → multiply by 60 000 for ms
-      startsAt: typeof d.lightningStart === 'number' ? new Date(d.lightningStart * 60_000) : null,
-      endsAt: typeof d.lightningEnd === 'number' ? new Date(d.lightningEnd * 60_000) : null,
+      // Keepa timestamps: minutes since Unix epoch → multiply by 60 000 for ms.
+      // lightningStart/End = 0 means "no value" in Keepa — guard against epoch date.
+      startsAt:
+        typeof d.lightningStart === 'number' && d.lightningStart > 0
+          ? new Date(d.lightningStart * 60_000)
+          : null,
+      endsAt:
+        typeof d.lightningEnd === 'number' && d.lightningEnd > 0
+          ? new Date(d.lightningEnd * 60_000)
+          : null,
     }))
     .filter((d) => d.asin.length > 0)
 
