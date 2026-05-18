@@ -315,7 +315,8 @@ Deno.serve(async (req: Request) => {
         profitLine = `Buy $${dealPrice.toFixed(2)} | No price history on Keepa`;
       }
 
-      const typeLabel = row.deal_type === 'lightning' ? 'Lightning Deal' : 'Best Deal';
+      const asin = row.asin as string;
+      const typeLabel = row.deal_type === 'lightning' ? '⚡ Lightning Deal' : 'Best Deal';
       const endsStr = row.ends_at != null
         ? `Ends: ${new Date(row.ends_at as string).toLocaleString('en-CA', {
             timeZone: 'America/Edmonton', month: 'short', day: 'numeric',
@@ -323,27 +324,30 @@ Deno.serve(async (req: Request) => {
           })}`
         : null;
 
-      const rank = salesRankMap.get(row.asin as string);
+      const rank = salesRankMap.get(asin);
       const rankStr = rank != null ? `Sales Rank: #${rank.toLocaleString()}` : null;
 
-      // Chart URL includes salesrank=1 so the rank trend line appears on the graph.
-      // Sent as a text message (not sendPhoto) so Telegram link-previews the PNG
-      // inline under each message individually — avoids consecutive-photo album grouping.
-      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${row.asin as string}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
-
-      const lines = [
+      // Caption: amazon link first (tap to buy), then deal info, then Keepa deep-link.
+      // Chart sent as sendPhoto so the graph appears inline without clicking anything.
+      // Drain adds 1.5s sleep between photo sends to prevent Telegram album grouping.
+      const caption = [
+        `https://amazon.ca/dp/${asin}`,
+        '',
         `${typeLabel} — Amazon.ca`,
         title,
+        `ASIN: ${asin}`,
         rankStr,
         profitLine,
         endsStr,
-        `amazon.ca/dp/${row.asin as string}`,
-        chartUrl,
-      ].filter((l): l is string => l != null);
+        '',
+        `https://keepa.com/#!product/6/${asin}`,
+      ].filter((l): l is string => l != null).join('\n');
+
+      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
 
       await db.from('outbound_notifications').insert({
         channel: 'telegram',
-        payload: { text: lines.join('\n') },
+        payload: { photo: chartUrl, caption },
       });
       await db.from('keepa_lightning_deals').update({ alerted: true }).eq('id', row.id);
       alerted++;

@@ -219,6 +219,11 @@ async function drain(request: Request): Promise<NextResponse> {
       result = { ok: smsResult.ok, messageId: smsResult.sid, error: smsResult.error }
     } else if (row.channel === 'telegram') {
       result = await sendTelegram(token, chatId, row.payload)
+      // Prevent Telegram from grouping consecutive photos into an album:
+      // photos sent within ~1s get merged. A 1.5s pause breaks the window.
+      if (result.ok && typeof row.payload.photo === 'string') {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
     } else {
       // Unknown channel
       await db
