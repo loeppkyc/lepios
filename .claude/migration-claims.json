@@ -593,7 +593,19 @@
       "filename": "0248_pg_cron_lightning_deals.sql",
       "claimed_at": "2026-05-18",
       "note": "pg_cron job: trigger_lightning_deals_scan() fires /api/cron/lightning-deals every 4 hours. Applied to prod via Supabase MCP. Cron job ID: 6."
+    },
+    "0249": {
+      "branch": "feat/asin-harvest",
+      "filename": "0249_asin_catalog.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Universal ASIN catalog table — harvested from Keepa /bestsellers. Category, domain, rank, first/last seen. Feeds deal alerts. Applied to prod via Supabase MCP."
+    },
+    "0250": {
+      "branch": "feat/asin-harvest",
+      "filename": "0250_pg_cron_asin_harvest.sql",
+      "claimed_at": "2026-05-18",
+      "note": "pg_cron weekly job: trigger_asin_harvest() fires /api/cron/asin-harvest once per week (Sundays 6am UTC). Applied to prod via Supabase MCP."
     }
   },
-  "next_available": 249
+  "next_available": 251
 }
