@@ -134,6 +134,20 @@ export async function getLightningDeals(
   const tokensLeft: number | null = json.tokensLeft ?? null
   const rawDeals: KeepaRawDeal[] = json.deals?.dr ?? []
 
+  if (rawDeals.length > 0) {
+    const d0 = rawDeals[0] as Record<string, unknown>
+    console.log('[keepa-deal-debug]', JSON.stringify({
+      keys: Object.keys(d0),
+      type: d0['type'],
+      dealPrice: d0['dealPrice'],
+      currentPrice: d0['currentPrice'],
+      deltaPercent: d0['deltaPercent'],
+      lightningStart: d0['lightningStart'],
+      lightningEnd: d0['lightningEnd'],
+      asin: d0['asin'],
+    }))
+  }
+
   const deals: LightningDeal[] = rawDeals
     .map((d) => {
       // Price fields: may be scalar or price-history array — extract last valid value
