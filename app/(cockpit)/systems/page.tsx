@@ -5,6 +5,7 @@ import { SystemsShell } from './_components/SystemsShell'
 import type { SystemsMetricsResponse } from '@/app/api/systems/metrics/route'
 import type { Idea } from '@/app/api/systems/ideas/route'
 import type { ExternalBenchmark } from '@/app/api/benchmarks/route'
+import type { CompetitiveIntelItem } from './_components/CompetitiveIntelWidget'
 
 export const revalidate = 0
 
@@ -14,7 +15,7 @@ export default async function SystemsPage() {
 
   const supabase = gate.supabase
 
-  const [configResult, tasksResult, ramResult, ideasResult, benchmarksResult] = await Promise.all([
+  const [configResult, tasksResult, ramResult, ideasResult, benchmarksResult, intelResult] = await Promise.all([
     supabase
       .from('harness_config')
       .select('key, value')
@@ -37,6 +38,12 @@ export default async function SystemsPage() {
       .select('id, benchmark_name, vs_system, parity_score, notes, measured_at')
       .order('measured_at', { ascending: false })
       .limit(100),
+    supabase
+      .from('competitive_intel')
+      .select('id, source, url, title, relevance_score, scraped_at')
+      .eq('flagged', true)
+      .order('scraped_at', { ascending: false })
+      .limit(20),
   ])
 
   const config = Object.fromEntries(
@@ -89,6 +96,7 @@ export default async function SystemsPage() {
       initialMetrics={initialMetrics}
       initialIdeas={(ideasResult.data ?? []) as Idea[]}
       initialBenchmarks={initialBenchmarks}
+      initialIntelItems={(intelResult.data ?? []) as CompetitiveIntelItem[]}
     />
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { GaugePressure } from './GaugePressure'
 import { BrainDumpFeed } from './BrainDumpFeed'
 import { BenchmarkTable } from './BenchmarkTable'
+import { CompetitiveIntelWidget, type CompetitiveIntelItem } from './CompetitiveIntelWidget'
 import type { SystemsMetricsResponse } from '@/app/api/systems/metrics/route'
 import type { Idea } from '@/app/api/systems/ideas/route'
 import type { ExternalBenchmark } from '@/app/api/benchmarks/route'
@@ -23,12 +24,14 @@ interface SystemsShellProps {
   initialMetrics: SystemsMetricsResponse
   initialIdeas: Idea[]
   initialBenchmarks: ExternalBenchmark[]
+  initialIntelItems: CompetitiveIntelItem[]
 }
 
 export function SystemsShell({
   initialMetrics,
   initialIdeas,
   initialBenchmarks,
+  initialIntelItems,
 }: SystemsShellProps) {
   const [metrics, setMetrics] = useState<SystemsMetricsResponse>(initialMetrics)
   const [pulsing, setPulsing] = useState(false)
@@ -106,6 +109,12 @@ export function SystemsShell({
       <section>
         <h2 className="label-caps mb-4">External Benchmarks</h2>
         <BenchmarkTable initialBenchmarks={initialBenchmarks} />
+      </section>
+
+      {/* Competitive Intel */}
+      <div className="border-border border-t" />
+      <section>
+        <CompetitiveIntelWidget initialIntelItems={initialIntelItems} />
       </section>
     </div>
   )
