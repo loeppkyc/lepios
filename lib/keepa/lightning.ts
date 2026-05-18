@@ -81,9 +81,9 @@ export async function getLightningDeals(
   const selection: KeepaLightningSelection = {
     domainId: domain,
     deltaPercent: minDiscountPct,
-    isLightningDeal: true,
-    dateRange: 0,          // today
-    priceTypes: [0, 1, 7], // Amazon, Marketplace New, New (3rd party)
+    isLightningDeal: false, // false = all price-drop deals; true = Amazon Lightning Deals only (rare on .ca)
+    dateRange: 1,           // last 24h
+    priceTypes: [0, 1, 7],  // Amazon, Marketplace New, New (3rd party)
     page: 0,
     perPage: limit,
   }
