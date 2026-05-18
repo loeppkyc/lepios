@@ -59,12 +59,13 @@ Deno.serve(async (req: Request) => {
     if (!secretRow || bearer !== secretRow.value.trim()) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
+    const cronSecret = secretRow.value.trim();
 
-    // Read API keys from harness_config
+    // Read runtime config from harness_config
     const { data: configRows } = await db
       .from('harness_config')
       .select('key, value')
-      .in('key', ['KEEPA_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']);
+      .in('key', ['KEEPA_API_KEY', 'LEPIOS_BASE_URL']);
 
     const cfg: Record<string, string> = {};
     for (const row of configRows ?? []) cfg[row.key] = row.value;
@@ -72,8 +73,8 @@ Deno.serve(async (req: Request) => {
     if (!cfg['KEEPA_API_KEY']) {
       return new Response(JSON.stringify({ error: 'KEEPA_API_KEY missing from harness_config' }), { status: 503 });
     }
-    if (!cfg['TELEGRAM_BOT_TOKEN']) {
-      return new Response(JSON.stringify({ error: 'TELEGRAM_BOT_TOKEN missing from harness_config' }), { status: 503 });
+    if (!cfg['LEPIOS_BASE_URL']) {
+      return new Response(JSON.stringify({ error: 'LEPIOS_BASE_URL missing from harness_config' }), { status: 503 });
     }
 
     // Fetch deals from Keepa
@@ -185,17 +186,26 @@ Deno.serve(async (req: Request) => {
         `https://www.amazon.ca/dp/${row.asin as string}`,
       ].join('\n');
 
-      await fetch(
-        `https://api.telegram.org/bot${cfg['TELEGRAM_BOT_TOKEN']}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: cfg['TELEGRAM_CHAT_ID'], text }),
-        },
-      );
+      // Route through outbound_notifications → notifications-drain (uses Vercel-side TELEGRAM_BOT_TOKEN)
+      await db.from('outbound_notifications').insert({
+        channel: 'telegram',
+        payload: { text },
+      });
 
       await db.from('keepa_lightning_deals').update({ alerted: true }).eq('id', row.id);
       alerted++;
+    }
+
+    // Flush the queue — notifications-drain uses process.env.TELEGRAM_BOT_TOKEN on Vercel
+    if (alerted > 0) {
+      await fetch(`${cfg['LEPIOS_BASE_URL']}/api/harness/notifications-drain`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cronSecret}`,
+        },
+        body: '{}',
+      }).catch((e) => console.error('[lightning-deals] drain call failed:', e));
     }
 
     await logEvent(db, { scanned, alerted, tokensLeft, started });
