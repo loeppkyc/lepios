@@ -202,7 +202,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     status: 'success',
     duration_ms: Date.now() - started,
     output_summary: `scanned=${scanned} alerted=${alerted} brand_filtered=${pending.length - filtered.length}`,
-    meta: { scanned, alerted, brand_filtered: pending.length - filtered.length, tokensLeft },
+    meta: { scanned, alerted, brand_filtered: pending.length - filtered.length, tokensLeft, rawSample },
   })
 
   return NextResponse.json({ ok: true, scanned, alerted })
