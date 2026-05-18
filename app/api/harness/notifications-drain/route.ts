@@ -101,12 +101,19 @@ async function sendTelegram(
   chatId: string,
   payload: Record<string, unknown>
 ): Promise<{ ok: boolean; messageId?: number; error?: string }> {
+  // When payload contains a `photo` URL, use sendPhoto (caption instead of text).
+  const isPhoto = typeof payload.photo === 'string' && payload.photo.length > 0
+  const url = `https://api.telegram.org/bot${token}/${isPhoto ? 'sendPhoto' : 'sendMessage'}`
+  const body = isPhoto
+    ? { chat_id: chatId, photo: payload.photo, caption: payload.caption ?? '' }
+    : { chat_id: chatId, ...payload }
+
   const result = await httpRequest({
-    url: `https://api.telegram.org/bot${token}/sendMessage`,
+    url,
     method: 'POST',
     capability: 'net.outbound.telegram',
     agentId: 'notifications_drain',
-    body: { chat_id: chatId, ...payload },
+    body,
   })
 
   if (!result.ok) {

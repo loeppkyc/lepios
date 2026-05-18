@@ -292,20 +292,17 @@ Deno.serve(async (req: Request) => {
       const title = (row.title as string | null) ?? (row.asin as string);
 
       let profitLine: string;
-      let feeLine: string | null = null;
 
       if (origPrice != null) {
         const referral = origPrice * REFERRAL_FEE_PCT;
         const fee = feeData.get(row.asin as string);
-        const fbaFee = fee?.fbaFee ?? 4.50; // flat estimate when dimensions unavailable
-        const fbaLabel = fee?.tier ?? '~Std';
+        const fbaFee = fee?.fbaFee ?? 4.50;
         const totalFees = referral + fbaFee + INBOUND_SHIP_FLAT;
         const net = origPrice - dealPrice - totalFees;
         const netRoi = (net / dealPrice) * 100;
 
         if (origPrice > dealPrice) {
           profitLine = `Buy $${dealPrice.toFixed(2)} → Sell ~$${origPrice.toFixed(2)} | Net ~$${net.toFixed(2)} (${netRoi >= 0 ? '+' : ''}${netRoi.toFixed(0)}% ROI)`;
-          feeLine = `Fees: $${referral.toFixed(2)} ref + $${fbaFee.toFixed(2)} FBA (${fbaLabel}) + $${INBOUND_SHIP_FLAT.toFixed(2)} ship`;
         } else {
           profitLine = `Buy $${dealPrice.toFixed(2)} → Avg $${origPrice.toFixed(2)} (deal ≥ avg)`;
         }
@@ -325,14 +322,16 @@ Deno.serve(async (req: Request) => {
         `${typeLabel} — Amazon.ca`,
         title,
         profitLine,
-        feeLine,
         endsStr,
         `amazon.ca/dp/${row.asin as string}`,
       ].filter((l): l is string => l != null);
 
+      // Keepa 90-day price history chart — same graph shown on the Keepa deals page
+      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${row.asin as string}&domain=ca&amazon=1&new=1&buybox=1&range=90&width=600&height=300`;
+
       await db.from('outbound_notifications').insert({
         channel: 'telegram',
-        payload: { text: lines.join('\n') },
+        payload: { photo: chartUrl, caption: lines.join('\n') },
       });
       await db.from('keepa_lightning_deals').update({ alerted: true }).eq('id', row.id);
       alerted++;
