@@ -59,6 +59,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Pallets', href: '/pallets' },
       { label: 'Lego Vault', href: '/lego-vault' },
       { label: 'Keepa Intel', href: '/keepa-intel' },
+      { label: 'Price Intel', href: '/price-intel' },
       { label: 'Retail HQ', href: '/retail-hq' },
       { label: 'Retail Radar', href: '/retail-radar' },
       { label: 'Retail Monitor', href: '/retail-monitor' },
