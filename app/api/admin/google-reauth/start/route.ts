@@ -22,7 +22,17 @@ const SCOPES = [
 ]
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const unauth = requireCronSecret(request)
+  // Accept token via ?token= query param so the URL can be opened directly in a browser.
+  // requireCronSecret checks the Authorization header first; fall back to ?token=.
+  const url = new URL(request.url)
+  const queryToken = url.searchParams.get('token')
+  const reqWithHeader = queryToken
+    ? new Request(request.url, {
+        ...request,
+        headers: new Headers({ ...Object.fromEntries(request.headers), Authorization: `Bearer ${queryToken}` }),
+      })
+    : request
+  const unauth = requireCronSecret(reqWithHeader)
   if (unauth) return unauth
 
   const clientId = (process.env.GOOGLE_CLIENT_ID ?? '').trim()
