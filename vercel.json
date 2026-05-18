@@ -127,6 +127,10 @@
     {
       "path": "/api/cron/rfd-scan",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/keepa-price-scan",
+      "schedule": "0 14 * * *"
     }
   ]
 }

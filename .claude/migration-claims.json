@@ -552,12 +552,30 @@
       "claimed_at": "2026-05-17",
       "note": "Deal Watcher v2 — add check_interval_sec (nullable, overrides check_interval_min) + expand type CHECK to include shopify."
     },
+    "0242": {
+      "branch": "feat/lego-price-intelligence",
+      "filename": "0242_lego_asin_catalog.sql",
+      "claimed_at": "2026-05-17",
+      "note": "LEGO price intelligence — lego_asin_catalog master table. Populated by /api/admin/lego-catalog/harvest. Applied to prod via Supabase MCP."
+    },
+    "0243": {
+      "branch": "feat/lego-price-intelligence",
+      "filename": "0243_price_alert_rules.sql",
+      "claimed_at": "2026-05-17",
+      "note": "LEGO price intelligence — price_alert_rules per set. Daily keepa-price-scan cron fires Telegram alerts on drop_pct_threshold or absolute_price_cap_cad. Applied to prod via Supabase MCP."
+    },
     "0244": {
       "branch": "feat/restock-tracker",
       "filename": "0244_lego_restock_events.sql",
       "claimed_at": "2026-05-17",
       "note": "Drop-bot intelligence — lego_restock_events log. deal-watcher adapter writes stock transitions; restock-patterns API computes avg gap + predicted next window. Applied to prod via Supabase MCP."
+    },
+    "0245": {
+      "branch": "feat/ra-scout",
+      "filename": "0245_ra_scout_scans.sql",
+      "claimed_at": "2026-05-17",
+      "note": "RA Scout — ra_scout_scans log. Claude Haiku vision reads LEGO set numbers from shelf photo, computes FBA margins, stores BUY/WATCH/SKIP verdicts. Applied to prod via Supabase MCP."
     }
   },
-  "next_available": 245
+  "next_available": 246
 }
