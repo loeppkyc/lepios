@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { GaugePressure } from './GaugePressure'
 import { BrainDumpFeed } from './BrainDumpFeed'
+import { BenchmarkTable } from './BenchmarkTable'
 import type { SystemsMetricsResponse } from '@/app/api/systems/metrics/route'
 import type { Idea } from '@/app/api/systems/ideas/route'
+import type { ExternalBenchmark } from '@/app/api/benchmarks/route'
 
 const POLL_MS = 30_000
 
@@ -20,9 +22,14 @@ function LastUpdated({ iso }: { iso: string }) {
 interface SystemsShellProps {
   initialMetrics: SystemsMetricsResponse
   initialIdeas: Idea[]
+  initialBenchmarks: ExternalBenchmark[]
 }
 
-export function SystemsShell({ initialMetrics, initialIdeas }: SystemsShellProps) {
+export function SystemsShell({
+  initialMetrics,
+  initialIdeas,
+  initialBenchmarks,
+}: SystemsShellProps) {
   const [metrics, setMetrics] = useState<SystemsMetricsResponse>(initialMetrics)
   const [pulsing, setPulsing] = useState(false)
 
@@ -92,6 +99,13 @@ export function SystemsShell({ initialMetrics, initialIdeas }: SystemsShellProps
       {/* Brain dump feed */}
       <section>
         <BrainDumpFeed initialIdeas={initialIdeas} />
+      </section>
+
+      {/* External Benchmarks */}
+      <div className="border-border border-t" />
+      <section>
+        <h2 className="label-caps mb-4">External Benchmarks</h2>
+        <BenchmarkTable initialBenchmarks={initialBenchmarks} />
       </section>
     </div>
   )

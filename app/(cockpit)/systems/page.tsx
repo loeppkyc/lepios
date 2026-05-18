@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SystemsShell } from './_components/SystemsShell'
 import type { SystemsMetricsResponse } from '@/app/api/systems/metrics/route'
 import type { Idea } from '@/app/api/systems/ideas/route'
+import type { ExternalBenchmark } from '@/app/api/benchmarks/route'
 
 export const revalidate = 0
 
@@ -13,7 +14,7 @@ export default async function SystemsPage() {
 
   const supabase = gate.supabase
 
-  const [configResult, tasksResult, ramResult, ideasResult] = await Promise.all([
+  const [configResult, tasksResult, ramResult, ideasResult, benchmarksResult] = await Promise.all([
     supabase
       .from('harness_config')
       .select('key, value')
@@ -31,6 +32,11 @@ export default async function SystemsPage() {
       .from('ideas')
       .select('id, title, description, status, source, created_at, updated_at')
       .order('created_at', { ascending: false }),
+    supabase
+      .from('external_benchmarks')
+      .select('id, benchmark_name, vs_system, parity_score, notes, measured_at')
+      .order('measured_at', { ascending: false })
+      .limit(100),
   ])
 
   const config = Object.fromEntries(
@@ -69,10 +75,20 @@ export default async function SystemsPage() {
     fetchedAt: new Date().toISOString(),
   }
 
+  const initialBenchmarks = (benchmarksResult.data ?? []).map((row) => ({
+    id: row.id as string,
+    benchmark_name: row.benchmark_name as string,
+    vs_system: row.vs_system as string,
+    parity_score: Number(row.parity_score),
+    notes: (row.notes as string | null) ?? null,
+    measured_at: row.measured_at as string,
+  })) satisfies ExternalBenchmark[]
+
   return (
     <SystemsShell
       initialMetrics={initialMetrics}
       initialIdeas={(ideasResult.data ?? []) as Idea[]}
+      initialBenchmarks={initialBenchmarks}
     />
   )
 }
