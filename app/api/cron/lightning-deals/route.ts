@@ -8,7 +8,7 @@
  * Steps:
  *   1. Auth guard (requireCronSecret — F22)
  *   2. Fetch from Keepa (getLightningDeals — ~50 tokens/call)
- *   3. Upsert each deal: ON CONFLICT (asin, domain, starts_at) DO NOTHING
+ *   3. Upsert each deal: ON CONFLICT (asin, domain) DO NOTHING
  *   4. Query the rows that are new (alerted=false, not yet ended)
  *   5. Fire Telegram alerts via outbound_notifications
  *   6. Mark alerted=true on sent rows
@@ -66,7 +66,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   // ── 2. Upsert deals into keepa_lightning_deals ─────────────────────────────
-  // ON CONFLICT (asin, domain, starts_at) DO NOTHING — pure dedup
+  // ON CONFLICT (asin, domain) DO NOTHING — pure dedup
   const rows = deals.map((d) => ({
     asin: d.asin,
     domain: 6,
@@ -85,7 +85,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const { error: upsertErr } = await db
     .from('keepa_lightning_deals')
     .upsert(rows, {
-      onConflict: 'asin,domain,starts_at',
+      onConflict: 'asin,domain',
       ignoreDuplicates: true,
     })
 
