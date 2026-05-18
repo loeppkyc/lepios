@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { saveSnapshot } from '@/lib/price-intel/snapshots'
 
 export class KeepaNetworkError extends Error {
   constructor(message: string) {
@@ -138,6 +139,17 @@ export async function getBsrHistory(asin: string): Promise<BsrHistoryResult> {
       { asin, points, tokens_left: tokensLeft, fetched_at: fetchedAt },
       { onConflict: 'asin' }
     )
+
+  // Write BSR snapshots for every point in the live response — fire-and-forget
+  if (points.length > 0) {
+    // Use the most recent BSR point as today's snapshot
+    const latestBsr = points[points.length - 1]?.rank
+    void saveSnapshot({
+      asin,
+      domain: 6,
+      prices: { bsr: latestBsr ?? null },
+    }).catch((e) => console.error('[getBsrHistory] BSR snapshot write failed:', e))
+  }
 
   return { asin, points, fetchedAt, fromCache: false, tokensLeft }
 }
