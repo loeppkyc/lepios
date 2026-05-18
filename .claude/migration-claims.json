@@ -605,7 +605,115 @@
       "filename": "0250_pg_cron_asin_harvest.sql",
       "claimed_at": "2026-05-18",
       "note": "pg_cron weekly job: trigger_asin_harvest() fires /api/cron/asin-harvest once per week (Sundays 6am UTC)."
+    },
+    "0251": {
+      "branch": "feat/greyed-out-batch-1",
+      "filename": "0251_insurance_policies.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Insurance policies — provider, type, premium, renewal date, coverage amount."
+    },
+    "0252": {
+      "branch": "feat/greyed-out-batch-1",
+      "filename": "0252_retirement_accounts.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Retirement accounts — RRSP/TFSA/LIRA/RESP/Pension, balance, contributions."
+    },
+    "0253": {
+      "branch": "feat/greyed-out-batch-1",
+      "filename": "0253_utility_bills.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Utility bills — electricity/gas/water/internet/cable tracker."
+    },
+    "0254": {
+      "branch": "feat/greyed-out-batch-1",
+      "filename": "0254_phone_plans.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Phone plans — carrier, plan, monthly cost, renewal date."
+    },
+    "0255": {
+      "branch": "feat/greyed-out-batch-1",
+      "filename": "0255_cashback_accounts.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Cashback accounts — card, portal, rate, pending/earned balances."
+    },
+    "0256": {
+      "branch": "feat/greyed-out-batch-2",
+      "filename": "0256_habits.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Habits + habit_entries — daily/weekly/monthly tracking with completions."
+    },
+    "0257": {
+      "branch": "feat/greyed-out-batch-2",
+      "filename": "0257_life_compass.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Life compass — vision/current/target state per life area."
+    },
+    "0258": {
+      "branch": "feat/greyed-out-batch-2",
+      "filename": "0258_printer_projects.sql",
+      "claimed_at": "2026-05-18",
+      "note": "3D printer projects — name, status, material, filament used, print time."
+    },
+    "0259": {
+      "branch": "feat/greyed-out-batch-2",
+      "filename": "0259_archive_items.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Personal archive items — title, category, description, file_url, tags."
+    },
+    "0260": {
+      "branch": "feat/greyed-out-batch-2",
+      "filename": "0260_calendar_notes.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Calendar notes — date-anchored notes and reminders."
+    },
+    "0261": {
+      "branch": "feat/greyed-out-batch-3",
+      "filename": "0261_business_milestones.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Business milestones — dated timeline of business history events."
+    },
+    "0262": {
+      "branch": "feat/greyed-out-batch-3",
+      "filename": "0262_coupons.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Coupons — store, code, discount, expiry, category, used flag."
+    },
+    "0263": {
+      "branch": "feat/greyed-out-batch-3",
+      "filename": "0263_ebay_listings.sql",
+      "claimed_at": "2026-05-18",
+      "note": "eBay listings — title, price, quantity, status, sold tracking, fees."
+    },
+    "0264": {
+      "branch": "feat/greyed-out-batch-3",
+      "filename": "0264_tax_return_docs.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Tax return documents — year, doc type, amount, upload tracking."
+    },
+    "0265": {
+      "branch": "feat/greyed-out-batch-3",
+      "filename": "0265_crypto_holdings.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Crypto holdings — symbol, quantity, avg cost, wallet/exchange."
+    },
+    "0266": {
+      "branch": "feat/greyed-out-batch-4",
+      "filename": "0266_automations.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Automations — trigger/action config, run history, active flag."
+    },
+    "0267": {
+      "branch": "feat/greyed-out-batch-4",
+      "filename": "0267_legal_items.sql",
+      "claimed_at": "2026-05-18",
+      "note": "Legal items — contracts, compliance, IP, status, due dates."
+    },
+    "0268": {
+      "branch": "feat/greyed-out-batch-4",
+      "filename": "0268_ai_coach_sessions.sql",
+      "claimed_at": "2026-05-18",
+      "note": "AI coach sessions — conversation history, goals, insights."
     }
   },
-  "next_available": 251
+  "next_available": 269
 }
