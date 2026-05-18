@@ -108,6 +108,11 @@ export async function getLightningDeals(
   const tokensLeft: number | null = json.tokensLeft ?? null
   const rawDeals: KeepaRawDeal[] = json.deals?.dr ?? []
 
+  // Temporary field-name diagnostic — remove after one confirmed scan
+  if (rawDeals.length > 0) {
+    console.error('[lightning-raw-sample]', JSON.stringify(rawDeals[0]))
+  }
+
   const deals: LightningDeal[] = rawDeals
     .map((d) => ({
       asin: d.asin ?? '',
