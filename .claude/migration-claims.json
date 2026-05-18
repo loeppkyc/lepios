@@ -749,6 +749,12 @@
       "filename": "0274_synthesis_debates.sql",
       "claimed_at": "2026-05-18",
       "note": "Synthesis Engine — synthesis_debates table with synthesis_source + synthesis_status_enum types. See docs/acceptance/synthesis-engine.md."
+    },
+    "0275": {
+      "branch": "feat/synthesis-engine",
+      "filename": "0275_pg_cron_synthesis.sql",
+      "claimed_at": "2026-05-18",
+      "note": "pg_cron schedule for synthesis run — Vercel cron slots exhausted (33/18 limit)"
     }
   },
   "next_available": 275
