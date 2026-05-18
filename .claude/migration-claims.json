@@ -755,7 +755,13 @@
       "filename": "0275_pg_cron_synthesis.sql",
       "claimed_at": "2026-05-18",
       "note": "pg_cron schedule for synthesis run — Vercel cron slots exhausted (33/18 limit)"
+    },
+    "0276": {
+      "branch": "feat/lightning-edge-fn",
+      "filename": "0276_pg_cron_lightning_deals_edge.sql",
+      "claimed_at": "2026-05-18",
+      "note": "pg_cron job: lightning-deals-edge fires Supabase Edge Function /functions/v1/lightning-deals every 4 hours. Replaces Vercel cron — no build-rate-limit dependency. Applied to prod via Supabase MCP before commit."
     }
   },
-  "next_available": 275
+  "next_available": 277
 }
