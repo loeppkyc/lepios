@@ -713,7 +713,13 @@
       "filename": "0268_ai_coach_sessions.sql",
       "claimed_at": "2026-05-18",
       "note": "AI coach sessions — conversation history, goals, insights."
+    },
+    "0269": {
+      "branch": "main",
+      "filename": "0269_keepa_lightning_deals_dedup.sql",
+      "claimed_at": "2026-05-18",
+      "note": "keepa_lightning_deals dedup fix — deleted 299 null-discount rows, dropped idx_kld_asin_starts, created UNIQUE(asin,domain) index. Route onConflict updated to 'asin,domain'. PR #367 merged 2026-05-18."
     }
   },
-  "next_available": 269
+  "next_available": 270
 }
