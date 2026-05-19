@@ -180,6 +180,7 @@ Deno.serve(async (req: Request) => {
 
     const feeData = new Map<string, { tier: string; fbaFee: number }>();
     const avg90Map = new Map<string, number>();
+    const imageMap = new Map<string, string>();
 
     if (needsLookup.length > 0) {
       const productUrl = [
@@ -208,11 +209,18 @@ Deno.serve(async (req: Request) => {
           packageWidth?: number;
           packageHeight?: number;
           packageWeight?: number;
+          imagesCSV?: string;
         }
         const productJson = await productRes.json() as { products?: KeepaProduct[] };
 
         for (const product of productJson.products ?? []) {
           if (!product.asin) continue;
+
+          // First image from imagesCSV → Amazon CDN URL
+          const firstImg = product.imagesCSV?.split(',')[0]?.trim();
+          if (firstImg) {
+            imageMap.set(product.asin, `https://images-na.ssl-images-amazon.com/images/I/${firstImg}`);
+          }
 
           // FBA fee tier from package dims
           const mmL = product.packageLength ?? 0;
@@ -294,6 +302,8 @@ Deno.serve(async (req: Request) => {
           })}`
         : null;
 
+      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
+
       const caption = [
         `${typeLabel} — Amazon.ca`,
         title,
@@ -302,23 +312,19 @@ Deno.serve(async (req: Request) => {
         displayAvg != null ? `Avg (90d): $${displayAvg.toFixed(2)}` : null,
         net != null
           ? `Net: ~$${net.toFixed(2)} (${netRoi! >= 0 ? '+' : ''}${netRoi!.toFixed(0)}% ROI)`
-          : 'No price history — no ROI calc',
+          : null,
         endsStr,
         '',
         `https://amazon.ca/dp/${asin}`,
+        chartUrl,
       ].filter((l): l is string => l != null).join('\n');
 
-      // Message 1: text — Telegram auto-previews the Amazon listing with product image
+      const productImg = imageMap.get(asin);
       await db.from('outbound_notifications').insert({
         channel: 'telegram',
-        payload: { text: caption },
-      });
-
-      // Message 2: Keepa chart
-      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
-      await db.from('outbound_notifications').insert({
-        channel: 'telegram',
-        payload: { photo: chartUrl, caption: `Keepa 90d — ${asin}` },
+        payload: productImg
+          ? { photo: productImg, caption }
+          : { text: caption },
       });
 
       await db.from('keepa_lightning_deals').update({ alerted: true }).eq('id', row.id);
