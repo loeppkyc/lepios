@@ -135,6 +135,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Phone Plans', href: '/phone-plans' },
       { label: 'Groceries', href: '/diet' },
       { label: 'Grocery Finder', href: '/grocery-finder' },
+      { label: 'Checklists', href: '/checklists' },
     ],
   },
   {
@@ -152,6 +153,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Cora's Future", href: '/coras-future' },
       { label: 'Pet Health', href: '/pet-health' },
       { label: '3D Printer HQ', href: '/3d-printer' },
+      { label: 'Tasks', href: '/tasks' },
+      { label: 'Contacts', href: '/contacts' },
     ],
   },
   {
@@ -179,6 +182,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Account',
     items: [
       { label: 'Profile', href: '/profile' },
+      { label: 'Account Vault', href: '/vault' },
       { label: 'Notifications', href: '/notifications' },
       { label: 'Help Centre', href: '/help' },
       { label: 'Admin', href: '/admin' },
