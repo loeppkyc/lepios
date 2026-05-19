@@ -39,7 +39,19 @@ async function checkTarget(target: WatchTarget): Promise<void> {
     const link = cartUrl ?? target.url ?? ''
     const extra = target.asin ? keepaLinks(target.asin) : ''
 
-    if (target.alert_on === 'in_stock' && result.in_stock && !prevWasInStock(target.last_status, target.type)) {
+    if (target.type === 'lego-ca') {
+      // Dead man's switch: alert only on transitions, skip first-seen (last_status null)
+      if (newStatus !== target.last_status && target.last_status != null) {
+        if (target.last_status === 'E_AVAILABLE' && !result.in_stock) {
+          eventType = 'out_of_stock'
+          const note = newStatus === 'R_RETIRED' ? ' (retired — unlikely to restock)' : ' (may restock)'
+          message = `🔴 <b>${target.name}</b> went OUT OF STOCK${note}\n🛒 ${link}${extra}`
+        } else if (target.last_status !== 'E_AVAILABLE' && result.in_stock) {
+          eventType = 'in_stock'
+          message = `🟢 <b>${target.name}</b> is back IN STOCK!${priceStr}\n🛒 ${link}${extra}`
+        }
+      }
+    } else if (target.alert_on === 'in_stock' && result.in_stock && !prevWasInStock(target.last_status, target.type)) {
       eventType = 'in_stock'
       message = `🟢 <b>${target.name}</b> is back IN STOCK!${priceStr}\n🛒 ${link}${extra}`
     } else if (
@@ -89,6 +101,18 @@ async function checkTarget(target: WatchTarget): Promise<void> {
           console.error(
             `[deal-watcher] lego_restock_events insert failed for ${target.name}: ${restockErr.message}`
           )
+        }
+      }
+      // Auto-deactivate when retired + OOS — won't restock
+      if (newStatus === 'R_RETIRED' && !result.in_stock) {
+        const { error: deactivateErr } = await supabase
+          .from('watch_targets')
+          .update({ is_active: false })
+          .eq('id', target.id)
+        if (deactivateErr) {
+          console.error(`[deal-watcher] Deactivate failed for ${target.name}: ${deactivateErr.message}`)
+        } else {
+          console.log(`[deal-watcher] Auto-deactivated retired+OOS: ${target.name}`)
         }
       }
     }
