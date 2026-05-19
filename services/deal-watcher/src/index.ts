@@ -109,7 +109,8 @@ async function checkTarget(target: WatchTarget): Promise<void> {
 }
 
 async function loadTargets(): Promise<WatchTarget[]> {
-  const { data } = await supabase.from('watch_targets').select('*').eq('is_active', true)
+  const { data, error } = await supabase.from('watch_targets').select('*').eq('is_active', true)
+  if (error) console.error('[deal-watcher] loadTargets error:', error.message, error.code)
   return (data ?? []) as WatchTarget[]
 }
 
