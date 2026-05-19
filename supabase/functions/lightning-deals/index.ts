@@ -10,8 +10,8 @@ const MIN_DISCOUNT_PCT = 25;
 const DOMAIN = 6; // Amazon.ca
 
 // Fee constants (Amazon.ca 2025)
-const REFERRAL_FEE_PCT = 0.15;   // 15% — Toys & Games category
-const INBOUND_SHIP_FLAT = 2.00;  // per-unit estimate: prep + ship to FC
+const REFERRAL_FEE_PCT = 0.15;
+const INBOUND_SHIP_FLAT = 2.00;
 
 const BRAND_ALLOWLIST = [
   'lego', 'hot wheels', 'hasbro', 'mattel', 'nintendo', 'sony',
@@ -19,21 +19,15 @@ const BRAND_ALLOWLIST = [
   'ravensburger', 'clue', 'monopoly', 'jenga', 'play-doh',
 ];
 
-// ── Amazon.ca FBA fulfillment fee lookup (2025 estimates) ─────────────────────
-// Keepa packageLength/Width/Height are in mm; packageWeight in grams.
-// Dims sorted longest→shortest for tier matching.
 function getFbaFee(mmL: number, mmW: number, mmH: number, grams: number): { tier: string; fee: number } {
   const dims = [mmL / 10, mmW / 10, mmH / 10].filter((d) => d > 0).sort((a, b) => b - a);
   const longest = dims[0] ?? 0;
   const median = dims[1] ?? 0;
   const shortest = dims[2] ?? 0;
 
-  // Small standard: ≤ 28 × 14 × 4.5 cm, ≤ 400 g
   if (longest <= 28 && median <= 14 && shortest <= 4.5 && grams <= 400) {
     return { tier: 'Sm Std', fee: grams <= 200 ? 3.60 : 3.90 };
   }
-
-  // Large standard: ≤ 45 × 34 × 26 cm, ≤ 12 kg
   if (longest <= 45 && median <= 34 && shortest <= 26 && grams <= 12_000) {
     const tiers: [number, number][] = [
       [500, 4.60], [1_000, 5.10], [1_500, 5.70], [2_000, 6.20],
@@ -44,19 +38,14 @@ function getFbaFee(mmL: number, mmW: number, mmH: number, grams: number): { tier
     }
     return { tier: 'Lg Std', fee: 11.50 };
   }
-
-  // Small oversize: ≤ 76 × 38 × 30 cm, ≤ 14.9 kg
   if (longest <= 76 && median <= 38 && shortest <= 30 && grams <= 14_900) {
     const extra = Math.max(0, Math.ceil((grams - 2_000) / 100));
     return { tier: 'Sm Oversize', fee: +(12.00 + extra * 0.40).toFixed(2) };
   }
-
-  // Medium oversize: ≤ 165 × 97 × 46 cm, ≤ 22.7 kg
   if (longest <= 165 && median <= 97 && shortest <= 46 && grams <= 22_700) {
     const extra = Math.max(0, Math.ceil((grams - 2_000) / 100));
     return { tier: 'Med Oversize', fee: +(18.00 + extra * 0.40).toFixed(2) };
   }
-
   return { tier: 'Lg Oversize', fee: 35.00 };
 }
 
@@ -69,8 +58,6 @@ function extractCurrentPrice(current: number[] | undefined): number | null {
   return validPrice(current[PRICE_TYPE_AMAZON]) ?? validPrice(current[PRICE_TYPE_MARKETPLACE_NEW]) ?? null;
 }
 
-// Deal endpoint avg[] has only 4 elements (all typically -1 for CA) — not useful.
-// This function handles the PRODUCT endpoint stats avg arrays (36 types).
 function extractStatAvg(avg: number[] | undefined): number | null {
   if (!Array.isArray(avg)) return null;
   return (
@@ -79,11 +66,6 @@ function extractStatAvg(avg: number[] | undefined): number | null {
     ?? validPrice(avg[PRICE_TYPE_BUY_BOX_NEW])
     ?? null
   );
-}
-
-function currentTypeIdx(current: number[] | undefined): number {
-  if (Array.isArray(current) && validPrice(current[PRICE_TYPE_AMAZON]) != null) return PRICE_TYPE_AMAZON;
-  return PRICE_TYPE_MARKETPLACE_NEW;
 }
 
 function toDateIso(mins: number | undefined): string | null {
@@ -115,7 +97,7 @@ Deno.serve(async (req: Request) => {
     if (!cfg['KEEPA_API_KEY']) return new Response(JSON.stringify({ error: 'KEEPA_API_KEY missing' }), { status: 503 });
     if (!cfg['LEPIOS_BASE_URL']) return new Response(JSON.stringify({ error: 'LEPIOS_BASE_URL missing' }), { status: 503 });
 
-    // ── 1. Fetch deals from Keepa deal endpoint ───────────────────────────────
+    // ── 1. Fetch deals ────────────────────────────────────────────────────────
     const selection = {
       domainId: DOMAIN,
       deltaPercentRange: [-100, -MIN_DISCOUNT_PCT],
@@ -140,10 +122,7 @@ Deno.serve(async (req: Request) => {
     const now = new Date();
     const scanned = rawDeals.length;
 
-    // ── 2. Parse and upsert deals ─────────────────────────────────────────────
-    // orig_price stays null — filled by product API below.
-    // salesRankMap: ASIN → current sales rank (current[3] = Keepa price type 3 = Sales Rank)
-    const salesRankMap = new Map<string, number>();
+    // ── 2. Parse and upsert ───────────────────────────────────────────────────
     const rows = rawDeals
       .map((d) => {
         const deal = d as Record<string, unknown>;
@@ -151,8 +130,6 @@ Deno.serve(async (req: Request) => {
         const rawCurrent = extractCurrentPrice(current);
         const dealPrice = rawCurrent != null ? rawCurrent / 100 : null;
         const asin = (deal.asin as string) ?? '';
-        const rank = current?.[3];
-        if (asin && rank != null && rank > 0) salesRankMap.set(asin, rank);
         return {
           asin,
           title: (deal.title as string) ?? null,
@@ -191,21 +168,18 @@ Deno.serve(async (req: Request) => {
 
     const brandFiltered = (pending ?? [])
       .filter((row) => {
-        // First 30 chars only — brand names lead toy titles; avoids Sony-webcam false positives.
         const titleStart = ((row.title as string | null) ?? '').toLowerCase().slice(0, 30);
         return BRAND_ALLOWLIST.some((b) => titleStart.includes(b));
       })
       .filter((row) => row.deal_price != null);
 
-    // ── 4. Product API lookup: avg prices + dimensions for fee calculation ────
-    // Cost: ~0.5 tokens/ASIN (history=0 is half price).
-    // Returns: stats.avg/avg90/avg180/avg365 (36-type arrays) + package dimensions.
-    const needsLookup = brandFiltered
-      .filter((row) => row.orig_price == null)
-      .map((row) => row.asin as string);
+    // ── 4. Product API: prices + dims + images ────────────────────────────────
+    // Always fetch ALL brand-matched items so images are populated every run.
+    // Token cost: ~0.5/ASIN × ~15 items ≈ 7 tokens.
+    const needsLookup = brandFiltered.map((row) => row.asin as string);
 
-    // feeData maps ASIN → { tier, fbaFee } computed from product dimensions
     const feeData = new Map<string, { tier: string; fbaFee: number }>();
+    const avg90Map = new Map<string, number>();
 
     if (needsLookup.length > 0) {
       const productUrl = [
@@ -230,7 +204,6 @@ Deno.serve(async (req: Request) => {
         interface KeepaProduct {
           asin?: string;
           stats?: KeepaStats;
-          // Dimensions in mm, weight in grams
           packageLength?: number;
           packageWidth?: number;
           packageHeight?: number;
@@ -241,7 +214,7 @@ Deno.serve(async (req: Request) => {
         for (const product of productJson.products ?? []) {
           if (!product.asin) continue;
 
-          // Dimensions → FBA tier (store even when avg is missing — we always show fees)
+          // FBA fee tier from package dims
           const mmL = product.packageLength ?? 0;
           const mmW = product.packageWidth ?? 0;
           const mmH = product.packageHeight ?? 0;
@@ -251,9 +224,16 @@ Deno.serve(async (req: Request) => {
             feeData.set(product.asin, { tier, fbaFee });
           }
 
-          // Avg price from stats
           if (!product.stats) continue;
           const s = product.stats;
+
+          // 90d avg for display
+          const avg90Hundredths = extractStatAvg(s.avg90);
+          if (avg90Hundredths != null) {
+            avg90Map.set(product.asin, avg90Hundredths / 100);
+          }
+
+          // Best available avg for ROI calc
           const origHundredths =
             extractStatAvg(s.avg)
             ?? extractStatAvg(s.avg90)
@@ -282,40 +262,30 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Re-sort after enrichment
     brandFiltered.sort((a, b) =>
       ((b.discount_pct as number | null) ?? 0) - ((a.discount_pct as number | null) ?? 0)
     );
 
-    // ── 5. Send up to MAX_ALERTS_PER_RUN notifications ────────────────────────
+    // ── 5. Send notifications ─────────────────────────────────────────────────
     const toAlert = brandFiltered.slice(0, MAX_ALERTS_PER_RUN);
     let alerted = 0;
 
     for (const row of toAlert) {
+      const asin = row.asin as string;
       const dealPrice = row.deal_price as number;
       const origPrice = row.orig_price as number | null;
-      const title = (row.title as string | null) ?? (row.asin as string);
+      const title = (row.title as string | null) ?? asin;
 
-      let profitLine: string;
+      const fee = feeData.get(asin);
+      const fbaFee = fee?.fbaFee ?? 4.50;
+      const referral = (origPrice ?? 0) * REFERRAL_FEE_PCT;
+      const totalFees = referral + fbaFee + INBOUND_SHIP_FLAT;
+      const net = origPrice != null && origPrice > dealPrice
+        ? origPrice - dealPrice - totalFees
+        : null;
+      const netRoi = net != null ? (net / dealPrice) * 100 : null;
 
-      if (origPrice != null) {
-        const referral = origPrice * REFERRAL_FEE_PCT;
-        const fee = feeData.get(row.asin as string);
-        const fbaFee = fee?.fbaFee ?? 4.50;
-        const totalFees = referral + fbaFee + INBOUND_SHIP_FLAT;
-        const net = origPrice - dealPrice - totalFees;
-        const netRoi = (net / dealPrice) * 100;
-
-        if (origPrice > dealPrice) {
-          profitLine = `Buy $${dealPrice.toFixed(2)} → Sell ~$${origPrice.toFixed(2)} | Net ~$${net.toFixed(2)} (${netRoi >= 0 ? '+' : ''}${netRoi.toFixed(0)}% ROI)`;
-        } else {
-          profitLine = `Buy $${dealPrice.toFixed(2)} → Avg $${origPrice.toFixed(2)} (deal ≥ avg)`;
-        }
-      } else {
-        profitLine = `Buy $${dealPrice.toFixed(2)} | No price history on Keepa`;
-      }
-
-      const asin = row.asin as string;
+      const displayAvg = avg90Map.get(asin) ?? origPrice;
       const typeLabel = row.deal_type === 'lightning' ? '⚡ Lightning Deal' : 'Best Deal';
       const endsStr = row.ends_at != null
         ? `Ends: ${new Date(row.ends_at as string).toLocaleString('en-CA', {
@@ -324,31 +294,33 @@ Deno.serve(async (req: Request) => {
           })}`
         : null;
 
-      const rank = salesRankMap.get(asin);
-      const rankStr = rank != null ? `Sales Rank: #${rank.toLocaleString()}` : null;
-
-      // Caption: amazon link first (tap to buy), then deal info, then Keepa deep-link.
-      // Chart sent as sendPhoto so the graph appears inline without clicking anything.
-      // Drain adds 1.5s sleep between photo sends to prevent Telegram album grouping.
       const caption = [
-        `https://amazon.ca/dp/${asin}`,
-        '',
         `${typeLabel} — Amazon.ca`,
         title,
-        `ASIN: ${asin}`,
-        rankStr,
-        profitLine,
+        '',
+        `Buy: $${dealPrice.toFixed(2)}`,
+        displayAvg != null ? `Avg (90d): $${displayAvg.toFixed(2)}` : null,
+        net != null
+          ? `Net: ~$${net.toFixed(2)} (${netRoi! >= 0 ? '+' : ''}${netRoi!.toFixed(0)}% ROI)`
+          : 'No price history — no ROI calc',
         endsStr,
         '',
-        `https://keepa.com/#!product/6/${asin}`,
+        `https://amazon.ca/dp/${asin}`,
       ].filter((l): l is string => l != null).join('\n');
 
-      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
-
+      // Message 1: text — Telegram auto-previews the Amazon listing with product image
       await db.from('outbound_notifications').insert({
         channel: 'telegram',
-        payload: { photo: chartUrl, caption },
+        payload: { text: caption },
       });
+
+      // Message 2: Keepa chart
+      const chartUrl = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`;
+      await db.from('outbound_notifications').insert({
+        channel: 'telegram',
+        payload: { photo: chartUrl, caption: `Keepa 90d — ${asin}` },
+      });
+
       await db.from('keepa_lightning_deals').update({ alerted: true }).eq('id', row.id);
       alerted++;
     }
