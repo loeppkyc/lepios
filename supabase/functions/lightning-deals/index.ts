@@ -267,7 +267,7 @@ Deno.serve(async (req: Request) => {
     );
 
     // ── 5. Send notifications ─────────────────────────────────────────────────
-    const toAlert = brandFiltered.slice(0, MAX_ALERTS_PER_RUN);
+    const toAlert = brandFiltered.filter((row) => row.orig_price != null).slice(0, MAX_ALERTS_PER_RUN);
     let alerted = 0;
 
     for (const row of toAlert) {
