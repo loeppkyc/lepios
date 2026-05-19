@@ -11,6 +11,19 @@ function intervalMs(target: WatchTarget): number {
   return target.check_interval_min * 60 * 1000
 }
 
+// Returns true if the previously-stored raw_status means "in stock" for this target type.
+// lego-ca stores LEGO's raw availability codes; amazon-asin normalises to 'in_stock'.
+function prevWasInStock(lastStatus: string | null, type: string): boolean {
+  if (lastStatus == null) return false
+  if (type === 'lego-ca') return lastStatus === 'E_AVAILABLE'
+  return lastStatus === 'in_stock'
+}
+
+function keepaLinks(asin: string): string {
+  const chart = `https://graph.keepa.com/pricehistory.png?asin=${asin}&domain=ca&amazon=1&new=1&buybox=1&salesrank=1&range=90&width=600&height=300`
+  return `\n📦 <a href="https://amazon.ca/dp/${asin}">Amazon.ca</a>\n📈 ${chart}`
+}
+
 async function checkTarget(target: WatchTarget): Promise<void> {
   let newStatus: string
   let eventType: string | null = null
@@ -24,10 +37,11 @@ async function checkTarget(target: WatchTarget): Promise<void> {
     const cartUrl = adapter.cartUrl(target)
     const priceStr = result.price != null ? ` $${result.price.toFixed(2)}` : ''
     const link = cartUrl ?? target.url ?? ''
+    const extra = target.asin ? keepaLinks(target.asin) : ''
 
-    if (target.alert_on === 'in_stock' && result.in_stock && target.last_status !== 'in_stock') {
+    if (target.alert_on === 'in_stock' && result.in_stock && !prevWasInStock(target.last_status, target.type)) {
       eventType = 'in_stock'
-      message = `🟢 <b>${target.name}</b> is back IN STOCK!${priceStr}\n${link}`
+      message = `🟢 <b>${target.name}</b> is back IN STOCK!${priceStr}\n🛒 ${link}${extra}`
     } else if (
       target.alert_on === 'price_drop' &&
       result.price != null &&
@@ -35,10 +49,10 @@ async function checkTarget(target: WatchTarget): Promise<void> {
       result.price <= target.threshold_price
     ) {
       eventType = 'price_drop'
-      message = `💰 <b>${target.name}</b> price dropped to${priceStr} (threshold: $${target.threshold_price.toFixed(2)})\n${link}`
+      message = `💰 <b>${target.name}</b> price dropped to${priceStr} (threshold: $${target.threshold_price.toFixed(2)})\n🛒 ${link}${extra}`
     } else if (target.alert_on === 'any_change' && newStatus !== target.last_status) {
       eventType = 'status_change'
-      message = `🔔 <b>${target.name}</b> status changed: ${target.last_status ?? 'unknown'} → ${newStatus}\n${link}`
+      message = `🔔 <b>${target.name}</b> status changed: ${target.last_status ?? 'unknown'} → ${newStatus}\n🛒 ${link}${extra}`
     }
 
     await supabase
