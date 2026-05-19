@@ -35,20 +35,24 @@ export function TasksPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [newTask, setNewTask] = useState({ task: '', priority: 2, notes: '', assigned_to: '' })
   const [saving, setSaving] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const reload = useCallback(() => setRefreshKey((k) => k + 1), [])
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/tasks')
       .then((r) => r.json())
       .then((d: TasksResponse & { error?: string }) => {
+        if (cancelled) return
         if (d.error) setError(d.error)
         else setData(d)
         setLoading(false)
       })
-      .catch((e: unknown) => { setError(String(e)); setLoading(false) })
-  }, [])
-
-  useEffect(() => { load() }, [load])
+      .catch((e: unknown) => { if (!cancelled) { setError(String(e)); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [refreshKey])
 
   const visible = (data?.tasks ?? []).filter((t) => {
     if (filter === 'active') return t.status === 'pending' || t.status === 'in_progress'
@@ -67,7 +71,7 @@ export function TasksPage() {
     setSaving(false)
     setShowAdd(false)
     setNewTask({ task: '', priority: 2, notes: '', assigned_to: '' })
-    load()
+    reload()
   }
 
   async function updateStatus(task: TaskRow, status: TaskRow['status']) {
@@ -76,12 +80,12 @@ export function TasksPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: task.id, status }),
     })
-    load()
+    reload()
   }
 
   async function deleteTask(id: string) {
     await fetch(`/api/tasks?id=${id}`, { method: 'DELETE' })
-    load()
+    reload()
   }
 
   return (

@@ -37,20 +37,24 @@ export function VaultPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [newEntry, setNewEntry] = useState({ service: '', username: '', url: '', notes: '', category: 'other' })
   const [saving, setSaving] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const reload = useCallback(() => setRefreshKey((k) => k + 1), [])
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/vault')
       .then((r) => r.json())
       .then((d: VaultResponse & { error?: string }) => {
+        if (cancelled) return
         if (d.error) setError(d.error)
         else setData(d)
         setLoading(false)
       })
-      .catch((e: unknown) => { setError(String(e)); setLoading(false) })
-  }, [])
-
-  useEffect(() => { load() }, [load])
+      .catch((e: unknown) => { if (!cancelled) { setError(String(e)); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [refreshKey])
 
   const filtered = (data?.entries ?? []).filter((e) => {
     if (!search) return true
@@ -85,7 +89,7 @@ export function VaultPage() {
     setSaving(false)
     setShowAdd(false)
     setNewEntry({ service: '', username: '', url: '', notes: '', category: 'other' })
-    load()
+    reload()
   }
 
   return (

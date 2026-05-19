@@ -40,19 +40,24 @@ export function ContactsPage() {
   const [newContact, setNewContact] = useState({ name: '', company: '', type: 'personal', email: '', phone: '', address: '', notes: '', category: '' })
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(() => {
+  const [refreshKey, setRefreshKey] = useState(0)
+  const reload = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/contacts')
       .then((r) => r.json())
       .then((d: ContactsResponse & { error?: string }) => {
+        if (cancelled) return
         if (d.error) setError(d.error)
         else setData(d)
         setLoading(false)
       })
-      .catch((e: unknown) => { setError(String(e)); setLoading(false) })
-  }, [])
-
-  useEffect(() => { load() }, [load])
+      .catch((e: unknown) => { if (!cancelled) { setError(String(e)); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [refreshKey])
 
   const filtered = (data?.contacts ?? []).filter((c) => {
     if (!search) return true
@@ -91,12 +96,12 @@ export function ContactsPage() {
     setSaving(false)
     setShowAdd(false)
     setNewContact({ name: '', company: '', type: 'personal', email: '', phone: '', address: '', notes: '', category: '' })
-    load()
+    reload()
   }
 
   async function deleteContact(id: string) {
     await fetch(`/api/contacts?id=${id}`, { method: 'DELETE' })
-    load()
+    reload()
   }
 
   return (

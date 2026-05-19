@@ -36,19 +36,24 @@ export function ChecklistsPage() {
   const [newItem, setNewItem] = useState({ name: '', category: '' })
   const [toggling, setToggling] = useState<string | null>(null)
 
-  const load = useCallback(() => {
+  const [refreshKey, setRefreshKey] = useState(0)
+  const reload = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetch('/api/checklists')
       .then((r) => r.json())
       .then((d: ChecklistsResponse & { error?: string }) => {
+        if (cancelled) return
         if (d.error) setError(d.error)
         else setData(d)
         setLoading(false)
       })
-      .catch((e: unknown) => { setError(String(e)); setLoading(false) })
-  }, [])
-
-  useEffect(() => { load() }, [load])
+      .catch((e: unknown) => { if (!cancelled) { setError(String(e)); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [refreshKey])
 
   async function toggleMonthly(itemId: string) {
     setToggling(itemId)
@@ -58,7 +63,7 @@ export function ChecklistsPage() {
       body: JSON.stringify({ action: 'toggle_monthly', item_id: itemId }),
     })
     setToggling(null)
-    load()
+    reload()
   }
 
   async function markChoreDone(choreId: string) {
@@ -67,7 +72,7 @@ export function ChecklistsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'mark_chore_done', chore_id: choreId }),
     })
-    load()
+    reload()
   }
 
   async function saveChore() {
@@ -79,7 +84,7 @@ export function ChecklistsPage() {
     })
     setAddChore(false)
     setNewChore({ name: '', frequency: 'weekly', assigned_to: '', notes: '' })
-    load()
+    reload()
   }
 
   async function saveItem() {
@@ -91,7 +96,7 @@ export function ChecklistsPage() {
     })
     setAddItem(false)
     setNewItem({ name: '', category: '' })
-    load()
+    reload()
   }
 
   const monthLabel = data
